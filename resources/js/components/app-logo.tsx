@@ -21,7 +21,7 @@ export default function AppLogo() {
             </Box>
             <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
                 <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1 }}>
-                    Laravel Starter Kit
+                    PimPK
                 </Typography>
             </Box>
         </>

@@ -45,7 +45,7 @@ export default function Welcome() {
                         <Typography variant="body1" color="text.secondary">
                             Products Management Information
                         </Typography>
-                        <Stack direction="row" spacing={2}>
+                        {/* <Stack direction="row" spacing={2}>
                             <Button component="a" href="https://laravel.com/docs" target="_blank" rel="noopener noreferrer" variant="text">
                                 Documentation
                             </Button>
@@ -55,7 +55,7 @@ export default function Welcome() {
                             <Button component="a" href="https://cloud.laravel.com" target="_blank" rel="noopener noreferrer" variant="contained">
                                 Deploy now
                             </Button>
-                        </Stack>
+                        </Stack> */}
                     </Stack>
                 </Container>
             </Box>
