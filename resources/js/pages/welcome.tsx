@@ -40,7 +40,7 @@ export default function Welcome() {
                             <AppLogoIcon style={{ width: 56, height: 56, fill: 'currentColor' }} />
                         </Box>
                         <Typography variant="h3" sx={{ fontWeight: 600 }}>
-                            PIM PK
+                            PIM <span style={{ fontWeight: 800, color: '#FF5733' }}>Pumpkin</span>
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
                             Products Management Information
