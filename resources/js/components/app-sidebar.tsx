@@ -5,16 +5,28 @@ import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sideb
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import DescriptionIcon from '@mui/icons-material/Description';
 import FolderIcon from '@mui/icons-material/Folder';
+import HomeIcon from '@mui/icons-material/Home';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Box, Divider, Drawer, Toolbar } from '@mui/material';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
     {
+        title: 'Home',
+        url: '/home',
+        icon: HomeIcon,
+    },
+    {
         title: 'Dashboard',
         url: '/dashboard',
         icon: DashboardIcon,
+    },
+    {
+        title: 'New Page',
+        url: '/new-page',
+        icon: DescriptionIcon,
     },
 ];
 
