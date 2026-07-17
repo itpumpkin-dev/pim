@@ -12,7 +12,7 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
             subheader={
                 !collapsed ? (
                     <ListSubheader component="div" sx={{ lineHeight: '32px', bgcolor: 'transparent' }}>
-                        Platform
+                        {/* Platform */}
                     </ListSubheader>
                 ) : undefined
             }

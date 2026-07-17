@@ -19,7 +19,9 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
     const { auth } = usePage<SharedData>().props;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
-        name: auth.user.name,
+        username: auth.user.username,
+        first_name: auth.user.first_name,
+        last_name: auth.user.last_name,
         email: auth.user.email,
     });
 
@@ -40,17 +42,45 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                     <Box component="form" onSubmit={submit}>
                         <Stack spacing={3}>
                             <TextField
-                                id="name"
-                                label="Name"
+                                id="username"
+                                label="Username"
                                 fullWidth
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                value={data.username}
+                                onChange={(e) => setData('username', e.target.value)}
                                 required
-                                autoComplete="name"
-                                placeholder="Full name"
-                                error={Boolean(errors.name)}
-                                helperText={errors.name}
+                                autoComplete="username"
+                                placeholder="username"
+                                error={Boolean(errors.username)}
+                                helperText={errors.username}
                             />
+
+                            <Stack direction="row" spacing={2}>
+                                <TextField
+                                    id="first_name"
+                                    label="First name"
+                                    fullWidth
+                                    value={data.first_name}
+                                    onChange={(e) => setData('first_name', e.target.value)}
+                                    required
+                                    autoComplete="given-name"
+                                    placeholder="First name"
+                                    error={Boolean(errors.first_name)}
+                                    helperText={errors.first_name}
+                                />
+
+                                <TextField
+                                    id="last_name"
+                                    label="Last name"
+                                    fullWidth
+                                    value={data.last_name}
+                                    onChange={(e) => setData('last_name', e.target.value)}
+                                    required
+                                    autoComplete="family-name"
+                                    placeholder="Last name"
+                                    error={Boolean(errors.last_name)}
+                                    helperText={errors.last_name}
+                                />
+                            </Stack>
 
                             <TextField
                                 id="email"

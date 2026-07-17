@@ -13,11 +13,11 @@ export default function AppLogo() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: 1,
-                    bgcolor: 'primary.main',
+                    // bgcolor: 'primary.main',
                     color: 'primary.contrastText',
                 }}
             >
-                <AppLogoIcon style={{ width: 20, height: 20, fill: 'currentColor' }} />
+                <AppLogoIcon style={{ width: 30, height: 30, fill: 'currentColor' }} />
             </Box>
             <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
                 <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1 }}>
