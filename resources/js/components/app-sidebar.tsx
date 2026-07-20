@@ -5,8 +5,8 @@ import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sideb
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import DescriptionIcon from '@mui/icons-material/Description';
 import FolderIcon from '@mui/icons-material/Folder';
+import GroupIcon from '@mui/icons-material/Group';
 import HomeIcon from '@mui/icons-material/Home';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { Box, Divider, Drawer, Toolbar } from '@mui/material';
@@ -24,9 +24,9 @@ const mainNavItems: NavItem[] = [
         icon: DashboardIcon,
     },
     {
-        title: 'New Page',
-        url: '/new-page',
-        icon: DescriptionIcon,
+        title: 'Users',
+        url: '/users',
+        icon: GroupIcon,
     },
 ];
 

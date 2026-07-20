@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -16,9 +17,15 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
 
-    Route::get('new-page', function () {
-        return Inertia::render('new-page');
-    })->name('new-page');
+    Route::get('users', function () {
+        return Inertia::render('users/index', [
+            'users' => User::query()->orderByDesc('created_at')->get(['id', 'name', 'email', 'email_verified_at', 'created_at']),
+        ]);
+    })->name('users.index');
+
+    Route::get('products/{id}', function (int $id) {
+        return Inertia::render('products/show', ['id' => $id]);
+    })->name('products.show');
 });
 
 require __DIR__.'/settings.php';
