@@ -1,9 +1,9 @@
 import { ProductCard } from '@/components/product-card';
 import { productCsvHeaders, products, productToCsvRow, type IconType } from '@/data/products';
-import AppLayout from '@/layouts/app-layout';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { downloadCsv } from '@/lib/csv';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import BlurOnIcon from '@mui/icons-material/BlurOn';
@@ -21,15 +21,11 @@ import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturi
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
-import { alpha, Box, Button, Chip, IconButton, InputAdornment, Paper, Stack, TextField, Typography } from '@mui/material';
+import LoginIcon from '@mui/icons-material/Login';
+import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Skeleton, Stack, TextField, Toolbar, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Home',
-        href: '/home',
-    },
-];
+
 
 const slides: { title: string; subtitle: string; icon: IconType; gradient: string }[] = [
     {
@@ -193,8 +189,17 @@ function CategoryStrip({ selected, onSelect }: { selected: string | null; onSele
 }
 
 export default function Home() {
+    const { auth } = usePage<SharedData>().props;
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setLoading(false);
+        }, 800);
+        return () => clearTimeout(timer);
+    }, []);
 
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -210,81 +215,194 @@ export default function Home() {
         downloadCsv(filename, productCsvHeaders, filtered.map(productToCsvRow));
     };
 
+    const actions = !auth.user ? (
+        <Button
+            component={Link}
+            href={route('login')}
+            variant="contained"
+            startIcon={<LoginIcon />}
+            sx={{
+                borderRadius: '50px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 2,
+                py: 1,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                // boxShadow: '0 4px 14px 0 rgba(234, 88, 12, 0.39)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                    transform: 'translateY(-2px)',
+                    // boxShadow: '0 6px 20px rgba(234, 88, 12, 0.5)',
+                    background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                },
+            }}
+        >
+            Sign in
+        </Button>
+    ) : (
+        <Button
+            component={Link}
+            href={route('dashboard')}
+            variant="outlined"
+            sx={{
+                borderRadius: '50px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1,
+                borderWidth: 2,
+                color: '#ea580c',
+                borderColor: '#ea580c',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                    borderWidth: 2,
+                    borderColor: '#c2410c',
+                    bgcolor: alpha('#ea580c', 0.08),
+                    transform: 'translateY(-2px)',
+                },
+            }}
+        >
+            ไปที่ Dashboard
+        </Button>
+    );
+
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
             <Head title="Home" />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
-                <HeroCarousel />
-
-                <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                        หมวดหมู่สินค้า
-                    </Typography>
-                    <CategoryStrip
-                        selected={selectedCategory}
-                        onSelect={(label) => setSelectedCategory((current) => (current === label ? null : label))}
-                    />
-                </Box>
-
-                <Box>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
-                        <Box>
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                รายการสินค้า
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                ทั้งหมด {filtered.length} รายการ
-                                {selectedCategory && ` · หมวดหมู่ "${selectedCategory}"`}
-                            </Typography>
+            <AppBar position="sticky" color="inherit" elevation={1}>
+                <Toolbar sx={{ justifyContent: 'space-between' }}>
+                    <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
+                        <Box sx={{ color: 'primary.main', display: 'flex' }}>
+                            <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
                         </Box>
-                        <Stack direction="row" spacing={1.5}>
-                            <TextField
-                                size="small"
-                                placeholder="ค้นหาสินค้าหรือหมวดหมู่"
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                slotProps={{
-                                    input: {
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <SearchIcon fontSize="small" color="action" />
-                                            </InputAdornment>
-                                        ),
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                        </Typography>
+                    </Box>
+                    {actions}
+                </Toolbar>
+            </AppBar>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
+                {loading ? (
+                    <>
+                        {/* Carousel Skeleton */}
+                        <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 3 }} />
+
+                        <Box>
+                            <Skeleton variant="text" width={150} height={32} sx={{ mb: 1.5 }} />
+                            <Stack direction="row" spacing={1.5} sx={{ overflow: 'hidden' }}>
+                                {[...Array(6)].map((_, i) => (
+                                    <Skeleton key={i} variant="rounded" width={120} height={40} sx={{ borderRadius: 3, flexShrink: 0 }} />
+                                ))}
+                            </Stack>
+                        </Box>
+
+                        <Box>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                                <Box>
+                                    <Skeleton variant="text" width={120} height={32} />
+                                    <Skeleton variant="text" width={200} height={20} />
+                                </Box>
+                                <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', md: 'flex' } }}>
+                                    <Skeleton variant="rounded" width={200} height={40} />
+                                    <Skeleton variant="rounded" width={120} height={40} />
+                                </Stack>
+                            </Stack>
+                            
+                            <Box
+                                sx={{
+                                    display: 'grid',
+                                    gap: 2,
+                                    gridTemplateColumns: {
+                                        xs: 'repeat(2, 1fr)',
+                                        sm: 'repeat(3, 1fr)',
+                                        md: 'repeat(4, 1fr)',
                                     },
                                 }}
-                            />
-                            <Button
-                                variant="outlined"
-                                startIcon={<FileDownloadOutlinedIcon />}
-                                onClick={handleExport}
-                                disabled={filtered.length === 0}
                             >
-                                {`Export ${selectedCategory ? 'หมวดหมู่นี้' : 'ทั้งหมด'}`}
-                            </Button>
-                        </Stack>
-                    </Stack>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gap: 2,
-                            gridTemplateColumns: {
-                                xs: 'repeat(2, 1fr)',
-                                sm: 'repeat(3, 1fr)',
-                                md: 'repeat(4, 1fr)',
-                            },
-                        }}
-                    >
-                        {filtered.map((product) => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                        {filtered.length === 0 && (
-                            <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
-                                ไม่พบสินค้าที่ค้นหา
+                                {[...Array(8)].map((_, i) => (
+                                    <Skeleton key={i} variant="rectangular" height={280} sx={{ borderRadius: 3 }} />
+                                ))}
+                            </Box>
+                        </Box>
+                    </>
+                ) : (
+                    <>
+                        <HeroCarousel />
+
+                        <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+                                หมวดหมู่สินค้า
                             </Typography>
-                        )}
-                    </Box>
-                </Box>
+                            <CategoryStrip
+                                selected={selectedCategory}
+                                onSelect={(label) => setSelectedCategory((current) => (current === label ? null : label))}
+                            />
+                        </Box>
+
+                        <Box>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
+                                <Box>
+                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                        รายการสินค้า
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        ทั้งหมด {filtered.length} รายการ
+                                        {selectedCategory && ` · หมวดหมู่ "${selectedCategory}"`}
+                                    </Typography>
+                                </Box>
+                                <Stack direction="row" spacing={1.5}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="ค้นหาสินค้าหรือหมวดหมู่"
+                                        value={search}
+                                        onChange={(event) => setSearch(event.target.value)}
+                                        slotProps={{
+                                            input: {
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon fontSize="small" color="action" />
+                                                    </InputAdornment>
+                                                ),
+                                            },
+                                        }}
+                                    />
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<FileDownloadOutlinedIcon />}
+                                        onClick={handleExport}
+                                        disabled={filtered.length === 0}
+                                    >
+                                        {`Export ${selectedCategory ? 'หมวดหมู่นี้' : 'ทั้งหมด'}`}
+                                    </Button>
+                                </Stack>
+                            </Stack>
+                            <Box
+                                sx={{
+                                    display: 'grid',
+                                    gap: 2,
+                                    gridTemplateColumns: {
+                                        xs: 'repeat(2, 1fr)',
+                                        sm: 'repeat(3, 1fr)',
+                                        md: 'repeat(4, 1fr)',
+                                    },
+                                }}
+                            >
+                                {filtered.map((product) => (
+                                    <ProductCard key={product.id} product={product} />
+                                ))}
+                                {filtered.length === 0 && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
+                                        ไม่พบสินค้าที่ค้นหา
+                                    </Typography>
+                                )}
+                            </Box>
+                        </Box>
+                    </>
+                )}
             </Box>
-        </AppLayout>
+        </Box>
     );
 }

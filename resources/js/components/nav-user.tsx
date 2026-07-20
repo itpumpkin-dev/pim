@@ -10,6 +10,8 @@ import { useState } from 'react';
 export function NavUser({ collapsed = false }: { collapsed?: boolean }) {
     const { auth } = usePage<SharedData>().props;
     const { isMobile } = useSidebar();
+    
+    if (!auth.user) return null;
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
 

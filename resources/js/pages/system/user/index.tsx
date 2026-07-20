@@ -108,7 +108,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                     </Box>
                     {canCreate && (
                         <Box>
-                            <Button variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }} onClick={() => setCreateOpen(true)}>
+                            <Button variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }} onClick={() => setCreateOpen(true)}>
                                 CREATE USER
                             </Button>
                         </Box>

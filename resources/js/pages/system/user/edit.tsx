@@ -149,7 +149,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
                     variant="contained"
                     color="primary"
                     disabled={processing}
-                    sx={{ borderRadius: 8, px: 4, fontWeight: 'bold' }}
+                    sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
                 >
                     SAVE
                 </Button>

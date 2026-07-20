@@ -14,11 +14,7 @@ import { Box, Divider, Drawer, Toolbar } from '@mui/material';
 import AppLogo from './app-logo';
 
 const MAIN_NAV_ITEMS: NavItem[] = [
-    {
-        title: 'Home',
-        url: '/home',
-        icon: HomeIcon,
-    },
+
     {
         title: 'Dashboard',
         url: '/dashboard',
@@ -46,25 +42,13 @@ const MAIN_NAV_ITEMS: NavItem[] = [
             },
         ],
     },
-    {
-        title: 'Users',
-        url: '/users',
-        icon: GroupIcon,
-    },
+    // {
+    //     title: 'Users',
+    //     url: '/users',
+    //     icon: GroupIcon,
+    // },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        url: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderIcon,
-    },
-    {
-        title: 'Documentation',
-        url: 'https://laravel.com/docs/starter-kits',
-        icon: MenuBookIcon,
-    },
-];
 
 export function AppSidebar() {
     const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
@@ -101,7 +85,6 @@ export function AppSidebar() {
                 <NavMain items={filteredMainNavItems} collapsed={collapsed} />
             </Box>
             <Box sx={{ mt: 'auto' }}>
-                <NavFooter items={footerNavItems} collapsed={collapsed} />
                 <Divider />
                 <NavUser collapsed={collapsed} />
             </Box>

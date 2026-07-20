@@ -102,7 +102,7 @@ export default function CreateUserDialog({ open, onClose }: CreateUserDialogProp
                     <Button variant="contained" color="inherit" onClick={handleClose} sx={{ borderRadius: 8, px: 4 }}>
                         CANCEL
                     </Button>
-                    <Button type="submit" variant="contained" color="primary" disabled={processing} sx={{ borderRadius: 8, px: 4 }}>
+                    <Button type="submit" variant="contained" color="primary" disabled={processing} sx={{ borderRadius: 8, px: 4, color: '#fff', }}>
                         SAVE
                     </Button>
                 </Box>

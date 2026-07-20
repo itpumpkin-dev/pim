@@ -253,7 +253,7 @@ export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
                         variant="contained"
                         color="primary"
                         disabled={processing}
-                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}
+                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                     >
                         Save
                     </Button>

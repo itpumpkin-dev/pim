@@ -20,18 +20,6 @@ const mainNavItems: NavItem[] = [
     },
 ];
 
-const rightNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        url: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderIcon,
-    },
-    {
-        title: 'Documentation',
-        url: 'https://laravel.com/docs/starter-kits',
-        icon: BookIcon,
-    },
-];
 
 interface AppHeaderProps {
     breadcrumbs?: BreadcrumbItem[];
@@ -90,16 +78,6 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                             <SearchIcon />
                         </IconButton>
 
-                        <Stack direction="row" sx={{ display: { xs: 'none', lg: 'flex' } }}>
-                            {rightNavItems.map((item) => (
-                                <Tooltip key={item.title} title={item.title}>
-                                    <IconButton component="a" href={item.url} target="_blank" rel="noopener noreferrer">
-                                        {item.icon && <item.icon fontSize="small" />}
-                                    </IconButton>
-                                </Tooltip>
-                            ))}
-                        </Stack>
-
                         <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
                             <Avatar src={auth.user.avatar_url} alt={auth.user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
                                 {getInitials(auth.user.name)}
@@ -146,22 +124,6 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                             </Button>
                         ))}
                     </Stack>
-                    <Divider sx={{ my: 2 }} />
-                    <Stack spacing={0.5}>
-                        {rightNavItems.map((item) => (
-                            <Button
-                                key={item.title}
-                                component="a"
-                                href={item.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                startIcon={item.icon ? <item.icon fontSize="small" /> : undefined}
-                                color="inherit"
-                                sx={{ justifyContent: 'flex-start' }}
-                            >
-                                {item.title}
-                            </Button>
-                        ))}
                     </Stack>
                 </Box>
             </Drawer>

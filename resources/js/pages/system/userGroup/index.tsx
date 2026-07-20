@@ -144,7 +144,7 @@ export default function UserGroupIndex({ gridConfig, gridData, filters }: UserGr
                             <Button
                                 variant="contained"
                                 color="primary"
-                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}
+                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                                 onClick={() => router.visit('/system/userGroup/create')}
                             >
                                 CREATE GROUP

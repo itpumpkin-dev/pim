@@ -16,7 +16,7 @@ datagrid:
     actions:
       update:
         icon: edit
-        label: Update
+        label: Edit
       delete:
         icon: delete
         label: Delete

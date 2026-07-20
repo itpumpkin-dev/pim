@@ -144,7 +144,7 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                             <Button
                                 variant="contained"
                                 color="primary"
-                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}
+                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                                 onClick={() => router.visit('/system/roles/create')}
                             >
                                 CREATE ROLE

@@ -103,7 +103,7 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                         variant="contained"
                         color="primary"
                         disabled={processing}
-                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}
+                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                     >
                         Save
                     </Button>
