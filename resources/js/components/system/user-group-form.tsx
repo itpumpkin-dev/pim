@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    Autocomplete,
     Box,
     Button,
     Checkbox,
@@ -38,13 +39,20 @@ interface UserGroupUserOption {
     last_name: string;
 }
 
+interface RoleOption {
+    id: number;
+    label: string;
+}
+
 interface UserGroupFormProps {
     users: UserGroupUserOption[];
+    roles: RoleOption[];
     group?: {
         id: number;
         name: string;
         description: string | null;
         user_ids: number[];
+        role_ids: number[];
     };
 }
 
@@ -52,16 +60,18 @@ interface UserGroupForm {
     name: string;
     description: string;
     users: number[];
+    roles: number[];
     [key: string]: string | number[];
 }
 
-export default function UserGroupFormPage({ users, group }: UserGroupFormProps) {
+export default function UserGroupFormPage({ users, roles, group }: UserGroupFormProps) {
     const isEdit = Boolean(group);
 
     const { data, setData, post, put, processing, errors, clearErrors } = useForm<UserGroupForm>({
         name: group?.name ?? '',
         description: group?.description ?? '',
         users: group?.user_ids ?? [],
+        roles: group?.role_ids ?? [],
     });
 
     const cancel = () => router.visit('/system/userGroup');
@@ -189,6 +199,28 @@ export default function UserGroupFormPage({ users, group }: UserGroupFormProps) 
                                     }}
                                     error={Boolean(errors.description)}
                                     helperText={errors.description}
+                                />
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    Roles
+                                </Typography>
+                                <Autocomplete
+                                    multiple
+                                    size="small"
+                                    options={roles}
+                                    getOptionLabel={(option) => option.label}
+                                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                                    value={roles.filter((r) => data.roles.includes(r.id))}
+                                    onChange={(e, newValue) => setData('roles', newValue.map((v) => v.id))}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            placeholder="Select roles"
+                                            error={Boolean(errors.roles)}
+                                            helperText={errors.roles}
+                                        />
+                                    )}
                                 />
                             </Box>
                         </Box>

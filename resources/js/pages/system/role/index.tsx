@@ -179,6 +179,10 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                                         <TableCell align="right">
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                                 {visibleActions.map(([actionKey, action]) => {
+                                                    if (actionKey === 'delete' && row.label === 'Administrator') {
+                                                        return null;
+                                                    }
+
                                                     let Icon = EditIcon;
                                                     if (action.icon === 'copy') Icon = ContentCopyIcon;
                                                     if (action.icon === 'delete') Icon = DeleteIcon;

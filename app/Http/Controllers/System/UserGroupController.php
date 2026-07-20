@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\System\StoreUserGroupRequest;
 use App\Http\Requests\System\UpdateUserGroupRequest;
 use App\Models\AuditLog;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\UserGroup;
 use App\Services\GridManager;
@@ -31,6 +32,7 @@ class UserGroupController extends Controller
     {
         return Inertia::render('system/userGroup/create', [
             'users' => $this->userOptions(),
+            'roles' => Role::orderBy('label')->get(['id', 'label']),
         ]);
     }
 
@@ -47,20 +49,28 @@ class UserGroupController extends Controller
             AuditLog::record('users_assigned', $group, null, ['user_ids' => $userIds]);
         }
 
+        $roleIds = $request->input('roles', []);
+        $group->roles()->sync($roleIds);
+        if (!empty($roleIds)) {
+            AuditLog::record('roles_assigned', $group, null, ['role_ids' => $roleIds]);
+        }
+
         return to_route('system.userGroup.index')->with('success', 'Group created successfully.');
     }
 
     public function edit(UserGroup $userGroup): Response
     {
-        $userGroup->load('users:id');
+        $userGroup->load('users:id', 'roles:id');
 
         return Inertia::render('system/userGroup/edit', [
             'users' => $this->userOptions(),
+            'roles' => Role::orderBy('label')->get(['id', 'label']),
             'group' => [
                 'id' => $userGroup->id,
                 'name' => $userGroup->name,
                 'description' => $userGroup->description,
                 'user_ids' => $userGroup->users->pluck('id'),
+                'role_ids' => $userGroup->roles->pluck('id'),
             ],
         ]);
     }
@@ -78,6 +88,14 @@ class UserGroupController extends Controller
 
         if ($this->idsChanged($oldUserIds, $newUserIds)) {
             AuditLog::record('users_updated', $userGroup, ['user_ids' => $oldUserIds], ['user_ids' => $newUserIds]);
+        }
+
+        $oldRoleIds = $userGroup->roles->pluck('id')->all();
+        $newRoleIds = array_map('intval', $request->input('roles', []));
+        $userGroup->roles()->sync($newRoleIds);
+
+        if ($this->idsChanged($oldRoleIds, $newRoleIds)) {
+            AuditLog::record('roles_updated', $userGroup, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
         }
 
         return to_route('system.userGroup.index')->with('success', 'Group updated successfully.');

@@ -143,6 +143,10 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                                         <TableCell align="right">
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                                 {visibleActions.map(([actionKey, action]) => {
+                                                    if (actionKey === 'delete' && row.id === auth.user?.id) {
+                                                        return null;
+                                                    }
+
                                                     let Icon = EditIcon;
                                                     if (action.icon === 'copy') Icon = ContentCopyIcon;
                                                     if (action.icon === 'delete') Icon = DeleteIcon;

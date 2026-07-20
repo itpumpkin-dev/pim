@@ -9,10 +9,16 @@ interface UserGroupUserOption {
     last_name: string;
 }
 
-interface CreateUserGroupProps {
-    users: UserGroupUserOption[];
+interface RoleOption {
+    id: number;
+    label: string;
 }
 
-export default function UserGroupCreate({ users }: CreateUserGroupProps) {
-    return <UserGroupFormPage users={users} />;
+interface CreateUserGroupProps {
+    users: UserGroupUserOption[];
+    roles: RoleOption[];
+}
+
+export default function UserGroupCreate({ users, roles }: CreateUserGroupProps) {
+    return <UserGroupFormPage users={users} roles={roles} />;
 }

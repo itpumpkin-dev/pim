@@ -6,10 +6,11 @@ use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Role extends Model
 {
-    use Auditable;
+    use Auditable, SoftDeletes;
 
     public $timestamps = false;
 
@@ -30,5 +31,10 @@ class Role extends Model
     public function apiPermissions(): HasMany
     {
         return $this->hasMany(RoleApiPermission::class);
+    }
+
+    public function userGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(UserGroup::class, 'role_user_group');
     }
 }

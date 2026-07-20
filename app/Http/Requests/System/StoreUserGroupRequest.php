@@ -27,6 +27,9 @@ class StoreUserGroupRequest extends FormRequest
 
             'users' => ['array'],
             'users.*' => ['integer', 'exists:users,id'],
+
+            'roles' => ['array'],
+            'roles.*' => ['integer', 'exists:roles,id'],
         ];
     }
 }

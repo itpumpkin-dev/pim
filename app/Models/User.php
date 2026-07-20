@@ -11,11 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use Auditable, HasFactory, Notifiable;
+    use Auditable, HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -128,8 +129,20 @@ class User extends Authenticatable
 
     public function hasPermission(string $resource, string $action): bool
     {
-        return $this->roles()
+        $hasDirectRolePermission = $this->roles()
             ->whereHas('permissions', function ($query) use ($resource, $action) {
+                $query->where('resource', $resource)
+                    ->where('action', $action)
+                    ->where('granted', true);
+            })
+            ->exists();
+
+        if ($hasDirectRolePermission) {
+            return true;
+        }
+
+        return $this->groups()
+            ->whereHas('roles.permissions', function ($query) use ($resource, $action) {
                 $query->where('resource', $resource)
                     ->where('action', $action)
                     ->where('granted', true);
@@ -139,14 +152,27 @@ class User extends Authenticatable
 
     public function getAllPermissions(): array
     {
-        return $this->roles()
+        $directPermissions = $this->roles()
             ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
             ->where('role_permissions.granted', true)
             ->select('role_permissions.resource', 'role_permissions.action')
             ->get()
             ->map(function ($item) {
                 return $item->resource . '.' . $item->action;
-            })
+            });
+
+        $groupPermissions = $this->groups()
+            ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
+            ->join('roles', 'role_user_group.role_id', '=', 'roles.id')
+            ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
+            ->where('role_permissions.granted', true)
+            ->select('role_permissions.resource', 'role_permissions.action')
+            ->get()
+            ->map(function ($item) {
+                return $item->resource . '.' . $item->action;
+            });
+
+        return $directPermissions->concat($groupPermissions)
             ->unique()
             ->values()
             ->toArray();
