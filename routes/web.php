@@ -8,10 +8,11 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
+    Route::get('/dashboard', function () {
         return Inertia::render('dashboard');
-    })->name('dashboard');
+    })->name('dashboard')->middleware('permission:dashboards,list_dashboards');
 });
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
+require __DIR__.'/system.php';

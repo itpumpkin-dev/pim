@@ -1,0 +1,44 @@
+datagrid:
+  user_grid:
+    source:
+      type: eloquent
+      class: App\Models\User
+    columns:
+      employee_id:
+        label: Employee ID
+        type: string
+        sortable: true
+      username:
+        label: Username
+        type: string
+        sortable: true
+      first_name:
+        label: First name
+        type: string
+        sortable: true
+      last_name:
+        label: Last name
+        type: string
+        sortable: true
+      enabled:
+        label: Status
+        type: boolean
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - username
+          - first_name
+          - last_name
+          - employee_id
+    actions:
+      update:
+        icon: edit
+        label: Update
+      # duplicate:
+      #   icon: copy
+      #   label: Duplicate
+      delete:
+        icon: delete
+        label: Delete

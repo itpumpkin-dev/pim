@@ -2,19 +2,42 @@ import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/react';
+import { type NavItem, type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, Drawer, Toolbar } from '@mui/material';
 import AppLogo from './app-logo';
 
-const mainNavItems: NavItem[] = [
+const MAIN_NAV_ITEMS: NavItem[] = [
     {
         title: 'Dashboard',
         url: '/dashboard',
         icon: DashboardIcon,
+        permission: 'dashboards.list_dashboards',
+    },
+    {
+        title: 'System',
+        icon: SettingsIcon,
+        items: [
+            {
+                title: 'Users',
+                url: '/system/user',
+                permission: 'users.list_users',
+            },
+            {
+                title: 'User Groups',
+                url: '/system/userGroup',
+                permission: 'user_groups.list_user_groups',
+            },
+            {
+                title: 'Roles',
+                url: '/system/roles',
+                permission: 'roles.list_roles',
+            },
+        ],
     },
 ];
 
@@ -33,8 +56,21 @@ const footerNavItems: NavItem[] = [
 
 export function AppSidebar() {
     const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
+    const { auth } = usePage<SharedData>().props;
     const collapsed = state === 'collapsed';
     const width = collapsed ? SIDEBAR_WIDTH_ICON : SIDEBAR_WIDTH;
+
+    const filterNavItems = (items: NavItem[]): NavItem[] => {
+        return items
+            .filter((item) => !item.permission || auth.permissions.includes(item.permission))
+            .map((item) => ({
+                ...item,
+                items: item.items ? filterNavItems(item.items) : undefined,
+            }))
+            .filter((item) => !item.items || item.items.length > 0);
+    };
+
+    const filteredMainNavItems = filterNavItems(MAIN_NAV_ITEMS);
 
     const content = (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -50,7 +86,7 @@ export function AppSidebar() {
             </Toolbar>
             <Divider />
             <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
-                <NavMain items={mainNavItems} collapsed={collapsed} />
+                <NavMain items={filteredMainNavItems} collapsed={collapsed} />
             </Box>
             <Box sx={{ mt: 'auto' }}>
                 <NavFooter items={footerNavItems} collapsed={collapsed} />

@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
 
 import TextLink from '@/components/text-link';
@@ -35,7 +35,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
         <AuthLayout title="Log in to your account" description="Enter your email and password below to log in">
             <Head title="Log in" />
 
-            <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Paper component="form" onSubmit={submit} sx={{ p: 4, borderRadius: 2, boxShadow: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <Stack spacing={3}>
                     <TextField
                         id="email"
@@ -102,13 +102,13 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     </Button>
                 </Stack>
 
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                {/* <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
                     Don't have an account?{' '}
                     <TextLink href={route('register')} tabIndex={5}>
                         Sign up
                     </TextLink>
-                </Typography>
-            </Box>
+                </Typography> */}
+            </Paper>
 
             {status && (
                 <Typography variant="body2" color="success.main" sx={{ mb: 2, textAlign: 'center', fontWeight: 500 }}>

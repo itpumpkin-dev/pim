@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable
 {
@@ -23,11 +24,14 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'username',
+        'name_prefix',
         'employee_id',
         'password_hash',
         'first_name',
         'last_name',
+        'phone',
         'email',
+        'avatar_path',
         'enabled',
         'catalog_locale_id',
         'ui_locale_id',
@@ -53,6 +57,7 @@ class User extends Authenticatable
      */
     protected $appends = [
         'name',
+        'avatar_url',
     ];
 
     /**
@@ -89,6 +94,13 @@ class User extends Authenticatable
         );
     }
 
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null,
+        );
+    }
+
     public function catalogLocale(): BelongsTo
     {
         return $this->belongsTo(Locale::class, 'catalog_locale_id');
@@ -112,6 +124,32 @@ class User extends Authenticatable
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(Role::class, 'user_role');
+    }
+
+    public function hasPermission(string $resource, string $action): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($resource, $action) {
+                $query->where('resource', $resource)
+                    ->where('action', $action)
+                    ->where('granted', true);
+            })
+            ->exists();
+    }
+
+    public function getAllPermissions(): array
+    {
+        return $this->roles()
+            ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
+            ->where('role_permissions.granted', true)
+            ->select('role_permissions.resource', 'role_permissions.action')
+            ->get()
+            ->map(function ($item) {
+                return $item->resource . '.' . $item->action;
+            })
+            ->unique()
+            ->values()
+            ->toArray();
     }
 
     public function groups(): BelongsToMany

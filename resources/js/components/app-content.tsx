@@ -8,7 +8,7 @@ interface AppContentProps extends React.ComponentProps<typeof Box> {
 export function AppContent({ variant = 'header', children, ...props }: AppContentProps) {
     if (variant === 'sidebar') {
         return (
-            <Box component="main" sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }} {...props}>
+            <Box component="main" sx={{ flex: 1, minWidth: 0, height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column' }} {...props}>
                 {children}
             </Box>
         );

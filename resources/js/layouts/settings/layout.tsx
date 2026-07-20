@@ -34,9 +34,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                         {sidebarNavItems.map((item) => (
                             <ListItemButton
                                 key={item.url}
-                                component={Link}
-                                href={item.url}
-                                prefetch
+                                component={item.url ? Link : 'div'}
+                                href={item.url as any}
+                                prefetch={item.url ? true : undefined}
                                 selected={currentPath === item.url}
                                 sx={{ borderRadius: 1 }}
                             >

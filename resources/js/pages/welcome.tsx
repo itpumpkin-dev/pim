@@ -36,6 +36,7 @@ export default function Welcome() {
                     minHeight: '100vh',
                     display: 'grid',
                     gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                    bgcolor: 'background.default',
                 }}
             >
                 <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 3, sm: 6 }, py: { xs: 4, sm: 6 } }}>
@@ -59,7 +60,7 @@ export default function Welcome() {
                             <AppLogoIcon style={{ width: 36, height: 36, fill: 'currentColor' }} />
                         </Box>
                         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                            PIM <Box component="span" sx={{ fontWeight: 800, color: '#FF5733' }}>Pumpkin</Box>
+                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
                         </Typography>
                     </Box>
 
@@ -154,12 +155,12 @@ export default function Welcome() {
                                             </Button>
                                         </Stack>
 
-                                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                                        {/* <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
                                             Don&apos;t have an account?{' '}
                                             <TextLink href={route('register')} tabIndex={6}>
                                                 Sign up
                                             </TextLink>
-                                        </Typography>
+                                        </Typography> */}
                                     </Box>
                                 </Stack>
                             )}
@@ -174,8 +175,10 @@ export default function Welcome() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
-                        background: (theme) => `linear-gradient(160deg, ${darken(theme.palette.warning.dark, 0.3)}, ${theme.palette.warning.dark})`,
-                        color: 'primary.contrastText',
+                        bgcolor: 'background.paper',
+                        color: 'text.primary',
+                        borderLeft: 1,
+                        borderColor: 'divider',
                     }}
                 >
                     <Box
@@ -201,7 +204,7 @@ export default function Welcome() {
                         }}
                     />
                     <Stack spacing={1} alignItems="center" sx={{ position: 'relative', textAlign: 'center', px: 6, maxWidth: 420 }}>
-                        <AppLogoIcon style={{ width: 96, height: 96, fill: '#fd5050ff' }} />
+                        <AppLogoIcon style={{ width: 96, height: 96 }} />
                         <Typography variant="h4" sx={{ fontWeight: 600 }}>
                             PIM Pumpkin
                         </Typography>

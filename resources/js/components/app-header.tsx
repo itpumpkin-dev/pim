@@ -101,7 +101,7 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                         </Stack>
 
                         <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.5 }}>
-                            <Avatar src={auth.user.avatar} alt={auth.user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
+                            <Avatar src={auth.user.avatar_url} alt={auth.user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
                                 {getInitials(auth.user.name)}
                             </Avatar>
                         </IconButton>

@@ -24,7 +24,7 @@ export function AppShell({ children, variant = 'header' }: AppShellProps) {
 
     return (
         <SidebarProvider defaultOpen={isOpen} open={isOpen} onOpenChange={handleSidebarChange}>
-            <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%' }}>{children}</Box>
+            <Box sx={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden' }}>{children}</Box>
         </SidebarProvider>
     );
 }
