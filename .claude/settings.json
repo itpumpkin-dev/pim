@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(echo \"ESLINT_EXIT=$?\")",
+      "Bash(php -l /c/xampp/htdocs/pim/routes/web.php)",
+      "Bash(grep -iE \"^\\(Inventory2|PrintOutlined|Print\\)\\\\.js$\")",
+      "Bash(grep -iE \"^CheckCircleOutline\\\\.js$\")",
+      "Bash(grep -iE \"^\\(Science|WaterDrop|BlurOn|Handyman|Construction|LocalFireDepartment|Build|Opacity|Colorize|Grain|Layers|BubbleChart|Plumbing|CleaningServices|PrecisionManufacturing\\)\\\\.js$\")",
+      "Bash(grep -iE \"^LocalOfferOutlined\\\\.js$\")",
+      "Bash(echo \"FULL_LINT_EXIT=$?\")",
+      "Bash(grep -iE \"^\\(PaidOutlined|AttachMoneyOutlined|Inventory2Outlined|TuneOutlined|SettingsOutlined|InfoOutlined\\)\\\\.js$\")",
+      "Bash(grep -iE \"^\\(StorefrontOutlined|PaletteOutlined|CategoryOutlined\\)\\\\.js$\")"
+    ]
+  }
+}

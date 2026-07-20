@@ -6,12 +6,19 @@ import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
+import GroupIcon from '@mui/icons-material/Group';
+import HomeIcon from '@mui/icons-material/Home';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, Drawer, Toolbar } from '@mui/material';
 import AppLogo from './app-logo';
 
 const MAIN_NAV_ITEMS: NavItem[] = [
+    {
+        title: 'Home',
+        url: '/home',
+        icon: HomeIcon,
+    },
     {
         title: 'Dashboard',
         url: '/dashboard',
@@ -38,6 +45,11 @@ const MAIN_NAV_ITEMS: NavItem[] = [
                 permission: 'roles.list_roles',
             },
         ],
+    },
+    {
+        title: 'Users',
+        url: '/users',
+        icon: GroupIcon,
     },
 ];
 
