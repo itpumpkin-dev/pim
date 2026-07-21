@@ -8,26 +8,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Category extends Model
+class AttributeFamily extends Model
 {
     use Auditable;
 
     protected $fillable = [
         'code',
-        'parent_id',
         'created_by',
         'updated_by',
     ];
-
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(Category::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(Category::class, 'parent_id');
-    }
 
     public function creator(): BelongsTo
     {
@@ -39,13 +28,15 @@ class Category extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    public function fieldValues(): HasMany
+    public function attributes(): BelongsToMany
     {
-        return $this->hasMany(CategoryFieldValue::class);
+        return $this->belongsToMany(Attribute::class, 'family_attributes', 'family_id', 'attribute_id')
+            ->using(FamilyAttribute::class)
+            ->withPivot('attribute_group_id');
     }
 
-    public function products(): BelongsToMany
+    public function products(): HasMany
     {
-        return $this->belongsToMany(Product::class, 'product_category');
+        return $this->hasMany(Product::class, 'family_id');
     }
 }

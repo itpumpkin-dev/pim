@@ -5,28 +5,32 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Category extends Model
+class CategoryField extends Model
 {
     use Auditable;
 
     protected $fillable = [
         'code',
-        'parent_id',
+        'type',
+        'is_required',
+        'value_per_locale',
+        'status',
+        'position',
+        'display_section',
         'created_by',
         'updated_by',
     ];
 
-    public function parent(): BelongsTo
+    protected function casts(): array
     {
-        return $this->belongsTo(Category::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(Category::class, 'parent_id');
+        return [
+            'is_required' => 'boolean',
+            'value_per_locale' => 'boolean',
+            'status' => 'boolean',
+            'position' => 'integer',
+        ];
     }
 
     public function creator(): BelongsTo
@@ -39,13 +43,8 @@ class Category extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
-    public function fieldValues(): HasMany
+    public function values(): HasMany
     {
         return $this->hasMany(CategoryFieldValue::class);
-    }
-
-    public function products(): BelongsToMany
-    {
-        return $this->belongsToMany(Product::class, 'product_category');
     }
 }
