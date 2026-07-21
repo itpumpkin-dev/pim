@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import ImageIcon from '@mui/icons-material/Image';
 import { Autocomplete, Box, Button, Checkbox, Chip, FormControlLabel, MenuItem, Select, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { ChangeEvent, FormEventHandler, useRef, useState } from 'react';
@@ -124,12 +124,18 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
         clearErrors(key as string);
     };
 
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
+    const performSubmit = () => {
         post(route('system.user.update', user.id), {
             forceFormData: true,
         });
     };
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        performSubmit();
+    };
+
+    const cancel = () => router.visit('/system/user');
 
     const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -143,16 +149,27 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
         <AppLayout
             breadcrumbs={breadcrumbs}
             actions={
-                <Button
-                    type="submit"
-                    form="user-edit-form"
-                    variant="contained"
-                    color="primary"
-                    disabled={processing}
-                    sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
-                >
-                    SAVE
-                </Button>
+                <>
+                    <Button
+                        type="button"
+                        onClick={cancel}
+                        variant="contained"
+                        color="inherit"
+                        sx={{ borderRadius: 8, px: 4, fontWeight: 'bold' }}
+                    >
+                        CANCEL
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={performSubmit}
+                        variant="contained"
+                        color="primary"
+                        disabled={processing}
+                        sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
+                    >
+                        SAVE
+                    </Button>
+                </>
             }
         >
             <Head title={`Edit ${user.name}`} />

@@ -22,6 +22,36 @@ const MAIN_NAV_ITEMS: NavItem[] = [
         permission: 'dashboards.list_dashboards',
     },
     {
+        title: 'Catalog',
+        icon: MenuBookIcon,
+        items: [
+            {
+                title: 'Products',
+                url: '/catalog/products',
+            },
+            {
+                title: 'Categories',
+                url: '/catalog/categories',
+            },
+            {
+                title: 'Category Fields',
+                url: '/catalog/categoryFields',
+            },
+            {
+                title: 'Attributes',
+                url: '/catalog/attributes',
+            },
+            {
+                title: 'Attribute Groups',
+                url: '/catalog/attributeGroups',
+            },
+            {
+                title: 'Attribute Families',
+                url: '/catalog/attributeFamilies',
+            },
+        ],
+    },
+    {
         title: 'System',
         icon: SettingsIcon,
         items: [

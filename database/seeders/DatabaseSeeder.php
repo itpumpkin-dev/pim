@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        $admin = Role::firstOrCreate(['label' => 'admin']);
+        $admin = Role::firstOrCreate(['label' => 'Administrator']);
 
         $user = User::factory()->create([
             'username' => 'adminuser',

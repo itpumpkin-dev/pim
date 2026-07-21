@@ -54,7 +54,7 @@ class AuditLog extends Model
         $request = request();
 
         return static::create([
-            'user_id' => $userId ?? auth()->id(),
+            'user_id' => $userId ?? (auth()->check() ? auth()->id() : null),
             'event' => $event,
             'auditable_type' => $auditable?->getMorphClass(),
             'auditable_id' => $auditable?->getKey(),
