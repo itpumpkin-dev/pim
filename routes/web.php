@@ -21,3 +21,4 @@ Route::get('products/{id}', function (int $id) {
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 require __DIR__.'/system.php';
+require __DIR__.'/catalog.php';

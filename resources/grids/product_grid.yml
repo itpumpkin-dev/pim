@@ -1,0 +1,35 @@
+datagrid:
+  product_grid:
+    source:
+      type: eloquent
+      class: App\Models\Product
+    columns:
+      sku:
+        label: SKU
+        type: string
+        sortable: true
+      type:
+        label: Type
+        type: string
+        sortable: true
+      enabled:
+        label: Status
+        type: boolean
+        sortable: true
+      created_at:
+        label: Created At
+        type: datetime
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - sku
+          - type
+    actions:
+      update:
+        icon: edit
+        label: Edit
+      delete:
+        icon: delete
+        label: Delete

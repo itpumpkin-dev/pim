@@ -7,17 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Attribute extends Model
 {
-    use Auditable;
+    use Auditable, SoftDeletes;
 
     protected $fillable = [
         'code',
+        'name',
         'type',
         'is_required',
         'is_unique',
         'is_locale_based',
+        'is_ai_translate',
         'is_channel_based',
         'is_filterable',
         'created_by',
@@ -30,6 +33,7 @@ class Attribute extends Model
             'is_required' => 'boolean',
             'is_unique' => 'boolean',
             'is_locale_based' => 'boolean',
+            'is_ai_translate' => 'boolean',
             'is_channel_based' => 'boolean',
             'is_filterable' => 'boolean',
         ];

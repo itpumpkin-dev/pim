@@ -1,0 +1,34 @@
+datagrid:
+  attribute_family_grid:
+    source:
+      type: eloquent
+      class: App\Models\AttributeFamily
+    columns:
+      id:
+        label: ID
+        type: number
+        sortable: true
+      code:
+        label: Code
+        type: string
+        sortable: true
+      name:
+        label: Name
+        type: string
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - code
+          - name
+    actions:
+      update:
+        icon: edit
+        label: Edit
+      duplicate:
+        icon: copy
+        label: Duplicate
+      delete:
+        icon: delete
+        label: Delete

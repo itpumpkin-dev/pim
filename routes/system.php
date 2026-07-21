@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('system')->name('system.')->group(function () {
     Route::get('user', [UserController::class, 'index'])->name('user.index')->middleware('permission:users,list_users');
+    Route::get('user/summary', [UserController::class, 'summary'])->name('user.summary')->middleware('permission:users,list_users');
+    Route::get('user/{user}/summary', [UserController::class, 'summaryShow'])->name('user.summary.show')->middleware('permission:users,list_users');
     Route::post('user', [UserController::class, 'store'])->name('user.store')->middleware('permission:users,create_users');
     Route::get('user/{user}/edit', [UserController::class, 'edit'])->name('user.edit')->middleware('permission:users,edit_users');
     Route::put('user/{user}', [UserController::class, 'update'])->name('user.update')->middleware('permission:users,edit_users');

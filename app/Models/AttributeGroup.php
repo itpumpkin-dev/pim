@@ -13,6 +13,7 @@ class AttributeGroup extends Model
 
     protected $fillable = [
         'code',
+        'name',
         'created_by',
         'updated_by',
     ];
