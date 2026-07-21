@@ -37,7 +37,7 @@ export function getTheme(mode: PaletteMode) {
             },
         },
         shape: {
-            borderRadius: 8,
+            borderRadius: 10,
         },
         typography: {
             fontFamily,

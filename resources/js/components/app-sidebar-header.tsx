@@ -1,3 +1,4 @@
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';

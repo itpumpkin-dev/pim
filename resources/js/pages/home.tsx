@@ -60,7 +60,7 @@ const categories: { label: string; icon: IconType }[] = [
     { label: 'กาวร้อน', icon: LocalFireDepartmentIcon },
     { label: 'เทปซ่อมแซม', icon: LayersIcon },
     { label: 'กาวอะคริลิคยาแนว', icon: ColorizeIcon },
-    { label: 'กาวอีพ็อกซี่/เอนกประสงค์', icon: BuildIcon },
+    { label: 'กาวอีพ็อกซี่/เอนกประสงค์', icon: BuildIcon }, 
 ];
 
 function HeroCarousel() {

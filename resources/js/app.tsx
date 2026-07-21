@@ -5,7 +5,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
-import { useResolvedAppearance } from './hooks/use-appearance';
+import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearance';
 import { getTheme } from './theme';
 
 declare global {
@@ -32,7 +32,11 @@ createInertiaApp({
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-        root.render(<ThemedApp App={App} props={props} />);
+        root.render(
+            <AppearanceProvider>
+                <ThemedApp App={App} props={props} />
+            </AppearanceProvider>,
+        );
     },
     progress: {
         color: '#f37021', // Pumpkin Orange — matches theme.ts primary

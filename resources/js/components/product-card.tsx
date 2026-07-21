@@ -1,14 +1,16 @@
-import { currency, productCsvHeaders, productToCsvRow, type Product } from '@/data/products';
+import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Product } from '@/data/products';
 import { downloadCsv } from '@/lib/csv';
 import { Link } from '@inertiajs/react';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { Box, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
+import { useState } from 'react';
 
 const packLabel = (product: Product) => `บรรจุ ${product.packQty} ${product.packUnit}/ลัง`;
 
 export function ProductCard({ product }: { product: Product }) {
     const Icon = product.icon;
+    const [imageFailed, setImageFailed] = useState(false);
 
     const handleExport = (event: React.MouseEvent) => {
         event.preventDefault();
@@ -25,6 +27,10 @@ export function ProductCard({ product }: { product: Product }) {
             sx={{
                 position: 'relative',
                 display: 'block',
+                width: '100%',
+                mb: 2,
+                breakInside: 'avoid',
+                WebkitColumnBreakInside: 'avoid',
                 borderRadius: 3,
                 border: 1,
                 borderColor: 'divider',
@@ -46,14 +52,25 @@ export function ProductCard({ product }: { product: Product }) {
 
             <Box
                 sx={{
-                    aspectRatio: '4 / 3',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     bgcolor: 'action.hover',
+                    minHeight: imageFailed ? 160 : undefined,
                 }}
             >
-                <Icon sx={{ fontSize: 56, color: 'text.disabled' }} />
+                {!imageFailed ? (
+                    <Box
+                        component="img"
+                        src={productImageUrl(product)}
+                        alt={product.name}
+                        loading="lazy"
+                        onError={() => setImageFailed(true)}
+                        sx={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain', p: 1.5 }}
+                    />
+                ) : (
+                    <Icon sx={{ fontSize: 56, color: 'text.disabled', my: 4 }} />
+                )}
             </Box>
 
             <Box sx={{ p: 2 }}>

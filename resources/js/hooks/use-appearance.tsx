@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type Appearance = 'light' | 'dark' | 'system';
 export type ResolvedAppearance = 'light' | 'dark';
@@ -30,7 +30,15 @@ export function initializeTheme(): ResolvedAppearance {
     return resolveAppearance(savedAppearance);
 }
 
-export function useAppearance() {
+interface AppearanceContextValue {
+    appearance: Appearance;
+    updateAppearance: (mode: Appearance) => void;
+}
+
+// state lives in a single context so every consumer (the toggle button, the ThemeProvider) shares the same value
+const AppearanceContext = createContext<AppearanceContextValue | null>(null);
+
+export function AppearanceProvider({ children }: { children: ReactNode }) {
     const [appearance, setAppearance] = useState<Appearance>('system');
 
     const updateAppearance = useCallback((mode: Appearance) => {
@@ -45,7 +53,17 @@ export function useAppearance() {
         setAppearance(savedAppearance || 'system');
     }, []);
 
-    return { appearance, updateAppearance } as const;
+    return <AppearanceContext.Provider value={{ appearance, updateAppearance }}>{children}</AppearanceContext.Provider>;
+}
+
+export function useAppearance() {
+    const context = useContext(AppearanceContext);
+
+    if (!context) {
+        throw new Error('useAppearance must be used within an AppearanceProvider');
+    }
+
+    return context;
 }
 
 export function useResolvedAppearance() {
