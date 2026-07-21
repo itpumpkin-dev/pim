@@ -13,7 +13,35 @@
       "Bash(grep -iE \"^LocalOfferOutlined\\\\.js$\")",
       "Bash(echo \"FULL_LINT_EXIT=$?\")",
       "Bash(grep -iE \"^\\(PaidOutlined|AttachMoneyOutlined|Inventory2Outlined|TuneOutlined|SettingsOutlined|InfoOutlined\\)\\\\.js$\")",
-      "Bash(grep -iE \"^\\(StorefrontOutlined|PaletteOutlined|CategoryOutlined\\)\\\\.js$\")"
+      "Bash(grep -iE \"^\\(StorefrontOutlined|PaletteOutlined|CategoryOutlined\\)\\\\.js$\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:2000)",
+      "PowerShell(Get-Process | Where-Object { $_.ProcessName -match 'node|php' } | Select-Object Id, ProcessName)",
+      "PowerShell(Get-NetTCPConnection -State Listen | Where-Object { $_.OwningProcess -in \\(Get-Process -Name node,php -ErrorAction SilentlyContinue\\).Id } | Select-Object LocalAddress, LocalPort, OwningProcess)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/products/1)",
+      "Bash(curl -s -D - -o /dev/null http://127.0.0.1:8000/products/1)",
+      "Bash(sort -t: -k2 -n)",
+      "Bash(awk '$1>1')",
+      "Bash(echo \"EXIT:$?\")",
+      "Read(//c/Users/pc.it11/Downloads/**)",
+      "Bash(ls -la \"/c/Users/pc.it11/Downloads/A CORDLESS POWER TOOLS-เครื่องมือไฟฟ้าไร้สาย 01-06-69.pdf\")",
+      "Bash(mkdir -p \"/c/Users/PC628D~1.IT1/AppData/Local/Temp/claude/c--xampp-htdocs-pim/814d6bf4-e1f2-44c6-82ee-e12b83623812/scratchpad\" *)",
+      "Bash(\"/c/Users/pc.it11/AppData/Local/Programs/Python/Python313/python\" -m pip show pymupdf pypdf pdfplumber)",
+      "Bash(pdfinfo \"/c/Users/PC628D~1.IT1/AppData/Local/Temp/claude/c--xampp-htdocs-pim/814d6bf4-e1f2-44c6-82ee-e12b83623812/scratchpad/cordless.pdf\")",
+      "Bash(ls /mingw64/bin/pdf* 2>&1)",
+      "Read(//mingw64/**)",
+      "Bash(\"/c/Users/pc.it11/AppData/Local/Programs/Python/Python313/python\" -m pip install --quiet pymupdf)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c ' *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(ls node_modules/.bin | grep -i -E 'playwright|puppeteer' ; find / -maxdepth 4 -iname 'chromium-cli*' 2>/dev/null)",
+      "Read(//c//**)",
+      "Bash(npx vite *)",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|palette.mode\" resources/js/pages/products/show.tsx)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\PC628D~1.IT1\\AppData\\Local\\Temp\\claude\\c--xampp-htdocs-pim\\814d6bf4-e1f2-44c6-82ee-e12b83623812\\scratchpad",
+      "C:\\Users\\pc.it11\\Downloads"
     ]
   }
 }

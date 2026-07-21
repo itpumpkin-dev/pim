@@ -64,7 +64,7 @@ const categories: { label: string; icon: IconType }[] = [
     { label: 'กาวร้อน', icon: LocalFireDepartmentIcon },
     { label: 'เทปซ่อมแซม', icon: LayersIcon },
     { label: 'กาวอะคริลิคยาแนว', icon: ColorizeIcon },
-    { label: 'กาวอีพ็อกซี่/เอนกประสงค์', icon: BuildIcon },
+    { label: 'กาวอีพ็อกซี่/เอนกประสงค์', icon: BuildIcon }, 
 ];
 
 function HeroCarousel() {
@@ -263,26 +263,22 @@ export default function Home() {
                             </Button>
                         </Stack>
                     </Stack>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gap: 2,
-                            gridTemplateColumns: {
-                                xs: 'repeat(2, 1fr)',
-                                sm: 'repeat(3, 1fr)',
-                                md: 'repeat(4, 1fr)',
-                            },
-                        }}
-                    >
-                        {filtered.map((product) => (
-                            <ProductCard key={product.id} product={product} />
-                        ))}
-                        {filtered.length === 0 && (
-                            <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
-                                ไม่พบสินค้าที่ค้นหา
-                            </Typography>
-                        )}
-                    </Box>
+                    {filtered.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                            ไม่พบสินค้าที่ค้นหา
+                        </Typography>
+                    ) : (
+                        <Box
+                            sx={{
+                                columnCount: { xs: 2, sm: 3, md: 4, lg: 5 },
+                                columnGap: 2,
+                            }}
+                        >
+                            {filtered.map((product) => (
+                                <ProductCard key={product.id} product={product} />
+                            ))}
+                        </Box>
+                    )}
                 </Box>
             </Box>
         </AppLayout>

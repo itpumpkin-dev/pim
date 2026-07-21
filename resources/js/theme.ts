@@ -2,6 +2,7 @@ import { createTheme, type PaletteMode, type ThemeOptions } from '@mui/material/
 
 const fontFamily = [
     '"Instrument Sans"',
+    '"Noto Sans Thai"',
     'ui-sans-serif',
     'system-ui',
     'sans-serif',
@@ -18,18 +19,19 @@ export function getTheme(mode: PaletteMode) {
         palette: {
             mode,
             primary: {
-                main: isDark ? '#818cf8' : '#4f46e5',
+                main: isDark ? '#ff6a3d' : '#ff3300',
+                contrastText: '#ffffff',
             },
             secondary: {
                 main: isDark ? '#a78bfa' : '#7c3aed',
             },
             background: {
-                default: isDark ? '#0a0a0a' : '#fafafa',
+                default: isDark ? '#0a0a0a' : '#fff8f6',
                 paper: isDark ? '#141414' : '#ffffff',
             },
         },
         shape: {
-            borderRadius: 8,
+            borderRadius: 10,
         },
         typography: {
             fontFamily,
