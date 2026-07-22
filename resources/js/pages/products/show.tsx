@@ -21,7 +21,7 @@ import { alpha, AppBar, Box, Button, Chip, Paper, Stack, Table, TableBody, Table
 import { cloneElement, useState } from 'react';
 
 type GridArea = { gridColumn: string; gridRow: string };
-type CellType = 'hero' | 'spec' | 'product' | 'stat' | 'info' | 'feature' | 'discount';
+type CellType = 'hero' | 'spec' | 'product' | 'stat' | 'info' | 'feature' | 'discount' | 'video';
 type CellDef = { key: string; type: CellType; render: (area: GridArea) => React.ReactElement };
 
 const hoverLiftSx = {
@@ -379,6 +379,36 @@ export default function ProductShow({ id }: { id: number }) {
         </Box>
     );
 
+    const videoRender = (area: GridArea) => (
+        <Box
+            sx={{
+                ...area,
+                height: '100%',
+                minWidth: 0,
+                position: 'relative',
+                borderRadius: '20px',
+                overflow: 'hidden',
+                bgcolor: '#000',
+                ...hoverLiftSx,
+            }}
+        >
+            <Chip
+                label="วิดีโอสินค้า"
+                size="small"
+                sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 700, bgcolor: alpha('#000', 0.55), color: '#fff' }}
+            />
+            <Box
+                component="video"
+                src="/storage/50259.mp4"
+                controls
+                muted
+                loop
+                playsInline
+                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+        </Box>
+    );
+
     const priceRender = (area: GridArea) => (
         <Box
             sx={{
@@ -512,6 +542,7 @@ export default function ProductShow({ id }: { id: number }) {
     }
 
     cells.push({ w: 3, h: 4, weight: 4, data: { key: 'product-photo', type: 'product', render: productRender } });
+    cells.push({ w: 4, h: 4, weight: 4, data: { key: 'video', type: 'video', render: videoRender } });
     cells.push({ w: 3, h: 3, weight: 4, data: { key: 'price', type: 'stat', render: priceRender } });
     cells.push({ w: 3, h: 3, weight: 4, data: { key: 'packaging', type: 'stat', render: packagingRender } });
     cells.push({
@@ -550,7 +581,7 @@ export default function ProductShow({ id }: { id: number }) {
         });
     });
 
-    const narrowHeights: Partial<Record<CellType, number>> = { hero: 6, spec: 8, product: 5 };
+    const narrowHeights: Partial<Record<CellType, number>> = { hero: 6, spec: 8, product: 5, video: 5 };
     const { cols, rowH } = computeBentoLayout(bentoWidth);
     const scaled = scaleBentoItems(cells, cols, (item) => narrowHeights[item.data.type]);
     const { placed, grid } = packBento(scaled, cols);
