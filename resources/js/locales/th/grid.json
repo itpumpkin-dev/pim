@@ -1,0 +1,41 @@
+{
+    "fields": {
+        "id": "รหัส",
+        "code": "โค้ด",
+        "name": "ชื่อ",
+        "label": "ชื่อ",
+        "type": "ประเภท",
+        "status": "สถานะ",
+        "createdAt": "วันที่สร้าง",
+        "required": "จำเป็น",
+        "unique": "ไม่ซ้ำ",
+        "localeBased": "แยกตามภาษา",
+        "channelBased": "แยกตามช่องทาง",
+        "employeeId": "รหัสพนักงาน",
+        "username": "ชื่อผู้ใช้",
+        "firstName": "ชื่อจริง",
+        "lastName": "นามสกุล",
+        "displayName": "ชื่อที่แสดง",
+        "sku": "SKU"
+    },
+    "rowActions": {
+        "edit": "แก้ไข",
+        "delete": "ลบ",
+        "duplicate": "ทำสำเนา"
+    },
+    "actionsHeader": "การดำเนินการ",
+    "active": "ใช้งาน",
+    "inactive": "ไม่ใช้งาน",
+    "enabled": "เปิดใช้งาน",
+    "disabled": "ปิดใช้งาน",
+    "yes": "ใช่",
+    "no": "ไม่ใช่",
+    "filter": "ตัวกรอง",
+    "perPage": "ต่อหน้า",
+    "pageOf": "จาก {{lastPage}}",
+    "results": "{{count}} รายการ",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "confirmDeletion": "ยืนยันการลบ",
+    "noDataFound": "ไม่พบข้อมูล"
+}

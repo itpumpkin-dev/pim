@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\System\LocaleController;
 use App\Http\Controllers\System\RoleController;
 use App\Http\Controllers\System\UserController;
 use App\Http\Controllers\System\UserGroupController;
@@ -27,4 +28,11 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit')->middleware('permission:roles,edit_roles');
     Route::put('roles/{role}', [RoleController::class, 'update'])->name('roles.update')->middleware('permission:roles,edit_roles');
     Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy')->middleware('permission:roles,delete_roles');
+
+    Route::get('locales', [LocaleController::class, 'index'])->name('locales.index')->middleware('permission:locales,list_locales');
+    Route::get('locales/create', [LocaleController::class, 'create'])->name('locales.create')->middleware('permission:locales,create_locales');
+    Route::post('locales', [LocaleController::class, 'store'])->name('locales.store')->middleware('permission:locales,create_locales');
+    Route::get('locales/{locale}/edit', [LocaleController::class, 'edit'])->name('locales.edit')->middleware('permission:locales,edit_locales');
+    Route::put('locales/{locale}', [LocaleController::class, 'update'])->name('locales.update')->middleware('permission:locales,edit_locales');
+    Route::delete('locales/{locale}', [LocaleController::class, 'destroy'])->name('locales.destroy')->middleware('permission:locales,delete_locales');
 });

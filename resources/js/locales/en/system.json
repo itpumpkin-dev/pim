@@ -1,0 +1,24 @@
+{
+    "usersCount": "{{count}} users",
+    "createUser": "CREATE USER",
+    "searchByUsername": "Search by Username",
+    "confirmDeletionTitle": "Confirm deletion",
+    "confirmDeleteUserMessage": "Are you sure you want to delete this user?",
+
+    "rolesCount": "{{count}} roles",
+    "createRole": "CREATE ROLE",
+    "searchByName": "Search by Name",
+    "deleteRoleTitle": "Delete role?",
+    "confirmDeleteRoleMessage": "Are you sure you want to delete the role \"{{label}}\"? This will remove it from every user it is assigned to and cannot be undone.",
+
+    "userGroupsCount": "{{count}} groups",
+    "createUserGroup": "CREATE GROUP",
+    "deleteGroupTitle": "Delete group?",
+    "confirmDeleteGroupMessage": "Are you sure you want to delete the group \"{{name}}\"? This will remove it from every user it is assigned to and cannot be undone.",
+
+    "localesTitle": "Locales",
+    "createLocale": "Create Locale",
+    "searchByCode": "Search by code",
+    "noLocalesFound": "No locales found.",
+    "confirmDeleteLocaleMessage": "Are you sure you want to delete this locale?"
+}

@@ -5,7 +5,7 @@ datagrid:
       class: App\Models\UserGroup
     columns:
       name:
-        label: Name
+        label: fields.name
         type: string
         sortable: true
     filters:
@@ -16,7 +16,7 @@ datagrid:
     actions:
       update:
         icon: edit
-        label: Edit
+        label: rowActions.edit
       delete:
         icon: delete
-        label: Delete
+        label: rowActions.delete

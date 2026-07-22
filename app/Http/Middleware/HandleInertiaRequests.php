@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Locale;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,6 +49,8 @@ class HandleInertiaRequests extends Middleware
             ],
             'status' => $request->session()->get('status'),
             'success' => $request->session()->get('success'),
+            'locale' => app()->getLocale(),
+            'locales' => Locale::where('enabled', true)->orderBy('code')->get(['id', 'code', 'display_name']),
         ]);
     }
 }

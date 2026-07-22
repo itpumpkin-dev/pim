@@ -1,0 +1,15 @@
+{
+    "dashboard": "Dashboard",
+    "catalog": "Catalog",
+    "products": "Products",
+    "categories": "Categories",
+    "categoryFields": "Category Fields",
+    "attributes": "Attributes",
+    "attributeGroups": "Attribute Groups",
+    "attributeFamilies": "Attribute Families",
+    "system": "System",
+    "users": "Users",
+    "userGroups": "User Groups",
+    "roles": "Roles",
+    "locales": "Locales"
+}

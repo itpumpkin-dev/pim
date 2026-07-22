@@ -7,18 +7,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import CreateUserDialog from '@/components/system/create-user-dialog';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'SYSTEM',
-        href: '#',
-    },
-    {
-        title: 'USERS',
-        href: '/system/user',
-    },
-];
 
 interface PaginationData<T> {
     data: T[];
@@ -51,6 +41,14 @@ interface UserIndexProps {
 }
 
 export default function UserIndex({ gridConfig, gridData, filters }: UserIndexProps) {
+    const { t } = useTranslation('grid');
+    const { t: tSystem } = useTranslation('system');
+    const { t: tNav } = useTranslation('nav');
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('system'), href: '#' },
+        { title: tNav('users'), href: '/system/user' },
+    ];
+
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canCreate = permissions.includes('users.create_users');
@@ -83,15 +81,15 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="System Users" />
+            <Head title={tSystem('usersCount', { count: gridData.total })} />
             <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Box>
                         <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center' }}>
-                            {gridData.total} users
+                            {tSystem('usersCount', { count: gridData.total })}
                         </Typography>
                         <TextField
-                            placeholder="Search by Username"
+                            placeholder={tSystem('searchByUsername')}
                             variant="standard"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -109,7 +107,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                     {canCreate && (
                         <Box>
                             <Button variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }} onClick={() => setCreateOpen(true)}>
-                                CREATE USER
+                                {tSystem('createUser')}
                             </Button>
                         </Box>
                     )}
@@ -123,7 +121,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                             <TableRow>
                                 {Object.entries(gridConfig.columns).map(([key, column]) => (
                                     <TableCell key={key} sx={{ fontWeight: 'bold', borderBottom: '2px solid', borderColor: 'divider', backgroundColor: '#f5f5f5' }}>
-                                        {column.label}
+                                        {t(column.label)}
                                     </TableCell>
                                 ))}
                                 {visibleActions.length > 0 && (
@@ -136,7 +134,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                                 <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                     {Object.entries(gridConfig.columns).map(([key, column]) => (
                                         <TableCell key={key} sx={{ fontWeight: key === 'employee_id' || key === 'username' ? 600 : 400 }}>
-                                            {column.type === 'boolean' ? (row[key] ? 'Active' : 'Inactive') : (row[key] || '-')}
+                                            {column.type === 'boolean' ? (row[key] ? t('active') : t('inactive')) : (row[key] || '-')}
                                         </TableCell>
                                     ))}
                                     {visibleActions.length > 0 && (
@@ -162,7 +160,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                                                     return (
                                                         <IconButton key={actionKey} size="small" sx={{ display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
                                                             <Icon fontSize="small" />
-                                                            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{action.label}</Typography>
+                                                            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
                                                         </IconButton>
                                                     );
                                                 })}
@@ -174,7 +172,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                             {gridData.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3 }}>
-                                        No data found.
+                                        {t('noDataFound')}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -183,14 +181,14 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                 </TableContainer>
             </Box>
         <Dialog open={deleteUserId !== null} onClose={() => setDeleteUserId(null)}>
-            <DialogTitle>Confirm deletion</DialogTitle>
+            <DialogTitle>{tSystem('confirmDeletionTitle')}</DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    Are you sure you want to delete this user?
+                    {tSystem('confirmDeleteUserMessage')}
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>Cancel</Button>
+                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>{t('cancel')}</Button>
                 <Button onClick={() => {
                     if (deleteUserId !== null) {
                         router.delete(`/system/user/${deleteUserId}`, {
@@ -198,7 +196,7 @@ export default function UserIndex({ gridConfig, gridData, filters }: UserIndexPr
                         });
                     }
                 }} color="error" variant="contained" sx={{ fontWeight: 'bold' }}>
-                    Delete
+                    {t('delete')}
                 </Button>
             </DialogActions>
         </Dialog>

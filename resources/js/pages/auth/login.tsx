@@ -3,6 +3,7 @@ import TextLink from '@/components/text-link';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface LoginForm {
     email: string;
@@ -17,6 +18,7 @@ interface LoginProps {
 }
 
 export default function Login({ status, canResetPassword }: LoginProps) {
+    const { t } = useTranslation('auth');
     const { data, setData, post, processing, errors, reset } = useForm<LoginForm>({
         email: '',
         password: '',
@@ -70,10 +72,10 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             <Stack spacing={3}>
                                 <Stack spacing={1}>
                                     <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                                        Sign in
+                                        {t('signIn')}
                                     </Typography>
                                     <Typography variant="body1" color="text.secondary">
-                                        Enter your email and password to access your account.
+                                        {t('signInSubtitle')}
                                     </Typography>
                                 </Stack>
 
@@ -88,7 +90,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                         <TextField
                                             id="email"
                                             type="email"
-                                            label="Email address"
+                                            label={t('emailAddress')}
                                             required
                                             autoFocus
                                             tabIndex={1}
@@ -105,7 +107,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             <TextField
                                                 id="password"
                                                 type="password"
-                                                label="Password"
+                                                label={t('password')}
                                                 required
                                                 tabIndex={2}
                                                 autoComplete="current-password"
@@ -119,7 +121,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             {canResetPassword && (
                                                 <Box sx={{ textAlign: 'right', mt: 1 }}>
                                                     <TextLink href={route('password.request')} tabIndex={5} style={{ fontSize: '0.875rem' }}>
-                                                        Forgot password?
+                                                        {t('forgotPassword')}
                                                     </TextLink>
                                                 </Box>
                                             )}
@@ -135,7 +137,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                                     onChange={(e) => setData('remember', e.target.checked)}
                                                 />
                                             }
-                                            label="Remember me"
+                                            label={t('rememberMe')}
                                         />
 
                                         <Button
@@ -147,7 +149,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             disabled={processing}
                                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                                         >
-                                            Sign in
+                                            {t('signIn')}
                                         </Button>
 
                                         <Button
@@ -158,7 +160,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             tabIndex={5}
                                             sx={{ mt: 0 }}
                                         >
-                                            กลับไปหน้าแรก (Home)
+                                            {t('backToHome')}
                                         </Button>
                                     </Stack>
                                 </Box>
@@ -208,7 +210,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                             PIM Pumpkin
                         </Typography>
                         <Typography variant="body1" sx={{ opacity: 0.85 }}>
-                            Products Management Information System
+                            {t('appTagline')}
                         </Typography>
                     </Stack>
                 </Box>

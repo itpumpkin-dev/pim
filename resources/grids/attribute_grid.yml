@@ -5,35 +5,35 @@ datagrid:
       class: App\Models\Attribute
     columns:
       code:
-        label: Code
+        label: fields.code
         type: string
         sortable: true
       name:
-        label: Name
+        label: fields.name
         type: string
         sortable: true
       type:
-        label: Type
+        label: fields.type
         type: string
         sortable: true
       is_required:
-        label: Required
+        label: fields.required
         type: boolean
         sortable: true
       is_unique:
-        label: Unique
+        label: fields.unique
         type: boolean
         sortable: true
       is_locale_based:
-        label: Locale Based
+        label: fields.localeBased
         type: boolean
         sortable: true
       is_channel_based:
-        label: Channel Based
+        label: fields.channelBased
         type: boolean
         sortable: true
       created_at:
-        label: Created At
+        label: fields.createdAt
         type: datetime
         sortable: true
     filters:
@@ -46,7 +46,7 @@ datagrid:
     actions:
       update:
         icon: edit
-        label: Edit
+        label: rowActions.edit
       delete:
         icon: delete
-        label: Delete
+        label: rowActions.delete

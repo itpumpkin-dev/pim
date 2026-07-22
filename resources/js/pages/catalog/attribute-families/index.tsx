@@ -34,6 +34,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GridColumn {
     label: string;
@@ -67,12 +68,15 @@ interface Props {
     filters: { search?: string; sort?: string; dir?: string };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'ATTRIBUTE FAMILIES', href: '/catalog/attributeFamilies' },
-];
-
 export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: Props) {
+    const { t } = useTranslation('grid');
+    const { t: tCatalog } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('attributeFamilies'), href: '/catalog/attributeFamilies' },
+    ];
+
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canCreate = permissions.includes('attribute_families.create_attribute_families') || true;
@@ -102,12 +106,12 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Attribute Families" />
+            <Head title={tCatalog('attributeFamiliesTitle')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
                 {/* Header Title & Create Button */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="#1e1b4b">
-                        Attribute Families
+                        {tCatalog('attributeFamiliesTitle')}
                     </Typography>
                     {canCreate && (
                         <Button
@@ -124,7 +128,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Create Attribute Family
+                            {tCatalog('createAttributeFamily')}
                         </Button>
                     )}
                 </Stack>
@@ -135,7 +139,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         <TextField
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search"
+                            placeholder={tCatalog('search')}
                             size="small"
                             sx={{
                                 bgcolor: '#fff',
@@ -152,7 +156,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                             }}
                         />
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {gridData.total} Results
+                            {t('results', { count: gridData.total })}
                         </Typography>
                     </Stack>
 
@@ -168,7 +172,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                                 bgcolor: '#fff',
                             }}
                         >
-                            Filter
+                            {t('filter')}
                         </Button>
 
                         <Select
@@ -183,7 +187,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         </Select>
 
                         <Typography variant="body2" color="text.secondary">
-                            Per Page
+                            {t('perPage')}
                         </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
@@ -191,7 +195,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         </Paper>
 
                         <Typography variant="body2" color="text.secondary">
-                            of {lastPage}
+                            {t('pageOf', { lastPage })}
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
@@ -216,10 +220,10 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                     <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>ID</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Code</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Name</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Actions</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.id')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.code')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.name')}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('actionsHeader')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -250,7 +254,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                             {gridData.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        No attribute families found.
+                                        {tCatalog('noAttributeFamiliesFound')}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -261,15 +265,15 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
 
             {/* Delete Dialog */}
             <Dialog open={deleteFamilyId !== null} onClose={() => setDeleteFamilyId(null)}>
-                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        Are you sure you want to delete this attribute family?
+                        {tCatalog('confirmDeleteAttributeFamilyMessage')}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeleteFamilyId(null)} color="inherit">
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
@@ -282,7 +286,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         color="error"
                         variant="contained"
                     >
-                        Delete
+                        {t('delete')}
                     </Button>
                 </DialogActions>
             </Dialog>

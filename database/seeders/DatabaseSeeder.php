@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        $this->call(LocaleSeeder::class);
+
         $admin = Role::firstOrCreate(['label' => 'Administrator']);
 
         $user = User::factory()->create([

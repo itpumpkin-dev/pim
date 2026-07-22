@@ -13,5 +13,11 @@ class Locale extends Model
 
     protected $fillable = [
         'code',
+        'display_name',
+        'enabled',
+    ];
+
+    protected $casts = [
+        'enabled' => 'boolean',
     ];
 }

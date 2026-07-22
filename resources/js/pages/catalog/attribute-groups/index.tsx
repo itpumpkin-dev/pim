@@ -33,6 +33,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GridColumn {
     label: string;
@@ -66,12 +67,15 @@ interface Props {
     filters: { search?: string; sort?: string; dir?: string };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'ATTRIBUTE GROUPS', href: '/catalog/attributeGroups' },
-];
-
 export default function AttributeGroupIndex({ gridConfig, gridData, filters }: Props) {
+    const { t } = useTranslation('grid');
+    const { t: tCatalog } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('attributeGroups'), href: '/catalog/attributeGroups' },
+    ];
+
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canCreate = permissions.includes('attribute_groups.create_attribute_groups') || true;
@@ -101,12 +105,12 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Attribute Groups" />
+            <Head title={tCatalog('attributeGroupsTitle')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
                 {/* Header Title & Create Button */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="#1e1b4b">
-                        Attribute Groups
+                        {tCatalog('attributeGroupsTitle')}
                     </Typography>
                     {canCreate && (
                         <Button
@@ -123,7 +127,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Create Attribute Group
+                            {tCatalog('createAttributeGroup')}
                         </Button>
                     )}
                 </Stack>
@@ -134,7 +138,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         <TextField
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search"
+                            placeholder={tCatalog('search')}
                             size="small"
                             sx={{
                                 bgcolor: '#fff',
@@ -151,7 +155,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                             }}
                         />
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {gridData.total} Results
+                            {t('results', { count: gridData.total })}
                         </Typography>
                     </Stack>
 
@@ -167,7 +171,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                                 bgcolor: '#fff',
                             }}
                         >
-                            Filter
+                            {t('filter')}
                         </Button>
 
                         <Select
@@ -182,7 +186,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         </Select>
 
                         <Typography variant="body2" color="text.secondary">
-                            Per Page
+                            {t('perPage')}
                         </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
@@ -190,7 +194,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         </Paper>
 
                         <Typography variant="body2" color="text.secondary">
-                            of {lastPage}
+                            {t('pageOf', { lastPage })}
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
@@ -215,10 +219,10 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                     <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>ID</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Code</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Name</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Actions</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.id')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.code')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.name')}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('actionsHeader')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -246,7 +250,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                             {gridData.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        No attribute groups found.
+                                        {tCatalog('noAttributeGroupsFound')}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -257,15 +261,15 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
 
             {/* Delete Dialog */}
             <Dialog open={deleteGroupId !== null} onClose={() => setDeleteGroupId(null)}>
-                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        Are you sure you want to delete this attribute group?
+                        {tCatalog('confirmDeleteAttributeGroupMessage')}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeleteGroupId(null)} color="inherit">
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
@@ -278,7 +282,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         color="error"
                         variant="contained"
                     >
-                        Delete
+                        {t('delete')}
                     </Button>
                 </DialogActions>
             </Dialog>

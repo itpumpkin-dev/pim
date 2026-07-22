@@ -5,23 +5,23 @@ datagrid:
       class: App\Models\User
     columns:
       employee_id:
-        label: Employee ID
+        label: fields.employeeId
         type: string
         sortable: true
       username:
-        label: Username
+        label: fields.username
         type: string
         sortable: true
       first_name:
-        label: First name
+        label: fields.firstName
         type: string
         sortable: true
       last_name:
-        label: Last name
+        label: fields.lastName
         type: string
         sortable: true
       enabled:
-        label: Status
+        label: fields.status
         type: boolean
         sortable: true
     filters:
@@ -35,10 +35,10 @@ datagrid:
     actions:
       update:
         icon: edit
-        label: Edit
+        label: rowActions.edit
       # duplicate:
       #   icon: copy
       #   label: Duplicate
       delete:
         icon: delete
-        label: Delete
+        label: rowActions.delete

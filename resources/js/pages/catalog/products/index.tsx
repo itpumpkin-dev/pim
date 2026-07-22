@@ -40,6 +40,7 @@ import {
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GridColumn {
     label: string;
@@ -78,13 +79,15 @@ interface Props {
     filters: { search?: string; sort?: string; dir?: string };
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'PRODUCTS', href: '/catalog/products' },
-];
-
 export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
+    const { t } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
     const { auth } = usePage<SharedData>().props;
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog').toUpperCase(), href: '#' },
+        { title: tNav('products').toUpperCase(), href: '/catalog/products' },
+    ];
     const permissions = auth.permissions || [];
     const canCreate = permissions.includes('products.create_products') || true;
     const canEdit = permissions.includes('products.edit_products') || true;
@@ -130,12 +133,12 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Products" />
+            <Head title={t('products')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="#1e1b4b">
-                        Products
+                        {t('products')}
                     </Typography>
 
                     <Stack direction="row" spacing={1.5}>
@@ -150,7 +153,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                 '&:hover': { bgcolor: '#f5f3ff' },
                             }}
                         >
-                            Quick Export
+                            {t('quickExport')}
                         </Button>
                         {canCreate && (
                             <Button
@@ -167,7 +170,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                     '&:hover': { bgcolor: 'primary.dark' },
                                 }}
                             >
-                                Create Product
+                                {t('createProduct')}
                             </Button>
                         )}
                     </Stack>
@@ -179,7 +182,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                         <TextField
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search"
+                            placeholder={t('search')}
                             size="small"
                             sx={{
                                 bgcolor: '#fff',
@@ -196,7 +199,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                             }}
                         />
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {gridData.total} Results
+                            {t('results', { count: gridData.total })}
                         </Typography>
                     </Stack>
 
@@ -212,7 +215,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                 bgcolor: '#fff',
                             }}
                         >
-                            Columns
+                            {t('columns')}
                         </Button>
                         <Button
                             variant="outlined"
@@ -225,7 +228,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                 bgcolor: '#fff',
                             }}
                         >
-                            Filter
+                            {t('filter')}
                         </Button>
 
                         <Select
@@ -240,7 +243,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                         </Select>
 
                         <Typography variant="body2" color="text.secondary">
-                            Per Page
+                            {t('perPage')}
                         </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
@@ -248,7 +251,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                         </Paper>
 
                         <Typography variant="body2" color="text.secondary">
-                            of {lastPage}
+                            {t('pageOf', { lastPage })}
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
@@ -280,19 +283,19 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                         onChange={(e) => handleSelectAll(e.target.checked)}
                                     />
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>SKU</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Image</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Name</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('sku')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('image')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('name')}</TableCell>
                                 <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>
                                     <Stack direction="row" alignItems="center" spacing={0.5}>
-                                        <span>Attribute Family</span>
+                                        <span>{t('attributeFamily')}</span>
                                         <ArrowDownwardIcon sx={{ fontSize: 14 }} />
                                     </Stack>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Status</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Type</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Complete</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>Actions</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('status')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('type')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('complete')}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('actions')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -334,10 +337,10 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                             </Box>
                                         </TableCell>
                                         <TableCell sx={{ color: '#334155' }}>{typeof row.name === 'string' && row.name ? row.name : '-'}</TableCell>
-                                        <TableCell sx={{ color: '#334155' }}>{row.family_code || row.family?.code || 'Default'}</TableCell>
+                                        <TableCell sx={{ color: '#334155' }}>{row.family_code || row.family?.code || t('defaultFamily')}</TableCell>
                                         <TableCell>
                                             <Chip
-                                                label={row.enabled ? 'Enabled' : 'Disabled'}
+                                                label={row.enabled ? t('enabled') : t('disabled')}
                                                 size="small"
                                                 sx={{
                                                     bgcolor: row.enabled ? '#22c55e' : '#94a3b8',
@@ -349,11 +352,11 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                             />
                                         </TableCell>
                                         <TableCell sx={{ color: '#334155', fontSize: '0.875rem' }}>
-                                            {row.type === 'configurable' ? 'Configurable' : 'Simple'}
+                                            {row.type === 'configurable' ? t('configurable') : t('simple')}
                                         </TableCell>
                                         <TableCell>
                                             <Chip
-                                                label="N/A"
+                                                label={t('notApplicable')}
                                                 size="small"
                                                 sx={{
                                                     bgcolor: '#cbd5e1',
@@ -387,7 +390,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                             {gridData.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={9} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        No products found.
+                                        {t('noProductsFound')}
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -398,15 +401,15 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={deleteProductId !== null} onClose={() => setDeleteProductId(null)}>
-                <DialogTitle>Confirm Deletion</DialogTitle>
+                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        Are you sure you want to delete this product?
+                        {t('confirmDeleteMessage')}
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeleteProductId(null)} color="inherit">
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
@@ -419,7 +422,7 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                         color="error"
                         variant="contained"
                     >
-                        Delete
+                        {t('delete')}
                     </Button>
                 </DialogActions>
             </Dialog>

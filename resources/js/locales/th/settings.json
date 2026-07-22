@@ -1,0 +1,13 @@
+{
+    "profileInformation": "ข้อมูลโปรไฟล์",
+    "profileInformationDesc": "อัปเดตชื่อและที่อยู่อีเมลของคุณ",
+    "username": "ชื่อผู้ใช้",
+    "firstName": "ชื่อจริง",
+    "lastName": "นามสกุล",
+    "emailAddress": "อีเมล",
+    "save": "บันทึก",
+    "saved": "บันทึกแล้ว",
+    "emailUnverified": "อีเมลของคุณยังไม่ได้รับการยืนยัน",
+    "resendVerification": "คลิกที่นี่เพื่อส่งอีเมลยืนยันอีกครั้ง",
+    "verificationSent": "ลิงก์ยืนยันใหม่ถูกส่งไปยังอีเมลของคุณแล้ว"
+}

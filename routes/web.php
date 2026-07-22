@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\LocaleController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -7,6 +8,8 @@ use Inertia\Inertia;
 Route::get('/', function () {
     return Inertia::render('home');
 })->name('home');
+
+Route::put('locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {

@@ -1,0 +1,24 @@
+{
+    "usersCount": "{{count}} ผู้ใช้งาน",
+    "createUser": "สร้างผู้ใช้งาน",
+    "searchByUsername": "ค้นหาด้วยชื่อผู้ใช้",
+    "confirmDeletionTitle": "ยืนยันการลบ",
+    "confirmDeleteUserMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานนี้?",
+
+    "rolesCount": "{{count}} บทบาท",
+    "createRole": "สร้างบทบาท",
+    "searchByName": "ค้นหาด้วยชื่อ",
+    "deleteRoleTitle": "ลบบทบาท?",
+    "confirmDeleteRoleMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบบทบาท \"{{label}}\"? การดำเนินการนี้จะลบออกจากผู้ใช้งานทุกคนที่ได้รับสิทธิ์นี้ และไม่สามารถย้อนกลับได้",
+
+    "userGroupsCount": "{{count}} กลุ่ม",
+    "createUserGroup": "สร้างกลุ่มผู้ใช้งาน",
+    "deleteGroupTitle": "ลบกลุ่ม?",
+    "confirmDeleteGroupMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่ม \"{{name}}\"? การดำเนินการนี้จะลบออกจากผู้ใช้งานทุกคนที่อยู่ในกลุ่มนี้ และไม่สามารถย้อนกลับได้",
+
+    "localesTitle": "ภาษา",
+    "createLocale": "สร้างภาษา",
+    "searchByCode": "ค้นหาด้วยโค้ด",
+    "noLocalesFound": "ไม่พบข้อมูลภาษา",
+    "confirmDeleteLocaleMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบภาษานี้?"
+}

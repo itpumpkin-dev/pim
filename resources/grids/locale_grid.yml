@@ -1,0 +1,35 @@
+datagrid:
+  locale_grid:
+    source:
+      type: eloquent
+      class: App\Models\Locale
+    columns:
+      id:
+        label: fields.id
+        type: number
+        sortable: true
+      code:
+        label: fields.code
+        type: string
+        sortable: true
+      display_name:
+        label: fields.displayName
+        type: string
+        sortable: true
+      enabled:
+        label: fields.status
+        type: boolean
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - code
+          - display_name
+    actions:
+      update:
+        icon: edit
+        label: rowActions.edit
+      delete:
+        icon: delete
+        label: rowActions.delete

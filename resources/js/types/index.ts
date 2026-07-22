@@ -24,12 +24,20 @@ export interface NavItem {
     permission?: string;
 }
 
+export interface Locale {
+    id: number;
+    code: string;
+    display_name: string | null;
+}
+
 export interface SharedData {
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
     status?: string | null;
     success?: string | null;
+    locale: string;
+    locales: Locale[];
     [key: string]: unknown;
 }
 

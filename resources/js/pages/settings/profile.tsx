@@ -2,21 +2,23 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Box, Button, Fade, Link as MuiLink, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Profile settings',
-        href: '/settings/profile',
-    },
-];
-
 export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
+    const { t } = useTranslation('settings');
     const { auth } = usePage<SharedData>().props;
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: t('profileInformation'),
+            href: '/settings/profile',
+        },
+    ];
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
         username: auth.user.username,
@@ -33,23 +35,23 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Profile settings" />
+            <Head title={t('profileInformation')} />
 
             <SettingsLayout>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <HeadingSmall title="Profile information" description="Update your name and email address" />
+                    <HeadingSmall title={t('profileInformation')} description={t('profileInformationDesc')} />
 
                     <Box component="form" onSubmit={submit}>
                         <Stack spacing={3}>
                             <TextField
                                 id="username"
-                                label="Username"
+                                label={t('username')}
                                 fullWidth
                                 value={data.username}
                                 onChange={(e) => setData('username', e.target.value)}
                                 required
                                 autoComplete="username"
-                                placeholder="username"
+                                placeholder={t('username')}
                                 error={Boolean(errors.username)}
                                 helperText={errors.username}
                             />
@@ -57,26 +59,26 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             <Stack direction="row" spacing={2}>
                                 <TextField
                                     id="first_name"
-                                    label="First name"
+                                    label={t('firstName')}
                                     fullWidth
                                     value={data.first_name}
                                     onChange={(e) => setData('first_name', e.target.value)}
                                     required
                                     autoComplete="given-name"
-                                    placeholder="First name"
+                                    placeholder={t('firstName')}
                                     error={Boolean(errors.first_name)}
                                     helperText={errors.first_name}
                                 />
 
                                 <TextField
                                     id="last_name"
-                                    label="Last name"
+                                    label={t('lastName')}
                                     fullWidth
                                     value={data.last_name}
                                     onChange={(e) => setData('last_name', e.target.value)}
                                     required
                                     autoComplete="family-name"
-                                    placeholder="Last name"
+                                    placeholder={t('lastName')}
                                     error={Boolean(errors.last_name)}
                                     helperText={errors.last_name}
                                 />
@@ -85,13 +87,13 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             <TextField
                                 id="email"
                                 type="email"
-                                label="Email address"
+                                label={t('emailAddress')}
                                 fullWidth
                                 value={data.email}
                                 onChange={(e) => setData('email', e.target.value)}
                                 required
                                 autoComplete="username"
-                                placeholder="Email address"
+                                placeholder={t('emailAddress')}
                                 error={Boolean(errors.email)}
                                 helperText={errors.email}
                             />
@@ -99,15 +101,15 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             {mustVerifyEmail && auth.user.email_verified_at === null && (
                                 <Box>
                                     <Typography variant="body2" color="text.secondary">
-                                        Your email address is unverified.{' '}
+                                        {t('emailUnverified')}{' '}
                                         <MuiLink component={Link} href={route('verification.send')} method="post" as="button" underline="hover">
-                                            Click here to re-send the verification email.
+                                            {t('resendVerification')}
                                         </MuiLink>
                                     </Typography>
 
                                     {status === 'verification-link-sent' && (
                                         <Typography variant="body2" color="success.main" sx={{ mt: 1, fontWeight: 500 }}>
-                                            A new verification link has been sent to your email address.
+                                            {t('verificationSent')}
                                         </Typography>
                                     )}
                                 </Box>
@@ -115,12 +117,12 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <Button type="submit" variant="contained" disabled={processing}>
-                                    Save
+                                    {t('save')}
                                 </Button>
 
                                 <Fade in={recentlySuccessful}>
                                     <Typography variant="body2" color="text.secondary">
-                                        Saved
+                                        {t('saved')}
                                     </Typography>
                                 </Fade>
                             </Box>

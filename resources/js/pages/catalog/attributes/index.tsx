@@ -7,6 +7,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { Box, Button, Chip, colors, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface GridColumn { label: string; type: string; sortable?: boolean; }
 interface GridAction { icon: string; label: string; }
@@ -14,15 +15,18 @@ interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<str
 interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; }
 interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string }; }
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'CATALOG', href: '#' }, { title: 'ATTRIBUTES', href: '/catalog/attributes' }];
-
-function cellValue(value: unknown, type: string) {
-    if (type === 'boolean') return <Chip label={value ? 'Yes' : 'No'} size="small" color={value ? 'primary' : 'default'} variant={value ? 'filled' : 'outlined'} />;
+function cellValue(value: unknown, type: string, t: (key: string) => string) {
+    if (type === 'boolean') return <Chip label={value ? t('yes') : t('no')} size="small" color={value ? 'primary' : 'default'} variant={value ? 'filled' : 'outlined'} />;
     if (type === 'datetime' && typeof value === 'string') return new Date(value).toLocaleDateString();
     return String(value ?? '-');
 }
 
 export default function AttributeIndex({ gridConfig, gridData, filters }: Props) {
+    const { t } = useTranslation('grid');
+    const { t: tCatalog } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+    const breadcrumbs: BreadcrumbItem[] = [{ title: tNav('catalog'), href: '#' }, { title: tNav('attributes'), href: '/catalog/attributes' }];
+
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canCreate = permissions.includes('attributes.create_attributes');
@@ -51,30 +55,30 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
 
     return <AppLayout
         breadcrumbs={breadcrumbs}>
-        <Head title="Attributes" />
+        <Head title={tCatalog('attributesTitle')} />
         <Box sx={{ p: 4 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
-                <Box><Typography variant="h4" fontWeight={700}>Attributes</Typography>
-                    <Typography color="text.secondary">{gridData.total} results</Typography>
+                <Box><Typography variant="h4" fontWeight={700}>{tCatalog('attributesTitle')}</Typography>
+                    <Typography color="text.secondary">{t('results', { count: gridData.total })}</Typography>
                 </Box>{canCreate &&
-                    <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>Create Attribute</Button>}
+                    <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
             </Box>
-            <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search attributes" size="small" sx={{ mb: 3, minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+            <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ mb: 3, minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>
                         <TableRow>
                             {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                <TableCell key={key} sx={{ fontWeight: 700 }}>{column.label}</TableCell>
+                                <TableCell key={key} sx={{ fontWeight: 700 }}>{t(column.label)}</TableCell>
                             ))}
-                            {visibleActions.length > 0 && <TableCell sx={{ fontWeight: 700 }} align="right">Actions</TableCell>}
+                            {visibleActions.length > 0 && <TableCell sx={{ fontWeight: 700 }} align="right">{t('actionsHeader')}</TableCell>}
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {gridData.data.map((row) => (
                             <TableRow key={row.id}>
                                 {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                    <TableCell key={key}>{cellValue(row[key], column.type)}</TableCell>
+                                    <TableCell key={key}>{cellValue(row[key], column.type, t)}</TableCell>
                                 ))}
                                 {visibleActions.length > 0 && (
                                     <TableCell align="right">
@@ -94,7 +98,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                                                 return (
                                                     <IconButton key={actionKey} size="small" sx={{ display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
                                                         <Icon fontSize="small" />
-                                                        <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{action.label}</Typography>
+                                                        <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
                                                     </IconButton>
                                                 );
                                             })}
@@ -106,7 +110,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                         {gridData.data.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center">
-                                    No attributes found.
+                                    {tCatalog('noAttributesFound')}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -115,14 +119,14 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
             </TableContainer>
         </Box>
         <Dialog open={deleteAttributeId !== null} onClose={() => setDeleteAttributeId(null)}>
-            <DialogTitle>Confirm deletion</DialogTitle>
+            <DialogTitle>{t('confirmDeletion')}</DialogTitle>
             <DialogContent>
                 <DialogContentText>
-                    Are you sure you want to delete this attribute?
+                    {tCatalog('confirmDeleteAttributeMessage')}
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setDeleteAttributeId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>Cancel</Button>
+                <Button onClick={() => setDeleteAttributeId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>{t('cancel')}</Button>
                 <Button onClick={() => {
                     if (deleteAttributeId !== null) {
                         router.delete(`/catalog/attributes/${deleteAttributeId}`, {
@@ -130,7 +134,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                         });
                     }
                 }} color="error" variant="contained" sx={{ fontWeight: 'bold' }}>
-                    Delete
+                    {t('delete')}
                 </Button>
             </DialogActions>
         </Dialog>

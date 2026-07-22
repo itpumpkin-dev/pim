@@ -5,15 +5,15 @@ datagrid:
       class: App\Models\AttributeFamily
     columns:
       id:
-        label: ID
+        label: fields.id
         type: number
         sortable: true
       code:
-        label: Code
+        label: fields.code
         type: string
         sortable: true
       name:
-        label: Name
+        label: fields.name
         type: string
         sortable: true
     filters:
@@ -25,10 +25,10 @@ datagrid:
     actions:
       update:
         icon: edit
-        label: Edit
+        label: rowActions.edit
       duplicate:
         icon: copy
-        label: Duplicate
+        label: rowActions.duplicate
       delete:
         icon: delete
-        label: Delete
+        label: rowActions.delete

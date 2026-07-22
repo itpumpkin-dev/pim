@@ -1,0 +1,15 @@
+{
+    "dashboard": "แดชบอร์ด",
+    "catalog": "แคตตาล็อก",
+    "products": "สินค้า",
+    "categories": "หมวดหมู่",
+    "categoryFields": "ฟิลด์หมวดหมู่",
+    "attributes": "แอตทริบิวต์",
+    "attributeGroups": "กลุ่มแอตทริบิวต์",
+    "attributeFamilies": "ตระกูลแอตทริบิวต์",
+    "system": "ระบบ",
+    "users": "ผู้ใช้งาน",
+    "userGroups": "กลุ่มผู้ใช้งาน",
+    "roles": "บทบาท",
+    "locales": "ภาษา"
+}
