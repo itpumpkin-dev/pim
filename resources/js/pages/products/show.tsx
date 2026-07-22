@@ -1,4 +1,5 @@
 import AppLogoIcon from '@/components/app-logo-icon';
+import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { ProductCard } from '@/components/product-card';
 import { currency, findProduct, productImageUrl, products, type IconType } from '@/data/products';
 import { useElementWidth } from '@/hooks/use-element-width';
@@ -40,14 +41,41 @@ const STAT_VARIANTS: Array<Record<string, unknown>> = [
 ];
 
 /** small icon + value + label tile, used both for real facts (brand/category/color) and for filling leftover grid gaps */
-function factCell(area: GridArea, variantIndex: number, FactIcon: IconType, value: string, label: string) {
+function factCell(area: GridArea, variantIndex: number, FactIcon: IconType, value: string, label: string, h = 2) {
+    const compact = h <= 1;
+
+    if (compact) {
+        return (
+            <Box
+                sx={{
+                    ...area,
+                    height: '100%',
+                    minWidth: 0,
+                    borderRadius: '12px',
+                    px: 1.5,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    overflow: 'hidden',
+                    ...hoverLiftSx,
+                    ...STAT_VARIANTS[variantIndex % STAT_VARIANTS.length],
+                }}
+            >
+                <FactIcon fontSize="small" sx={{ opacity: 0.85, flexShrink: 0 }} />
+                <Typography variant="body2" noWrap sx={{ fontWeight: 800, minWidth: 0 }}>
+                    {value}
+                </Typography>
+            </Box>
+        );
+    }
+
     return (
         <Box
             sx={{
                 ...area,
                 height: '100%',
                 minWidth: 0,
-                borderRadius: 5,
+                borderRadius: '14px',
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
@@ -130,15 +158,25 @@ export default function ProductShow({ id }: { id: number }) {
                 <Head title="ไม่พบสินค้า" />
                 <AppBar position="sticky" color="inherit" elevation={1}>
                     <Toolbar sx={{ justifyContent: 'space-between' }}>
-                        <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
+                        <Box
+                            component={Link}
+                            href="/"
+                            sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}
+                        >
                             <Box sx={{ color: 'primary.main', display: 'flex' }}>
                                 <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
                             </Box>
                             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                                PIM{' '}
+                                <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                                    Pumpkin
+                                </Box>
                             </Typography>
                         </Box>
-                        {actions}
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <AppearanceToggleDropdown />
+                            {actions}
+                        </Stack>
                     </Toolbar>
                 </AppBar>
 
@@ -163,7 +201,7 @@ export default function ProductShow({ id }: { id: number }) {
                 minWidth: 0,
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: 5,
+                borderRadius: '20px',
                 p: { xs: 3, md: 4 },
                 display: 'flex',
                 flexDirection: 'column',
@@ -258,7 +296,7 @@ export default function ProductShow({ id }: { id: number }) {
                 height: '100%',
                 minWidth: 0,
                 overflow: 'auto',
-                borderRadius: 5,
+                borderRadius: '20px',
                 p: 3,
                 bgcolor: '#f5f5f7',
                 color: '#1a1a1a',
@@ -296,7 +334,7 @@ export default function ProductShow({ id }: { id: number }) {
                 height: '100%',
                 minWidth: 0,
                 position: 'relative',
-                borderRadius: 5,
+                borderRadius: '20px',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
@@ -347,7 +385,7 @@ export default function ProductShow({ id }: { id: number }) {
                 ...area,
                 height: '100%',
                 minWidth: 0,
-                borderRadius: 5,
+                borderRadius: '14px',
                 p: 2.5,
                 bgcolor: 'primary.main',
                 color: 'primary.contrastText',
@@ -374,7 +412,7 @@ export default function ProductShow({ id }: { id: number }) {
                 ...area,
                 height: '100%',
                 minWidth: 0,
-                borderRadius: 5,
+                borderRadius: '14px',
                 p: 2.5,
                 bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#000' : 'grey.900'),
                 color: '#fff',
@@ -404,7 +442,7 @@ export default function ProductShow({ id }: { id: number }) {
                 ...area,
                 height: '100%',
                 minWidth: 0,
-                borderRadius: 5,
+                borderRadius: '14px',
                 p: 2.5,
                 display: 'flex',
                 flexDirection: 'column',
@@ -435,7 +473,7 @@ export default function ProductShow({ id }: { id: number }) {
                     ...area,
                     height: '100%',
                     minWidth: 0,
-                    borderRadius: 5,
+                    borderRadius: '14px',
                     p: 2.5,
                     display: 'flex',
                     flexDirection: 'column',
@@ -449,7 +487,7 @@ export default function ProductShow({ id }: { id: number }) {
                         width: 44,
                         height: 44,
                         flexShrink: 0,
-                        borderRadius: 3,
+                        borderRadius: '12px',
                         bgcolor: (theme) => alpha(theme.palette[accent].main, 0.15),
                         color: `${accent}.main`,
                         display: 'flex',
@@ -537,10 +575,16 @@ export default function ProductShow({ id }: { id: number }) {
                             <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
                         </Box>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                            PIM{' '}
+                            <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                                Pumpkin
+                            </Box>
                         </Typography>
                     </Box>
-                    {actions}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <AppearanceToggleDropdown />
+                        {actions}
+                    </Stack>
                 </Toolbar>
             </AppBar>
 
@@ -556,6 +600,7 @@ export default function ProductShow({ id }: { id: number }) {
                         gridTemplateColumns: `repeat(${cols}, 1fr)`,
                         gridAutoRows: `${rowH}px`,
                         gap: 1.25,
+                        py: 2,
                     }}
                 >
                     {placed.map((p) => cloneElement(p.data.render(gridArea(p.x, p.y, p.w, p.h)), { key: p.data.key }))}
@@ -567,6 +612,7 @@ export default function ProductShow({ id }: { id: number }) {
                                 TuneOutlinedIcon,
                                 fillerPool[index % fillerPool.length].value,
                                 fillerPool[index % fillerPool.length].label,
+                                g.h,
                             ),
                             {
                                 key: `gap-${g.x}-${g.y}`,
