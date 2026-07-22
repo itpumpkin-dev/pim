@@ -1,22 +1,22 @@
+import AppLogoIcon from '@/components/app-logo-icon';
 import { ProductCard } from '@/components/product-card';
 import { currency, findProduct, productImageUrl, products, type IconType } from '@/data/products';
 import { useElementWidth } from '@/hooks/use-element-width';
-import { useLocale } from '@/hooks/use-locale';
-import AppLayout from '@/layouts/app-layout';
 import { computeBentoLayout, findBentoGaps, gridArea, packBento, scaleBentoItems, type BentoItem } from '@/lib/bento';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { type SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
+import LoginIcon from '@mui/icons-material/Login';
 import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
-import { alpha, Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableRow, Typography } from '@mui/material';
+import { alpha, AppBar, Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableRow, Toolbar, Typography } from '@mui/material';
 import { cloneElement, useState } from 'react';
 
 type GridArea = { gridColumn: string; gridRow: string };
@@ -69,33 +69,91 @@ function factCell(area: GridArea, variantIndex: number, FactIcon: IconType, valu
 }
 
 export default function ProductShow({ id }: { id: number }) {
+    const { auth } = usePage<SharedData>().props;
     const product = findProduct(id);
     const [imageFailed, setImageFailed] = useState(false);
     const { ref: bentoRef, width: bentoWidth } = useElementWidth<HTMLDivElement>();
-    const { t, tCategory } = useLocale();
+
+    const actions = !auth.user ? (
+        <Button
+            component={Link}
+            href={route('login')}
+            variant="contained"
+            startIcon={<LoginIcon />}
+            sx={{
+                borderRadius: '50px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 2,
+                py: 1,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                    transform: 'translateY(-2px)',
+                    background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                },
+            }}
+        >
+            Sign in
+        </Button>
+    ) : (
+        <Button
+            component={Link}
+            href={route('dashboard')}
+            variant="outlined"
+            sx={{
+                borderRadius: '50px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1,
+                borderWidth: 2,
+                color: '#ea580c',
+                borderColor: '#ea580c',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                    borderWidth: 2,
+                    borderColor: '#c2410c',
+                    bgcolor: alpha('#ea580c', 0.08),
+                    transform: 'translateY(-2px)',
+                },
+            }}
+        >
+            ไปที่ Dashboard
+        </Button>
+    );
 
     if (!product) {
         return (
-            <AppLayout breadcrumbs={[{ title: t('nav.home'), href: '/home' }]}>
-                <Head title={t('show.notFound.message')} />
-                <Stack spacing={2} alignItems="flex-start" sx={{ p: 4 }}>
-                    <Typography variant="h6">{t('show.notFound.message')}</Typography>
-                    <Button component={Link} href="/home" startIcon={<ArrowBackIcon />}>
-                        {t('show.notFound.backHome')}
+            <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+                <Head title="ไม่พบสินค้า" />
+                <AppBar position="sticky" color="inherit" elevation={1}>
+                    <Toolbar sx={{ justifyContent: 'space-between' }}>
+                        <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
+                            <Box sx={{ color: 'primary.main', display: 'flex' }}>
+                                <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
+                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                            </Typography>
+                        </Box>
+                        {actions}
+                    </Toolbar>
+                </AppBar>
+
+                <Stack spacing={2} alignItems="flex-start" sx={{ p: { xs: 2, md: 4 } }}>
+                    <Typography variant="h6">ไม่พบสินค้าที่คุณต้องการ</Typography>
+                    <Button component={Link} href="/" startIcon={<ArrowBackIcon />}>
+                        กลับหน้า Home
                     </Button>
                 </Stack>
-            </AppLayout>
+            </Box>
         );
     }
 
     const Icon = product.icon;
     const related = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
-
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: t('nav.home'), href: '/home' },
-        { title: tCategory(product.category), href: '/home' },
-        { title: product.name, href: `/products/${product.id}` },
-    ];
 
     const heroRender = (area: GridArea) => (
         <Box
@@ -161,7 +219,7 @@ export default function ProductShow({ id }: { id: number }) {
                 <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, gap: 1 }}>
                     <Chip
                         size="small"
-                        label={t('show.sku', { sku: product.sku })}
+                        label={`SKU ${product.sku}`}
                         sx={{ bgcolor: alpha('#fff', 0.08), color: '#fff', border: 1, borderColor: alpha('#fff', 0.1) }}
                     />
                     {product.color && (
@@ -180,14 +238,14 @@ export default function ProductShow({ id }: { id: number }) {
                     startIcon={<EditOutlinedIcon />}
                     sx={{ borderRadius: 999, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
                 >
-                    {t('common.edit')}
+                    แก้ไขข้อมูล
                 </Button>
                 <Button
                     variant="outlined"
                     startIcon={<PrintOutlinedIcon />}
                     sx={{ borderRadius: 999, color: '#fff', borderColor: alpha('#fff', 0.3), '&:hover': { borderColor: '#fff' } }}
                 >
-                    {t('common.print')}
+                    พิมพ์ข้อมูล
                 </Button>
             </Stack>
         </Box>
@@ -210,7 +268,7 @@ export default function ProductShow({ id }: { id: number }) {
             <Stack direction="row" spacing={0.75} alignItems="center">
                 <TuneOutlinedIcon fontSize="small" sx={{ color: '#8a8a8a' }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8a8a8a' }}>
-                    {t('show.spec.heading')}
+                    ข้อมูลจำเพาะ
                 </Typography>
             </Stack>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.5, ...clampSx(2) }}>
@@ -305,7 +363,7 @@ export default function ProductShow({ id }: { id: number }) {
                 {currency(product.price)}
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                {t('show.stat.pricePerUnit')}
+                ราคาต่อหน่วย
             </Typography>
         </Box>
     );
@@ -331,12 +389,11 @@ export default function ProductShow({ id }: { id: number }) {
             <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
                 {product.packQty}
                 <Typography component="span" variant="body1" sx={{ fontWeight: 700, opacity: 0.75, ml: 0.5 }}>
-                    {product.packUnit}
-                    {t('show.stat.packUnitSuffix')}
+                    {product.packUnit}/ลัง
                 </Typography>
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                {t('show.stat.packagingCaption', { size: product.size })}
+                ขนาดบรรจุ {product.size}
             </Typography>
         </Box>
     );
@@ -360,7 +417,7 @@ export default function ProductShow({ id }: { id: number }) {
         >
             <LocalOfferOutlinedIcon fontSize="medium" sx={{ opacity: 0.9, mb: 0.5 }} />
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                {t('show.discount.title')}
+                ส่วนลดตามจำนวนสั่งซื้อ
             </Typography>
             <Typography variant="body1" sx={{ opacity: 0.9, mt: 0.5, ...clampSx(3) }}>
                 {product.discountNote}
@@ -423,13 +480,13 @@ export default function ProductShow({ id }: { id: number }) {
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, t('show.fact.brand')) },
+        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, 'แบรนด์') },
     });
     cells.push({
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, tCategory(product.category), t('show.fact.category')) },
+        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, product.category, 'หมวดหมู่') },
     });
 
     if (product.color) {
@@ -438,7 +495,7 @@ export default function ProductShow({ id }: { id: number }) {
             w: 2,
             h: 2,
             weight: 2,
-            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteOutlinedIcon, color, t('show.fact.color')) },
+            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteOutlinedIcon, color, 'สี') },
         });
     }
 
@@ -466,16 +523,30 @@ export default function ProductShow({ id }: { id: number }) {
         Object.keys(product.specs).length > 0
             ? Object.entries(product.specs).map(([label, value]) => ({ label, value }))
             : [
-                  { label: t('show.fact.brand'), value: product.brand },
-                  { label: t('show.fact.category'), value: tCategory(product.category) },
+                  { label: 'แบรนด์', value: product.brand },
+                  { label: 'หมวดหมู่', value: product.category },
               ];
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
             <Head title={product.name} />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
-                <Button component={Link} href="/home" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
-                    {t('common.back')}
+            <AppBar position="sticky" color="inherit" elevation={1}>
+                <Toolbar sx={{ justifyContent: 'space-between' }}>
+                    <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
+                        <Box sx={{ color: 'primary.main', display: 'flex' }}>
+                            <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
+                        </Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                        </Typography>
+                    </Box>
+                    {actions}
+                </Toolbar>
+            </AppBar>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
+                <Button component={Link} href="/" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
+                    กลับ
                 </Button>
 
                 <Box
@@ -507,7 +578,7 @@ export default function ProductShow({ id }: { id: number }) {
                 {related.length > 0 && (
                     <Box>
                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                            {t('show.related.heading')}
+                            สินค้าที่เกี่ยวข้อง
                         </Typography>
                         <Box sx={{ columnCount: { xs: 2, sm: 3, md: 4 }, columnGap: 2 }}>
                             {related.map((item) => (
@@ -517,6 +588,6 @@ export default function ProductShow({ id }: { id: number }) {
                     </Box>
                 )}
             </Box>
-        </AppLayout>
+        </Box>
     );
 }

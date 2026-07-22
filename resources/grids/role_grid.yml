@@ -1,0 +1,22 @@
+datagrid:
+  role_grid:
+    source:
+      type: eloquent
+      class: App\Models\Role
+    columns:
+      label:
+        label: Name
+        type: string
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - label
+    actions:
+      update:
+        icon: edit
+        label: Edit
+      delete:
+        icon: delete
+        label: Delete

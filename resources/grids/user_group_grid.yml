@@ -1,0 +1,22 @@
+datagrid:
+  user_group_grid:
+    source:
+      type: eloquent
+      class: App\Models\UserGroup
+    columns:
+      name:
+        label: Name
+        type: string
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - name
+    actions:
+      update:
+        icon: edit
+        label: Edit
+      delete:
+        icon: delete
+        label: Delete

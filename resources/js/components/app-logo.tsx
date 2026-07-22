@@ -13,15 +13,14 @@ export default function AppLogo() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: 1,
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText',
+                    color: 'primary.main',
                 }}
             >
-                <AppLogoIcon style={{ width: 20, height: 20, fill: 'currentColor' }} />
+                <AppLogoIcon style={{ width: 30, height: 30, fill: 'currentColor' }} />
             </Box>
             <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1 }}>
-                    PimPK
+                <Typography variant="body2" noWrap sx={{ fontWeight: 1000, lineHeight: 1, fontSize: 24, color: 'text.primary' }}>
+                    PIM<Box component="span" sx={{ color: 'primary.main' }}>Pumpkin</Box>
                 </Typography>
             </Box>
         </>

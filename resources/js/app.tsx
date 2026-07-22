@@ -42,6 +42,6 @@ createInertiaApp({
         );
     },
     progress: {
-        color: '#4B5563',
+        color: '#f37021', // Pumpkin Orange — matches theme.ts primary
     },
 });

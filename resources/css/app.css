@@ -1,4 +1,4 @@
-@import url('https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700|noto-sans-thai:400,500,600,700,800,900');
+@import url('https://fonts.bunny.net/css?family=sarabun:400,500,600,700,800');
 
 *,
 *::before,
@@ -16,6 +16,5 @@ body,
 
 body {
     font-family:
-        'Instrument Sans', 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-        'Noto Color Emoji';
+        'Sarabun', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }

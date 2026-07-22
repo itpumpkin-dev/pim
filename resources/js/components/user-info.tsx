@@ -7,7 +7,7 @@ export function UserInfo({ user, showEmail = false }: { user: User; showEmail?: 
 
     return (
         <>
-            <Avatar src={user.avatar} alt={user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
+            <Avatar src={user.avatar_url} alt={user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
                 {getInitials(user.name)}
             </Avatar>
             <Box sx={{ display: 'grid', flex: 1, textAlign: 'left', minWidth: 0, ml: 1.5 }}>

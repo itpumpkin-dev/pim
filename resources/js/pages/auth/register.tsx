@@ -6,7 +6,9 @@ import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
 
 interface RegisterForm {
-    name: string;
+    username: string;
+    first_name: string;
+    last_name: string;
     email: string;
     password: string;
     password_confirmation: string;
@@ -15,7 +17,9 @@ interface RegisterForm {
 
 export default function Register() {
     const { data, setData, post, processing, errors, reset } = useForm<RegisterForm>({
-        name: '',
+        username: '',
+        first_name: '',
+        last_name: '',
         email: '',
         password: '',
         password_confirmation: '',
@@ -34,28 +38,62 @@ export default function Register() {
             <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <Stack spacing={3}>
                     <TextField
-                        id="name"
+                        id="username"
                         type="text"
-                        label="Name"
+                        label="Username"
                         required
                         autoFocus
                         tabIndex={1}
-                        autoComplete="name"
-                        value={data.name}
-                        onChange={(e) => setData('name', e.target.value)}
+                        autoComplete="username"
+                        value={data.username}
+                        onChange={(e) => setData('username', e.target.value)}
                         disabled={processing}
-                        placeholder="Full name"
+                        placeholder="username"
                         fullWidth
-                        error={Boolean(errors.name)}
-                        helperText={errors.name}
+                        error={Boolean(errors.username)}
+                        helperText={errors.username}
                     />
+
+                    <Stack direction="row" spacing={2}>
+                        <TextField
+                            id="first_name"
+                            type="text"
+                            label="First name"
+                            required
+                            tabIndex={2}
+                            autoComplete="given-name"
+                            value={data.first_name}
+                            onChange={(e) => setData('first_name', e.target.value)}
+                            disabled={processing}
+                            placeholder="First name"
+                            fullWidth
+                            error={Boolean(errors.first_name)}
+                            helperText={errors.first_name}
+                        />
+
+                        <TextField
+                            id="last_name"
+                            type="text"
+                            label="Last name"
+                            required
+                            tabIndex={3}
+                            autoComplete="family-name"
+                            value={data.last_name}
+                            onChange={(e) => setData('last_name', e.target.value)}
+                            disabled={processing}
+                            placeholder="Last name"
+                            fullWidth
+                            error={Boolean(errors.last_name)}
+                            helperText={errors.last_name}
+                        />
+                    </Stack>
 
                     <TextField
                         id="email"
                         type="email"
                         label="Email address"
                         required
-                        tabIndex={2}
+                        tabIndex={4}
                         autoComplete="email"
                         value={data.email}
                         onChange={(e) => setData('email', e.target.value)}
@@ -71,7 +109,7 @@ export default function Register() {
                         type="password"
                         label="Password"
                         required
-                        tabIndex={3}
+                        tabIndex={5}
                         autoComplete="new-password"
                         value={data.password}
                         onChange={(e) => setData('password', e.target.value)}
@@ -87,7 +125,7 @@ export default function Register() {
                         type="password"
                         label="Confirm password"
                         required
-                        tabIndex={4}
+                        tabIndex={6}
                         autoComplete="new-password"
                         value={data.password_confirmation}
                         onChange={(e) => setData('password_confirmation', e.target.value)}
@@ -102,7 +140,7 @@ export default function Register() {
                         type="submit"
                         variant="contained"
                         fullWidth
-                        tabIndex={5}
+                        tabIndex={7}
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
@@ -112,7 +150,7 @@ export default function Register() {
 
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
                     Already have an account?{' '}
-                    <TextLink href={route('login')} tabIndex={6}>
+                    <TextLink href={route('login')} tabIndex={8}>
                         Log in
                     </TextLink>
                 </Typography>

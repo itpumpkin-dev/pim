@@ -1,8 +1,7 @@
 import { createTheme, type PaletteMode, type ThemeOptions } from '@mui/material/styles';
 
 const fontFamily = [
-    '"Instrument Sans"',
-    '"Noto Sans Thai"',
+    '"Sarabun"',
     'ui-sans-serif',
     'system-ui',
     'sans-serif',
@@ -15,19 +14,26 @@ const fontFamily = [
 export function getTheme(mode: PaletteMode) {
     const isDark = mode === 'dark';
 
+    // 60-30-10: neutral surfaces/text dominate (60%), slate carries structural
+    // chrome and supporting text (30%), pumpkin orange is reserved for CTAs and
+    // active/selected states only (10%).
+    const slate = isDark ? '#94a3b8' : '#475569';
+
     const options: ThemeOptions = {
         palette: {
             mode,
             primary: {
-                main: isDark ? '#ff6a3d' : '#ff3300',
-                contrastText: '#ffffff',
+                main: '#f37021', // Pumpkin Orange — 10% accent
             },
             secondary: {
-                main: isDark ? '#a78bfa' : '#7c3aed',
+                main: slate, // 30% structural/supporting
             },
             background: {
-                default: isDark ? '#0a0a0a' : '#fff8f6',
-                paper: isDark ? '#141414' : '#ffffff',
+                default: isDark ? '#0f172a' : '#f8fafc', // 60% neutral
+                paper: isDark ? '#1e293b' : '#ffffff',
+            },
+            text: {
+                secondary: slate,
             },
         },
         shape: {
