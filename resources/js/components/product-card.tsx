@@ -1,4 +1,5 @@
 import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Product } from '@/data/products';
+import { useLocale } from '@/hooks/use-locale';
 import { downloadCsv } from '@/lib/csv';
 import { Link } from '@inertiajs/react';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
@@ -6,11 +7,10 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { Box, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useState } from 'react';
 
-const packLabel = (product: Product) => `บรรจุ ${product.packQty} ${product.packUnit}/ลัง`;
-
 export function ProductCard({ product }: { product: Product }) {
     const Icon = product.icon;
     const [imageFailed, setImageFailed] = useState(false);
+    const { t, tCategory } = useLocale();
 
     const handleExport = (event: React.MouseEvent) => {
         event.preventDefault();
@@ -75,7 +75,7 @@ export function ProductCard({ product }: { product: Product }) {
 
             <Box sx={{ p: 2 }}>
                 <Typography variant="caption" color="text.secondary">
-                    {product.brand} · {product.category}
+                    {product.brand} · {tCategory(product.category)}
                 </Typography>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, minHeight: 40 }}>
                     {product.name}
@@ -91,11 +91,11 @@ export function ProductCard({ product }: { product: Product }) {
                     </Typography>
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
                         <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                        <Typography variant="caption">{packLabel(product)}</Typography>
+                        <Typography variant="caption">{t('common.packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
                     </Stack>
                 </Stack>
 
-                <Tooltip title="Export ข้อมูลสินค้านี้">
+                <Tooltip title={t('common.exportThisProduct')}>
                     <IconButton
                         size="small"
                         onClick={handleExport}

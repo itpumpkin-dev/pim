@@ -1,6 +1,7 @@
 import { ProductCard } from '@/components/product-card';
 import { currency, findProduct, productImageUrl, products, type IconType } from '@/data/products';
 import { useElementWidth } from '@/hooks/use-element-width';
+import { useLocale } from '@/hooks/use-locale';
 import AppLayout from '@/layouts/app-layout';
 import { computeBentoLayout, findBentoGaps, gridArea, packBento, scaleBentoItems, type BentoItem } from '@/lib/bento';
 import { type BreadcrumbItem } from '@/types';
@@ -71,15 +72,16 @@ export default function ProductShow({ id }: { id: number }) {
     const product = findProduct(id);
     const [imageFailed, setImageFailed] = useState(false);
     const { ref: bentoRef, width: bentoWidth } = useElementWidth<HTMLDivElement>();
+    const { t, tCategory } = useLocale();
 
     if (!product) {
         return (
-            <AppLayout breadcrumbs={[{ title: 'Home', href: '/home' }]}>
-                <Head title="ไม่พบสินค้า" />
+            <AppLayout breadcrumbs={[{ title: t('nav.home'), href: '/home' }]}>
+                <Head title={t('show.notFound.message')} />
                 <Stack spacing={2} alignItems="flex-start" sx={{ p: 4 }}>
-                    <Typography variant="h6">ไม่พบสินค้าที่คุณต้องการ</Typography>
+                    <Typography variant="h6">{t('show.notFound.message')}</Typography>
                     <Button component={Link} href="/home" startIcon={<ArrowBackIcon />}>
-                        กลับหน้า Home
+                        {t('show.notFound.backHome')}
                     </Button>
                 </Stack>
             </AppLayout>
@@ -90,8 +92,8 @@ export default function ProductShow({ id }: { id: number }) {
     const related = products.filter((item) => item.category === product.category && item.id !== product.id).slice(0, 4);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Home', href: '/home' },
-        { title: product.category, href: '/home' },
+        { title: t('nav.home'), href: '/home' },
+        { title: tCategory(product.category), href: '/home' },
         { title: product.name, href: `/products/${product.id}` },
     ];
 
@@ -159,7 +161,7 @@ export default function ProductShow({ id }: { id: number }) {
                 <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, gap: 1 }}>
                     <Chip
                         size="small"
-                        label={`SKU ${product.sku}`}
+                        label={t('show.sku', { sku: product.sku })}
                         sx={{ bgcolor: alpha('#fff', 0.08), color: '#fff', border: 1, borderColor: alpha('#fff', 0.1) }}
                     />
                     {product.color && (
@@ -178,14 +180,14 @@ export default function ProductShow({ id }: { id: number }) {
                     startIcon={<EditOutlinedIcon />}
                     sx={{ borderRadius: 999, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
                 >
-                    แก้ไขข้อมูล
+                    {t('common.edit')}
                 </Button>
                 <Button
                     variant="outlined"
                     startIcon={<PrintOutlinedIcon />}
                     sx={{ borderRadius: 999, color: '#fff', borderColor: alpha('#fff', 0.3), '&:hover': { borderColor: '#fff' } }}
                 >
-                    พิมพ์ข้อมูล
+                    {t('common.print')}
                 </Button>
             </Stack>
         </Box>
@@ -208,7 +210,7 @@ export default function ProductShow({ id }: { id: number }) {
             <Stack direction="row" spacing={0.75} alignItems="center">
                 <TuneOutlinedIcon fontSize="small" sx={{ color: '#8a8a8a' }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8a8a8a' }}>
-                    ข้อมูลจำเพาะ
+                    {t('show.spec.heading')}
                 </Typography>
             </Stack>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.5, ...clampSx(2) }}>
@@ -303,7 +305,7 @@ export default function ProductShow({ id }: { id: number }) {
                 {currency(product.price)}
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                ราคาต่อหน่วย
+                {t('show.stat.pricePerUnit')}
             </Typography>
         </Box>
     );
@@ -329,11 +331,12 @@ export default function ProductShow({ id }: { id: number }) {
             <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
                 {product.packQty}
                 <Typography component="span" variant="body1" sx={{ fontWeight: 700, opacity: 0.75, ml: 0.5 }}>
-                    {product.packUnit}/ลัง
+                    {product.packUnit}
+                    {t('show.stat.packUnitSuffix')}
                 </Typography>
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                ขนาดบรรจุ {product.size}
+                {t('show.stat.packagingCaption', { size: product.size })}
             </Typography>
         </Box>
     );
@@ -357,7 +360,7 @@ export default function ProductShow({ id }: { id: number }) {
         >
             <LocalOfferOutlinedIcon fontSize="medium" sx={{ opacity: 0.9, mb: 0.5 }} />
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                ส่วนลดตามจำนวนสั่งซื้อ
+                {t('show.discount.title')}
             </Typography>
             <Typography variant="body1" sx={{ opacity: 0.9, mt: 0.5, ...clampSx(3) }}>
                 {product.discountNote}
@@ -420,13 +423,13 @@ export default function ProductShow({ id }: { id: number }) {
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, 'แบรนด์') },
+        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, t('show.fact.brand')) },
     });
     cells.push({
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, product.category, 'หมวดหมู่') },
+        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, tCategory(product.category), t('show.fact.category')) },
     });
 
     if (product.color) {
@@ -435,7 +438,7 @@ export default function ProductShow({ id }: { id: number }) {
             w: 2,
             h: 2,
             weight: 2,
-            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteOutlinedIcon, color, 'สี') },
+            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteOutlinedIcon, color, t('show.fact.color')) },
         });
     }
 
@@ -463,8 +466,8 @@ export default function ProductShow({ id }: { id: number }) {
         Object.keys(product.specs).length > 0
             ? Object.entries(product.specs).map(([label, value]) => ({ label, value }))
             : [
-                  { label: 'แบรนด์', value: product.brand },
-                  { label: 'หมวดหมู่', value: product.category },
+                  { label: t('show.fact.brand'), value: product.brand },
+                  { label: t('show.fact.category'), value: tCategory(product.category) },
               ];
 
     return (
@@ -472,7 +475,7 @@ export default function ProductShow({ id }: { id: number }) {
             <Head title={product.name} />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
                 <Button component={Link} href="/home" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
-                    กลับ
+                    {t('common.back')}
                 </Button>
 
                 <Box
@@ -504,7 +507,7 @@ export default function ProductShow({ id }: { id: number }) {
                 {related.length > 0 && (
                     <Box>
                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                            สินค้าที่เกี่ยวข้อง
+                            {t('show.related.heading')}
                         </Typography>
                         <Box sx={{ columnCount: { xs: 2, sm: 3, md: 4 }, columnGap: 2 }}>
                             {related.map((item) => (

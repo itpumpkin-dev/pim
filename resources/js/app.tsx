@@ -6,6 +6,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearance';
+import { LocaleProvider } from './hooks/use-locale';
 import { getTheme } from './theme';
 
 declare global {
@@ -34,7 +35,9 @@ createInertiaApp({
 
         root.render(
             <AppearanceProvider>
-                <ThemedApp App={App} props={props} />
+                <LocaleProvider>
+                    <ThemedApp App={App} props={props} />
+                </LocaleProvider>
             </AppearanceProvider>,
         );
     },
