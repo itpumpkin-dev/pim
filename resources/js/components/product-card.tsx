@@ -2,17 +2,18 @@ import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Pro
 import { useLocale } from '@/hooks/use-locale';
 import { downloadCsv } from '@/lib/csv';
 import { Link } from '@inertiajs/react';
+import { useTranslation } from 'react-i18next';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import { Box, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 
 export function ProductCard({ product }: { product: Product }) {
+    const { t } = useTranslation();
     const Icon = product.icon;
     const [imageFailed, setImageFailed] = useState(false);
     const [hovering, setHovering] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const { t, tCategory } = useLocale();
 
     useEffect(() => {
         if (!product.videoUrl) return;
@@ -111,7 +112,7 @@ export function ProductCard({ product }: { product: Product }) {
 
                 <Box sx={{ p: 2 }}>
                     <Typography variant="caption" color="text.secondary">
-                        {product.brand} · {tCategory(product.category)}
+                        {product.brand} · {product.category}
                     </Typography>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, minHeight: 40 }}>
                         {product.name}
@@ -120,7 +121,7 @@ export function ProductCard({ product }: { product: Product }) {
                         {product.color ? `${product.color} · ` : ''}
                         {product.size}
                     </Typography>
-
+ 
                     <Stack direction="row" alignItems="center" justifyContent="space-between">
                         <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
                             {currency(product.price)}
@@ -130,7 +131,7 @@ export function ProductCard({ product }: { product: Product }) {
                             <Typography variant="caption">{t('common.packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
                         </Stack>
                     </Stack>
-
+ 
                     <Tooltip title={t('common.exportThisProduct')}>
                         <IconButton
                             size="small"

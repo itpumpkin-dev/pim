@@ -9,7 +9,7 @@ import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearance';
 import { useSyncI18nLanguage } from './hooks/use-locale';
-import { LocaleProvider } from './hooks/use-locale';
+// import { LocaleProvider } from './hooks/use-locale';
 import { getTheme } from './theme';
 
 declare global {
@@ -45,7 +45,6 @@ createInertiaApp({
 
         root.render(
             <AppearanceProvider>
-<<<<<<< HEAD
                 <App {...props}>
                     {({ Component, props: pageProps, key }) => {
                         const layout = (Component as ComponentType & PageLayout).layout;
@@ -54,11 +53,6 @@ createInertiaApp({
                         return <ThemedPage>{typeof layout === 'function' ? layout(page) : page}</ThemedPage>;
                     }}
                 </App>
-=======
-                <LocaleProvider>
-                    <ThemedApp App={App} props={props} />
-                </LocaleProvider>
->>>>>>> 76c5b0d017e006d5782314ec2b9ed272ebb1cbe0
             </AppearanceProvider>,
         );
     },
