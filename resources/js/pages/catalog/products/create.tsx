@@ -26,6 +26,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface AttributeFamily {
     id: number;
@@ -53,13 +54,16 @@ interface ProductForm {
     [key: string]: any;
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'PRODUCTS', href: '/catalog/products' },
-    { title: 'CREATE PRODUCT', href: '/catalog/products/create' },
-];
-
 export default function ProductCreate({ families, attributes }: Props) {
+    const { t } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('products'), href: '/catalog/products' },
+        { title: t('createProduct'), href: '/catalog/products/create' },
+    ];
+
     const { data, setData, post, processing, errors } = useForm<ProductForm>({
         enabled: true,
         family_id: families.length > 0 ? families[0].id : '',
@@ -89,22 +93,22 @@ export default function ProductCreate({ families, attributes }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Create New Products" />
+            <Head title={t('createProductTitle')} />
             <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 900, mx: 'auto' }}>
                 <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>
-                    Create New Products
+                    {t('createProductTitle')}
                 </Typography>
 
                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 1 }}>
                     <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                        Product Info
+                        {t('productInfo')}
                     </Typography>
 
                     <Stack spacing={3}>
                         {/* Status Checkboxes */}
                         <Box>
                             <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
-                                Status
+                                {t('status')}
                             </Typography>
                             <Stack direction="row" spacing={3}>
                                 <FormControlLabel
@@ -114,7 +118,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                                             onChange={() => setData('enabled', true)}
                                         />
                                     }
-                                    label="Active"
+                                    label={t('active')}
                                 />
                                 <FormControlLabel
                                     control={
@@ -123,17 +127,17 @@ export default function ProductCreate({ families, attributes }: Props) {
                                             onChange={() => setData('enabled', false)}
                                         />
                                     }
-                                    label="Non Active"
+                                    label={t('nonActive')}
                                 />
                             </Stack>
                         </Box>
 
                         {/* Family Dropdown */}
                         <FormControl fullWidth required error={Boolean(errors.family_id)}>
-                            <InputLabel id="family-label">Family *</InputLabel>
+                            <InputLabel id="family-label">{t('familyRequired')}</InputLabel>
                             <Select
                                 labelId="family-label"
-                                label="Family *"
+                                label={t('familyRequired')}
                                 value={data.family_id}
                                 onChange={(e) => setData('family_id', e.target.value)}
                             >
@@ -148,10 +152,10 @@ export default function ProductCreate({ families, attributes }: Props) {
 
                         {/* Product Types Dropdown */}
                         <FormControl fullWidth required error={Boolean(errors.type)}>
-                            <InputLabel id="product-type-label">Product Types *</InputLabel>
+                            <InputLabel id="product-type-label">{t('productTypesRequired')}</InputLabel>
                             <Select
                                 labelId="product-type-label"
-                                label="Product Types *"
+                                label={t('productTypesRequired')}
                                 value={data.type}
                                 onChange={(e) => {
                                     const val = e.target.value;
@@ -161,20 +165,20 @@ export default function ProductCreate({ families, attributes }: Props) {
                                     }
                                 }}
                             >
-                                <MenuItem value="simple">Simple</MenuItem>
-                                <MenuItem value="configurable">Configurable</MenuItem>
+                                <MenuItem value="simple">{t('simple')}</MenuItem>
+                                <MenuItem value="configurable">{t('configurable')}</MenuItem>
                             </Select>
                             {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
                         </FormControl>
 
                         {/* SKU Input */}
                         <TextField
-                            label="SKU *"
+                            label={t('skuRequired')}
                             required
                             fullWidth
                             value={data.sku}
                             onChange={(e) => setData('sku', e.target.value)}
-                            placeholder="50xxx"
+                            placeholder={t('skuPlaceholder')}
                             error={Boolean(errors.sku)}
                             helperText={errors.sku}
                         />
@@ -183,7 +187,7 @@ export default function ProductCreate({ families, attributes }: Props) {
 
                 {Object.keys(errors).length > 0 && (
                     <Alert severity="error" sx={{ mt: 2 }}>
-                        Please correct the errors before saving.
+                        {t('correctErrorsBeforeSaving')}
                     </Alert>
                 )}
 
@@ -195,7 +199,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         variant="contained"
                         sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' }, fontWeight: 700 }}
                     >
-                        CANCEL
+                        {t('cancel')}
                     </Button>
                     <Button
                         type="submit"
@@ -203,7 +207,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         disabled={processing}
                         sx={{ bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#222' }, fontWeight: 700 }}
                     >
-                        SAVE
+                        {t('save')}
                     </Button>
                 </Stack>
             </Box>
@@ -218,7 +222,7 @@ export default function ProductCreate({ families, attributes }: Props) {
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={700}>
-                        Configurable Attributes
+                        {t('configurableAttributesTitle')}
                     </Typography>
                     <IconButton onClick={() => setConfigModalOpen(false)} size="small">
                         <CloseIcon />
@@ -249,7 +253,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         renderInput={(params) => (
                             <TextField
                                 {...params}
-                                placeholder="Select attributes (e.g. Color, Size, Brand)"
+                                placeholder={t('selectAttributesPlaceholder')}
                                 variant="outlined"
                             />
                         )}
@@ -260,7 +264,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         onClick={() => setConfigModalOpen(false)}
                         sx={{ color: '#7e22ce', fontWeight: 700, textTransform: 'none' }}
                     >
-                        Back
+                        {t('back')}
                     </Button>
                     <Button
                         variant="contained"
@@ -278,7 +282,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                             textTransform: 'none',
                         }}
                     >
-                        Save Product
+                        {t('saveProduct')}
                     </Button>
                 </DialogActions>
             </Dialog>

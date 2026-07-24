@@ -209,9 +209,12 @@ class ProductController extends Controller
             $groupsData = array_values($groupsData);
         }
 
-        $values = ProductValue::where('product_id', $product->id)
-            ->pluck('value', 'attribute_id')
-            ->toArray();
+        $rawValues = ProductValue::where('product_id', $product->id)->get();
+        $values = [];
+        foreach ($rawValues as $val) {
+            $key = $val->locale_id ?: 'default';
+            $values[$val->attribute_id][$key] = $val->value;
+        }
 
         $family = $product->family;
 
@@ -252,31 +255,66 @@ class ProductController extends Controller
 
         $values = $request->input('values', []);
 
-        foreach ($request->file('values', []) as $attributeId => $file) {
-            if (is_array($file)) {
-                $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
-                $values[$attributeId] = json_encode($paths);
-            } elseif ($file) {
-                $values[$attributeId] = $file->store('product-attributes', 'public');
+        foreach ($request->file('values', []) as $attributeId => $localeFiles) {
+            if (is_array($localeFiles)) {
+                foreach ($localeFiles as $localeKey => $file) {
+                    if (is_array($file)) {
+                        $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
+                        $values[$attributeId][$localeKey] = json_encode($paths);
+                    } elseif ($file) {
+                        $values[$attributeId][$localeKey] = $file->store('product-attributes', 'public');
+                    }
+                }
+            } elseif ($localeFiles) {
+                $values[$attributeId]['default'] = $localeFiles->store('product-attributes', 'public');
             }
         }
 
         if (is_array($values)) {
-            foreach ($values as $attributeId => $val) {
-                if ($val !== null && $val !== '') {
-                    ProductValue::updateOrCreate(
-                        [
-                            'product_id' => $product->id,
-                            'attribute_id' => $attributeId,
-                        ],
-                        [
-                            'value' => is_array($val) ? json_encode($val) : (string)$val,
-                        ]
-                    );
+            foreach ($values as $attributeId => $localeValues) {
+                $attribute = Attribute::find($attributeId);
+                if (!$attribute) continue;
+
+                if (is_array($localeValues)) {
+                    foreach ($localeValues as $localeKey => $val) {
+                        $localeId = $localeKey === 'default' ? null : $localeKey;
+
+                        if ($val !== null && $val !== '') {
+                            ProductValue::updateOrCreate(
+                                [
+                                    'product_id' => $product->id,
+                                    'attribute_id' => $attributeId,
+                                    'locale_id' => $localeId,
+                                ],
+                                [
+                                    'value' => is_array($val) ? json_encode($val) : (string)$val,
+                                ]
+                            );
+                        } else {
+                            ProductValue::where('product_id', $product->id)
+                                ->where('attribute_id', $attributeId)
+                                ->where('locale_id', $localeId)
+                                ->delete();
+                        }
+                    }
                 } else {
-                    ProductValue::where('product_id', $product->id)
-                        ->where('attribute_id', $attributeId)
-                        ->delete();
+                    if ($localeValues !== null && $localeValues !== '') {
+                        ProductValue::updateOrCreate(
+                            [
+                                'product_id' => $product->id,
+                                'attribute_id' => $attributeId,
+                                'locale_id' => null,
+                            ],
+                            [
+                                'value' => (string)$localeValues,
+                            ]
+                        );
+                    } else {
+                        ProductValue::where('product_id', $product->id)
+                            ->where('attribute_id', $attributeId)
+                            ->whereNull('locale_id')
+                            ->delete();
+                    }
                 }
             }
         }

@@ -1,3 +1,4 @@
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -70,6 +71,7 @@ interface AssignedGroup {
 
 interface Props {
     family: AttributeFamily;
+    translations: Record<string, string>;
     groups: AttributeGroup[];
     attributes: AttributeItem[];
     familyAttributes?: FamilyAttributePivot[];
@@ -81,14 +83,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE FAMILY', href: '#' },
 ];
 
-export default function AttributeFamilyEdit({ family, groups, attributes, familyAttributes = [] }: Props) {
+export default function AttributeFamilyEdit({ family, translations, groups, attributes, familyAttributes = [] }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         code: family.code || '',
-        name: family.name || '',
-        label_en: family.name || family.code || '',
-        label_zh_cn: '',
-        label_zh_sg: '',
-        label_zu: '',
+        translations: translations || {},
     });
 
     const [attrSearch, setAttrSearch] = useState('');
@@ -218,7 +216,7 @@ export default function AttributeFamilyEdit({ family, groups, attributes, family
 
         router.put(`/catalog/attributeFamilies/${family.id}`, {
             code: data.code,
-            name: data.name || data.label_en || data.code,
+            translations: data.translations,
             group_attributes: groupAttrsPayload,
         });
     };
@@ -525,55 +523,16 @@ export default function AttributeFamilyEdit({ family, groups, attributes, family
                                     size="small"
                                     placeholder="Enter Code"
                                     value={data.code}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setData('code', val);
-                                        if (!data.name) setData('name', val);
-                                    }}
+                                    onChange={(e) => setData('code', e.target.value)}
                                     error={Boolean(errors.code)}
                                     helperText={errors.code}
                                 />
                             </Paper>
 
-                            {/* Label Panel */}
-                            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                                    Label
-                                </Typography>
-                                <Stack spacing={2}>
-                                    <TextField
-                                        label="English (United States)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_en}
-                                        onChange={(e) => {
-                                            setData('label_en', e.target.value);
-                                            setData('name', e.target.value);
-                                        }}
-                                    />
-                                    <TextField
-                                        label="Chinese (China)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zh_cn}
-                                        onChange={(e) => setData('label_zh_cn', e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Chinese (Singapore)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zh_sg}
-                                        onChange={(e) => setData('label_zh_sg', e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Zulu (South Africa)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zu}
-                                        onChange={(e) => setData('label_zu', e.target.value)}
-                                    />
-                                </Stack>
-                            </Paper>
+                            <LocaleLabelFields
+                                values={data.translations}
+                                onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                            />
                         </Stack>
                     </Grid>
                 </Grid>

@@ -25,7 +25,7 @@ for (const path in modules) {
 if (!i18n.isInitialized) {
     i18n.use(initReactI18next).init({
         resources,
-        lng: 'th',
+        lng: 'en',
         fallbackLng: 'en',
         defaultNS: 'common',
         interpolation: { escapeValue: false },

@@ -1,3 +1,4 @@
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -11,21 +12,21 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent } from 'react';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'ATTRIBUTE GROUPS', href: '/catalog/attributeGroups' },
-    { title: 'ADD ATTRIBUTE GROUP', href: '/catalog/attributeGroups/create' },
-];
+import { useTranslation } from 'react-i18next';
 
 export default function AttributeGroupCreate() {
+    const { t } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('attributeGroups'), href: '/catalog/attributeGroups' },
+        { title: t('addAttributeGroupTitle'), href: '/catalog/attributeGroups/create' },
+    ];
+
     const { data, setData, post, processing, errors } = useForm({
         code: '',
-        name: '',
-        label_en: '',
-        label_zh_cn: '',
-        label_zh_sg: '',
-        label_zu: '',
+        translations: {} as Record<string, string>,
     });
 
     const submit = (e: FormEvent) => {
@@ -37,12 +38,12 @@ export default function AttributeGroupCreate() {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Add Attribute Group" />
+            <Head title={t('addAttributeGroupTitle')} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="#1e1b4b">
-                        Add Attribute Group
+                        {t('addAttributeGroupTitle')}
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
                         <Button
@@ -58,7 +59,7 @@ export default function AttributeGroupCreate() {
                                 '&:hover': { borderColor: 'primary.main' },
                             }}
                         >
-                            Back
+                            {t('back')}
                         </Button>
                         <Button
                             type="submit"
@@ -73,7 +74,7 @@ export default function AttributeGroupCreate() {
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Attribute Group
+                            {t('saveAttributeGroup')}
                         </Button>
                     </Stack>
                 </Stack>
@@ -82,69 +83,31 @@ export default function AttributeGroupCreate() {
                     {/* General Panel */}
                     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
                         <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                            General
+                            {t('generalTitle')}
                         </Typography>
                         <TextField
-                            label="Code *"
+                            label={t('codeRequired')}
                             required
                             fullWidth
                             size="small"
-                            placeholder="Code"
+                            placeholder={t('codePlaceholder')}
                             value={data.code}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                setData('code', val);
-                                if (!data.name) setData('name', val);
-                            }}
+                            onChange={(e) => setData('code', e.target.value)}
                             error={Boolean(errors.code)}
                             helperText={errors.code}
                         />
                     </Paper>
 
-                    {/* Label Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                            Label
-                        </Typography>
-                        <Stack spacing={2}>
-                            <TextField
-                                label="English (United States)"
-                                fullWidth
-                                size="small"
-                                value={data.label_en}
-                                onChange={(e) => {
-                                    setData('label_en', e.target.value);
-                                    setData('name', e.target.value);
-                                }}
-                            />
-                            <TextField
-                                label="Chinese (China)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zh_cn}
-                                onChange={(e) => setData('label_zh_cn', e.target.value)}
-                            />
-                            <TextField
-                                label="Chinese (Singapore)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zh_sg}
-                                onChange={(e) => setData('label_zh_sg', e.target.value)}
-                            />
-                            <TextField
-                                label="Zulu (South Africa)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zu}
-                                onChange={(e) => setData('label_zu', e.target.value)}
-                            />
-                        </Stack>
-                    </Paper>
+                    <LocaleLabelFields
+                        title={t('labelTitle')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
                 </Stack>
 
                 {Object.keys(errors).length > 0 && (
                     <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        Please correct the highlighted fields before saving.
+                        {t('correctHighlightedFields')}
                     </Alert>
                 )}
             </Box>

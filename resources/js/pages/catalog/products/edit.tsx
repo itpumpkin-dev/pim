@@ -26,6 +26,8 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
+import RichTextEditor from '@/components/rich-text-editor';
+import { useLocale } from '@/hooks/use-locale';
 
 interface AttributeOption {
     id: number;
@@ -92,13 +94,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function ProductEdit({ product, families, assignedGroups, productValues }: Props) {
+    const { locales, locale: currentLocaleCode } = useLocale();
     const [tabIndex, setTabIndex] = useState(0);
 
+    // Find active locale ID matching system language
+    const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
+    const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
+
     // Collect initial values for all real attributes
-    const initialValues: Record<string, string> = {};
+    const initialValues: Record<string, Record<string | number, any>> = {};
     assignedGroups.forEach((group) => {
         group.attributes.forEach((attr) => {
-            initialValues[attr.id] = productValues[attr.id] || '';
+            initialValues[attr.id] = (productValues[attr.id] as any) || (attr.is_locale_based ? {} : { default: '' });
         });
     });
 
@@ -110,10 +117,14 @@ export default function ProductEdit({ product, families, assignedGroups, product
         values: initialValues,
     });
 
-    const handleAttributeChange = (attributeId: number, val: AttributeValue) => {
+    const handleAttributeChange = (attributeId: number, val: AttributeValue, isLocaleBased: boolean) => {
+        const key = isLocaleBased ? activeLocaleId : 'default';
         setData('values', {
             ...data.values,
-            [attributeId]: val,
+            [attributeId]: {
+                ...(data.values[attributeId] || {}),
+                [key]: val,
+            },
         });
     };
 
@@ -158,8 +169,17 @@ export default function ProductEdit({ product, families, assignedGroups, product
                             <Select size="small" defaultValue="default" sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 120 }}>
                                 <MenuItem value="default">Default</MenuItem>
                             </Select>
-                            <Select size="small" defaultValue="en" sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 180 }}>
-                                <MenuItem value="en">English (United States)</MenuItem>
+                            <Select
+                                size="small"
+                                value={activeLocaleId}
+                                onChange={(e) => setActiveLocaleId(Number(e.target.value))}
+                                sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 180 }}
+                            >
+                                {locales.map((loc) => (
+                                    <MenuItem key={loc.id} value={loc.id}>
+                                        {loc.display_name || loc.code}
+                                    </MenuItem>
+                                ))}
                             </Select>
                             <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
                                 More
@@ -226,14 +246,20 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                         {assignedGroups
                                             .filter((g) => g.code.toLowerCase() === 'general')
                                             .flatMap((g) => g.attributes)
-                                            .map((attr) => (
-                                                <RenderAttributeInput
-                                                    key={attr.id}
-                                                    attr={attr}
-                                                    value={data.values[attr.id] || ''}
-                                                    onChange={(val) => handleAttributeChange(attr.id, val)}
-                                                />
-                                            ))}
+                                            .map((attr) => {
+                                                const valKey = attr.is_locale_based ? activeLocaleId : 'default';
+                                                const val = data.values[attr.id]?.[valKey] || '';
+                                                const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                return (
+                                                    <RenderAttributeInput
+                                                        key={attr.id}
+                                                        attr={attr}
+                                                        value={val}
+                                                        onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
+                                                        activeLocaleCode={activeLocaleCode}
+                                                    />
+                                                );
+                                            })}
                                     </Stack>
                                 </Paper>
 
@@ -251,14 +277,20 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                                         No attributes assigned to this group yet.
                                                     </Typography>
                                                 ) : (
-                                                    group.attributes.map((attr) => (
-                                                        <RenderAttributeInput
-                                                            key={attr.id}
-                                                            attr={attr}
-                                                            value={data.values[attr.id] || ''}
-                                                            onChange={(val) => handleAttributeChange(attr.id, val)}
-                                                        />
-                                                    ))
+                                                     group.attributes.map((attr) => {
+                                                         const valKey = attr.is_locale_based ? activeLocaleId : 'default';
+                                                         const val = data.values[attr.id]?.[valKey] || '';
+                                                         const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                         return (
+                                                             <RenderAttributeInput
+                                                                 key={attr.id}
+                                                                 attr={attr}
+                                                                 value={val}
+                                                                 onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
+                                                                 activeLocaleCode={activeLocaleCode}
+                                                             />
+                                                         );
+                                                     })
                                                 )}
                                             </Stack>
                                         </Paper>
@@ -421,20 +453,45 @@ function RenderAttributeInput({
     attr,
     value,
     onChange,
+    activeLocaleCode,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
     onChange: (val: AttributeValue) => void;
+    activeLocaleCode?: string;
 }) {
     const label = attr.name || attr.code;
     const stringValue = typeof value === 'string' ? value : '';
 
+    const renderChips = () => {
+        return (
+            <>
+                {attr.is_locale_based ? (
+                    <Chip
+                        label={activeLocaleCode ? activeLocaleCode.toUpperCase() : 'LOCALE'}
+                        size="small"
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#c084fc', color: '#fff', fontWeight: 700 }}
+                    />
+                ) : (
+                    <Chip
+                        label="DEFAULT"
+                        size="small"
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0', color: '#475569', fontWeight: 600 }}
+                    />
+                )}
+            </>
+        );
+    };
+
     if (attr.type === 'select' || attr.type === 'multiselect') {
         return (
             <FormControl fullWidth size="small">
-                <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5 }}>
-                    {label} {attr.is_required && '*'}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
                 <Select displayEmpty value={stringValue} onChange={(e) => onChange(e.target.value)}>
                     <MenuItem value="">
                         <em>Select option</em>
@@ -456,15 +513,11 @@ function RenderAttributeInput({
                     <Typography variant="caption" fontWeight={600} color="#334155">
                         {label} {attr.is_required && '*'}
                     </Typography>
-                    <Chip label="DEFAULT" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0' }} />
-                    <Chip label="EN_US" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0' }} />
+                    {renderChips()}
                 </Stack>
-                <TextField
-                    multiline
-                    rows={4}
-                    fullWidth
+                <RichTextEditor
                     value={stringValue}
-                    onChange={(e) => onChange(e.target.value)}
+                    onChange={onChange}
                     placeholder={`Enter ${label.toLowerCase()}`}
                 />
             </Box>
@@ -478,7 +531,7 @@ function RenderAttributeInput({
                     <Typography variant="caption" fontWeight={600} color="#334155">
                         {label} {attr.is_required && '*'}
                     </Typography>
-                    <Chip label="DEFAULT" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0' }} />
+                    {renderChips()}
                 </Stack>
                 <TextField
                     size="small"
@@ -494,29 +547,33 @@ function RenderAttributeInput({
     }
 
     if (attr.type === 'boolean') {
-        const boolValue = stringValue === '1' || stringValue === 'true';
         return (
             <Box>
-                <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
-                    {label} {attr.is_required && '*'}
-                </Typography>
-                <Switch checked={boolValue} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
+                <Switch checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />
             </Box>
         );
     }
 
     if (attr.type === 'checkbox') {
-        const boolValue = stringValue === '1' || stringValue === 'true';
         return (
             <Box>
-                <FormControlLabel
-                    control={<Checkbox checked={boolValue} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />}
-                    label={
-                        <Typography variant="caption" fontWeight={600} color="#334155">
-                            {label} {attr.is_required && '*'}
-                        </Typography>
-                    }
-                />
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <FormControlLabel
+                        control={<Checkbox checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />}
+                        label={
+                            <Typography variant="caption" fontWeight={600} color="#334155">
+                                {label} {attr.is_required && '*'}
+                            </Typography>
+                        }
+                    />
+                    {renderChips()}
+                </Stack>
             </Box>
         );
     }
@@ -524,9 +581,12 @@ function RenderAttributeInput({
     if (attr.type === 'date' || attr.type === 'datetime') {
         return (
             <Box>
-                <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
-                    {label} {attr.is_required && '*'}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
                 <TextField
                     type={attr.type === 'date' ? 'date' : 'datetime-local'}
                     size="small"
@@ -567,9 +627,12 @@ function RenderAttributeInput({
 
         return (
             <Box>
-                <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
-                    {label} {attr.is_required && '*'}
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
                 <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
                     <Button
                         component="label"
@@ -612,8 +675,7 @@ function RenderAttributeInput({
                 <Typography variant="caption" fontWeight={600} color="#334155">
                     {label} {attr.is_required && '*'}
                 </Typography>
-                <Chip label="DEFAULT" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0' }} />
-                <Chip label="EN_US" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0' }} />
+                {renderChips()}
             </Stack>
             <TextField
                 size="small"

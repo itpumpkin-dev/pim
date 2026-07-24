@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
+use App\Models\AttributeTranslation;
+use App\Models\Locale;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -80,6 +82,8 @@ class AttributeController extends Controller
                 'id', 'code', 'name', 'type', 'is_required', 'is_unique',
                 'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable',
             ]),
+            'translations' => $attribute->translations()->get()
+                ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
         ]);
     }
 
@@ -95,10 +99,15 @@ class AttributeController extends Controller
             'is_ai_translate' => ['boolean'],
             'is_channel_based' => ['boolean'],
             'is_filterable' => ['boolean'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
         ]);
 
-        Attribute::create([
+        $translations = $validated['translations'] ?? [];
+
+        $attribute = Attribute::create([
             ...$validated,
+            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -108,6 +117,8 @@ class AttributeController extends Controller
             'created_by' => $request->user()->id,
             'updated_by' => $request->user()->id,
         ]);
+
+        $this->syncTranslations($attribute, $translations);
 
         return to_route('catalog.attributes.index')->with('success', 'Attribute created successfully.');
     }
@@ -124,10 +135,15 @@ class AttributeController extends Controller
             'is_ai_translate' => ['boolean'],
             'is_channel_based' => ['boolean'],
             'is_filterable' => ['boolean'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $translations = $validated['translations'] ?? [];
 
         $attribute->update([
             ...$validated,
+            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -137,7 +153,42 @@ class AttributeController extends Controller
             'updated_by' => $request->user()->id,
         ]);
 
+        $this->syncTranslations($attribute, $translations);
+
         return to_route('catalog.attributes.index')->with('success', 'Attribute updated successfully.');
+    }
+
+    private function resolveName(array $translations, ?string $name, string $code): string
+    {
+        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
+
+        if ($defaultLocaleId !== null && !empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
+            return trim($translations[$defaultLocaleId]);
+        }
+
+        $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+
+        return $firstNonEmpty !== null ? trim($firstNonEmpty) : ($name ?? ucfirst($code));
+    }
+
+    private function syncTranslations(Attribute $attribute, array $translations): void
+    {
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+
+            if ($label === '') {
+                AttributeTranslation::where('attribute_id', $attribute->id)
+                    ->where('locale_id', $localeId)
+                    ->delete();
+
+                continue;
+            }
+
+            AttributeTranslation::updateOrCreate(
+                ['attribute_id' => $attribute->id, 'locale_id' => $localeId],
+                ['label' => $label]
+            );
+        }
     }
 
     public function destroy(Attribute $attribute): RedirectResponse

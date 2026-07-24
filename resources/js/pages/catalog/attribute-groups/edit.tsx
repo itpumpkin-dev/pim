@@ -1,3 +1,4 @@
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -20,6 +21,7 @@ interface AttributeGroup {
 
 interface Props {
     group: AttributeGroup;
+    translations: Record<string, string>;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -28,14 +30,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE GROUP', href: '#' },
 ];
 
-export default function AttributeGroupEdit({ group }: Props) {
+export default function AttributeGroupEdit({ group, translations }: Props) {
     const { data, setData, put, processing, errors } = useForm({
         code: group.code || '',
-        name: group.name || '',
-        label_en: group.name || group.code || '',
-        label_zh_cn: '',
-        label_zh_sg: '',
-        label_zu: '',
+        translations: translations || {},
     });
 
     const submit = (e: FormEvent) => {
@@ -101,55 +99,16 @@ export default function AttributeGroupEdit({ group }: Props) {
                             size="small"
                             placeholder="Code"
                             value={data.code}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                setData('code', val);
-                                if (!data.name) setData('name', val);
-                            }}
+                            onChange={(e) => setData('code', e.target.value)}
                             error={Boolean(errors.code)}
                             helperText={errors.code}
                         />
                     </Paper>
 
-                    {/* Label Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                            Label
-                        </Typography>
-                        <Stack spacing={2}>
-                            <TextField
-                                label="English (United States)"
-                                fullWidth
-                                size="small"
-                                value={data.label_en}
-                                onChange={(e) => {
-                                    setData('label_en', e.target.value);
-                                    setData('name', e.target.value);
-                                }}
-                            />
-                            <TextField
-                                label="Chinese (China)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zh_cn}
-                                onChange={(e) => setData('label_zh_cn', e.target.value)}
-                            />
-                            <TextField
-                                label="Chinese (Singapore)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zh_sg}
-                                onChange={(e) => setData('label_zh_sg', e.target.value)}
-                            />
-                            <TextField
-                                label="Zulu (South Africa)"
-                                fullWidth
-                                size="small"
-                                value={data.label_zu}
-                                onChange={(e) => setData('label_zu', e.target.value)}
-                            />
-                        </Stack>
-                    </Paper>
+                    <LocaleLabelFields
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
                 </Stack>
 
                 {Object.keys(errors).length > 0 && (

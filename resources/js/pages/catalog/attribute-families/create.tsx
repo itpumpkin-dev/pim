@@ -1,3 +1,4 @@
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -33,6 +34,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface AttributeGroup {
     id: number;
@@ -60,20 +62,19 @@ interface Props {
     attributes: AttributeItem[];
 }
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'CATALOG', href: '#' },
-    { title: 'ATTRIBUTE FAMILIES', href: '/catalog/attributeFamilies' },
-    { title: 'CREATE ATTRIBUTE FAMILY', href: '/catalog/attributeFamilies/create' },
-];
-
 export default function AttributeFamilyCreate({ groups, attributes }: Props) {
+    const { t } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('attributeFamilies'), href: '/catalog/attributeFamilies' },
+        { title: t('createAttributeFamily'), href: '/catalog/attributeFamilies/create' },
+    ];
+
     const { data, setData, post, processing, errors } = useForm({
         code: '',
-        name: '',
-        label_en: '',
-        label_zh_cn: '',
-        label_zh_sg: '',
-        label_zu: '',
+        translations: {} as Record<string, string>,
         group_attributes: [] as { attribute_id: number; attribute_group_id: number }[],
     });
 
@@ -174,19 +175,19 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
 
         router.post('/catalog/attributeFamilies', {
             code: data.code,
-            name: data.name || data.label_en || data.code,
+            translations: data.translations,
             group_attributes: groupAttrsPayload,
         });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Create Attribute Family" />
+            <Head title={t('createAttributeFamily')} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="#1e1b4b">
-                        Create Attribute Family
+                        {t('createAttributeFamily')}
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
                         <Button
@@ -202,7 +203,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                 '&:hover': { borderColor: 'primary.main' },
                             }}
                         >
-                            Back
+                            {t('back')}
                         </Button>
                         <Button
                             type="submit"
@@ -217,7 +218,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Attribute Family
+                            {t('saveAttributeFamily')}
                         </Button>
                     </Stack>
                 </Stack>
@@ -229,10 +230,10 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                                 <Box>
                                     <Typography variant="h6" fontWeight={700} color="#1e1b4b">
-                                        Attribute Groups
+                                        {tNav('attributeGroups')}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        Manage attribute family groups
+                                        {t('attributeGroupsPanelSubtitle')}
                                     </Typography>
                                 </Box>
                                 <Stack direction="row" spacing={1.5}>
@@ -240,7 +241,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                         onClick={handleDeleteAllGroups}
                                         sx={{ color: '#ef4444', textTransform: 'none', fontWeight: 600 }}
                                     >
-                                        Delete Group
+                                        {t('deleteGroup')}
                                     </Button>
                                     <Button
                                         variant="outlined"
@@ -253,7 +254,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                             '&:hover': { borderColor: 'primary.main' },
                                         }}
                                     >
-                                        Assign Attribute Group
+                                        {t('assignAttributeGroup')}
                                     </Button>
                                 </Stack>
                             </Stack>
@@ -262,7 +263,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                 {/* Main Column section */}
                                 <Grid item xs={12} sm={6}>
                                     <Typography variant="subtitle2" fontWeight={700} color="#334155" sx={{ mb: 1.5 }}>
-                                        Main Column
+                                        {t('mainColumn')}
                                     </Typography>
 
                                     <Box
@@ -276,7 +277,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                         {assignedGroups.length === 0 ? (
                                             <Box sx={{ border: '1px dashed #cbd5e1', borderRadius: 2, p: 4, textAlign: 'center' }}>
                                                 <Typography variant="body2" color="text.secondary">
-                                                    No groups assigned yet. Click "Assign Attribute Group" to add groups.
+                                                    {t('noGroupsAssignedYet')}
                                                 </Typography>
                                             </Box>
                                         ) : (
@@ -368,7 +369,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                                 ))}
                                                                 {group.attributes.length === 0 && (
                                                                     <Typography variant="caption" color="text.secondary" sx={{ pl: 1, fontStyle: 'italic' }}>
-                                                                        Drop attribute here
+                                                                        {t('dropAttributeHere')}
                                                                     </Typography>
                                                                 )}
                                                             </Stack>
@@ -384,14 +385,14 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                 <Grid item xs={12} sm={6}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                                         <Typography variant="subtitle2" fontWeight={700} color="#334155">
-                                            Unassigned Attributes
+                                            {t('unassignedAttributes')}
                                         </Typography>
                                         <TextField
                                             value={attrSearch}
                                             onChange={(e) => setAttrSearch(e.target.value)}
                                             size="small"
                                             variant="standard"
-                                            placeholder="Search"
+                                            placeholder={t('search')}
                                             InputProps={{
                                                 disableUnderline: true,
                                                 endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
@@ -400,7 +401,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                         />
                                     </Stack>
                                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-                                        Drag attribute here to unassign from group.
+                                        {t('dragAttributeToUnassign')}
                                     </Typography>
 
                                     <Box
@@ -456,7 +457,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                             ))}
                                             {filteredUnassigned.length === 0 && (
                                                 <Typography variant="caption" color="text.secondary" sx={{ p: 2, display: 'block', textAlign: 'center' }}>
-                                                    Drop here to unassign attributes.
+                                                    {t('dropHereToUnassign')}
                                                 </Typography>
                                             )}
                                         </List>
@@ -472,71 +473,33 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             {/* General Panel */}
                             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
                                 <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                                    General
+                                    {t('generalTitle')}
                                 </Typography>
                                 <TextField
-                                    label="Code *"
+                                    label={t('codeRequired')}
                                     required
                                     fullWidth
                                     size="small"
-                                    placeholder="Enter Code"
+                                    placeholder={t('enterCodePlaceholder')}
                                     value={data.code}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setData('code', val);
-                                        if (!data.name) setData('name', val);
-                                    }}
+                                    onChange={(e) => setData('code', e.target.value)}
                                     error={Boolean(errors.code)}
                                     helperText={errors.code}
                                 />
                             </Paper>
 
-                            {/* Label Panel */}
-                            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
-                                    Label
-                                </Typography>
-                                <Stack spacing={2}>
-                                    <TextField
-                                        label="English (United States)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_en}
-                                        onChange={(e) => {
-                                            setData('label_en', e.target.value);
-                                            setData('name', e.target.value);
-                                        }}
-                                    />
-                                    <TextField
-                                        label="Chinese (China)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zh_cn}
-                                        onChange={(e) => setData('label_zh_cn', e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Chinese (Singapore)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zh_sg}
-                                        onChange={(e) => setData('label_zh_sg', e.target.value)}
-                                    />
-                                    <TextField
-                                        label="Zulu (South Africa)"
-                                        fullWidth
-                                        size="small"
-                                        value={data.label_zu}
-                                        onChange={(e) => setData('label_zu', e.target.value)}
-                                    />
-                                </Stack>
-                            </Paper>
+                            <LocaleLabelFields
+                                title={t('labelTitle')}
+                                values={data.translations}
+                                onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                            />
                         </Stack>
                     </Grid>
                 </Grid>
 
                 {Object.keys(errors).length > 0 && (
                     <Alert severity="error" sx={{ mt: 3 }}>
-                        Please correct the highlighted fields before saving.
+                        {t('correctHighlightedFields')}
                     </Alert>
                 )}
             </Box>
@@ -551,7 +514,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={700} color="#1e1b4b">
-                        Assign Attribute Group
+                        {t('assignAttributeGroup')}
                     </Typography>
                     <IconButton onClick={() => setAssignDialogOpen(false)} size="small">
                         <CloseIcon />
@@ -559,7 +522,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Typography variant="body2" fontWeight={600} color="#334155" sx={{ mb: 1 }}>
-                        Groups *
+                        {t('groupsRequired')}
                     </Typography>
                     <FormControl fullWidth size="small">
                         <Select
@@ -568,14 +531,14 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             onChange={(e) => setSelectedGroupId(e.target.value)}
                             renderValue={(selected) => {
                                 if (!selected) {
-                                    return <Typography color="text.secondary">Select option</Typography>;
+                                    return <Typography color="text.secondary">{t('selectOption')}</Typography>;
                                 }
                                 const g = groups.find((item) => item.id === Number(selected));
                                 return g ? (g.name || g.code) : String(selected);
                             }}
                         >
                             <MenuItem value="" disabled>
-                                Select option
+                                {t('selectOption')}
                             </MenuItem>
                             {groups.map((grp) => (
                                 <MenuItem key={grp.id} value={grp.id}>
@@ -584,7 +547,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             ))}
                             {groups.length === 0 && (
                                 <MenuItem value="" disabled>
-                                    No attribute groups available
+                                    {t('noAttributeGroupsAvailable')}
                                 </MenuItem>
                             )}
                         </Select>
@@ -605,7 +568,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             textTransform: 'none',
                         }}
                     >
-                        Assign Attribute Group
+                        {t('assignAttributeGroup')}
                     </Button>
                 </DialogActions>
             </Dialog>

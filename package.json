@@ -35,6 +35,7 @@
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "react-i18next": "^17.0.10",
+        "react-quill-new": "^3.8.3",
         "typescript": "^5.7.2",
         "vite": "^6.0"
     },
