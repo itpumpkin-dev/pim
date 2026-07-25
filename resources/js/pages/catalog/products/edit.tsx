@@ -24,6 +24,12 @@ import {
     Tabs,
     TextField,
     Typography,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import RichTextEditor from '@/components/rich-text-editor';
@@ -42,6 +48,7 @@ interface AttributeItem {
     type: string;
     is_required?: boolean;
     is_unique?: boolean;
+    is_locale_based?: boolean;
     options?: AttributeOption[];
 }
 
@@ -69,11 +76,20 @@ interface Product {
     updated_at: string;
 }
 
+interface VariantItem {
+    id?: number;
+    sku: string;
+    price: string;
+    qty: string;
+    values?: Record<number, string>;
+}
+
 interface Props {
     product: Product;
     families: AttributeFamily[];
     assignedGroups: GroupWithAttributes[];
     productValues: Record<number | string, string>;
+    variants?: VariantItem[];
 }
 
 type AttributeValue = string | File | File[];
@@ -83,7 +99,8 @@ interface ProductForm {
     family_id: number;
     type: string;
     enabled: boolean;
-    values: Record<string | number, AttributeValue>;
+    values: Record<string | number, Record<string | number, AttributeValue>>;
+    variants: VariantItem[];
     [key: string]: any;
 }
 
@@ -93,7 +110,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT PRODUCT', href: '#' },
 ];
 
-export default function ProductEdit({ product, families, assignedGroups, productValues }: Props) {
+export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [] }: Props) {
     const { locales, locale: currentLocaleCode } = useLocale();
     const [tabIndex, setTabIndex] = useState(0);
 
@@ -115,9 +132,10 @@ export default function ProductEdit({ product, families, assignedGroups, product
         type: product.type || 'simple',
         enabled: Boolean(product.enabled),
         values: initialValues,
+        variants: variants,
     });
 
-    const handleAttributeChange = (attributeId: number, val: AttributeValue, isLocaleBased: boolean) => {
+    const handleAttributeChange = (attributeId: number, val: AttributeValue, isLocaleBased?: boolean) => {
         const key = isLocaleBased ? activeLocaleId : 'default';
         setData('values', {
             ...data.values,
@@ -246,6 +264,12 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                         {assignedGroups
                                             .filter((g) => g.code.toLowerCase() === 'general')
                                             .flatMap((g) => g.attributes)
+                                            .filter((attr) => {
+                                                if (data.type.toLowerCase() === 'configurable') {
+                                                    return attr.code !== 'price' && attr.code !== 'qty';
+                                                }
+                                                return true;
+                                            })
                                             .map((attr) => {
                                                 const valKey = attr.is_locale_based ? activeLocaleId : 'default';
                                                 const val = data.values[attr.id]?.[valKey] || '';
@@ -277,24 +301,100 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                                         No attributes assigned to this group yet.
                                                     </Typography>
                                                 ) : (
-                                                     group.attributes.map((attr) => {
-                                                         const valKey = attr.is_locale_based ? activeLocaleId : 'default';
-                                                         const val = data.values[attr.id]?.[valKey] || '';
-                                                         const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                         return (
-                                                             <RenderAttributeInput
-                                                                 key={attr.id}
-                                                                 attr={attr}
-                                                                 value={val}
-                                                                 onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
-                                                                 activeLocaleCode={activeLocaleCode}
-                                                             />
-                                                         );
-                                                     })
+                                                     group.attributes
+                                                         .filter((attr) => {
+                                                             if (data.type.toLowerCase() === 'configurable') {
+                                                                 return attr.code !== 'price' && attr.code !== 'qty';
+                                                             }
+                                                             return true;
+                                                         })
+                                                         .map((attr) => {
+                                                             const valKey = attr.is_locale_based ? activeLocaleId : 'default';
+                                                             const val = data.values[attr.id]?.[valKey] || '';
+                                                             const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                             return (
+                                                                 <RenderAttributeInput
+                                                                     key={attr.id}
+                                                                     attr={attr}
+                                                                     value={val}
+                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
+                                                                     activeLocaleCode={activeLocaleCode}
+                                                                 />
+                                                             );
+                                                         })
                                                 )}
                                             </Stack>
                                         </Paper>
                                     ))}
+
+                                {/* Dynamic Cartesian Variants Table */}
+                                {data.type.toLowerCase() === 'configurable' && data.variants.length > 0 && (
+                                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                        <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                            ตัวเลือกสินค้าย่อย (Variants List)
+                                        </Typography>
+                                        <TableContainer>
+                                            <Table size="small">
+                                                <TableHead>
+                                                    <TableRow>
+                                                        <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
+                                                        <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
+                                                    </TableRow>
+                                                </TableHead>
+                                                <TableBody>
+                                                    {data.variants.map((v, index) => {
+                                                        const suffix = v.sku.replace(data.sku + '-', '');
+                                                        return (
+                                                            <TableRow key={index}>
+                                                                <TableCell sx={{ fontWeight: 600 }}>{suffix || v.sku}</TableCell>
+                                                                <TableCell>
+                                                                    <TextField
+                                                                        size="small"
+                                                                        required
+                                                                        value={v.sku}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...data.variants];
+                                                                            updated[index] = { ...v, sku: e.target.value };
+                                                                            setData('variants', updated);
+                                                                        }}
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TextField
+                                                                        size="small"
+                                                                        type="number"
+                                                                        value={v.price}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...data.variants];
+                                                                            updated[index] = { ...v, price: e.target.value };
+                                                                            setData('variants', updated);
+                                                                        }}
+                                                                        placeholder="ราคา"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TextField
+                                                                        size="small"
+                                                                        type="number"
+                                                                        value={v.qty}
+                                                                        onChange={(e) => {
+                                                                            const updated = [...data.variants];
+                                                                            updated[index] = { ...v, qty: e.target.value };
+                                                                            setData('variants', updated);
+                                                                        }}
+                                                                        placeholder="สต๊อก"
+                                                                    />
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        </TableContainer>
+                                    </Paper>
+                                )}
                             </Stack>
                         </Grid>
 

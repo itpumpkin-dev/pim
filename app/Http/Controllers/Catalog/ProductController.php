@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -139,7 +140,7 @@ class ProductController extends Controller
     public function create(): Response
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
-        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
+        $attributes = Attribute::with('options')->select('id', 'code', 'name', 'type')->get();
 
         return Inertia::render('catalog/products/create', [
             'families' => $families,
@@ -154,16 +155,71 @@ class ProductController extends Controller
             'family_id' => ['required', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable'],
             'enabled' => ['required', 'boolean'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.sku' => ['required_if:type,configurable', 'string', 'max:100', 'unique:products,sku'],
+            'variants.*.price' => ['nullable', 'numeric'],
+            'variants.*.qty' => ['nullable', 'integer'],
+            'variants.*.attributes' => ['nullable', 'array'],
         ]);
 
-        Product::create([
-            'sku' => $validated['sku'],
-            'family_id' => $validated['family_id'],
-            'type' => $validated['type'],
-            'enabled' => $validated['enabled'],
-            'created_by' => $request->user()?->id,
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($validated, $request) {
+            $parentProduct = Product::create([
+                'sku' => $validated['sku'],
+                'family_id' => $validated['family_id'],
+                'type' => $validated['type'],
+                'enabled' => $validated['enabled'],
+                'created_by' => $request->user()?->id,
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            if ($validated['type'] === 'configurable' && !empty($validated['variants'])) {
+                $priceAttr = Attribute::where('code', 'price')->first();
+                $qtyAttr = Attribute::where('code', 'qty')->first();
+
+                foreach ($validated['variants'] as $variantData) {
+                    $childProduct = Product::create([
+                        'sku' => $variantData['sku'],
+                        'parent_id' => $parentProduct->id,
+                        'family_id' => $parentProduct->family_id,
+                        'type' => 'simple',
+                        'enabled' => $parentProduct->enabled,
+                        'created_by' => $request->user()?->id,
+                        'updated_by' => $request->user()?->id,
+                    ]);
+
+                    // Save price
+                    if ($priceAttr && isset($variantData['price']) && $variantData['price'] !== '') {
+                        ProductValue::create([
+                            'product_id' => $childProduct->id,
+                            'attribute_id' => $priceAttr->id,
+                            'value' => (string) $variantData['price'],
+                        ]);
+                    }
+
+                    // Save qty
+                    if ($qtyAttr && isset($variantData['qty']) && $variantData['qty'] !== '') {
+                        ProductValue::create([
+                            'product_id' => $childProduct->id,
+                            'attribute_id' => $qtyAttr->id,
+                            'value' => (string) $variantData['qty'],
+                        ]);
+                    }
+
+                    // Save combination attributes (e.g. color, size option codes/IDs)
+                    if (!empty($variantData['attributes'])) {
+                        foreach ($variantData['attributes'] as $attrId => $attrVal) {
+                            if ($attrVal !== null && $attrVal !== '') {
+                                ProductValue::create([
+                                    'product_id' => $childProduct->id,
+                                    'attribute_id' => $attrId,
+                                    'value' => (string) $attrVal,
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         return to_route('catalog.products.index')->with('success', 'Product created successfully.');
     }
@@ -216,6 +272,37 @@ class ProductController extends Controller
             $values[$val->attribute_id][$key] = $val->value;
         }
 
+        $variantsData = [];
+        if (strtolower($product->type) === 'configurable') {
+            $priceAttrId = Attribute::where('code', 'price')->value('id');
+            $qtyAttrId = Attribute::where('code', 'qty')->value('id');
+
+            $variants = Product::where('parent_id', $product->id)->get();
+            foreach ($variants as $variant) {
+                $rawVals = ProductValue::where('product_id', $variant->id)->get();
+                $variantValues = [];
+                $price = '';
+                $qty = '';
+
+                foreach ($rawVals as $val) {
+                    if ($val->attribute_id == $priceAttrId) {
+                        $price = $val->value;
+                    } elseif ($val->attribute_id == $qtyAttrId) {
+                        $qty = $val->value;
+                    }
+                    $variantValues[$val->attribute_id] = $val->value;
+                }
+
+                $variantsData[] = [
+                    'id' => $variant->id,
+                    'sku' => $variant->sku,
+                    'price' => $price,
+                    'qty' => $qty,
+                    'values' => $variantValues,
+                ];
+            }
+        }
+
         $family = $product->family;
 
         return Inertia::render('catalog/products/edit', [
@@ -232,6 +319,7 @@ class ProductController extends Controller
             'families' => $families,
             'assignedGroups' => $groupsData,
             'productValues' => $values,
+            'variants' => $variantsData,
         ]);
     }
 
@@ -243,81 +331,175 @@ class ProductController extends Controller
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
             'values' => ['nullable', 'array'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.id' => ['nullable', 'integer'],
+            'variants.*.sku' => ['required_if:type,configurable', 'string', 'max:100'],
+            'variants.*.price' => ['nullable', 'numeric'],
+            'variants.*.qty' => ['nullable', 'integer'],
         ]);
 
-        $product->update([
-            'sku' => $validated['sku'],
-            'family_id' => $validated['family_id'],
-            'type' => strtolower($validated['type']),
-            'enabled' => $validated['enabled'],
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($validated, $request, $product) {
+            $product->update([
+                'sku' => $validated['sku'],
+                'family_id' => $validated['family_id'],
+                'type' => strtolower($validated['type']),
+                'enabled' => $validated['enabled'],
+                'updated_by' => $request->user()?->id,
+            ]);
 
-        $values = $request->input('values', []);
+            $values = $request->input('values', []);
 
-        foreach ($request->file('values', []) as $attributeId => $localeFiles) {
-            if (is_array($localeFiles)) {
-                foreach ($localeFiles as $localeKey => $file) {
-                    if (is_array($file)) {
-                        $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
-                        $values[$attributeId][$localeKey] = json_encode($paths);
-                    } elseif ($file) {
-                        $values[$attributeId][$localeKey] = $file->store('product-attributes', 'public');
+            foreach ($request->file('values', []) as $attributeId => $localeFiles) {
+                if (is_array($localeFiles)) {
+                    foreach ($localeFiles as $localeKey => $file) {
+                        if (is_array($file)) {
+                            $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
+                            $values[$attributeId][$localeKey] = json_encode($paths);
+                        } elseif ($file) {
+                            $values[$attributeId][$localeKey] = $file->store('product-attributes', 'public');
+                        }
                     }
+                } elseif ($localeFiles) {
+                    $values[$attributeId]['default'] = $localeFiles->store('product-attributes', 'public');
                 }
-            } elseif ($localeFiles) {
-                $values[$attributeId]['default'] = $localeFiles->store('product-attributes', 'public');
             }
-        }
 
-        if (is_array($values)) {
-            foreach ($values as $attributeId => $localeValues) {
-                $attribute = Attribute::find($attributeId);
-                if (!$attribute) continue;
+            if (is_array($values)) {
+                foreach ($values as $attributeId => $localeValues) {
+                    $attribute = Attribute::find($attributeId);
+                    if (!$attribute) continue;
 
-                if (is_array($localeValues)) {
-                    foreach ($localeValues as $localeKey => $val) {
-                        $localeId = $localeKey === 'default' ? null : $localeKey;
+                    if (is_array($localeValues)) {
+                        foreach ($localeValues as $localeKey => $val) {
+                            $localeId = $localeKey === 'default' ? null : $localeKey;
 
-                        if ($val !== null && $val !== '') {
+                            if ($val !== null && $val !== '') {
+                                ProductValue::updateOrCreate(
+                                    [
+                                        'product_id' => $product->id,
+                                        'attribute_id' => $attributeId,
+                                        'locale_id' => $localeId,
+                                    ],
+                                    [
+                                        'value' => is_array($val) ? json_encode($val) : (string)$val,
+                                    ]
+                                );
+                            } else {
+                                ProductValue::where('product_id', $product->id)
+                                    ->where('attribute_id', $attributeId)
+                                    ->where('locale_id', $localeId)
+                                    ->delete();
+                            }
+                        }
+                    } else {
+                        if ($localeValues !== null && $localeValues !== '') {
                             ProductValue::updateOrCreate(
                                 [
                                     'product_id' => $product->id,
                                     'attribute_id' => $attributeId,
-                                    'locale_id' => $localeId,
+                                    'locale_id' => null,
                                 ],
                                 [
-                                    'value' => is_array($val) ? json_encode($val) : (string)$val,
+                                    'value' => (string)$localeValues,
                                 ]
                             );
                         } else {
                             ProductValue::where('product_id', $product->id)
                                 ->where('attribute_id', $attributeId)
-                                ->where('locale_id', $localeId)
+                                ->whereNull('locale_id')
                                 ->delete();
                         }
                     }
-                } else {
-                    if ($localeValues !== null && $localeValues !== '') {
-                        ProductValue::updateOrCreate(
-                            [
-                                'product_id' => $product->id,
-                                'attribute_id' => $attributeId,
-                                'locale_id' => null,
-                            ],
-                            [
-                                'value' => (string)$localeValues,
-                            ]
-                        );
-                    } else {
-                        ProductValue::where('product_id', $product->id)
-                            ->where('attribute_id', $attributeId)
-                            ->whereNull('locale_id')
-                            ->delete();
-                    }
                 }
             }
-        }
+
+            // Sync Variants (Cartesian Product Children)
+            if (strtolower($validated['type']) === 'configurable' && !empty($validated['variants'])) {
+                $priceAttr = Attribute::where('code', 'price')->first();
+                $qtyAttr = Attribute::where('code', 'qty')->first();
+                $existingVariantIds = [];
+
+                foreach ($validated['variants'] as $variantData) {
+                    $childProduct = null;
+                    if (!empty($variantData['id'])) {
+                        $childProduct = Product::find($variantData['id']);
+                    }
+
+                    if ($childProduct) {
+                        $childProduct->update([
+                            'sku' => $variantData['sku'],
+                            'enabled' => $product->enabled,
+                            'updated_by' => $request->user()?->id,
+                        ]);
+                    } else {
+                        // Check unique SKU for new variants
+                        $request->validate([
+                            'variants.*.sku' => ['unique:products,sku'],
+                        ]);
+
+                        $childProduct = Product::create([
+                            'sku' => $variantData['sku'],
+                            'parent_id' => $product->id,
+                            'family_id' => $product->family_id,
+                            'type' => 'simple',
+                            'enabled' => $product->enabled,
+                            'created_by' => $request->user()?->id,
+                            'updated_by' => $request->user()?->id,
+                        ]);
+                    }
+
+                    $existingVariantIds[] = $childProduct->id;
+
+                    // Update price
+                    if ($priceAttr) {
+                        if (isset($variantData['price']) && $variantData['price'] !== '') {
+                            ProductValue::updateOrCreate(
+                                [
+                                    'product_id' => $childProduct->id,
+                                    'attribute_id' => $priceAttr->id,
+                                ],
+                                ['value' => (string) $variantData['price']]
+                            );
+                        } else {
+                            ProductValue::where('product_id', $childProduct->id)->where('attribute_id', $priceAttr->id)->delete();
+                        }
+                    }
+
+                    // Update qty
+                    if ($qtyAttr) {
+                        if (isset($variantData['qty']) && $variantData['qty'] !== '') {
+                            ProductValue::updateOrCreate(
+                                [
+                                    'product_id' => $childProduct->id,
+                                    'attribute_id' => $qtyAttr->id,
+                                ],
+                                ['value' => (string) $variantData['qty']]
+                            );
+                        } else {
+                            ProductValue::where('product_id', $childProduct->id)->where('attribute_id', $qtyAttr->id)->delete();
+                        }
+                    }
+
+                    // Save attribute combinations (new variants)
+                    if (!empty($variantData['attributes'])) {
+                        foreach ($variantData['attributes'] as $attrId => $attrVal) {
+                            if ($attrVal !== null && $attrVal !== '') {
+                                ProductValue::updateOrCreate(
+                                    [
+                                        'product_id' => $childProduct->id,
+                                        'attribute_id' => $attrId,
+                                    ],
+                                    ['value' => (string) $attrVal]
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Delete variants removed from frontend
+                Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->delete();
+            }
+        });
 
         return to_route('catalog.products.index')->with('success', 'Product updated successfully.');
     }

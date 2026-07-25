@@ -14,6 +14,7 @@ class Product extends Model
 
     protected $fillable = [
         'sku',
+        'parent_id',
         'family_id',
         'type',
         'enabled',
@@ -23,7 +24,18 @@ class Product extends Model
     {
         return [
             'enabled' => 'boolean',
+            'parent_id' => 'integer',
         ];
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'parent_id');
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(Product::class, 'parent_id');
     }
 
     public function family(): BelongsTo

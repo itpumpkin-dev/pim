@@ -4,6 +4,8 @@ use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\ProductController;
+use App\Http\Controllers\Catalog\CategoryController;
+use App\Http\Controllers\Catalog\CategoryFieldController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function () {
@@ -39,4 +41,20 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'update'])->name('attributeFamilies.update')->middleware('permission:attribute_families,edit_attribute_families');
     Route::put('attributeFamilies/{attributeFamily}/edit', [AttributeFamilyController::class, 'update']);
     Route::delete('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'destroy'])->name('attributeFamilies.destroy')->middleware('permission:attribute_families,delete_attribute_families');
+
+    Route::get('categories', [CategoryController::class, 'index'])->name('categories.index')->middleware('permission:categories,list_categories');
+    Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create')->middleware('permission:categories,create_categories');
+    Route::post('categories', [CategoryController::class, 'store'])->name('categories.store')->middleware('permission:categories,create_categories');
+    Route::get('categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit')->middleware('permission:categories,edit_categories');
+    Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:categories,edit_categories');
+    Route::put('categories/{category}/edit', [CategoryController::class, 'update']);
+    Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy')->middleware('permission:categories,delete_categories');
+
+    Route::get('categoryFields', [CategoryFieldController::class, 'index'])->name('categoryFields.index')->middleware('permission:category_fields,list_category_fields');
+    Route::get('categoryFields/create', [CategoryFieldController::class, 'create'])->name('categoryFields.create')->middleware('permission:category_fields,create_category_fields');
+    Route::post('categoryFields', [CategoryFieldController::class, 'store'])->name('categoryFields.store')->middleware('permission:category_fields,create_category_fields');
+    Route::get('categoryFields/{categoryField}/edit', [CategoryFieldController::class, 'edit'])->name('categoryFields.edit')->middleware('permission:category_fields,edit_category_fields');
+    Route::put('categoryFields/{categoryField}', [CategoryFieldController::class, 'update'])->name('categoryFields.update')->middleware('permission:category_fields,edit_category_fields');
+    Route::put('categoryFields/{categoryField}/edit', [CategoryFieldController::class, 'update']);
+    Route::delete('categoryFields/{categoryField}', [CategoryFieldController::class, 'destroy'])->name('categoryFields.destroy')->middleware('permission:category_fields,delete_category_fields');
 });

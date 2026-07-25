@@ -14,6 +14,7 @@ class CategoryField extends Model
     protected $fillable = [
         'code',
         'type',
+        'labels',
         'is_required',
         'value_per_locale',
         'status',
@@ -30,6 +31,7 @@ class CategoryField extends Model
             'value_per_locale' => 'boolean',
             'status' => 'boolean',
             'position' => 'integer',
+            'labels' => 'array',
         ];
     }
 
