@@ -35,6 +35,6 @@ class Role extends Model
 
     public function userGroups(): BelongsToMany
     {
-        return $this->belongsToMany(UserGroup::class, 'role_user_group');
+        return $this->belongsToMany(UserGroup::class, 'role_user_group', 'role_id', 'group_id');
     }
 }

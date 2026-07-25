@@ -11,8 +11,12 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('user/summary', [UserController::class, 'summary'])->name('user.summary')->middleware('permission:users,list_users');
     Route::get('user/{user}/summary', [UserController::class, 'summaryShow'])->name('user.summary.show')->middleware('permission:users,list_users');
     Route::post('user', [UserController::class, 'store'])->name('user.store')->middleware('permission:users,create_users');
-    Route::get('user/{user}/edit', [UserController::class, 'edit'])->name('user.edit')->middleware('permission:users,edit_users');
-    Route::put('user/{user}', [UserController::class, 'update'])->name('user.update')->middleware('permission:users,edit_users');
+    // No permission middleware here: a user is always allowed to view/edit their own
+    // account (this is also the "Settings" page). UserController enforces that anyone
+    // other than the account owner needs the `users.edit_users` permission, and that
+    // only holders of that permission may change enabled/groups/roles.
+    Route::get('user/{user}/edit', [UserController::class, 'edit'])->name('user.edit');
+    Route::put('user/{user}', [UserController::class, 'update'])->name('user.update');
     Route::delete('user/{user}', [UserController::class, 'destroy'])->name('user.destroy')->middleware('permission:users,delete_users');
 
     Route::get('userGroup', [UserGroupController::class, 'index'])->name('userGroup.index')->middleware('permission:user_groups,list_user_groups');

@@ -74,6 +74,7 @@ class User extends Authenticatable
             'enabled' => 'boolean',
             'last_login_at' => 'datetime',
             'login_count' => 'integer',
+            'permissions_version' => 'integer',
         ];
     }
 

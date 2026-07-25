@@ -28,6 +28,9 @@ export const PALETTE = {
     accent: '#EA580C',
     secondary: '#9CA3AF',     // Mid Gray
     highlight: '#06B6D4',     // Signal Orange — sparingly for emphasis
+
+    //redAlert
+    redAlert: '#EF4444',
 } as const;
 
 export function getTheme(mode: PaletteMode) {
@@ -52,10 +55,10 @@ export function getTheme(mode: PaletteMode) {
                 secondary: isDark ? '#94a3b8' : '#64748b',
             },
             error: {
-                main: PALETTE.highlight,       // Signal Orange for destructive / error
+                main: PALETTE.redAlert,       // Signal Orange for destructive / error
             },
             warning: {
-                main: PALETTE.highlight,       // Signal Orange for warnings
+                main: PALETTE.redAlert,       // Signal Orange for warnings
             },
             info: {
                 main: PALETTE.accent,          // Data Cyan for info

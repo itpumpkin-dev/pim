@@ -11,6 +11,7 @@ use App\Models\RolePermission;
 use App\Models\User;
 use App\Services\GridManager;
 use App\Services\PermissionCatalog;
+use App\Services\SessionInvalidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -53,6 +54,7 @@ class RoleController extends Controller
         $role->users()->sync($userIds);
         if (!empty($userIds)) {
             AuditLog::record('users_assigned', $role, null, ['user_ids' => $userIds]);
+            SessionInvalidator::usersExceptCurrentActor($userIds);
         }
 
         return to_route('system.roles.index')->with('success', 'Role created successfully.');
@@ -76,13 +78,21 @@ class RoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
+        $affectedUserIds = SessionInvalidator::roleUserIds($role);
+
         $role->delete();
+
+        SessionInvalidator::usersExceptCurrentActor($affectedUserIds);
 
         return to_route('system.roles.index');
     }
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
+        // Users who currently hold this role, directly or via a group, before
+        // any of the changes below are applied.
+        $previouslyAffectedUserIds = SessionInvalidator::roleUserIds($role);
+
         $role->update(['label' => $request->label]);
 
         $oldPermissions = $this->groupedPermissions($role);
@@ -91,7 +101,8 @@ class RoleController extends Controller
         $role->permissions()->delete();
         $this->savePermissions($role, $newPermissions);
 
-        if ($this->permissionsChanged($oldPermissions, $newPermissions)) {
+        $permissionsChanged = $this->permissionsChanged($oldPermissions, $newPermissions);
+        if ($permissionsChanged) {
             AuditLog::record('permissions_updated', $role, $oldPermissions, $newPermissions);
         }
 
@@ -99,8 +110,17 @@ class RoleController extends Controller
         $newUserIds = array_map('intval', $request->input('users', []));
         $role->users()->sync($newUserIds);
 
-        if ($this->idsChanged($oldUserIds, $newUserIds)) {
+        $usersChanged = $this->idsChanged($oldUserIds, $newUserIds);
+        if ($usersChanged) {
             AuditLog::record('users_updated', $role, ['user_ids' => $oldUserIds], ['user_ids' => $newUserIds]);
+        }
+
+        if ($permissionsChanged || $usersChanged) {
+            // Union of who was affected before the change and who is affected
+            // now, so both users who lost the role and users who gained it
+            // are forced to re-authenticate.
+            $nowAffectedUserIds = SessionInvalidator::roleUserIds($role);
+            SessionInvalidator::usersExceptCurrentActor(array_merge($previouslyAffectedUserIds, $nowAffectedUserIds));
         }
 
         return to_route('system.roles.index')->with('success', 'Role updated successfully.');

@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserGroup;
 use App\Services\GridManager;
+use App\Services\SessionInvalidator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -47,6 +48,7 @@ class UserGroupController extends Controller
         $group->users()->sync($userIds);
         if (!empty($userIds)) {
             AuditLog::record('users_assigned', $group, null, ['user_ids' => $userIds]);
+            SessionInvalidator::usersExceptCurrentActor($userIds);
         }
 
         $roleIds = $request->input('roles', []);
@@ -86,7 +88,8 @@ class UserGroupController extends Controller
         $newUserIds = array_map('intval', $request->input('users', []));
         $userGroup->users()->sync($newUserIds);
 
-        if ($this->idsChanged($oldUserIds, $newUserIds)) {
+        $usersChanged = $this->idsChanged($oldUserIds, $newUserIds);
+        if ($usersChanged) {
             AuditLog::record('users_updated', $userGroup, ['user_ids' => $oldUserIds], ['user_ids' => $newUserIds]);
         }
 
@@ -94,8 +97,16 @@ class UserGroupController extends Controller
         $newRoleIds = array_map('intval', $request->input('roles', []));
         $userGroup->roles()->sync($newRoleIds);
 
-        if ($this->idsChanged($oldRoleIds, $newRoleIds)) {
+        $rolesChanged = $this->idsChanged($oldRoleIds, $newRoleIds);
+        if ($rolesChanged) {
             AuditLog::record('roles_updated', $userGroup, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
+        }
+
+        if ($usersChanged || $rolesChanged) {
+            // Both the members who left/joined and the members who stayed
+            // need a fresh session: leaving/joining changes their own access,
+            // staying members are affected if the group's roles changed.
+            SessionInvalidator::usersExceptCurrentActor(array_merge($oldUserIds, $newUserIds));
         }
 
         return to_route('system.userGroup.index')->with('success', 'Group updated successfully.');
@@ -103,7 +114,11 @@ class UserGroupController extends Controller
 
     public function destroy(UserGroup $userGroup): RedirectResponse
     {
+        $affectedUserIds = SessionInvalidator::userGroupUserIds($userGroup);
+
         $userGroup->delete();
+
+        SessionInvalidator::usersExceptCurrentActor($affectedUserIds);
 
         return to_route('system.userGroup.index');
     }

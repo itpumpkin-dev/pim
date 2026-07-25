@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Services\GridManager;
+use App\Services\SessionInvalidator;
 
 class UserController extends Controller
 {
@@ -140,8 +141,10 @@ class UserController extends Controller
         return to_route('system.user.index')->with('success', 'User created successfully.');
     }
 
-    public function edit(User $user): Response
+    public function edit(Request $request, User $user): Response
     {
+        $this->authorizeUserAccess($request, $user);
+
         $user->load(['groups:id,name', 'roles:id,label']);
 
         return Inertia::render('system/user/edit', [
@@ -168,14 +171,24 @@ class UserController extends Controller
             'roles' => Role::orderBy('label')->get(['id', 'label']),
             'locales' => Locale::orderBy('code')->get(['id', 'code']),
             'timezones' => timezone_identifiers_list(),
+            'canManageAccess' => $request->user()->hasPermission('users', 'edit_users'),
         ]);
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $data = $request->safe()->only([
-            'name_prefix', 'first_name', 'last_name', 'phone', 'email', 'enabled', 'ui_locale_id', 'timezone',
-        ]);
+        $this->authorizeUserAccess($request, $user);
+
+        // Only holders of `users.edit_users` may change account access (status, groups,
+        // roles). Anyone editing their own profile without that permission may only
+        // change their own personal details, never their own privileges.
+        $canManageAccess = $request->user()->hasPermission('users', 'edit_users');
+
+        $fields = ['name_prefix', 'first_name', 'last_name', 'phone', 'email', 'ui_locale_id', 'timezone'];
+        if ($canManageAccess) {
+            $fields[] = 'enabled';
+        }
+        $data = $request->safe()->only($fields);
 
         if ($request->hasFile('avatar')) {
             if ($user->avatar_path) {
@@ -196,21 +209,48 @@ class UserController extends Controller
             AuditLog::record('password_reset', $user);
         }
 
-        $oldGroupIds = $user->groups->pluck('id')->all();
-        $newGroupIds = array_map('intval', $request->input('groups', []));
-        $user->groups()->sync($newGroupIds);
-        if ($this->idsChanged($oldGroupIds, $newGroupIds)) {
-            AuditLog::record('groups_updated', $user, ['group_ids' => $oldGroupIds], ['group_ids' => $newGroupIds]);
+        if ($canManageAccess) {
+            $oldGroupIds = $user->groups->pluck('id')->all();
+            $newGroupIds = array_map('intval', $request->input('groups', []));
+            $user->groups()->sync($newGroupIds);
+            $groupsChanged = $this->idsChanged($oldGroupIds, $newGroupIds);
+            if ($groupsChanged) {
+                AuditLog::record('groups_updated', $user, ['group_ids' => $oldGroupIds], ['group_ids' => $newGroupIds]);
+            }
+
+            $oldRoleIds = $user->roles->pluck('id')->all();
+            $newRoleIds = array_map('intval', $request->input('roles', []));
+            $user->roles()->sync($newRoleIds);
+            $rolesChanged = $this->idsChanged($oldRoleIds, $newRoleIds);
+            if ($rolesChanged) {
+                AuditLog::record('roles_updated', $user, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
+            }
+
+            if ($groupsChanged || $rolesChanged) {
+                SessionInvalidator::usersExceptCurrentActor([$user->id]);
+            }
         }
 
-        $oldRoleIds = $user->roles->pluck('id')->all();
-        $newRoleIds = array_map('intval', $request->input('roles', []));
-        $user->roles()->sync($newRoleIds);
-        if ($this->idsChanged($oldRoleIds, $newRoleIds)) {
-            AuditLog::record('roles_updated', $user, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
+        if ($request->user()->hasPermission('users', 'list_users')) {
+            return to_route('system.user.index')->with('success', 'User updated successfully.');
         }
 
-        return to_route('system.user.index')->with('success', 'User updated successfully.');
+        return to_route('system.user.edit', $user)->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * A user may always view/edit their own account. Viewing or editing anyone
+     * else's account requires the `users.edit_users` permission.
+     */
+    private function authorizeUserAccess(Request $request, User $user): void
+    {
+        $currentUser = $request->user();
+
+        abort_unless(
+            $currentUser->id === $user->id || $currentUser->hasPermission('users', 'edit_users'),
+            403,
+            'You do not have permission to perform this action.'
+        );
     }
 
     private function idsChanged(array $old, array $new): bool
@@ -223,6 +263,12 @@ class UserController extends Controller
 
     public function destroy(User $user): RedirectResponse
     {
+        abort_if(
+            $user->roles()->where('label', 'Administrator')->exists(),
+            403,
+            'Users with the Administrator role cannot be deleted.'
+        );
+
         if ($user->avatar_path) {
             Storage::disk('public')->delete($user->avatar_path);
         }

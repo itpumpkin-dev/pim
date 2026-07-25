@@ -7,6 +7,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createElement, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
+import { PermissionsChangedToast } from './components/permissions-changed-toast';
 import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearance';
 import { useSyncI18nLanguage } from './hooks/use-locale';
 // import { LocaleProvider } from './hooks/use-locale';
@@ -32,6 +33,7 @@ function ThemedPage({ children }: { children: ReactNode }) {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
+            <PermissionsChangedToast />
             {children}
         </ThemeProvider>
     );

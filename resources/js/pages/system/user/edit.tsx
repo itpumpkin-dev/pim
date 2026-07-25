@@ -55,6 +55,7 @@ interface EditUserProps {
     roles: RoleOption[];
     locales: LocaleOption[];
     timezones: string[];
+    canManageAccess: boolean;
 }
 
 interface UserForm {
@@ -97,8 +98,9 @@ function localeLabel(code: string) {
     }
 }
 
-export default function UserEdit({ user, groups, roles, locales, timezones }: EditUserProps) {
-    const [tab, setTab] = useState(0);
+export default function UserEdit({ user, groups, roles, locales, timezones, canManageAccess }: EditUserProps) {
+    const tabs = canManageAccess ? TABS : TABS.filter((label) => label !== 'Groups and Roles');
+    const [tab, setTab] = useState(tabs[0]);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -207,28 +209,30 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
                 </Box>
 
                 <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
-                    {TABS.map((label, index) => (
-                        <Tab key={label} label={label} value={index} />
+                    {tabs.map((label) => (
+                        <Tab key={label} label={label} value={label} />
                     ))}
                 </Tabs>
 
-                {tab === 0 && (
+                {tab === 'General properties' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
-                        <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Status *
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 2 }}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.enabled} onChange={() => update('enabled', true)} />}
-                                    label="Active"
-                                />
-                                <FormControlLabel
-                                    control={<Checkbox checked={!data.enabled} onChange={() => update('enabled', false)} />}
-                                    label="Non Active"
-                                />
+                        {canManageAccess && (
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    Status *
+                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2 }}>
+                                    <FormControlLabel
+                                        control={<Checkbox checked={data.enabled} onChange={() => update('enabled', true)} />}
+                                        label="Active"
+                                    />
+                                    <FormControlLabel
+                                        control={<Checkbox checked={!data.enabled} onChange={() => update('enabled', false)} />}
+                                        label="Non Active"
+                                    />
+                                </Box>
                             </Box>
-                        </Box>
+                        )}
 
                         {/* <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -329,7 +333,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
                     </Box>
                 )}
 
-                {tab === 1 && (
+                {tab === 'Groups and Roles' && canManageAccess && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 500 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -369,7 +373,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
                     </Box>
                 )}
 
-                {tab === 2 && (
+                {tab === 'Password' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
@@ -402,7 +406,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones }: Ed
                     </Box>
                 )}
 
-                {tab === 3 && (
+                {tab === 'Interfaces' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
