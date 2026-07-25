@@ -1,0 +1,26 @@
+datagrid:
+  department_grid:
+    source:
+      type: eloquent
+      class: App\Models\Department
+    columns:
+      name:
+        label: fields.name
+        type: string
+        sortable: true
+      enabled:
+        label: fields.status
+        type: boolean
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - name
+    actions:
+      update:
+        icon: edit
+        label: rowActions.edit
+      delete:
+        icon: delete
+        label: rowActions.delete

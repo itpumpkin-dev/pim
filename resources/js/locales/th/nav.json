@@ -12,6 +12,8 @@
     "system": "ระบบ",
     "users": "ผู้ใช้งาน",
     "userGroups": "กลุ่มผู้ใช้งาน",
+    "departments": "แผนก",
+    "jobPositions": "ตำแหน่งงาน",
     "roles": "บทบาท",
     "locales": "ภาษา",
     "importExport": "นำเข้า / ส่งออก",

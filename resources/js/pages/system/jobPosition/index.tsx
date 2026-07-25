@@ -1,14 +1,32 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    InputAdornment,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography,
+    IconButton,
+} from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import CreateUserDialog from '@/components/system/create-user-dialog';
 
 interface PaginationData<T> {
     data: T[];
@@ -30,17 +48,7 @@ interface GridConfig {
     }>;
 }
 
-interface DepartmentOption {
-    id: number;
-    name: string;
-}
-
-interface JobPositionOption {
-    id: number;
-    name: string;
-}
-
-interface UserIndexProps {
+interface JobPositionIndexProps {
     gridConfig: GridConfig;
     gridData: PaginationData<any>;
     filters: {
@@ -48,28 +56,26 @@ interface UserIndexProps {
         sort?: string;
         dir?: string;
     };
-    departments: DepartmentOption[];
-    jobPositions: JobPositionOption[];
 }
 
-export default function UserIndex({ gridConfig, gridData, filters, departments, jobPositions }: UserIndexProps) {
+export default function JobPositionIndex({ gridConfig, gridData, filters }: JobPositionIndexProps) {
     const { t } = useTranslation('grid');
     const { t: tSystem } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('system'), href: '#' },
-        { title: tNav('users'), href: '/system/user' },
+        { title: tNav('jobPositions'), href: '/system/jobPosition' },
     ];
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canCreate = permissions.includes('users.create_users');
-    const canEdit = permissions.includes('users.edit_users');
-    const canDelete = permissions.includes('users.delete_users');
+    const canCreate = permissions.includes('job_positions.create_job_positions');
+    const canEdit = permissions.includes('job_positions.edit_job_positions');
+    const canDelete = permissions.includes('job_positions.delete_job_positions');
 
     const [search, setSearch] = useState(filters.search || '');
-    const [createOpen, setCreateOpen] = useState(false);
-    const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const isFirstRender = useRef(true);
 
     const visibleActions = Object.entries(gridConfig.actions ?? {}).filter(([actionKey]) => {
@@ -78,6 +84,19 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
         return true;
     });
 
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+
+        setDeleting(true);
+        router.delete(`/system/jobPosition/${deleteTarget.id}`, {
+            preserveScroll: true,
+            onFinish: () => {
+                setDeleting(false);
+                setDeleteTarget(null);
+            },
+        });
+    };
+
     useEffect(() => {
         if (isFirstRender.current) {
             isFirstRender.current = false;
@@ -85,7 +104,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
         }
 
         const delayDebounceFn = setTimeout(() => {
-            router.get('/system/user', { search }, { preserveState: true, replace: true });
+            router.get('/system/jobPosition', { search }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
@@ -93,46 +112,46 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={tSystem('usersCount', { count: gridData.total })} />
+            <Head title={tSystem('jobPositionsCount', { count: gridData.total })} />
             <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center' }}>
-                            {tSystem('usersCount', { count: gridData.total })}
+                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, alignItems: 'center', border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1, display: 'inline-flex' }}>
+                            {tSystem('jobPositionsCount', { count: gridData.total })}
                         </Typography>
-                        <TextField
-                            placeholder={tSystem('searchByUsername')}
-                            variant="standard"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                                    </InputAdornment>
-                                ),
-                                disableUnderline: false,
-                            }}
-                            sx={{ minWidth: 300, '& .MuiInput-root': { pb: 1 } }}
-                        />
+                        <Box sx={{ mt: 3 }}>
+                            <TextField
+                                placeholder={tSystem('searchByName')}
+                                variant="standard"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: 'text.secondary' }} />
+                                        </InputAdornment>
+                                    ),
+                                    disableUnderline: false,
+                                }}
+                                sx={{ minWidth: 300, '& .MuiInput-root': { pb: 1 } }}
+                            />
+                        </Box>
                     </Box>
                     {canCreate && (
                         <Box>
-                            <Button variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }} onClick={() => setCreateOpen(true)}>
-                                {tSystem('createUser')}
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff' }}
+                                onClick={() => router.visit('/system/jobPosition/create')}
+                            >
+                                {tSystem('createJobPosition')}
                             </Button>
                         </Box>
                     )}
                 </Box>
 
-                <CreateUserDialog
-                    open={createOpen}
-                    onClose={() => setCreateOpen(false)}
-                    departments={departments}
-                    jobPositions={jobPositions}
-                />
-
-                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 1, mt: 4 }}>
                     <Table sx={{ minWidth: 650 }}>
                         <TableHead>
                             <TableRow>
@@ -150,7 +169,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                             {gridData.data.map((row) => (
                                 <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                     {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                        <TableCell key={key} sx={{ fontWeight: key === 'employee_id' || key === 'username' ? 600 : 400 }}>
+                                        <TableCell key={key} sx={{ fontWeight: key === 'name' ? 600 : 400 }}>
                                             {column.type === 'boolean' ? (row[key] ? t('active') : t('inactive')) : (row[key] || '-')}
                                         </TableCell>
                                     ))}
@@ -158,19 +177,16 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                                         <TableCell align="right">
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                                 {visibleActions.map(([actionKey, action]) => {
-                                                    if (actionKey === 'delete' && row.id === auth.user?.id) {
-                                                        return null;
-                                                    }
-
                                                     let Icon = EditIcon;
                                                     if (action.icon === 'copy') Icon = ContentCopyIcon;
                                                     if (action.icon === 'delete') Icon = DeleteIcon;
 
                                                     const handleClick = () => {
                                                         if (actionKey === 'update') {
-                                                            router.visit(`/system/user/${row.id}/edit`);
-                                                        } else if (actionKey === 'delete') {
-                                                            setDeleteUserId(row.id as number);
+                                                            router.visit(`/system/jobPosition/${row.id}/edit`);
+                                                        }
+                                                        if (actionKey === 'delete') {
+                                                            setDeleteTarget({ id: row.id, name: row.name });
                                                         }
                                                     };
 
@@ -197,26 +213,23 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                     </Table>
                 </TableContainer>
             </Box>
-        <Dialog open={deleteUserId !== null} onClose={() => setDeleteUserId(null)}>
-            <DialogTitle>{tSystem('confirmDeletionTitle')}</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    {tSystem('confirmDeleteUserMessage')}
-                </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>{t('cancel')}</Button>
-                <Button onClick={() => {
-                    if (deleteUserId !== null) {
-                        router.delete(`/system/user/${deleteUserId}`, {
-                            onSuccess: () => setDeleteUserId(null),
-                        });
-                    }
-                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }}>
-                    {t('delete')}
-                </Button>
-            </DialogActions>
-        </Dialog>
+
+            <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+                <DialogTitle>{tSystem('deleteJobPositionTitle')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {tSystem('confirmDeleteJobPositionMessage', { name: deleteTarget?.name })}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)}>
+                        {t('cancel')}
+                    </Button>
+                    <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+                        {t('delete')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </AppLayout>
     );
 }

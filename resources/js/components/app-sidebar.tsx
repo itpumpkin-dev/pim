@@ -102,6 +102,16 @@ function useMainNavItems(): NavItem[] {
                     permission: 'user_groups.list_user_groups',
                 },
                 {
+                    title: t('departments'),
+                    url: '/system/department',
+                    permission: 'departments.list_departments',
+                },
+                {
+                    title: t('jobPositions'),
+                    url: '/system/jobPosition',
+                    permission: 'job_positions.list_job_positions',
+                },
+                {
                     title: t('roles'),
                     url: '/system/roles',
                     permission: 'roles.list_roles',

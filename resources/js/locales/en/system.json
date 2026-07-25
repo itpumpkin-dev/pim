@@ -16,6 +16,16 @@
     "deleteGroupTitle": "Delete group?",
     "confirmDeleteGroupMessage": "Are you sure you want to delete the group \"{{name}}\"? This will remove it from every user it is assigned to and cannot be undone.",
 
+    "departmentsCount": "{{count}} departments",
+    "createDepartment": "CREATE DEPARTMENT",
+    "deleteDepartmentTitle": "Delete department?",
+    "confirmDeleteDepartmentMessage": "Are you sure you want to delete the department \"{{name}}\"? Users assigned to it will no longer have a department.",
+
+    "jobPositionsCount": "{{count}} job positions",
+    "createJobPosition": "CREATE JOB POSITION",
+    "deleteJobPositionTitle": "Delete job position?",
+    "confirmDeleteJobPositionMessage": "Are you sure you want to delete the job position \"{{name}}\"? Users assigned to it will no longer have a job position.",
+
     "localesTitle": "Locales",
     "createLocale": "Create Locale",
     "searchByCode": "Search by code",

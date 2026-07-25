@@ -16,6 +16,16 @@
     "deleteGroupTitle": "ลบกลุ่ม?",
     "confirmDeleteGroupMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่ม \"{{name}}\"? การดำเนินการนี้จะลบออกจากผู้ใช้งานทุกคนที่อยู่ในกลุ่มนี้ และไม่สามารถย้อนกลับได้",
 
+    "departmentsCount": "{{count}} แผนก",
+    "createDepartment": "สร้างแผนก",
+    "deleteDepartmentTitle": "ลบแผนก?",
+    "confirmDeleteDepartmentMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบแผนก \"{{name}}\"? ผู้ใช้งานที่ถูกกำหนดแผนกนี้จะไม่มีแผนกอีกต่อไป",
+
+    "jobPositionsCount": "{{count}} ตำแหน่งงาน",
+    "createJobPosition": "สร้างตำแหน่งงาน",
+    "deleteJobPositionTitle": "ลบตำแหน่งงาน?",
+    "confirmDeleteJobPositionMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบตำแหน่งงาน \"{{name}}\"? ผู้ใช้งานที่ถูกกำหนดตำแหน่งนี้จะไม่มีตำแหน่งงานอีกต่อไป",
+
     "localesTitle": "ภาษา",
     "createLocale": "สร้างภาษา",
     "searchByCode": "ค้นหาด้วยโค้ด",

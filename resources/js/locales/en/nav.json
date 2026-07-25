@@ -12,6 +12,8 @@
     "system": "System",
     "users": "Users",
     "userGroups": "User Groups",
+    "departments": "Departments",
+    "jobPositions": "Job Positions",
     "roles": "Roles",
     "locales": "Locales",
     "importExport": "Import / Export",

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\System\DepartmentController;
+use App\Http\Controllers\System\JobPositionController;
 use App\Http\Controllers\System\LocaleController;
 use App\Http\Controllers\System\RoleController;
 use App\Http\Controllers\System\UserController;
@@ -32,6 +34,20 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit')->middleware('permission:roles,edit_roles');
     Route::put('roles/{role}', [RoleController::class, 'update'])->name('roles.update')->middleware('permission:roles,edit_roles');
     Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy')->middleware('permission:roles,delete_roles');
+
+    Route::get('department', [DepartmentController::class, 'index'])->name('department.index')->middleware('permission:departments,list_departments');
+    Route::get('department/create', [DepartmentController::class, 'create'])->name('department.create')->middleware('permission:departments,create_departments');
+    Route::post('department', [DepartmentController::class, 'store'])->name('department.store')->middleware('permission:departments,create_departments');
+    Route::get('department/{department}/edit', [DepartmentController::class, 'edit'])->name('department.edit')->middleware('permission:departments,edit_departments');
+    Route::put('department/{department}', [DepartmentController::class, 'update'])->name('department.update')->middleware('permission:departments,edit_departments');
+    Route::delete('department/{department}', [DepartmentController::class, 'destroy'])->name('department.destroy')->middleware('permission:departments,delete_departments');
+
+    Route::get('jobPosition', [JobPositionController::class, 'index'])->name('jobPosition.index')->middleware('permission:job_positions,list_job_positions');
+    Route::get('jobPosition/create', [JobPositionController::class, 'create'])->name('jobPosition.create')->middleware('permission:job_positions,create_job_positions');
+    Route::post('jobPosition', [JobPositionController::class, 'store'])->name('jobPosition.store')->middleware('permission:job_positions,create_job_positions');
+    Route::get('jobPosition/{jobPosition}/edit', [JobPositionController::class, 'edit'])->name('jobPosition.edit')->middleware('permission:job_positions,edit_job_positions');
+    Route::put('jobPosition/{jobPosition}', [JobPositionController::class, 'update'])->name('jobPosition.update')->middleware('permission:job_positions,edit_job_positions');
+    Route::delete('jobPosition/{jobPosition}', [JobPositionController::class, 'destroy'])->name('jobPosition.destroy')->middleware('permission:job_positions,delete_job_positions');
 
     Route::get('locales', [LocaleController::class, 'index'])->name('locales.index')->middleware('permission:locales,list_locales');
     Route::get('locales/create', [LocaleController::class, 'create'])->name('locales.create')->middleware('permission:locales,create_locales');

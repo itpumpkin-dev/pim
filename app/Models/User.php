@@ -33,6 +33,8 @@ class User extends Authenticatable
         'phone',
         'email',
         'avatar_path',
+        'department_id',
+        'job_position_id',
         'enabled',
         'catalog_locale_id',
         'ui_locale_id',
@@ -121,6 +123,16 @@ class User extends Authenticatable
     public function defaultTree(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'default_tree_id');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function jobPosition(): BelongsTo
+    {
+        return $this->belongsTo(JobPosition::class);
     }
 
     public function roles(): BelongsToMany

@@ -1,8 +1,18 @@
 import AppLogo from '@/components/app-logo';
 import { useForm } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Button, Dialog, DialogContent, Divider, IconButton, TextField, Typography } from '@mui/material';
+import { Box, Button, Dialog, DialogContent, Divider, IconButton, MenuItem, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
+
+interface DepartmentOption {
+    id: number;
+    name: string;
+}
+
+interface JobPositionOption {
+    id: number;
+    name: string;
+}
 
 interface CreateUserForm {
     username: string;
@@ -12,12 +22,16 @@ interface CreateUserForm {
     first_name: string;
     last_name: string;
     email: string;
-    [key: string]: string;
+    department_id: number | '';
+    job_position_id: number | '';
+    [key: string]: string | number;
 }
 
 interface CreateUserDialogProps {
     open: boolean;
     onClose: () => void;
+    departments?: DepartmentOption[];
+    jobPositions?: JobPositionOption[];
 }
 
 const fields: { key: keyof CreateUserForm; label: string; type?: string }[] = [
@@ -30,7 +44,7 @@ const fields: { key: keyof CreateUserForm; label: string; type?: string }[] = [
     { key: 'email', label: 'Email', type: 'email' },
 ];
 
-export default function CreateUserDialog({ open, onClose }: CreateUserDialogProps) {
+export default function CreateUserDialog({ open, onClose, departments = [], jobPositions = [] }: CreateUserDialogProps) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm<CreateUserForm>({
         username: '',
         employee_id: '',
@@ -39,6 +53,8 @@ export default function CreateUserDialog({ open, onClose }: CreateUserDialogProp
         first_name: '',
         last_name: '',
         email: '',
+        department_id: '',
+        job_position_id: '',
     });
 
     const handleClose = () => {
@@ -96,6 +112,56 @@ export default function CreateUserDialog({ open, onClose }: CreateUserDialogProp
                             />
                         </Box>
                     ))}
+
+                    <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Department
+                        </Typography>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            value={data.department_id}
+                            onChange={(e) => {
+                                setData('department_id', e.target.value === '' ? '' : Number(e.target.value));
+                                clearErrors('department_id');
+                            }}
+                            error={Boolean(errors.department_id)}
+                            helperText={errors.department_id}
+                        >
+                            <MenuItem value="">—</MenuItem>
+                            {departments.map((department) => (
+                                <MenuItem key={department.id} value={department.id}>
+                                    {department.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
+
+                    <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            Job position
+                        </Typography>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            value={data.job_position_id}
+                            onChange={(e) => {
+                                setData('job_position_id', e.target.value === '' ? '' : Number(e.target.value));
+                                clearErrors('job_position_id');
+                            }}
+                            error={Boolean(errors.job_position_id)}
+                            helperText={errors.job_position_id}
+                        >
+                            <MenuItem value="">—</MenuItem>
+                            {jobPositions.map((jobPosition) => (
+                                <MenuItem key={jobPosition.id} value={jobPosition.id}>
+                                    {jobPosition.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>

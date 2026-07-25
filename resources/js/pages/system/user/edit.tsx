@@ -31,6 +31,16 @@ interface LocaleOption {
     code: string;
 }
 
+interface DepartmentOption {
+    id: number;
+    name: string;
+}
+
+interface JobPositionOption {
+    id: number;
+    name: string;
+}
+
 interface EditUserProps {
     user: {
         id: number;
@@ -40,6 +50,8 @@ interface EditUserProps {
         last_name: string;
         phone: string | null;
         email: string;
+        department_id: number | null;
+        job_position_id: number | null;
         enabled: boolean;
         avatar_url: string | null;
         ui_locale_id: number | null;
@@ -55,6 +67,8 @@ interface EditUserProps {
     roles: RoleOption[];
     locales: LocaleOption[];
     timezones: string[];
+    departments: DepartmentOption[];
+    jobPositions: JobPositionOption[];
     canManageAccess: boolean;
 }
 
@@ -64,6 +78,8 @@ interface UserForm {
     last_name: string;
     phone: string;
     email: string;
+    department_id: number | '';
+    job_position_id: number | '';
     enabled: boolean;
     avatar: File | null;
     groups: number[];
@@ -98,7 +114,7 @@ function localeLabel(code: string) {
     }
 }
 
-export default function UserEdit({ user, groups, roles, locales, timezones, canManageAccess }: EditUserProps) {
+export default function UserEdit({ user, groups, roles, locales, timezones, departments, jobPositions, canManageAccess }: EditUserProps) {
     const tabs = canManageAccess ? TABS : TABS.filter((label) => label !== 'Groups and Roles');
     const [tab, setTab] = useState(tabs[0]);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url);
@@ -111,6 +127,8 @@ export default function UserEdit({ user, groups, roles, locales, timezones, canM
         last_name: user.last_name,
         phone: user.phone || '',
         email: user.email,
+        department_id: user.department_id ?? '',
+        job_position_id: user.job_position_id ?? '',
         enabled: user.enabled,
         avatar: null,
         groups: user.group_ids,
@@ -288,6 +306,48 @@ export default function UserEdit({ user, groups, roles, locales, timezones, canM
                                 error={Boolean(errors.phone)}
                                 helperText={errors.phone}
                             />
+                        </Box>
+
+                        <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Department
+                            </Typography>
+                            <Select
+                                fullWidth
+                                size="small"
+                                displayEmpty
+                                value={data.department_id}
+                                onChange={(e) => update('department_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                error={Boolean(errors.department_id)}
+                            >
+                                <MenuItem value="">—</MenuItem>
+                                {departments.map((department) => (
+                                    <MenuItem key={department.id} value={department.id}>
+                                        {department.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </Box>
+
+                        <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                Job position
+                            </Typography>
+                            <Select
+                                fullWidth
+                                size="small"
+                                displayEmpty
+                                value={data.job_position_id}
+                                onChange={(e) => update('job_position_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                error={Boolean(errors.job_position_id)}
+                            >
+                                <MenuItem value="">—</MenuItem>
+                                {jobPositions.map((jobPosition) => (
+                                    <MenuItem key={jobPosition.id} value={jobPosition.id}>
+                                        {jobPosition.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
                         </Box>
 
                         <Box

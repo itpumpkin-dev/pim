@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\System\StoreUserRequest;
 use App\Http\Requests\System\UpdateUserRequest;
 use App\Models\AuditLog;
+use App\Models\Department;
+use App\Models\JobPosition;
 use App\Models\Locale;
 use App\Models\Role;
 use App\Models\RolePermission;
@@ -31,6 +33,8 @@ class UserController extends Controller
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
             'filters' => $request->only(['search', 'sort', 'dir']),
+            'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
+            'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -136,6 +140,8 @@ class UserController extends Controller
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'email' => $request->email,
+            'department_id' => $request->department_id,
+            'job_position_id' => $request->job_position_id,
         ]);
 
         return to_route('system.user.index')->with('success', 'User created successfully.');
@@ -156,6 +162,8 @@ class UserController extends Controller
                 'last_name' => $user->last_name,
                 'phone' => $user->phone,
                 'email' => $user->email,
+                'department_id' => $user->department_id,
+                'job_position_id' => $user->job_position_id,
                 'enabled' => $user->enabled,
                 'avatar_url' => $user->avatar_url,
                 'ui_locale_id' => $user->ui_locale_id,
@@ -171,6 +179,8 @@ class UserController extends Controller
             'roles' => Role::orderBy('label')->get(['id', 'label']),
             'locales' => Locale::orderBy('code')->get(['id', 'code']),
             'timezones' => timezone_identifiers_list(),
+            'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
+            'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'canManageAccess' => $request->user()->hasPermission('users', 'edit_users'),
         ]);
     }
@@ -184,7 +194,7 @@ class UserController extends Controller
         // change their own personal details, never their own privileges.
         $canManageAccess = $request->user()->hasPermission('users', 'edit_users');
 
-        $fields = ['name_prefix', 'first_name', 'last_name', 'phone', 'email', 'ui_locale_id', 'timezone'];
+        $fields = ['name_prefix', 'first_name', 'last_name', 'phone', 'email', 'department_id', 'job_position_id', 'ui_locale_id', 'timezone'];
         if ($canManageAccess) {
             $fields[] = 'enabled';
         }

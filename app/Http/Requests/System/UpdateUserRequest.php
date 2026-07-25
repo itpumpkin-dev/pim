@@ -31,6 +31,8 @@ class UpdateUserRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(\App\Models\User::class)->ignore($user->id)],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
             'enabled' => ['required', 'boolean'],
             'avatar' => ['nullable', 'image', 'max:2048'],
 
