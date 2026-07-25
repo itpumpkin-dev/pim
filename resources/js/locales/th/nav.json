@@ -12,5 +12,9 @@
     "users": "ผู้ใช้งาน",
     "userGroups": "กลุ่มผู้ใช้งาน",
     "roles": "บทบาท",
-    "locales": "ภาษา"
+    "locales": "ภาษา",
+    "importExport": "นำเข้า / ส่งออก",
+    "imports": "นำเข้าข้อมูล",
+    "exports": "ส่งออกข้อมูล",
+    "jobTracker": "ตัวติดตามงาน"
 }

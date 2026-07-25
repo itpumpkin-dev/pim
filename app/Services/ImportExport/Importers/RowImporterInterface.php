@@ -1,0 +1,22 @@
+<?php
+
+namespace App\Services\ImportExport\Importers;
+
+use App\Models\ImportConfig;
+use App\Services\ImportExport\RowImportException;
+
+interface RowImporterInterface
+{
+    /**
+     * Ordered list of column headers this importer understands (used both to
+     * validate/read uploaded files and to build the sample template).
+     *
+     * @return array<int, string>
+     */
+    public function columns(): array;
+
+    /**
+     * @throws RowImportException on invalid/unresolvable row data
+     */
+    public function importRow(array $row, ImportConfig $config): void;
+}

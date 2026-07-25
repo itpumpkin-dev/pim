@@ -8,6 +8,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import GroupIcon from '@mui/icons-material/Group';
 import HomeIcon from '@mui/icons-material/Home';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, Drawer, Toolbar } from '@mui/material';
@@ -51,6 +52,27 @@ function useMainNavItems(): NavItem[] {
                 {
                     title: t('attributeFamilies'),
                     url: '/catalog/attributeFamilies',
+                },
+            ],
+        },
+        {
+            title: t('importExport'),
+            icon: ImportExportIcon,
+            items: [
+                {
+                    title: t('imports'),
+                    url: '/import-export/imports',
+                    permission: 'import_configs.list_import_configs',
+                },
+                {
+                    title: t('exports'),
+                    url: '/import-export/exports',
+                    permission: 'export_configs.list_export_configs',
+                },
+                {
+                    title: t('jobTracker'),
+                    url: '/import-export/jobs',
+                    permission: 'job_trackers.list_job_trackers',
                 },
             ],
         },

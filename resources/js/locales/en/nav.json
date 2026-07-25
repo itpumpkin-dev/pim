@@ -12,5 +12,9 @@
     "users": "Users",
     "userGroups": "User Groups",
     "roles": "Roles",
-    "locales": "Locales"
+    "locales": "Locales",
+    "importExport": "Import / Export",
+    "imports": "Imports",
+    "exports": "Exports",
+    "jobTracker": "Job Tracker"
 }
