@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
 use App\Models\AttributeTranslation;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +19,9 @@ use Inertia\Response;
 
 class AttributeController extends Controller
 {
+    use HasVersionHistory;
+
+
     public function index(Request $request): Response
     {
         $grid = new GridManager('attribute_grid');
@@ -84,7 +89,13 @@ class AttributeController extends Controller
             ]),
             'translations' => $attribute->translations()->get()
                 ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
+            'canViewHistory' => auth()->user()?->hasPermission('attributes', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(Attribute $attribute): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($attribute)]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -120,6 +131,11 @@ class AttributeController extends Controller
 
         $this->syncTranslations($attribute, $translations);
 
+        $newTranslations = $this->currentTranslations($attribute);
+        if (!empty($newTranslations)) {
+            AuditLog::record('labels_set', $attribute, null, $newTranslations);
+        }
+
         return to_route('catalog.attributes.index')->with('success', 'Attribute created successfully.');
     }
 
@@ -140,6 +156,7 @@ class AttributeController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
+        $oldTranslations = $this->currentTranslations($attribute);
 
         $attribute->update([
             ...$validated,
@@ -155,7 +172,23 @@ class AttributeController extends Controller
 
         $this->syncTranslations($attribute, $translations);
 
+        $newTranslations = $this->currentTranslations($attribute);
+        if ($oldTranslations !== $newTranslations) {
+            AuditLog::record('labels_updated', $attribute, $oldTranslations, $newTranslations);
+        }
+
         return to_route('catalog.attributes.index')->with('success', 'Attribute updated successfully.');
+    }
+
+    /**
+     * Fresh (uncached) locale_id => label map for the attribute's current
+     * translations — used to snapshot before/after state for audit diffs.
+     */
+    private function currentTranslations(Attribute $attribute): array
+    {
+        return $attribute->translations()->get()
+            ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
     }
 
     private function resolveName(array $translations, ?string $name, string $code): string

@@ -2,6 +2,7 @@ import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
+import { getTheme } from '@/theme';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -11,9 +12,14 @@ import HomeIcon from '@mui/icons-material/Home';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { Box, Divider, Drawer, Toolbar } from '@mui/material';
+import { Box, Divider, Drawer, ThemeProvider, Toolbar } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
+
+// AdminLTE sidebars are always dark, independent of the app's light/dark
+// mode toggle — so the sidebar gets its own fixed-dark theme instead of
+// inheriting the ambient one.
+const sidebarTheme = getTheme('dark');
 
 function useMainNavItems(): NavItem[] {
     const { t } = useTranslation('nav');
@@ -131,14 +137,20 @@ export function AppSidebar() {
 
     const content = (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Toolbar sx={{ px: collapsed ? 1 : 2, justifyContent: collapsed ? 'center' : 'flex-start' }}>
+            <Toolbar
+                sx={{
+                    px: collapsed ? 1 : 2,
+                    minHeight: '57px !important',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                }}
+            >
                 <Box
                     component={Link}
                     href="/dashboard"
                     prefetch
                     sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', overflow: 'hidden' }}
                 >
-                    <AppLogo />
+                    <AppLogo collapsed={collapsed} />
                 </Box>
             </Toolbar>
             <Divider />
@@ -154,34 +166,38 @@ export function AppSidebar() {
 
     if (isMobile) {
         return (
-            <Drawer
-                anchor="left"
-                open={openMobile}
-                onClose={() => setOpenMobile(false)}
-                ModalProps={{ keepMounted: true }}
-                sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH } }}
-            >
-                {content}
-            </Drawer>
+            <ThemeProvider theme={sidebarTheme}>
+                <Drawer
+                    anchor="left"
+                    open={openMobile}
+                    onClose={() => setOpenMobile(false)}
+                    ModalProps={{ keepMounted: true }}
+                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH } }}
+                >
+                    {content}
+                </Drawer>
+            </ThemeProvider>
         );
     }
 
     return (
-        <Drawer
-            variant="permanent"
-            sx={{
-                width,
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                '& .MuiDrawer-paper': {
+        <ThemeProvider theme={sidebarTheme}>
+            <Drawer
+                variant="permanent"
+                sx={{
                     width,
-                    boxSizing: 'border-box',
-                    overflowX: 'hidden',
-                    transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
-                },
-            }}
-        >
-            {content}
-        </Drawer>
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    '& .MuiDrawer-paper': {
+                        width,
+                        boxSizing: 'border-box',
+                        overflowX: 'hidden',
+                        transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
+                    },
+                }}
+            >
+                {content}
+            </Drawer>
+        </ThemeProvider>
     );
 }

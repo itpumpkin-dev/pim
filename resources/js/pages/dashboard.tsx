@@ -319,7 +319,7 @@ export default function Dashboard({
                     </Grid>
                 )}
                 
-                <Divider sx={{ my: 4 }} />
+                <Divider sx={{ my: 3 }} />
                 {/* Recent Activity */}
                 {canViewConsole && (
                     <Box sx={{ mt: 2 }}>

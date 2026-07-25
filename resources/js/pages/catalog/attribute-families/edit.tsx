@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -30,6 +31,8 @@ import {
     Paper,
     Select,
     Stack,
+    Tab,
+    Tabs,
     TextField,
     Typography,
 } from '@mui/material';
@@ -75,6 +78,7 @@ interface Props {
     groups: AttributeGroup[];
     attributes: AttributeItem[];
     familyAttributes?: FamilyAttributePivot[];
+    canViewHistory?: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -83,7 +87,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE FAMILY', href: '#' },
 ];
 
-export default function AttributeFamilyEdit({ family, translations, groups, attributes, familyAttributes = [] }: Props) {
+export default function AttributeFamilyEdit({ family, translations, groups, attributes, familyAttributes = [], canViewHistory = false }: Props) {
+    const [tabIndex, setTabIndex] = useState(0);
     const { data, setData, put, processing, errors } = useForm({
         code: family.code || '',
         translations: translations || {},
@@ -225,6 +230,21 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Attribute Family: ${family.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+                {canViewHistory && (
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, v) => setTabIndex(v)}
+                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                    >
+                        <Tab label="General" />
+                        <Tab label="History" />
+                    </Tabs>
+                )}
+
+                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/attributeFamilies/${family.id}/history`} />}
+
+                {tabIndex === 0 && (
+                <>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="text.primary">
@@ -541,6 +561,8 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                     <Alert severity="error" sx={{ mt: 3 }}>
                         Please correct the highlighted fields before saving.
                     </Alert>
+                )}
+                </>
                 )}
             </Box>
 

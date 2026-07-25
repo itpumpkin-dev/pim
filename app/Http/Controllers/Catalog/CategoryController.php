@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\CategoryField;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,6 +14,9 @@ use Inertia\Response;
 
 class CategoryController extends Controller
 {
+    use HasVersionHistory;
+
+
     /**
      * Display a listing of the categories.
      */
@@ -111,7 +116,13 @@ class CategoryController extends Controller
             'category' => $category,
             'parentCategories' => $parentCategories,
             'categoryFields' => $categoryFields,
+            'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(Category $category): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($category)]);
     }
 
     /**

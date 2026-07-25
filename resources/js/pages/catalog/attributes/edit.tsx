@@ -1,11 +1,13 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface Attribute {
@@ -37,11 +39,13 @@ interface AttributeForm {
 interface Props {
     attribute: Attribute;
     translations: Record<string, string>;
+    canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations }: Props) {
+export default function AttributeEdit({ attribute, translations, canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const [tabIndex, setTabIndex] = useState(0);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
@@ -87,6 +91,21 @@ export default function AttributeEdit({ attribute, translations }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editAttributeTitle')}: ${attribute.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+                {canViewHistory && (
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, v) => setTabIndex(v)}
+                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                    >
+                        <Tab label="General" />
+                        <Tab label="History" />
+                    </Tabs>
+                )}
+
+                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/attributes/${attribute.id}/history`} />}
+
+                {tabIndex === 0 && (
+                <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
                     <Typography variant="h4" fontWeight={700}>{t('editAttributeTitle')}</Typography>
                     <Stack direction="row" spacing={1}>
@@ -152,6 +171,8 @@ export default function AttributeEdit({ attribute, translations }: Props) {
                 </Stack>
 
                 {Object.keys(errors).length > 0 && <Alert severity="error" sx={{ mt: 2 }}>{t('correctHighlightedFields')}</Alert>}
+                </>
+                )}
             </Box>
         </AppLayout>
     );

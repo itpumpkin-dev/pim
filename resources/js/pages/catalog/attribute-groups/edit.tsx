@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -8,10 +9,12 @@ import {
     Button,
     Paper,
     Stack,
+    Tab,
+    Tabs,
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 
 interface AttributeGroup {
     id: number;
@@ -22,6 +25,7 @@ interface AttributeGroup {
 interface Props {
     group: AttributeGroup;
     translations: Record<string, string>;
+    canViewHistory?: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -30,7 +34,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE GROUP', href: '#' },
 ];
 
-export default function AttributeGroupEdit({ group, translations }: Props) {
+export default function AttributeGroupEdit({ group, translations, canViewHistory = false }: Props) {
+    const [tabIndex, setTabIndex] = useState(0);
     const { data, setData, put, processing, errors } = useForm({
         code: group.code || '',
         translations: translations || {},
@@ -47,6 +52,21 @@ export default function AttributeGroupEdit({ group, translations }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Attribute Group: ${group.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+                {canViewHistory && (
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, v) => setTabIndex(v)}
+                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                    >
+                        <Tab label="General" />
+                        <Tab label="History" />
+                    </Tabs>
+                )}
+
+                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/attributeGroups/${group.id}/history`} />}
+
+                {tabIndex === 0 && (
+                <>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700} color="text.primary">
@@ -115,6 +135,8 @@ export default function AttributeGroupEdit({ group, translations }: Props) {
                     <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
                         Please correct the highlighted fields before saving.
                     </Alert>
+                )}
+                </>
                 )}
             </Box>
         </AppLayout>

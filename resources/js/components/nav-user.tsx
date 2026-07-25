@@ -32,7 +32,7 @@ export function NavUser({ collapsed = false }: { collapsed?: boolean }) {
                     '&:hover': { bgcolor: 'action.hover' },
                 }}
             >
-                <UserInfo user={auth.user} />
+                <UserInfo user={auth.user} withStatusDot />
                 {!collapsed && <ExpandMoreIcon fontSize="small" sx={{ ml: 'auto' }} />}
             </ButtonBase>
             <Menu

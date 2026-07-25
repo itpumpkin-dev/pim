@@ -34,6 +34,7 @@ import {
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
+import { HistoryPanel } from '@/components/history-panel';
 
 interface AttributeOption {
     id: number;
@@ -98,6 +99,7 @@ interface Props {
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
     channels?: ChannelOption[];
+    canViewHistory?: boolean;
 }
 
 type AttributeValue = string | File | File[];
@@ -119,7 +121,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT PRODUCT', href: '#' },
 ];
 
-export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [], channels = [] }: Props) {
+export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [], channels = [], canViewHistory = false }: Props) {
     const { locales, locale: currentLocaleCode } = useLocale();
     const [tabIndex, setTabIndex] = useState(0);
 
@@ -245,7 +247,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                         }}
                     >
                         <Tab label="General" />
-                        <Tab label="History" />
+                        {canViewHistory && <Tab label="History" />}
                     </Tabs>
                 </Box>
 
@@ -326,6 +328,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                 </Box>
 
                 {/* Main 2-Column Layout */}
+                {tabIndex === 0 && (
                 <Box sx={{ px: { xs: 2, md: 4 } }}>
                     <Grid container spacing={3}>
                         {/* Left Main Area: Real Attribute Groups from Database */}
@@ -631,6 +634,9 @@ export default function ProductEdit({ product, families, assignedGroups, product
                         </Grid>
                     </Grid>
                 </Box>
+                )}
+
+                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
             </Box>
         </AppLayout>
     );

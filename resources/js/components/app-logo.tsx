@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import AppLogoIcon from './app-logo-icon';
 
-export default function AppLogo() {
+export default function AppLogo({ collapsed = false }: { collapsed?: boolean }) {
     return (
         <>
             <Box
@@ -14,15 +14,18 @@ export default function AppLogo() {
                     justifyContent: 'center',
                     borderRadius: 1,
                     color: 'primary.main',
+                    flexShrink: 0,
                 }}
             >
                 <AppLogoIcon style={{ width: 30, height: 30, fill: 'currentColor' }} />
             </Box>
-            <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 1000, lineHeight: 1, fontSize: 24, color: 'text.primary' }}>
-                    PIM<Box component="span" sx={{ color: 'primary.main' }}>Pumpkin</Box>
-                </Typography>
-            </Box>
+            {!collapsed && (
+                <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 1000, lineHeight: 1, fontSize: 24, color: 'text.primary' }}>
+                        PIM<Box component="span" sx={{ color: 'primary.main' }}>Pumpkin</Box>
+                    </Typography>
+                </Box>
+            )}
         </>
     );
 }

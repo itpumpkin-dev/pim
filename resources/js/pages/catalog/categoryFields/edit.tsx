@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { HistoryPanel } from '@/components/history-panel';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
-import { FormEvent } from 'react';
+import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface CategoryFieldItem {
@@ -21,11 +22,13 @@ interface CategoryFieldItem {
 
 interface Props {
     field: CategoryFieldItem;
+    canViewHistory?: boolean;
 }
 
-export default function CategoryFieldEdit({ field }: Props) {
+export default function CategoryFieldEdit({ field, canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const [tabIndex, setTabIndex] = useState(0);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
@@ -54,6 +57,21 @@ export default function CategoryFieldEdit({ field }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Category Field: ${field.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+                {canViewHistory && (
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, v) => setTabIndex(v)}
+                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                    >
+                        <Tab label="General" />
+                        <Tab label="History" />
+                    </Tabs>
+                )}
+
+                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/categoryFields/${field.id}/history`} />}
+
+                {tabIndex === 0 && (
+                <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
                     <Typography variant="h4" fontWeight={700}>Edit Category Field</Typography>
                     <Stack direction="row" spacing={1}>
@@ -137,6 +155,8 @@ export default function CategoryFieldEdit({ field }: Props) {
                     <Alert severity="error" sx={{ mt: 2 }}>
                         {t('correctHighlightedFields')}
                     </Alert>
+                )}
+                </>
                 )}
             </Box>
         </AppLayout>

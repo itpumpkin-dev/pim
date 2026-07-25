@@ -3,17 +3,24 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { Box, Collapse, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Tooltip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useTranslation } from 'react-i18next';
 
+// AdminLTE "solid" active style: the active nav-link gets a full accent-color
+// background instead of a soft tint, matching AdminLTE's Primary nav scheme.
 const activeSx = {
-    color: 'primary.main',
-    bgcolor: 'rgba(6, 182, 212, 0.08)',
-    '&:hover': {
-        bgcolor: 'rgba(6, 182, 212, 0.12)',
-    },
+    bgcolor: 'primary.main',
+    color: '#fff',
+    '& .MuiListItemIcon-root': { color: '#fff' },
+    '&:hover': { bgcolor: 'primary.dark' },
+};
+
+const hoverSx = {
+    '&:hover': { bgcolor: 'action.hover' },
 };
 
 export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; collapsed?: boolean }) {
     const page = usePage();
+    const { t } = useTranslation('nav');
 
     const defaultOpenItems = useMemo(() => {
         const open: Record<string, boolean> = {};
@@ -38,8 +45,18 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
             sx={{ px: 1 }}
             subheader={
                 !collapsed ? (
-                    <ListSubheader component="div" sx={{ lineHeight: '32px', bgcolor: 'transparent' }}>
-                        {/* Platform */}
+                    <ListSubheader
+                        component="div"
+                        sx={{
+                            lineHeight: '32px',
+                            bgcolor: 'transparent',
+                            fontSize: '0.6875rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.06em',
+                            color: 'text.disabled',
+                        }}
+                    >
+                        {t('mainNavigation')}
                     </ListSubheader>
                 ) : undefined
             }
@@ -55,7 +72,6 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                         key={item.title}
                         component={item.url ? Link : 'div'}
                         href={item.url as any}
-                        prefetch={item.url ? true : undefined}
                         selected={isActive}
                         onClick={hasChildren ? () => handleToggle(item.title) : undefined}
                         sx={{
@@ -63,9 +79,10 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                             justifyContent: collapsed ? 'center' : 'flex-start',
                             px: collapsed ? 1 : 2,
                             py: 0.75,
-                            ...(isActive && activeSx),
+                            ...(isActive ? activeSx : hoverSx),
                             ...(isGroupActive &&
                                 !isActive && {
+                                    bgcolor: 'action.selected',
                                     color: 'text.primary',
                                     '& .MuiListItemIcon-root': { color: 'primary.main' },
                                 }),
@@ -76,7 +93,7 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                                 sx={{
                                     minWidth: collapsed ? 0 : 36,
                                     justifyContent: 'center',
-                                    color: isActive || isGroupActive ? 'primary.main' : 'text.secondary',
+                                    color: isActive ? '#fff' : isGroupActive ? 'primary.main' : 'text.secondary',
                                 }}
                             >
                                 <item.icon fontSize="small" />
@@ -88,7 +105,7 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                                 sx={{
                                     '& .MuiTypography-root': {
                                         fontWeight: isActive ? 600 : hasChildren ? 600 : 500,
-                                        fontSize: hasChildren ? '0.875rem' : '0.875rem',
+                                        fontSize: hasChildren ? '1rem' : '1rem',
                                     },
                                 }}
                             />
@@ -137,18 +154,17 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                                                 key={subItem.title}
                                                 component={subItem.url ? Link : 'div'}
                                                 href={subItem.url as any}
-                                                prefetch={subItem.url ? true : undefined}
                                                 selected={isSubActive}
                                                 sx={{
                                                     borderRadius: 1.5,
                                                     px: 1.5,
                                                     py: 0.625,
                                                     mb: 0.25,
-                                                    ...(isSubActive && activeSx),
+                                                    ...(isSubActive ? activeSx : hoverSx),
                                                 }}
                                             >
                                                 {subItem.icon && (
-                                                    <ListItemIcon sx={{ minWidth: 32, color: isSubActive ? 'primary.main' : 'text.secondary' }}>
+                                                    <ListItemIcon sx={{ minWidth: 32, color: isSubActive ? '#fff' : 'text.secondary' }}>
                                                         <subItem.icon fontSize="small" />
                                                     </ListItemIcon>
                                                 )}
@@ -156,9 +172,9 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                                                     primary={subItem.title}
                                                     sx={{
                                                         '& .MuiTypography-root': {
-                                                            fontSize: '0.8125rem',
+                                                            fontSize: '0.9rem',
                                                             fontWeight: isSubActive ? 600 : 400,
-                                                            color: isSubActive ? 'primary.main' : 'text.secondary',
+                                                            color: isSubActive ? '#fff' : 'text.secondary',
                                                         },
                                                     }}
                                                 />

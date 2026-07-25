@@ -28,6 +28,15 @@
     "cancel": "ยกเลิก",
     "delete": "ลบ",
 
+    "manageColumns": "จัดการคอลัมน์",
+    "availableColumns": "คอลัมน์ที่มีให้เลือก",
+    "selectedColumns": "คอลัมน์ที่เลือก",
+    "searchColumns": "ค้นหา",
+    "apply": "นำไปใช้",
+    "id": "ID",
+    "createdAt": "วันที่สร้าง",
+    "updatedAt": "วันที่แก้ไขล่าสุด",
+
     "createProductTitle": "สร้างสินค้าใหม่",
     "productInfo": "ข้อมูลสินค้า",
     "active": "เปิดใช้งาน",

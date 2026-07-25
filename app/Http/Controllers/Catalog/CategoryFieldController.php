@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\CategoryField;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -11,6 +13,9 @@ use Inertia\Response;
 
 class CategoryFieldController extends Controller
 {
+    use HasVersionHistory;
+
+
     /**
      * Display a listing of the category fields.
      */
@@ -75,7 +80,13 @@ class CategoryFieldController extends Controller
     {
         return Inertia::render('catalog/categoryFields/edit', [
             'field' => $categoryField,
+            'canViewHistory' => auth()->user()?->hasPermission('category_fields', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(CategoryField $categoryField): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($categoryField)]);
     }
 
     /**

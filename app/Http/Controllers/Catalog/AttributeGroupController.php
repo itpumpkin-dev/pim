@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\AttributeGroup;
 use App\Models\AttributeGroupTranslation;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\GridManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,6 +17,9 @@ use Inertia\Response;
 
 class AttributeGroupController extends Controller
 {
+    use HasVersionHistory;
+
+
     public function index(Request $request): Response
     {
         $grid = new GridManager('attribute_group_grid');
@@ -50,6 +56,11 @@ class AttributeGroupController extends Controller
 
         $this->syncTranslations($group, $translations);
 
+        $newTranslations = $this->currentTranslations($group);
+        if (!empty($newTranslations)) {
+            AuditLog::record('labels_set', $group, null, $newTranslations);
+        }
+
         return to_route('catalog.attributeGroups.index')->with('success', 'Attribute Group created successfully.');
     }
 
@@ -59,7 +70,13 @@ class AttributeGroupController extends Controller
             'group' => $attributeGroup->only(['id', 'code', 'name']),
             'translations' => $attributeGroup->translations()->get()
                 ->mapWithKeys(fn (AttributeGroupTranslation $t) => [(string) $t->locale_id => $t->label]),
+            'canViewHistory' => auth()->user()?->hasPermission('attribute_groups', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(AttributeGroup $attributeGroup): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($attributeGroup)]);
     }
 
     public function update(Request $request, AttributeGroup $attributeGroup): RedirectResponse
@@ -72,6 +89,7 @@ class AttributeGroupController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
+        $oldTranslations = $this->currentTranslations($attributeGroup);
 
         $attributeGroup->update([
             'code' => strtolower($validated['code']),
@@ -81,7 +99,23 @@ class AttributeGroupController extends Controller
 
         $this->syncTranslations($attributeGroup, $translations);
 
+        $newTranslations = $this->currentTranslations($attributeGroup);
+        if ($oldTranslations !== $newTranslations) {
+            AuditLog::record('labels_updated', $attributeGroup, $oldTranslations, $newTranslations);
+        }
+
         return to_route('catalog.attributeGroups.index')->with('success', 'Attribute Group updated successfully.');
+    }
+
+    /**
+     * Fresh (uncached) locale_id => label map for the group's current
+     * translations — used to snapshot before/after state for audit diffs.
+     */
+    private function currentTranslations(AttributeGroup $group): array
+    {
+        return $group->translations()->get()
+            ->mapWithKeys(fn (AttributeGroupTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
     }
 
     private function resolveName(array $translations, ?string $name, string $code): string

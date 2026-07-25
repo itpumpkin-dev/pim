@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
+use App\Models\AuditLog;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\Product;
@@ -21,6 +23,9 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
+    use HasVersionHistory;
+
+
     public function index(Request $request): Response
     {
         $grid = new GridManager('product_grid');
@@ -35,14 +40,18 @@ class ProductController extends Controller
             ->pluck('attributes.id', 'family_attributes.family_id');
 
         $productIds = $gridData->getCollection()->pluck('id');
+        $parentIds = $gridData->getCollection()->pluck('parent_id')->filter()->unique();
 
-        $relevantAttributeIds = $imageAttributeIdByFamily->values()->push($nameAttributeId)->filter()->unique();
+        $parentSkus = $parentIds->isNotEmpty()
+            ? Product::whereIn('id', $parentIds)->pluck('sku', 'id')
+            : collect();
+
+        $allAttributes = Attribute::orderBy('code')->get(['id', 'code', 'name', 'type']);
 
         $values = ProductValue::whereIn('product_id', $productIds)
-            ->whereIn('attribute_id', $relevantAttributeIds)
             ->get(['product_id', 'attribute_id', 'value']);
 
-        $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily) {
+        $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $product->name = $nameAttributeId
@@ -55,6 +64,16 @@ class ProductController extends Controller
                 : null;
             $product->image_url = $imagePath ? Storage::url($imagePath) : null;
 
+            $product->parent_sku = $product->parent_id ? ($parentSkus->get($product->parent_id) ?? null) : null;
+
+            $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $values) {
+                $rawValue = optional(
+                    $values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $attribute->id)
+                )->value;
+
+                return [$attribute->id => $this->formatAttributeValue($attribute, $rawValue)];
+            });
+
             return $product;
         });
         $gridData->setCollection($items);
@@ -63,6 +82,12 @@ class ProductController extends Controller
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
             'filters' => $request->only(['search', 'sort', 'dir']),
+            'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
+                'id' => $attribute->id,
+                'code' => $attribute->code,
+                'label' => $attribute->name,
+                'type' => $attribute->type,
+            ]),
         ]);
     }
 
@@ -338,7 +363,13 @@ class ProductController extends Controller
             'productValues' => $values,
             'variants' => $variantsData,
             'channels' => $channels,
+            'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(Product $product): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($product)]);
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -392,6 +423,9 @@ class ProductController extends Controller
                 }
             }
 
+            $touchedAttributeIds = collect($values)->keys()->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->unique()->values();
+            $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
+
             if (is_array($values)) {
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
@@ -428,6 +462,9 @@ class ProductController extends Controller
                     }
                 }
             }
+
+            $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
+            $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
 
             // Sync Variants (Cartesian Product Children)
             if (strtolower($validated['type']) === 'configurable' && !empty($validated['variants'])) {
@@ -562,6 +599,9 @@ class ProductController extends Controller
             'values' => ['required', 'array'],
         ]);
 
+        $touchedAttributeIds = collect($validated['values'])->keys()->map(fn ($id) => (int) $id)->unique()->values();
+        $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
+
         foreach ($validated['values'] as $attributeId => $val) {
             $attribute = Attribute::find($attributeId);
             if (!$attribute) continue;
@@ -588,7 +628,63 @@ class ProductController extends Controller
             }
         }
 
+        $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
+        $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
+
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Current attribute values for a product, restricted to the given
+     * attribute ids, keyed by a human-readable "code[channel:x,locale:y]"
+     * label so it reads sensibly in the audit diff table.
+     */
+    private function productValueSnapshot(int $productId, \Illuminate\Support\Collection $attributeIds): array
+    {
+        if ($attributeIds->isEmpty()) {
+            return [];
+        }
+
+        $codes = Attribute::whereIn('id', $attributeIds)->pluck('code', 'id');
+
+        return ProductValue::where('product_id', $productId)
+            ->whereIn('attribute_id', $attributeIds)
+            ->get()
+            ->mapWithKeys(function (ProductValue $value) use ($codes) {
+                $label = $codes->get($value->attribute_id, "attribute_{$value->attribute_id}");
+                $suffix = array_filter([
+                    $value->channel_id ? "channel:{$value->channel_id}" : null,
+                    $value->locale_id ? "locale:{$value->locale_id}" : null,
+                ]);
+                $key = $suffix ? "{$label}[" . implode(',', $suffix) . ']' : $label;
+
+                return [$key => $value->value];
+            })
+            ->all();
+    }
+
+    /**
+     * Diff two productValueSnapshot() results and, if anything changed,
+     * record it against the product's audit trail.
+     */
+    private function recordProductValueChanges(Product $product, array $oldValues, array $newValues): void
+    {
+        $changedOld = [];
+        $changedNew = [];
+
+        foreach (array_unique(array_merge(array_keys($oldValues), array_keys($newValues))) as $key) {
+            $old = $oldValues[$key] ?? null;
+            $new = $newValues[$key] ?? null;
+
+            if ($old !== $new) {
+                $changedOld[$key] = $old;
+                $changedNew[$key] = $new;
+            }
+        }
+
+        if (!empty($changedOld) || !empty($changedNew)) {
+            AuditLog::record('attribute_values_updated', $product, $changedOld, $changedNew);
+        }
     }
 
     /**

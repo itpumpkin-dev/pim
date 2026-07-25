@@ -28,6 +28,15 @@
     "cancel": "Cancel",
     "delete": "Delete",
 
+    "manageColumns": "Manage columns",
+    "availableColumns": "Available Columns",
+    "selectedColumns": "Selected Columns",
+    "searchColumns": "Search",
+    "apply": "Apply",
+    "id": "ID",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+
     "createProductTitle": "Create New Products",
     "productInfo": "Product Info",
     "active": "Active",

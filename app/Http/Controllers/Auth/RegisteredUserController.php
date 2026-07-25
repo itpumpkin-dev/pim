@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -48,6 +49,7 @@ class RegisteredUserController extends Controller
 
         $member = Role::firstOrCreate(['label' => 'Member']);
         $user->roles()->attach($member);
+        AuditLog::record('roles_assigned', $user, null, ['role_ids' => [$member->id]]);
 
         event(new Registered($user));
 
