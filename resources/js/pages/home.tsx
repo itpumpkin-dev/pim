@@ -32,19 +32,19 @@ const slides: { title: string; subtitle: string; icon: IconType; gradient: strin
         title: 'คลังข้อมูลสินค้าเคมีภัณฑ์และกาว',
         subtitle: 'รวมข้อมูลสเปค ราคา และรายละเอียดสินค้าจากซูดาล ซันนิค และพัมคินไว้ในที่เดียว',
         icon: ScienceIcon,
-        gradient: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+        gradient: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
     },
     {
         title: 'จัดหมวดหมู่สินค้าอย่างเป็นระบบ',
         subtitle: 'ค้นหาและอ้างอิงข้อมูลสินค้าตามหมวดหมู่ได้อย่างรวดเร็วและเป็นระเบียบ',
         icon: ConstructionIcon,
-        gradient: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
+        gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
     },
     {
         title: 'ตรวจสอบราคาและส่วนลดได้ง่าย',
         subtitle: 'ดูราคาต่อหน่วยและส่วนลดตามจำนวนสั่งซื้อของแต่ละสินค้าได้ทันที',
         icon: LocalOfferOutlinedIcon,
-        gradient: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)',
+        gradient: 'linear-gradient(135deg, #EA580C 0%, #F97316 100%)',
     },
 ];
 
@@ -228,13 +228,13 @@ export default function Home() {
                 px: 2,
                 py: 1,
                 color: '#fff',
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
                 // boxShadow: '0 4px 14px 0 rgba(234, 88, 12, 0.39)',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     transform: 'translateY(-2px)',
                     // boxShadow: '0 6px 20px rgba(234, 88, 12, 0.5)',
-                    background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                    background: 'linear-gradient(135deg, #0891B2 0%, #0E7490 100%)',
                 },
             }}
         >
@@ -252,13 +252,13 @@ export default function Home() {
                 px: 3,
                 py: 1,
                 borderWidth: 2,
-                color: '#ea580c',
-                borderColor: '#ea580c',
+                color: '#06B6D4',
+                borderColor: '#06B6D4',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     borderWidth: 2,
-                    borderColor: '#c2410c',
-                    bgcolor: alpha('#ea580c', 0.08),
+                    borderColor: '#0891B2',
+                    bgcolor: alpha('#06B6D4', 0.08),
                     transform: 'translateY(-2px)',
                 },
             }}

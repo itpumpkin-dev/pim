@@ -13,7 +13,7 @@ export default function LocaleLabelFields({ values, onChange, title = 'Label', e
 
     return (
         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-            <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                 {title}
             </Typography>
             <Stack spacing={2}>

@@ -625,7 +625,7 @@ const clampSx = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: l
 
 /** rotating palette for small fact tiles, so the grid reads as a lively mosaic instead of one flat color */
 const STAT_VARIANTS: Array<Record<string, unknown>> = [
-    { bgcolor: '#f5f5f7', color: '#1a1a1a' },
+    { bgcolor: '#F9FAFB', color: '#334155' },
     { bgcolor: 'info.main', color: 'info.contrastText' },
     { bgcolor: 'background.paper', color: 'text.primary', boxShadow: 1 },
     { bgcolor: 'success.main', color: 'success.contrastText' },
@@ -708,11 +708,11 @@ export default function ProductShow({ id }: { id: number }) {
                 px: 2,
                 py: 1,
                 color: '#fff',
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     transform: 'translateY(-2px)',
-                    background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                    background: 'linear-gradient(135deg, #0891B2 0%, #0E7490 100%)',
                 },
             }}
         >
@@ -730,13 +730,13 @@ export default function ProductShow({ id }: { id: number }) {
                 px: 3,
                 py: 1,
                 borderWidth: 2,
-                color: '#ea580c',
-                borderColor: '#ea580c',
+                color: '#06B6D4',
+                borderColor: '#06B6D4',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     borderWidth: 2,
-                    borderColor: '#c2410c',
-                    bgcolor: alpha('#ea580c', 0.08),
+                    borderColor: '#0891B2',
+                    bgcolor: alpha('#06B6D4', 0.08),
                     transform: 'translateY(-2px)',
                 },
             }}
@@ -891,14 +891,14 @@ export default function ProductShow({ id }: { id: number }) {
                 overflow: 'auto',
                 borderRadius: '20px',
                 p: 3,
-                bgcolor: '#f5f5f7',
-                color: '#1a1a1a',
+                bgcolor: '#F9FAFB',
+                color: '#334155',
                 ...hoverLiftSx,
             }}
         >
             <Stack direction="row" spacing={0.75} alignItems="center">
-                <TuneOutlinedIcon fontSize="small" sx={{ color: '#8a8a8a' }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8a8a8a' }}>
+                <TuneOutlinedIcon fontSize="small" sx={{ color: '#9CA3AF' }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9CA3AF' }}>
                     ข้อมูลจำเพาะ
                 </Typography>
             </Stack>

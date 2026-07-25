@@ -108,10 +108,10 @@ export default function LocaleIndex({ gridData, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('localesTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
                 {/* Header Title & Create Button */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="#1e1b4b">
+                    <Typography variant="h5" fontWeight={700} color="text.primary">
                         {tSystem('localesTitle')}
                     </Typography>
                     {canCreate && (
@@ -221,11 +221,11 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                     <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.id')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.code')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.displayName')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('fields.status')}</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('actionsHeader')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.id')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.code')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.displayName')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.status')}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actionsHeader')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>

@@ -6,9 +6,9 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 const activeSx = {
     color: 'primary.main',
-    bgcolor: 'rgba(243, 112, 33, 0.08)',
+    bgcolor: 'rgba(6, 182, 212, 0.08)',
     '&:hover': {
-        bgcolor: 'rgba(243, 112, 33, 0.12)',
+        bgcolor: 'rgba(6, 182, 212, 0.12)',
     },
 };
 

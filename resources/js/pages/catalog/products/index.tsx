@@ -134,10 +134,10 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('products')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="#1e1b4b">
+                    <Typography variant="h5" fontWeight={700} color="text.primary">
                         {t('products')}
                     </Typography>
 
@@ -283,19 +283,19 @@ export default function ProductIndex({ gridConfig, gridData, filters }: Props) {
                                         onChange={(e) => handleSelectAll(e.target.checked)}
                                     />
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('sku')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('image')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('name')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('sku')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('image')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('name')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
                                     <Stack direction="row" alignItems="center" spacing={0.5}>
                                         <span>{t('attributeFamily')}</span>
                                         <ArrowDownwardIcon sx={{ fontSize: 14 }} />
                                     </Stack>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('status')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('type')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('complete')}</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: '#475569', py: 1.5 }}>{t('actions')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('status')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('type')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('complete')}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actions')}</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>

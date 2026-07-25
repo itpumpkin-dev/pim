@@ -35,10 +35,10 @@ export default function LocaleCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Locale" />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="#1e1b4b">
+                    <Typography variant="h5" fontWeight={700} color="text.primary">
                         Add Locale
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -78,7 +78,7 @@ export default function LocaleCreate() {
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
                     {/* General Panel */}
                     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                             General
                         </Typography>
                         <Stack spacing={2}>

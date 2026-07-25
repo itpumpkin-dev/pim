@@ -30,7 +30,7 @@ export default function AuthSplitLayout({ children, title, description }: AuthLa
                     height: '100%',
                     p: 5,
                     color: 'common.white',
-                    bgcolor: '#18181b',
+                    bgcolor: '#334155',
                 }}
             >
                 <Box

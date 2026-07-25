@@ -57,6 +57,6 @@ createInertiaApp({
         );
     },
     progress: {
-        color: '#f37021', // Pumpkin Orange — matches theme.ts primary
+        color: '#06B6D4', // Data Cyan — matches theme.ts accent
     },
 });

@@ -224,10 +224,10 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Attribute Family: ${family.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: '#fbfbfe', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="#1e1b4b">
+                    <Typography variant="h5" fontWeight={700} color="text.primary">
                         Edit Attribute Family
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -270,7 +270,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                         <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                                 <Box>
-                                    <Typography variant="h6" fontWeight={700} color="#1e1b4b">
+                                    <Typography variant="h6" fontWeight={700} color="text.primary">
                                         Attribute Groups
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
@@ -395,7 +395,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                                     >
                                                                         <Stack direction="row" alignItems="center" spacing={1}>
                                                                             <DragIndicatorIcon fontSize="small" sx={{ color: '#cbd5e1', fontSize: 16 }} />
-                                                                            <Typography variant="body2" color="#475569" sx={{ fontSize: '0.85rem' }}>
+                                                                            <Typography variant="body2" color="text.primary" sx={{ fontSize: '0.85rem' }}>
                                                                                 {attr.name || attr.code}
                                                                             </Typography>
                                                                         </Stack>
@@ -492,7 +492,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                     </ListItemIcon>
                                                     <ListItemText
                                                         primary={attr.name || attr.code}
-                                                        primaryTypographyProps={{ variant: 'body2', color: '#475569', fontSize: '0.85rem' }}
+                                                        primaryTypographyProps={{ variant: 'body2', color: 'text.primary', fontSize: '0.85rem' }}
                                                     />
                                                 </ListItem>
                                             ))}
@@ -513,7 +513,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                         <Stack spacing={3}>
                             {/* General Panel */}
                             <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                     General
                                 </Typography>
                                 <TextField
@@ -553,7 +553,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={700} color="#1e1b4b">
+                    <Typography variant="h6" fontWeight={700} color="text.primary">
                         Assign Attribute Group
                     </Typography>
                     <IconButton onClick={() => setAssignDialogOpen(false)} size="small">

@@ -232,7 +232,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Product | SKU: ${data.sku}`} />
-            <Box component="form" onSubmit={submit} sx={{ bgcolor: '#fbfbfe', minHeight: '100vh', pb: 6 }}>
+            <Box component="form" onSubmit={submit} sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 6 }}>
                 {/* Top Tabs Bar */}
                 <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', px: { xs: 2, md: 4 } }}>
                     <Tabs
@@ -252,7 +252,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                 {/* Sub-Header Toolbar */}
                 <Box sx={{ px: { xs: 2, md: 4 }, py: 2.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 3 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-                        <Typography variant="h5" fontWeight={700} color="#1e1b4b">
+                        <Typography variant="h5" fontWeight={700} color="text.primary">
                             Edit Product | SKU: {data.sku}
                         </Typography>
 
@@ -333,7 +333,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                             <Stack spacing={3}>
                                 {/* General Card containing SKU and real General Attributes */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2.5 }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
                                         General
                                     </Typography>
                                     <Stack spacing={2.5}>
@@ -380,7 +380,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                     .filter((g) => g.code.toLowerCase() !== 'general')
                                     .map((group) => (
                                         <Paper key={group.id} variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                            <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2.5 }}>
+                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
                                                 {group.name}
                                             </Typography>
                                             <Stack spacing={2.5}>
@@ -389,27 +389,27 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                                         No attributes assigned to this group yet.
                                                     </Typography>
                                                 ) : (
-                                                     group.attributes
-                                                         .filter((attr) => {
-                                                             if (data.type.toLowerCase() === 'configurable') {
-                                                                 return attr.code !== 'price' && attr.code !== 'qty';
-                                                             }
-                                                             return true;
-                                                         })
-                                                         .map((attr) => {
-                                                             const { channelKey, localeKey } = getValueKeys(attr);
-                                                             const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
-                                                             const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                             return (
-                                                                 <RenderAttributeInput
-                                                                     key={attr.id}
-                                                                     attr={attr}
-                                                                     value={val}
-                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
-                                                                     activeLocaleCode={activeLocaleCode}
-                                                                 />
-                                                             );
-                                                         })
+                                                    group.attributes
+                                                        .filter((attr) => {
+                                                            if (data.type.toLowerCase() === 'configurable') {
+                                                                return attr.code !== 'price' && attr.code !== 'qty';
+                                                            }
+                                                            return true;
+                                                        })
+                                                        .map((attr) => {
+                                                            const { channelKey, localeKey } = getValueKeys(attr);
+                                                            const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
+                                                            const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                            return (
+                                                                <RenderAttributeInput
+                                                                    key={attr.id}
+                                                                    attr={attr}
+                                                                    value={val}
+                                                                    onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
+                                                                    activeLocaleCode={activeLocaleCode}
+                                                                />
+                                                            );
+                                                        })
                                                 )}
                                             </Stack>
                                         </Paper>
@@ -418,7 +418,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                 {/* Dynamic Cartesian Variants Table */}
                                 {data.type.toLowerCase() === 'configurable' && data.variants.length > 0 && (
                                     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                        <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                             ตัวเลือกสินค้าย่อย (Variants List)
                                         </Typography>
                                         <TableContainer>
@@ -491,7 +491,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                             <Stack spacing={3}>
                                 {/* Product Info Panel */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                         Product Info
                                     </Typography>
                                     <Stack spacing={2}>
@@ -548,7 +548,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
 
                                 {/* Categories Panel */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                         Categories
                                     </Typography>
                                     <Stack direction="row" alignItems="center" spacing={1}>
@@ -561,7 +561,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
 
                                 {/* Associations Panel */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="#1e1b4b" sx={{ mb: 2 }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                         Associations
                                     </Typography>
 
@@ -664,7 +664,7 @@ function RenderAttributeInput({
                     <Chip
                         label="DEFAULT"
                         size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0', color: '#475569', fontWeight: 600 }}
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0', color: 'text.primary', fontWeight: 600 }}
                     />
                 )}
             </>
@@ -796,8 +796,8 @@ function RenderAttributeInput({
                 ? value.map((f) => f.name)
                 : []
             : value instanceof File
-              ? [value.name]
-              : [];
+                ? [value.name]
+                : [];
 
         let existingLabel = '';
         if (selectedNames.length === 0 && stringValue) {
