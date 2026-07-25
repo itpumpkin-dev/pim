@@ -118,5 +118,21 @@
     "saveAttributeFamily": "บันทึกตระกูลแอตทริบิวต์",
     "groupsRequired": "กลุ่ม *",
     "selectOption": "เลือกตัวเลือก",
-    "noAttributeGroupsAvailable": "ไม่มีกลุ่มแอตทริบิวต์ที่ใช้ได้"
+    "noAttributeGroupsAvailable": "ไม่มีกลุ่มแอตทริบิวต์ที่ใช้ได้",
+
+    "channelsTitle": "ช่องทางขาย",
+    "createChannel": "สร้างช่องทางขาย",
+    "editChannel": "แก้ไขช่องทางขาย",
+    "searchChannels": "ค้นหาช่องทางขาย",
+    "noChannelsFound": "ไม่พบช่องทางขาย",
+    "confirmDeleteChannel": "คุณแน่ใจหรือไม่ว่าต้องการลบช่องทางขายนี้?",
+    "rootCategoryOptional": "หมวดหมู่หลัก",
+    "noRootCategory": "[ไม่มีหมวดหมู่หลัก]",
+    "currenciesAndLocalesTitle": "สกุลเงินและภาษา",
+    "currencies": "สกุลเงิน",
+    "currenciesRequired": "สกุลเงิน *",
+    "localesRequired": "ภาษา *",
+    "selectCurrencies": "เลือกสกุลเงิน",
+    "selectLocales": "เลือกภาษา",
+    "saveChannel": "บันทึกช่องทางขาย"
 }

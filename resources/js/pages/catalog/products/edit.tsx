@@ -31,7 +31,7 @@ import {
     TableHead,
     TableRow,
 } from '@mui/material';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -49,6 +49,7 @@ interface AttributeItem {
     is_required?: boolean;
     is_unique?: boolean;
     is_locale_based?: boolean;
+    is_channel_based?: boolean;
     options?: AttributeOption[];
 }
 
@@ -63,6 +64,12 @@ interface AttributeFamily {
     id: number;
     code: string;
     name?: string;
+}
+
+interface ChannelOption {
+    id: number;
+    code: string;
+    name: string | null;
 }
 
 interface Product {
@@ -88,18 +95,20 @@ interface Props {
     product: Product;
     families: AttributeFamily[];
     assignedGroups: GroupWithAttributes[];
-    productValues: Record<number | string, string>;
+    productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
+    channels?: ChannelOption[];
 }
 
 type AttributeValue = string | File | File[];
 
+// values: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value
 interface ProductForm {
     sku: string;
     family_id: number;
     type: string;
     enabled: boolean;
-    values: Record<string | number, Record<string | number, AttributeValue>>;
+    values: Record<string | number, Record<string, Record<string | number, AttributeValue>>>;
     variants: VariantItem[];
     [key: string]: any;
 }
@@ -110,7 +119,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT PRODUCT', href: '#' },
 ];
 
-export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [] }: Props) {
+export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [], channels = [] }: Props) {
     const { locales, locale: currentLocaleCode } = useLocale();
     const [tabIndex, setTabIndex] = useState(0);
 
@@ -118,11 +127,16 @@ export default function ProductEdit({ product, families, assignedGroups, product
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
     const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
 
-    // Collect initial values for all real attributes
-    const initialValues: Record<string, Record<string | number, any>> = {};
+    // The server preloads values for this (first) channel across all locales;
+    // switching to any other channel triggers a re-fetch of scopable fields.
+    const defaultChannelId = channels.length > 0 ? channels[0].id : null;
+    const [activeChannelId, setActiveChannelId] = useState<number | null>(defaultChannelId);
+
+    // Collect initial values for all real attributes (already nested channel -> locale by the backend)
+    const initialValues: Record<string, Record<string, Record<string | number, any>>> = {};
     assignedGroups.forEach((group) => {
         group.attributes.forEach((attr) => {
-            initialValues[attr.id] = (productValues[attr.id] as any) || (attr.is_locale_based ? {} : { default: '' });
+            initialValues[attr.id] = (productValues[attr.id] as any) || {};
         });
     });
 
@@ -135,16 +149,75 @@ export default function ProductEdit({ product, families, assignedGroups, product
         variants: variants,
     });
 
-    const handleAttributeChange = (attributeId: number, val: AttributeValue, isLocaleBased?: boolean) => {
-        const key = isLocaleBased ? activeLocaleId : 'default';
+    // Resolves which nested keys a given attribute's value lives under for the
+    // currently selected channel/locale, based on its own scoping flags.
+    const getValueKeys = (attr: AttributeItem) => ({
+        channelKey: attr.is_channel_based && activeChannelId ? String(activeChannelId) : 'global',
+        localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
+    });
+
+    const handleAttributeChange = (attributeId: number, val: AttributeValue, attr: AttributeItem) => {
+        const { channelKey, localeKey } = getValueKeys(attr);
+        const attrValues = data.values[attributeId] || {};
         setData('values', {
             ...data.values,
             [attributeId]: {
-                ...(data.values[attributeId] || {}),
-                [key]: val,
+                ...attrValues,
+                [channelKey]: {
+                    ...(attrValues[channelKey] || {}),
+                    [localeKey]: val,
+                },
             },
         });
     };
+
+    // Only channel/locale-based fields are re-fetched on switch; non-scopable
+    // fields always live under the constant 'global'/'default' keys and never change.
+    const visitedCombosRef = useRef<Set<string>>(new Set(locales.map((l) => `${defaultChannelId ?? 'none'}:${l.id}`)));
+
+    useEffect(() => {
+        const comboKey = `${activeChannelId ?? 'none'}:${activeLocaleId}`;
+        if (visitedCombosRef.current.has(comboKey)) {
+            return;
+        }
+        visitedCombosRef.current.add(comboKey);
+
+        const params = new URLSearchParams();
+        if (activeChannelId) params.set('channel_id', String(activeChannelId));
+        params.set('locale_id', String(activeLocaleId));
+
+        fetch(`/catalog/products/${product.id}/attribute-values?${params.toString()}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json) => {
+                if (!json?.values) return;
+
+                const allAttributes = assignedGroups.flatMap((g) => g.attributes);
+
+                setData((prev) => {
+                    const nextValues = { ...prev.values };
+                    Object.entries(json.values as Record<string, string | null>).forEach(([attributeId, value]) => {
+                        if (value === null) return;
+                        const attr = allAttributes.find((a) => String(a.id) === attributeId);
+                        if (!attr) return;
+                        const { channelKey, localeKey } = getValueKeys(attr);
+                        nextValues[attributeId] = {
+                            ...(nextValues[attributeId] || {}),
+                            [channelKey]: {
+                                ...((nextValues[attributeId] || {})[channelKey] || {}),
+                                [localeKey]: value,
+                            },
+                        };
+                    });
+                    return { ...prev, values: nextValues };
+                });
+            })
+            .catch(() => {
+                // best-effort re-fetch; leave already-loaded values untouched on failure
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeChannelId, activeLocaleId]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -184,8 +257,23 @@ export default function ProductEdit({ product, families, assignedGroups, product
                         </Typography>
 
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Select size="small" defaultValue="default" sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 120 }}>
-                                <MenuItem value="default">Default</MenuItem>
+                            <Select
+                                size="small"
+                                displayEmpty
+                                value={activeChannelId ?? ''}
+                                onChange={(e) => setActiveChannelId(e.target.value === '' ? null : Number(e.target.value))}
+                                sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 160 }}
+                            >
+                                {channels.length === 0 && (
+                                    <MenuItem value="">
+                                        <em>No channels</em>
+                                    </MenuItem>
+                                )}
+                                {channels.map((ch) => (
+                                    <MenuItem key={ch.id} value={ch.id}>
+                                        {ch.name || ch.code}
+                                    </MenuItem>
+                                ))}
                             </Select>
                             <Select
                                 size="small"
@@ -271,15 +359,15 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                                 return true;
                                             })
                                             .map((attr) => {
-                                                const valKey = attr.is_locale_based ? activeLocaleId : 'default';
-                                                const val = data.values[attr.id]?.[valKey] || '';
+                                                const { channelKey, localeKey } = getValueKeys(attr);
+                                                const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
                                                 const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
                                                 return (
                                                     <RenderAttributeInput
                                                         key={attr.id}
                                                         attr={attr}
                                                         value={val}
-                                                        onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
+                                                        onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                         activeLocaleCode={activeLocaleCode}
                                                     />
                                                 );
@@ -309,15 +397,15 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                                              return true;
                                                          })
                                                          .map((attr) => {
-                                                             const valKey = attr.is_locale_based ? activeLocaleId : 'default';
-                                                             const val = data.values[attr.id]?.[valKey] || '';
+                                                             const { channelKey, localeKey } = getValueKeys(attr);
+                                                             const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
                                                              const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
                                                              return (
                                                                  <RenderAttributeInput
                                                                      key={attr.id}
                                                                      attr={attr}
                                                                      value={val}
-                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr.is_locale_based)}
+                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                                      activeLocaleCode={activeLocaleCode}
                                                                  />
                                                              );

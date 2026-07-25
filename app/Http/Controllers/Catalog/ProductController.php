@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
+use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -265,11 +266,27 @@ class ProductController extends Controller
             $groupsData = array_values($groupsData);
         }
 
-        $rawValues = ProductValue::where('product_id', $product->id)->get();
+        // Preload values scoped to no channel (global attributes) plus the default
+        // channel, across all locales. Values for other channels are fetched on
+        // demand via GET .../attribute-values when the user switches the channel
+        // selector, to keep this initial payload bounded.
+        $channels = Channel::all()->map(fn (Channel $c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
+        $defaultChannelId = $channels->first()['id'] ?? null;
+
+        $rawValues = ProductValue::where('product_id', $product->id)
+            ->where(function ($q) use ($defaultChannelId) {
+                $q->whereNull('channel_id');
+                if ($defaultChannelId) {
+                    $q->orWhere('channel_id', $defaultChannelId);
+                }
+            })
+            ->get();
+
         $values = [];
         foreach ($rawValues as $val) {
-            $key = $val->locale_id ?: 'default';
-            $values[$val->attribute_id][$key] = $val->value;
+            $channelKey = $val->channel_id ? (string) $val->channel_id : 'global';
+            $localeKey = $val->locale_id ? (string) $val->locale_id : 'default';
+            $values[$val->attribute_id][$channelKey][$localeKey] = $val->value;
         }
 
         $variantsData = [];
@@ -320,6 +337,7 @@ class ProductController extends Controller
             'assignedGroups' => $groupsData,
             'productValues' => $values,
             'variants' => $variantsData,
+            'channels' => $channels,
         ]);
     }
 
@@ -347,29 +365,43 @@ class ProductController extends Controller
                 'updated_by' => $request->user()?->id,
             ]);
 
+            // $values is nested: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value.
+            // The frontend already resolves each attribute's channelKey/localeKey against its
+            // is_channel_based/is_locale_based flags, so this loop just needs to translate the
+            // sentinel keys back to null for global/default scope.
             $values = $request->input('values', []);
 
-            foreach ($request->file('values', []) as $attributeId => $localeFiles) {
-                if (is_array($localeFiles)) {
-                    foreach ($localeFiles as $localeKey => $file) {
-                        if (is_array($file)) {
-                            $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
-                            $values[$attributeId][$localeKey] = json_encode($paths);
-                        } elseif ($file) {
-                            $values[$attributeId][$localeKey] = $file->store('product-attributes', 'public');
+            foreach ($request->file('values', []) as $attributeId => $channelFiles) {
+                if (is_array($channelFiles)) {
+                    foreach ($channelFiles as $channelKey => $localeFiles) {
+                        if (is_array($localeFiles)) {
+                            foreach ($localeFiles as $localeKey => $file) {
+                                if (is_array($file)) {
+                                    $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
+                                    $values[$attributeId][$channelKey][$localeKey] = json_encode($paths);
+                                } elseif ($file) {
+                                    $values[$attributeId][$channelKey][$localeKey] = $file->store('product-attributes', 'public');
+                                }
+                            }
+                        } elseif ($localeFiles) {
+                            $values[$attributeId][$channelKey]['default'] = $localeFiles->store('product-attributes', 'public');
                         }
                     }
-                } elseif ($localeFiles) {
-                    $values[$attributeId]['default'] = $localeFiles->store('product-attributes', 'public');
+                } elseif ($channelFiles) {
+                    $values[$attributeId]['global']['default'] = $channelFiles->store('product-attributes', 'public');
                 }
             }
 
             if (is_array($values)) {
-                foreach ($values as $attributeId => $localeValues) {
+                foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
-                    if (!$attribute) continue;
+                    if (!$attribute || !is_array($channelValues)) continue;
 
-                    if (is_array($localeValues)) {
+                    foreach ($channelValues as $channelKey => $localeValues) {
+                        $channelId = $channelKey === 'global' ? null : $channelKey;
+
+                        if (!is_array($localeValues)) continue;
+
                         foreach ($localeValues as $localeKey => $val) {
                             $localeId = $localeKey === 'default' ? null : $localeKey;
 
@@ -378,6 +410,7 @@ class ProductController extends Controller
                                     [
                                         'product_id' => $product->id,
                                         'attribute_id' => $attributeId,
+                                        'channel_id' => $channelId,
                                         'locale_id' => $localeId,
                                     ],
                                     [
@@ -387,27 +420,10 @@ class ProductController extends Controller
                             } else {
                                 ProductValue::where('product_id', $product->id)
                                     ->where('attribute_id', $attributeId)
+                                    ->where('channel_id', $channelId)
                                     ->where('locale_id', $localeId)
                                     ->delete();
                             }
-                        }
-                    } else {
-                        if ($localeValues !== null && $localeValues !== '') {
-                            ProductValue::updateOrCreate(
-                                [
-                                    'product_id' => $product->id,
-                                    'attribute_id' => $attributeId,
-                                    'locale_id' => null,
-                                ],
-                                [
-                                    'value' => (string)$localeValues,
-                                ]
-                            );
-                        } else {
-                            ProductValue::where('product_id', $product->id)
-                                ->where('attribute_id', $attributeId)
-                                ->whereNull('locale_id')
-                                ->delete();
                         }
                     }
                 }
@@ -510,5 +526,83 @@ class ProductController extends Controller
         $product->delete();
 
         return to_route('catalog.products.index')->with('success', 'Product deleted successfully.');
+    }
+
+    /**
+     * Return the current value of every channel/locale-scopable attribute for
+     * the given channel/locale combination. Used by the product edit page to
+     * re-fetch just the scopable fields when the channel or locale selector changes.
+     */
+    public function attributeValues(Request $request, Product $product): JsonResponse
+    {
+        $channelId = $request->query('channel_id');
+        $localeId = $request->query('locale_id');
+
+        $values = [];
+        foreach ($this->scopableAttributesFor($product) as $attribute) {
+            $values[$attribute->id] = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $attribute->id)
+                ->where('channel_id', $attribute->is_channel_based ? $channelId : null)
+                ->where('locale_id', $attribute->is_locale_based ? $localeId : null)
+                ->value('value');
+        }
+
+        return response()->json(['values' => $values]);
+    }
+
+    /**
+     * Standalone API to set a batch of attribute values for one channel/locale
+     * combination, applying each attribute's own scoping rule server-side.
+     */
+    public function updateAttributeValue(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'channel_id' => ['nullable', 'exists:channels,id'],
+            'locale_id' => ['nullable', 'exists:locales,id'],
+            'values' => ['required', 'array'],
+        ]);
+
+        foreach ($validated['values'] as $attributeId => $val) {
+            $attribute = Attribute::find($attributeId);
+            if (!$attribute) continue;
+
+            $channelId = $attribute->is_channel_based ? ($validated['channel_id'] ?? null) : null;
+            $localeId = $attribute->is_locale_based ? ($validated['locale_id'] ?? null) : null;
+
+            if ($val !== null && $val !== '') {
+                ProductValue::updateOrCreate(
+                    [
+                        'product_id' => $product->id,
+                        'attribute_id' => $attributeId,
+                        'channel_id' => $channelId,
+                        'locale_id' => $localeId,
+                    ],
+                    ['value' => is_array($val) ? json_encode($val) : (string) $val]
+                );
+            } else {
+                ProductValue::where('product_id', $product->id)
+                    ->where('attribute_id', $attributeId)
+                    ->where('channel_id', $channelId)
+                    ->where('locale_id', $localeId)
+                    ->delete();
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Attributes assigned to the product's family (or all attributes, if the
+     * family has none assigned yet) that vary by channel and/or locale.
+     */
+    private function scopableAttributesFor(Product $product)
+    {
+        $familyAttributeIds = FamilyAttribute::where('family_id', $product->family_id)->pluck('attribute_id');
+
+        return Attribute::when($familyAttributeIds->isNotEmpty(), fn ($q) => $q->whereIn('id', $familyAttributeIds))
+            ->where(function ($q) {
+                $q->where('is_channel_based', true)->orWhere('is_locale_based', true);
+            })
+            ->get(['id', 'is_channel_based', 'is_locale_based']);
     }
 }

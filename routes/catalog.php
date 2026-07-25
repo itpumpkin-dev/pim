@@ -3,6 +3,7 @@
 use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
+use App\Http\Controllers\Catalog\ChannelController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
@@ -17,6 +18,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:products,edit_products');
     Route::put('products/{product}/edit', [ProductController::class, 'update']);
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
+    Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
+    Route::put('products/{product}/attribute-values', [ProductController::class, 'updateAttributeValue'])->name('products.updateAttributeValue')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
@@ -57,4 +60,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('categoryFields/{categoryField}', [CategoryFieldController::class, 'update'])->name('categoryFields.update')->middleware('permission:category_fields,edit_category_fields');
     Route::put('categoryFields/{categoryField}/edit', [CategoryFieldController::class, 'update']);
     Route::delete('categoryFields/{categoryField}', [CategoryFieldController::class, 'destroy'])->name('categoryFields.destroy')->middleware('permission:category_fields,delete_category_fields');
+
+    Route::get('channels', [ChannelController::class, 'index'])->name('channels.index')->middleware('permission:channels,list_channels');
+    Route::get('channels/create', [ChannelController::class, 'create'])->name('channels.create')->middleware('permission:channels,create_channels');
+    Route::post('channels', [ChannelController::class, 'store'])->name('channels.store')->middleware('permission:channels,create_channels');
+    Route::get('channels/{channel}/edit', [ChannelController::class, 'edit'])->name('channels.edit')->middleware('permission:channels,edit_channels');
+    Route::put('channels/{channel}', [ChannelController::class, 'update'])->name('channels.update')->middleware('permission:channels,edit_channels');
+    Route::put('channels/{channel}/edit', [ChannelController::class, 'update']);
+    Route::delete('channels/{channel}', [ChannelController::class, 'destroy'])->name('channels.destroy')->middleware('permission:channels,delete_channels');
 });

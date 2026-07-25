@@ -59,6 +59,11 @@ function useMainNavItems(): NavItem[] {
             icon: SettingsIcon,
             items: [
                 {
+                    title: t('channels'),
+                    url: '/catalog/channels',
+                    permission: 'channels.list_channels',
+                },
+                {
                     title: t('users'),
                     url: '/system/user',
                     permission: 'users.list_users',

@@ -3,6 +3,7 @@
     "catalog": "Catalog",
     "products": "Products",
     "categories": "Categories",
+    "channels": "Channels",
     "categoryFields": "Category Fields",
     "attributes": "Attributes",
     "attributeGroups": "Attribute Groups",
