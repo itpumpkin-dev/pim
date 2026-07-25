@@ -203,11 +203,18 @@ class UserController extends Controller
             $data['password_hash'] = $request->password;
         }
 
+        $wasEnabled = $user->enabled;
+
         $user->update($data);
 
         if ($passwordChanged) {
             AuditLog::record('password_reset', $user);
         }
+
+        // A disabled account must be logged out immediately, not just
+        // blocked from logging in again — an already-open session shouldn't
+        // keep working.
+        $justDisabled = $canManageAccess && $wasEnabled && ! $user->enabled;
 
         if ($canManageAccess) {
             $oldGroupIds = $user->groups->pluck('id')->all();
@@ -226,7 +233,7 @@ class UserController extends Controller
                 AuditLog::record('roles_updated', $user, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
             }
 
-            if ($groupsChanged || $rolesChanged) {
+            if ($groupsChanged || $rolesChanged || $justDisabled) {
                 SessionInvalidator::usersExceptCurrentActor([$user->id]);
             }
         }

@@ -1,8 +1,11 @@
 import AppLogoIcon from '@/components/app-logo-icon';
+import LocaleDropdown from '@/components/locale-dropdown';
 import TextLink from '@/components/text-link';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
-import { FormEventHandler } from 'react';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Box, Button, Checkbox, CircularProgress, FormControlLabel, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { FormEventHandler, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface LoginForm {
@@ -19,6 +22,7 @@ interface LoginProps {
 
 export default function Login({ status, canResetPassword }: LoginProps) {
     const { t } = useTranslation('auth');
+    const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm<LoginForm>({
         email: '',
         password: '',
@@ -44,27 +48,30 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                 }}
             >
                 <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 3, sm: 6 }, py: { xs: 4, sm: 6 } }}>
-                    <Box
-                        component={Link}
-                        href={route('home')}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'text.primary' }}
-                    >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Box
-                            sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: 32,
-                                height: 32,
-                                borderRadius: 1,
-                                color: 'primary.contrastText',
-                            }}
+                            component={Link}
+                            href={route('home')}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'text.primary' }}
                         >
-                            <AppLogoIcon style={{ width: 36, height: 36, fill: 'currentColor' }} />
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 1,
+                                    color: 'primary.contrastText',
+                                }}
+                            >
+                                <AppLogoIcon style={{ width: 36, height: 36, fill: 'currentColor' }} />
+                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                                PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                            </Typography>
                         </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
-                        </Typography>
+                        <LocaleDropdown />
                     </Box>
 
                     <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
@@ -106,7 +113,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                         <Box>
                                             <TextField
                                                 id="password"
-                                                type="password"
+                                                type={showPassword ? 'text' : 'password'}
                                                 label={t('password')}
                                                 required
                                                 tabIndex={2}
@@ -117,6 +124,22 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                                 fullWidth
                                                 error={Boolean(errors.password)}
                                                 helperText={errors.password}
+                                                slotProps={{
+                                                    input: {
+                                                        endAdornment: (
+                                                            <InputAdornment position="end">
+                                                                <IconButton
+                                                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                                                                    onClick={() => setShowPassword((prev) => !prev)}
+                                                                    edge="end"
+                                                                    tabIndex={-1}
+                                                                >
+                                                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                                                </IconButton>
+                                                            </InputAdornment>
+                                                        ),
+                                                    },
+                                                }}
                                             />
                                             {canResetPassword && (
                                                 <Box sx={{ textAlign: 'right', mt: 1 }}>
