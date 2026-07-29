@@ -8,6 +8,7 @@ use App\Services\GridManager;
 use App\Services\LocaleTranslationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,8 +49,19 @@ class LocaleController extends Controller
         ]);
 
         // Folder + English fallback only — translation is a separate,
-        // explicit step the admin triggers from the locales list.
-        $this->localeTranslationService->scaffoldFolder($locale);
+        // explicit step the admin triggers from the locales list. Scaffolding
+        // is best-effort: if it fails (e.g. a filesystem issue with the
+        // entered code), the locale row still exists and the admin should
+        // still land on the list rather than the request dying mid-flight.
+        try {
+            $this->localeTranslationService->scaffoldFolder($locale);
+        } catch (\Throwable $e) {
+            Log::error('Failed to scaffold locale folder after creating locale.', [
+                'locale_id' => $locale->id,
+                'code' => $locale->code,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return to_route('system.locales.index')->with('success', 'Locale created successfully.');
     }

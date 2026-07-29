@@ -23,6 +23,11 @@ class CategoryFieldController extends Controller
     {
         $search = $request->input('search');
 
+        $perPage = (int) $request->input('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
         $fields = CategoryField::query()
             ->when($search, function ($query, $search) {
                 $query->where('code', 'like', "%{$search}%")
@@ -31,7 +36,7 @@ class CategoryFieldController extends Controller
             })
             ->orderBy('position')
             ->orderBy('id', 'desc')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('catalog/categoryFields/index', [

@@ -5,7 +5,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Chip } from '@mui/material';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
@@ -52,6 +56,7 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
     const canDelete = permissions.includes('category_fields.delete_category_fields');
 
     const [search, setSearch] = useState(filters.search ?? '');
+    const [perPage, setPerPage] = useState<number>(fields.per_page ?? 15);
     const [deleteFieldId, setDeleteFieldId] = useState<number | null>(null);
     const firstRender = useRef(true);
 
@@ -62,14 +67,22 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categoryFields', { search }, { preserveState: true, replace: true });
+            router.get('/catalog/categoryFields', { search, per_page: perPage }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
     }, [search]);
 
-    const handlePageChange = (_: unknown, page: number) => {
-        router.get('/catalog/categoryFields', { search, page }, { preserveState: true });
+    const currentPage = fields.current_page ?? 1;
+    const lastPage = fields.last_page ?? 1;
+
+    const goToPage = (page: number) => {
+        router.get('/catalog/categoryFields', { search, page, per_page: perPage }, { preserveState: true });
+    };
+
+    const handlePerPageChange = (value: number) => {
+        setPerPage(value);
+        router.get('/catalog/categoryFields', { search, page: 1, per_page: value }, { preserveState: true });
     };
 
     const getFieldLabel = (item: CategoryFieldItem) => {
@@ -102,20 +115,62 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
                     )}
                 </Box>
 
-                <TextField
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search fields..."
-                    size="small"
-                    sx={{ mb: 3, minWidth: 280 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                    <TextField
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Search fields..."
+                        size="small"
+                        sx={{ minWidth: 280 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Select
+                            value={perPage}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                            size="small"
+                            sx={{ minWidth: 60, height: 36 }}
+                        >
+                            <MenuItem value={10}>10</MenuItem>
+                            <MenuItem value={15}>15</MenuItem>
+                            <MenuItem value={25}>25</MenuItem>
+                            <MenuItem value={50}>50</MenuItem>
+                        </Select>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('perPage')}
+                        </Typography>
+
+                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="body2">{currentPage}</Typography>
+                        </Paper>
+
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('pageOf', { lastPage })}
+                        </Typography>
+
+                        <Stack direction="row" spacing={0.2}>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                <FirstPageIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                <LastPageIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                    </Stack>
+                </Stack>
 
                 <TableContainer component={Paper}>
                     <Table>
@@ -190,17 +245,6 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
                         </TableBody>
                     </Table>
                 </TableContainer>
-
-                {fields.total > fields.per_page && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination
-                            count={Math.ceil(fields.total / fields.per_page)}
-                            page={fields.current_page}
-                            onChange={handlePageChange}
-                            color="primary"
-                        />
-                    </Box>
-                )}
             </Box>
 
             <Dialog open={deleteFieldId !== null} onClose={() => setDeleteFieldId(null)}>

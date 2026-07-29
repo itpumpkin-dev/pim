@@ -5,14 +5,18 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Box, Button, Chip, colors, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import { Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface GridColumn { label: string; type: string; sortable?: boolean; }
 interface GridAction { icon: string; label: string; }
 interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<string, GridAction>; }
-interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; }
+interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; current_page: number; last_page: number; per_page: number; }
 interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string }; }
 
 function cellValue(value: unknown, type: string, t: (key: string) => string) {
@@ -34,6 +38,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const canDelete = permissions.includes('attributes.delete_attributes');
 
     const [search, setSearch] = useState(filters.search ?? '');
+    const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteAttributeId, setDeleteAttributeId] = useState<number | null>(null);
     const firstRender = useRef(true);
 
@@ -49,9 +54,21 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
             return;
         }
 
-        const timeout = setTimeout(() => router.get('/catalog/attributes', { search }, { preserveState: true, replace: true }), 300);
+        const timeout = setTimeout(() => router.get('/catalog/attributes', { search, per_page: perPage }, { preserveState: true, replace: true }), 300);
         return () => clearTimeout(timeout);
     }, [search]);
+
+    const currentPage = gridData.current_page ?? 1;
+    const lastPage = gridData.last_page ?? 1;
+
+    const goToPage = (page: number) => {
+        router.get('/catalog/attributes', { search, page, per_page: perPage }, { preserveState: true });
+    };
+
+    const handlePerPageChange = (value: number) => {
+        setPerPage(value);
+        router.get('/catalog/attributes', { search, page: 1, per_page: value }, { preserveState: true });
+    };
 
     return <AppLayout
         breadcrumbs={breadcrumbs}>
@@ -63,7 +80,48 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                 </Box>{canCreate &&
                     <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
             </Box>
-            <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ mb: 3, minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Select
+                        value={perPage}
+                        onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                        size="small"
+                        sx={{ minWidth: 60, height: 36 }}
+                    >
+                        <MenuItem value={10}>10</MenuItem>
+                        <MenuItem value={25}>25</MenuItem>
+                        <MenuItem value={50}>50</MenuItem>
+                    </Select>
+                    <Typography variant="body2" color="text.secondary">
+                        {t('perPage')}
+                    </Typography>
+
+                    <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="body2">{currentPage}</Typography>
+                    </Paper>
+
+                    <Typography variant="body2" color="text.secondary">
+                        {t('pageOf', { lastPage })}
+                    </Typography>
+
+                    <Stack direction="row" spacing={0.2}>
+                        <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                            <FirstPageIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                            <ChevronLeftIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                            <ChevronRightIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                            <LastPageIcon fontSize="small" />
+                        </IconButton>
+                    </Stack>
+                </Stack>
+            </Stack>
             <TableContainer component={Paper}>
                 <Table>
                     <TableHead>

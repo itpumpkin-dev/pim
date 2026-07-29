@@ -1,0 +1,41 @@
+{
+    "fields": {
+        "id": "ID",
+        "code": "コード",
+        "name": "名前",
+        "label": "名前",
+        "type": "タイプ",
+        "status": "ステータス",
+        "createdAt": "作成日時",
+        "required": "必須",
+        "unique": "一意",
+        "localeBased": "ロケールに基づく",
+        "channelBased": "チャネルに基づく",
+        "employeeId": "従業員ID",
+        "username": "ユーザー名",
+        "firstName": "名前（ firstName ）",
+        "lastName": "名前（ lastName ）",
+        "displayName": "表示名",
+        "sku": "SKU"
+    },
+    "rowActions": {
+        "edit": "編集",
+        "delete": "削除",
+        "duplicate": " duplic ate"
+    },
+    "actionsHeader": "アクション",
+    "active": "活性化",
+    "inactive": "無効化",
+    "enabled": "有効",
+    "disabled": "無効",
+    "yes": "はい",
+    "no": "いいえ",
+    "filter": "フィルター",
+    "perPage": "1ページあたりの件数",
+    "pageOf": "合計{{lastPage}}件中",
+    "results": "{{count}}件の結果",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "confirmDeletion": "削除を確認",
+    "noDataFound": "該当データが見つかりません。"
+}

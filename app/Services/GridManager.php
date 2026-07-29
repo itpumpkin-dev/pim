@@ -69,6 +69,11 @@ class GridManager
             $query->orderBy($sortField, strtolower($sortDir) === 'desc' ? 'desc' : 'asc');
         }
         
-        return $query->paginate(10)->withQueryString();
+        $perPage = (int) $request->input('per_page', 10);
+        if (!in_array($perPage, [10, 25, 50], true)) {
+            $perPage = 10;
+        }
+
+        return $query->paginate($perPage)->withQueryString();
     }
 }

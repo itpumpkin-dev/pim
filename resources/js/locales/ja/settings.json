@@ -1,0 +1,13 @@
+{
+    "profileInformation": "プロフィール情報",
+    "profileInformationDesc": "名前とメールアドレスを更新する",
+    "username": "ユーザー名",
+    "firstName": "名前（first name）",
+    "lastName": "苗字（last name）",
+    "emailAddress": "メールアドレス",
+    "save": "保存",
+    "saved": "保存されました",
+    "emailUnverified": "あなたのメールアドレスが未確認です。",
+    "resendVerification": "確認用のメールを再送します。こちらをクリックしてください。",
+    "verificationSent": "新しい確認用リンクがメールアドレスに送信されました。"
+}

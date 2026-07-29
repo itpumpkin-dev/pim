@@ -1,0 +1,41 @@
+{
+    "fields": {
+        "id": "ID",
+        "code": "Code",
+        "name": "Name",
+        "label": "Name",
+        "type": "Type",
+        "status": "Status",
+        "createdAt": "Created At",
+        "required": "Required",
+        "unique": "Unique",
+        "localeBased": "Locale Based",
+        "channelBased": "Channel Based",
+        "employeeId": "Employee ID",
+        "username": "Username",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "displayName": "Display Name",
+        "sku": "SKU"
+    },
+    "rowActions": {
+        "edit": "Edit",
+        "delete": "Delete",
+        "duplicate": "Duplicate"
+    },
+    "actionsHeader": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "yes": "Yes",
+    "no": "No",
+    "filter": "Filter",
+    "perPage": "Per Page",
+    "pageOf": "of {{lastPage}}",
+    "results": "{{count}} Results",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirmDeletion": "Confirm Deletion",
+    "noDataFound": "No data found."
+}

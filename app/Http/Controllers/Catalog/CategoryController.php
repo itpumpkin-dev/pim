@@ -24,6 +24,11 @@ class CategoryController extends Controller
     {
         $search = $request->input('search');
 
+        $perPage = (int) $request->input('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
         // Fetch categories with their parent to show in list
         $categories = Category::with('parent')
             ->when($search, function ($query, $search) {
@@ -32,7 +37,7 @@ class CategoryController extends Controller
                     ->orWhere('description', 'like', "%{$search}%");
             })
             ->orderBy('id', 'desc')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('catalog/categories/index', [
