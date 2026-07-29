@@ -4,6 +4,7 @@ use App\Http\Controllers\System\DepartmentController;
 use App\Http\Controllers\System\JobPositionController;
 use App\Http\Controllers\System\LocaleController;
 use App\Http\Controllers\System\RoleController;
+use App\Http\Controllers\System\TranslationProviderController;
 use App\Http\Controllers\System\UserController;
 use App\Http\Controllers\System\UserGroupController;
 use Illuminate\Support\Facades\Route;
@@ -55,4 +56,14 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('locales/{locale}/edit', [LocaleController::class, 'edit'])->name('locales.edit')->middleware('permission:locales,edit_locales');
     Route::put('locales/{locale}', [LocaleController::class, 'update'])->name('locales.update')->middleware('permission:locales,edit_locales');
     Route::delete('locales/{locale}', [LocaleController::class, 'destroy'])->name('locales.destroy')->middleware('permission:locales,delete_locales');
+    Route::post('locales/{locale}/translate', [LocaleController::class, 'translate'])->name('locales.translate')->middleware('permission:locales,edit_locales');
+
+    Route::get('translationProviders', [TranslationProviderController::class, 'index'])->name('translationProviders.index')->middleware('permission:translation_providers,list_translation_providers');
+    Route::get('translationProviders/create', [TranslationProviderController::class, 'create'])->name('translationProviders.create')->middleware('permission:translation_providers,create_translation_providers');
+    Route::get('translationProviders/field-options', [TranslationProviderController::class, 'fieldOptions'])->name('translationProviders.fieldOptions')->middleware('permission:translation_providers,create_translation_providers');
+    Route::post('translationProviders', [TranslationProviderController::class, 'store'])->name('translationProviders.store')->middleware('permission:translation_providers,create_translation_providers');
+    Route::get('translationProviders/{translationProvider}/edit', [TranslationProviderController::class, 'edit'])->name('translationProviders.edit')->middleware('permission:translation_providers,edit_translation_providers');
+    Route::put('translationProviders/{translationProvider}', [TranslationProviderController::class, 'update'])->name('translationProviders.update')->middleware('permission:translation_providers,edit_translation_providers');
+    Route::delete('translationProviders/{translationProvider}', [TranslationProviderController::class, 'destroy'])->name('translationProviders.destroy')->middleware('permission:translation_providers,delete_translation_providers');
+    Route::post('translationProviders/{translationProvider}/test', [TranslationProviderController::class, 'test'])->name('translationProviders.test')->middleware('permission:translation_providers,edit_translation_providers');
 });

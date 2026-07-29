@@ -121,6 +121,11 @@ function useMainNavItems(): NavItem[] {
                     url: '/system/locales',
                     permission: 'locales.list_locales',
                 },
+                {
+                    title: t('translationProviders'),
+                    url: '/system/translationProviders',
+                    permission: 'translation_providers.list_translation_providers',
+                },
             ],
         },
     ];

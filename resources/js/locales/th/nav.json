@@ -16,6 +16,7 @@
     "jobPositions": "ตำแหน่งงาน",
     "roles": "บทบาท",
     "locales": "ภาษา",
+    "translationProviders": "ผู้ให้บริการแปลภาษา",
     "importExport": "นำเข้า / ส่งออก",
     "imports": "นำเข้าข้อมูล",
     "exports": "ส่งออกข้อมูล",

@@ -708,11 +708,11 @@ export default function ProductShow({ id }: { id: number }) {
                 px: 2,
                 py: 1,
                 color: '#fff',
-                background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     transform: 'translateY(-2px)',
-                    background: 'linear-gradient(135deg, #0891B2 0%, #0E7490 100%)',
+                    background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                 },
             }}
         >

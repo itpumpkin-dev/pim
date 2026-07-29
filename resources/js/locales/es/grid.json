@@ -1,0 +1,41 @@
+{
+    "fields": {
+        "id": "ID",
+        "code": "Código",
+        "name": "Nombre",
+        "label": "Nombre",
+        "type": "Tipo",
+        "status": "Estado",
+        "createdAt": "Creado el",
+        "required": "Requerido",
+        "unique": "Único",
+        "localeBased": "Basado en Idioma",
+        "channelBased": "Basado en Canal",
+        "employeeId": "Identificación del Empleado",
+        "username": "Nombre de Usuario",
+        "firstName": "Nombre",
+        "lastName": "Apellidos",
+        "displayName": "Nombre para Mostrar",
+        "sku": "SKU"
+    },
+    "rowActions": {
+        "edit": "Editar",
+        "delete": "Eliminar",
+        "duplicate": "Duplicar"
+    },
+    "actionsHeader": "Acciones",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "enabled": "Enable",
+    "disabled": "Disabled",
+    "yes": "Sí",
+    "no": "No",
+    "filter": "Filtrar",
+    "perPage": "Por página",
+    "pageOf": "de {{lastPage}}",
+    "results": "{{count}} Resultados",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "confirmDeletion": "Confirmar eliminación",
+    "noDataFound": "No se encontraron datos."
+}

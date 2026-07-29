@@ -4,31 +4,45 @@
     "searchByUsername": "ค้นหาด้วยชื่อผู้ใช้",
     "confirmDeletionTitle": "ยืนยันการลบ",
     "confirmDeleteUserMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งานนี้?",
-
     "rolesCount": "{{count}} บทบาท",
     "createRole": "สร้างบทบาท",
     "searchByName": "ค้นหาด้วยชื่อ",
     "deleteRoleTitle": "ลบบทบาท?",
     "confirmDeleteRoleMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบบทบาท \"{{label}}\"? การดำเนินการนี้จะลบออกจากผู้ใช้งานทุกคนที่ได้รับสิทธิ์นี้ และไม่สามารถย้อนกลับได้",
-
     "userGroupsCount": "{{count}} กลุ่ม",
     "createUserGroup": "สร้างกลุ่มผู้ใช้งาน",
     "deleteGroupTitle": "ลบกลุ่ม?",
     "confirmDeleteGroupMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่ม \"{{name}}\"? การดำเนินการนี้จะลบออกจากผู้ใช้งานทุกคนที่อยู่ในกลุ่มนี้ และไม่สามารถย้อนกลับได้",
-
     "departmentsCount": "{{count}} แผนก",
     "createDepartment": "สร้างแผนก",
     "deleteDepartmentTitle": "ลบแผนก?",
     "confirmDeleteDepartmentMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบแผนก \"{{name}}\"? ผู้ใช้งานที่ถูกกำหนดแผนกนี้จะไม่มีแผนกอีกต่อไป",
-
     "jobPositionsCount": "{{count}} ตำแหน่งงาน",
     "createJobPosition": "สร้างตำแหน่งงาน",
     "deleteJobPositionTitle": "ลบตำแหน่งงาน?",
     "confirmDeleteJobPositionMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบตำแหน่งงาน \"{{name}}\"? ผู้ใช้งานที่ถูกกำหนดตำแหน่งนี้จะไม่มีตำแหน่งงานอีกต่อไป",
-
     "localesTitle": "ภาษา",
     "createLocale": "สร้างภาษา",
     "searchByCode": "ค้นหาด้วยโค้ด",
     "noLocalesFound": "ไม่พบข้อมูลภาษา",
-    "confirmDeleteLocaleMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบภาษานี้?"
+    "confirmDeleteLocaleMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบภาษานี้?",
+    "translationColumn": "การแปล",
+    "translationNotStarted": "ยังไม่เริ่มแปล",
+    "translationQueued": "อยู่ในคิว",
+    "translationTranslating": "กำลังแปล",
+    "translationCompleted": "แปลครบแล้ว",
+    "translationPartial": "แปลบางส่วน",
+    "translationFailed": "แปลไม่สำเร็จ",
+    "startTranslation": "เริ่มแปล",
+    "retryTranslation": "แปลซ้ำ",
+
+    "translationProvidersTitle": "ผู้ให้บริการแปลภาษา",
+    "createTranslationProvider": "เพิ่มผู้ให้บริการ",
+    "noTranslationProvidersFound": "ไม่พบผู้ให้บริการแปลภาษา",
+    "confirmDeleteTranslationProviderMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบผู้ให้บริการแปลภาษานี้?",
+    "testProvider": "ทดสอบ",
+    "isDefaultProvider": "ค่าเริ่มต้น",
+    "defaultProvider": "ค่าเริ่มต้น",
+    "translationProviderName": "ชื่อ",
+    "translationProviderType": "ประเภท"
 }

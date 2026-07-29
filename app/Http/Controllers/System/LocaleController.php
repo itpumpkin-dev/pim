@@ -5,6 +5,7 @@ namespace App\Http\Controllers\System;
 use App\Http\Controllers\Controller;
 use App\Models\Locale;
 use App\Services\GridManager;
+use App\Services\LocaleTranslationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,6 +13,10 @@ use Inertia\Response;
 
 class LocaleController extends Controller
 {
+    public function __construct(private readonly LocaleTranslationService $localeTranslationService)
+    {
+    }
+
     public function index(Request $request): Response
     {
         $grid = new GridManager('locale_grid');
@@ -36,11 +41,15 @@ class LocaleController extends Controller
             'enabled' => ['boolean'],
         ]);
 
-        Locale::create([
+        $locale = Locale::create([
             'code' => $validated['code'],
             'display_name' => $validated['display_name'] ?? null,
             'enabled' => $validated['enabled'] ?? true,
         ]);
+
+        // Folder + English fallback only — translation is a separate,
+        // explicit step the admin triggers from the locales list.
+        $this->localeTranslationService->scaffoldFolder($locale);
 
         return to_route('system.locales.index')->with('success', 'Locale created successfully.');
     }
@@ -74,5 +83,12 @@ class LocaleController extends Controller
         $locale->delete();
 
         return to_route('system.locales.index')->with('success', 'Locale deleted successfully.');
+    }
+
+    public function translate(Locale $locale): RedirectResponse
+    {
+        $this->localeTranslationService->queueTranslation($locale);
+
+        return back()->with('success', 'Translation started.');
     }
 }

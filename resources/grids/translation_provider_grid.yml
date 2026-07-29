@@ -1,35 +1,35 @@
 datagrid:
-  locale_grid:
+  translation_provider_grid:
     source:
       type: eloquent
-      class: App\Models\Locale
+      class: App\Models\TranslationProvider
     columns:
       id:
         label: fields.id
         type: number
         sortable: true
-      code:
-        label: fields.code
+      name:
+        label: fields.name
         type: string
         sortable: true
-      display_name:
-        label: fields.displayName
+      type:
+        label: fields.type
         type: string
         sortable: true
       enabled:
         label: fields.status
         type: boolean
         sortable: true
-      translation_status:
-        label: system.translationColumn
-        type: string
-        sortable: false
+      is_default:
+        label: system.isDefaultProvider
+        type: boolean
+        sortable: true
     filters:
       global:
         type: string
         fields:
-          - code
-          - display_name
+          - name
+          - type
     actions:
       update:
         icon: edit
@@ -37,6 +37,6 @@ datagrid:
       delete:
         icon: delete
         label: rowActions.delete
-      translate:
+      test:
         icon: translate
-        label: system.startTranslation
+        label: system.testProvider

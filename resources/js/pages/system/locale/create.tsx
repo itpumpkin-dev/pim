@@ -3,6 +3,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Checkbox,
@@ -12,6 +13,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
+import ISO6391 from 'iso-639-1';
 import { FormEvent } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -19,6 +21,16 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'LOCALES', href: '/system/locales' },
     { title: 'ADD LOCALE', href: '/system/locales/create' },
 ];
+
+interface LanguageOption {
+    code: string;
+    name: string;
+    nativeName: string;
+}
+
+const languageOptions: LanguageOption[] = ISO6391.getLanguages(ISO6391.getAllCodes()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+);
 
 export default function LocaleCreate() {
     const { data, setData, post, processing, errors } = useForm({
@@ -82,16 +94,44 @@ export default function LocaleCreate() {
                             General
                         </Typography>
                         <Stack spacing={2}>
-                            <TextField
-                                label="Code *"
-                                required
+                            <Autocomplete
+                                freeSolo
                                 fullWidth
                                 size="small"
-                                placeholder="e.g. th, en"
-                                value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code}
+                                options={languageOptions}
+                                getOptionLabel={(option) =>
+                                    typeof option === 'string' ? option : `${option.name} (${option.code})`
+                                }
+                                isOptionEqualToValue={(option, value) =>
+                                    typeof value === 'string' ? option.code === value : option.code === value.code
+                                }
+                                inputValue={data.code}
+                                onInputChange={(_, newInputValue, reason) => {
+                                    // Ignore 'reset' (MUI replaying the picked
+                                    // option's label back into the input) and
+                                    // 'clear' — only free typing should drive
+                                    // the code field; selection is handled by
+                                    // onChange below with the real code.
+                                    if (reason === 'input') {
+                                        setData('code', newInputValue);
+                                    }
+                                }}
+                                onChange={(_, newValue) => {
+                                    if (newValue && typeof newValue !== 'string') {
+                                        setData('code', newValue.code);
+                                        setData('display_name', newValue.nativeName || newValue.name);
+                                    }
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Code *"
+                                        required
+                                        placeholder="e.g. th, en"
+                                        error={Boolean(errors.code)}
+                                        helperText={errors.code}
+                                    />
+                                )}
                             />
                             <TextField
                                 label="Display Name"

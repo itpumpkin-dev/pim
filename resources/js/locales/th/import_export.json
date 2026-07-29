@@ -25,7 +25,6 @@
     "typeCategories": "หมวดหมู่",
     "typeAttributes": "แอตทริบิวต์",
     "typeAttributeFamilies": "ตระกูลแอตทริบิวต์",
-
     "exportsTitle": "ส่งออกข้อมูล",
     "createExport": "สร้างการส่งออก",
     "editExport": "แก้ไขการส่งออก",
@@ -35,7 +34,6 @@
     "fileFormat": "รูปแบบไฟล์",
     "withMedia": "รวมไฟล์สื่อ",
     "exportNow": "ส่งออกทันที",
-
     "jobTrackerTitle": "ตัวติดตามงาน",
     "job": "งาน",
     "jobType": "ประเภทงาน",

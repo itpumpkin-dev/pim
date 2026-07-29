@@ -1,0 +1,13 @@
+{
+    "profileInformation": "简介信息",
+    "profileInformationDesc": "更新您的姓名和电子邮件地址",
+    "username": "用户名",
+    "firstName": "名称",
+    "lastName": "姓",
+    "emailAddress": "电子邮件地址",
+    "save": "保存",
+    "saved": "已保存",
+    "emailUnverified": "您的电子邮件地址尚未核实 .",
+    "resendVerification": "点击这里重新发送校验邮件 .",
+    "verificationSent": "一个新的校验链接已经发送到您的电子邮件地址 ."
+}

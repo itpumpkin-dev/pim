@@ -69,7 +69,6 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
 
                 const button = (
                     <ListItemButton
-                        key={item.title}
                         component={item.url ? Link : 'div'}
                         href={item.url as any}
                         selected={isActive}
@@ -103,9 +102,13 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                             <ListItemText
                                 primary={item.title}
                                 sx={{
+                                    minWidth: 0,
                                     '& .MuiTypography-root': {
                                         fontWeight: isActive ? 600 : hasChildren ? 600 : 500,
                                         fontSize: hasChildren ? '1rem' : '1rem',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
                                     },
                                 }}
                             />
@@ -123,12 +126,10 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                     </ListItemButton>
                 );
 
-                const itemContent = collapsed ? (
-                    <Tooltip key={item.title} title={item.title} placement="right">
+                const itemContent = (
+                    <Tooltip key={item.title} title={item.title} placement="right" enterDelay={collapsed ? 0 : 700}>
                         {button}
                     </Tooltip>
-                ) : (
-                    button
                 );
 
                 if (hasChildren && !collapsed) {
@@ -150,35 +151,40 @@ export function NavMain({ items = [], collapsed = false }: { items: NavItem[]; c
                                     {item.items!.map((subItem) => {
                                         const isSubActive = subItem.url === page.url;
                                         return (
-                                            <ListItemButton
-                                                key={subItem.title}
-                                                component={subItem.url ? Link : 'div'}
-                                                href={subItem.url as any}
-                                                selected={isSubActive}
-                                                sx={{
-                                                    borderRadius: 1.5,
-                                                    px: 1.5,
-                                                    py: 0.625,
-                                                    mb: 0.25,
-                                                    ...(isSubActive ? activeSx : hoverSx),
-                                                }}
-                                            >
-                                                {subItem.icon && (
-                                                    <ListItemIcon sx={{ minWidth: 32, color: isSubActive ? '#fff' : 'text.secondary' }}>
-                                                        <subItem.icon fontSize="small" />
-                                                    </ListItemIcon>
-                                                )}
-                                                <ListItemText
-                                                    primary={subItem.title}
+                                            <Tooltip key={subItem.title} title={subItem.title} placement="right" enterDelay={700}>
+                                                <ListItemButton
+                                                    component={subItem.url ? Link : 'div'}
+                                                    href={subItem.url as any}
+                                                    selected={isSubActive}
                                                     sx={{
-                                                        '& .MuiTypography-root': {
-                                                            fontSize: '0.9rem',
-                                                            fontWeight: isSubActive ? 600 : 400,
-                                                            color: isSubActive ? '#fff' : 'text.secondary',
-                                                        },
+                                                        borderRadius: 1.5,
+                                                        px: 1.5,
+                                                        py: 0.625,
+                                                        mb: 0.25,
+                                                        ...(isSubActive ? activeSx : hoverSx),
                                                     }}
-                                                />
-                                            </ListItemButton>
+                                                >
+                                                    {subItem.icon && (
+                                                        <ListItemIcon sx={{ minWidth: 32, color: isSubActive ? '#fff' : 'text.secondary' }}>
+                                                            <subItem.icon fontSize="small" />
+                                                        </ListItemIcon>
+                                                    )}
+                                                    <ListItemText
+                                                        primary={subItem.title}
+                                                        sx={{
+                                                            minWidth: 0,
+                                                            '& .MuiTypography-root': {
+                                                                fontSize: '0.9rem',
+                                                                fontWeight: isSubActive ? 600 : 400,
+                                                                color: isSubActive ? '#fff' : 'text.secondary',
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                            },
+                                                        }}
+                                                    />
+                                                </ListItemButton>
+                                            </Tooltip>
                                         );
                                     })}
                                 </List>

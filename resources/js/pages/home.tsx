@@ -228,13 +228,13 @@ export default function Home() {
                 px: 2,
                 py: 1,
                 color: '#fff',
-                background: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+                background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                 // boxShadow: '0 4px 14px 0 rgba(234, 88, 12, 0.39)',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     transform: 'translateY(-2px)',
                     // boxShadow: '0 6px 20px rgba(234, 88, 12, 0.5)',
-                    background: 'linear-gradient(135deg, #0891B2 0%, #0E7490 100%)',
+                    background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                 },
             }}
         >
