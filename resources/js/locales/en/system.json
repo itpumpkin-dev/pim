@@ -41,6 +41,17 @@
     "translationFailed": "Failed",
     "startTranslation": "Start Translation",
     "retryTranslation": "Retry Translation",
+    "editTranslations": "Edit Translations",
+
+    "translationsTitle": "Edit Translations",
+    "translationNamespace": "File",
+    "translationKey": "Key",
+    "translationSource": "English (reference)",
+    "translationValue": "Translation",
+    "searchTranslations": "Search key or text",
+    "noTranslationEntriesFound": "No matching strings.",
+    "saveTranslations": "Save Changes",
+    "unsavedTranslationsCount": "{{count}} unsaved",
 
     "translationProvidersTitle": "Translation Providers",
     "createTranslationProvider": "Add Provider",

@@ -54,7 +54,7 @@ class LocaleController extends Controller
         // entered code), the locale row still exists and the admin should
         // still land on the list rather than the request dying mid-flight.
         try {
-            $this->localeTranslationService->scaffoldFolder($locale);
+            $this->localeTranslationService->scaffoldLocale($locale);
         } catch (\Throwable $e) {
             Log::error('Failed to scaffold locale folder after creating locale.', [
                 'locale_id' => $locale->id,

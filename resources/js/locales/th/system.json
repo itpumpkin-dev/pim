@@ -35,7 +35,6 @@
     "translationFailed": "แปลไม่สำเร็จ",
     "startTranslation": "เริ่มแปล",
     "retryTranslation": "แปลซ้ำ",
-
     "translationProvidersTitle": "ผู้ให้บริการแปลภาษา",
     "createTranslationProvider": "เพิ่มผู้ให้บริการ",
     "noTranslationProvidersFound": "ไม่พบผู้ให้บริการแปลภาษา",

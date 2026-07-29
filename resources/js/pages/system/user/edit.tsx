@@ -1,9 +1,34 @@
+import { TimelinePanel } from '@/components/timeline-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
+import CloseIcon from '@mui/icons-material/Close';
 import ImageIcon from '@mui/icons-material/Image';
-import { Autocomplete, Box, Button, Checkbox, Chip, FormControlLabel, MenuItem, Select, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { ChangeEvent, FormEventHandler, useRef, useState } from 'react';
+import {
+    Autocomplete,
+    Box,
+    Button,
+    Checkbox,
+    Chip,
+    Dialog,
+    DialogContent,
+    FormControlLabel,
+    IconButton,
+    MenuItem,
+    Paper,
+    Select,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Tabs,
+    TextField,
+    Typography,
+} from '@mui/material';
+import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -24,6 +49,29 @@ interface UserGroupOption {
 interface RoleOption {
     id: number;
     label: string;
+}
+
+interface PermissionEntry {
+    resource: string;
+    action: string;
+}
+
+interface RoleSummary {
+    id: number;
+    label: string;
+    permissions: PermissionEntry[];
+}
+
+interface GroupSummary {
+    id: number;
+    name: string;
+    roles: RoleSummary[];
+}
+
+interface UserPermissions {
+    roles: RoleSummary[];
+    groups: GroupSummary[];
+    effective_permissions: string[];
 }
 
 interface LocaleOption {
@@ -70,6 +118,7 @@ interface EditUserProps {
     departments: DepartmentOption[];
     jobPositions: JobPositionOption[];
     canManageAccess: boolean;
+    permissions: UserPermissions;
 }
 
 interface UserForm {
@@ -92,11 +141,18 @@ interface UserForm {
     [key: string]: string | boolean | number | number[] | File | null | undefined;
 }
 
-const TABS = ['General properties', 'Groups and Roles', 'Password', 'Interfaces'];
+const TABS = ['General properties', 'Groups and Roles', 'Permissions', 'Timeline', 'Password', 'Interfaces'];
 
 function formatDateTime(value: string | null) {
     if (!value) return 'Never';
     return new Date(value).toLocaleString('en-US');
+}
+
+function humanize(value: string): string {
+    return value
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 }
 
 let localeDisplay: Intl.DisplayNames | null = null;
@@ -114,10 +170,38 @@ function localeLabel(code: string) {
     }
 }
 
-export default function UserEdit({ user, groups, roles, locales, timezones, departments, jobPositions, canManageAccess }: EditUserProps) {
+export default function UserEdit({ user, groups, roles, locales, timezones, departments, jobPositions, canManageAccess, permissions }: EditUserProps) {
     const tabs = canManageAccess ? TABS : TABS.filter((label) => label !== 'Groups and Roles');
     const [tab, setTab] = useState(tabs[0]);
+
+    const permissionRows = useMemo(() => {
+        const rows = new Map<string, { resource: string; action: string; sources: string[] }>();
+
+        const add = (permission: PermissionEntry, source: string) => {
+            const key = `${permission.resource}.${permission.action}`;
+            const existing = rows.get(key);
+            if (existing) {
+                if (!existing.sources.includes(source)) existing.sources.push(source);
+            } else {
+                rows.set(key, { resource: permission.resource, action: permission.action, sources: [source] });
+            }
+        };
+
+        permissions.roles.forEach((role) => {
+            role.permissions.forEach((permission) => add(permission, `Role: ${role.label}`));
+        });
+        permissions.groups.forEach((group) => {
+            group.roles.forEach((role) => {
+                role.permissions.forEach((permission) => add(permission, `Group: ${group.name} → Role: ${role.label}`));
+            });
+        });
+
+        return Array.from(rows.values()).sort(
+            (a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action),
+        );
+    }, [permissions]);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url);
+    const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const { data, setData, post, processing, errors, clearErrors } = useForm<UserForm>({
@@ -196,6 +280,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
             <Box component="form" id="user-edit-form" onSubmit={submit} sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                     <Box
+                        onClick={() => avatarPreview && setAvatarViewerOpen(true)}
                         sx={{
                             width: 72,
                             height: 72,
@@ -207,6 +292,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                             justifyContent: 'center',
                             overflow: 'hidden',
                             flexShrink: 0,
+                            cursor: avatarPreview ? 'pointer' : 'default',
                         }}
                     >
                         {avatarPreview ? (
@@ -215,6 +301,25 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                             <ImageIcon sx={{ fontSize: 36 }} />
                         )}
                     </Box>
+
+                    <Dialog open={avatarViewerOpen} onClose={() => setAvatarViewerOpen(false)} maxWidth="sm">
+                        <IconButton
+                            onClick={() => setAvatarViewerOpen(false)}
+                            sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.paper' } }}
+                        >
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                        <DialogContent sx={{ p: 0, display: 'flex' }}>
+                            {avatarPreview && (
+                                <Box
+                                    component="img"
+                                    src={avatarPreview}
+                                    alt={user.name}
+                                    sx={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }}
+                                />
+                            )}
+                        </DialogContent>
+                    </Dialog>
                     <Box>
                         <Typography variant="h5" sx={{ fontWeight: 700 }}>
                             {user.name}
@@ -302,9 +407,10 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                                 fullWidth
                                 size="small"
                                 value={data.phone}
-                                onChange={(e) => update('phone', e.target.value)}
+                                onChange={(e) => update('phone', e.target.value.slice(0, 10))}
                                 error={Boolean(errors.phone)}
                                 helperText={errors.phone}
+                                slotProps={{ htmlInput: { maxLength: 10 } }}
                             />
                         </Box>
 
@@ -430,6 +536,53 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                                 renderInput={(params) => <TextField {...params} error={Boolean(errors.roles)} helperText={errors.roles} />}
                             />
                         </Box>
+                    </Box>
+                )}
+
+                {tab === 'Permissions' && (
+                    <Box sx={{ maxWidth: 800 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Effective permissions granted to this user, whether assigned directly via a role or inherited through a group.
+                        </Typography>
+                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Table size="small">
+                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 700 }}>Resource</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>Granted via</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {permissionRows.map((row) => (
+                                        <TableRow key={`${row.resource}.${row.action}`}>
+                                            <TableCell>{humanize(row.resource)}</TableCell>
+                                            <TableCell>{humanize(row.action)}</TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                                    {row.sources.map((source) => (
+                                                        <Chip key={source} label={source} size="small" variant="outlined" />
+                                                    ))}
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {permissionRows.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                                No permissions assigned.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Box>
+                )}
+
+                {tab === 'Timeline' && (
+                    <Box sx={{ maxWidth: 700 }}>
+                        <TimelinePanel timelineUrl={route('system.user.history', user.id)} />
                     </Box>
                 )}
 

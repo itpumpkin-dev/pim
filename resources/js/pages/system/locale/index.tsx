@@ -3,6 +3,7 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TranslateIcon from '@mui/icons-material/Translate';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -364,6 +365,17 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                                     </TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                            {canEdit && row.code !== 'en' && (
+                                                <Tooltip title={tSystem('editTranslations')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{ color: '#64748b' }}
+                                                        onClick={() => router.visit(`/system/locales/${row.id}/translations`)}
+                                                    >
+                                                        <EditNoteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
                                             {canEdit && (
                                                 <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => router.visit(`/system/locales/${row.id}/edit`)}>
                                                     <EditIcon fontSize="small" />

@@ -115,12 +115,22 @@ class UserController extends Controller
 
     private function transformUserSummary(User $user): array
     {
-        return [
+        return array_merge([
             'id' => $user->id,
             'username' => $user->username,
             'name' => $user->name,
             'email' => $user->email,
             'enabled' => $user->enabled,
+        ], $this->permissionsPayload($user));
+    }
+
+    /**
+     * Roles/groups a user has, each with the permissions they grant, plus a
+     * flattened "resource.action" list of everything the user can do.
+     */
+    private function permissionsPayload(User $user): array
+    {
+        return [
             'roles' => $user->roles->map(fn (Role $role) => $this->mapRoleSummary($role))->values(),
             'groups' => $user->groups->map(fn (UserGroup $group) => [
                 'id' => $group->id,
@@ -151,7 +161,7 @@ class UserController extends Controller
     {
         $this->authorizeUserAccess($request, $user);
 
-        $user->load(['groups:id,name', 'roles:id,label']);
+        $user->load($this->summaryRelations());
 
         return Inertia::render('system/user/edit', [
             'user' => [
@@ -182,7 +192,46 @@ class UserController extends Controller
             'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'canManageAccess' => $request->user()->hasPermission('users', 'edit_users'),
+            'permissions' => $this->permissionsPayload($user),
         ]);
+    }
+
+    /**
+     * Full activity timeline for this user: profile changes, group/role
+     * assignments, password resets, and login/logout events - anything
+     * audited against the user record, newest first.
+     */
+    public function history(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeUserAccess($request, $user);
+
+        $logs = AuditLog::where('auditable_type', $user->getMorphClass())
+            ->where('auditable_id', $user->getKey())
+            ->orderByDesc('created_at')
+            ->with('user:id,first_name,last_name,email')
+            ->get();
+
+        return response()->json([
+            'timeline' => $logs->map(fn (AuditLog $log) => [
+                'event' => $log->event,
+                'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                'actor' => $log->user ? ($log->user->name ?: $log->user->email) : 'System',
+                'diff' => $this->diffFor($log),
+            ])->values(),
+        ]);
+    }
+
+    private function diffFor(AuditLog $log): array
+    {
+        $old = $log->old_values ?? [];
+        $new = $log->new_values ?? [];
+        $keys = array_unique(array_merge(array_keys($old), array_keys($new)));
+
+        return collect($keys)->map(fn ($key) => [
+            'key' => $key,
+            'old' => $old[$key] ?? null,
+            'new' => $new[$key] ?? null,
+        ])->values()->all();
     }
 
     public function update(UpdateUserRequest $request, User $user): RedirectResponse

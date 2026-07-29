@@ -12,6 +12,8 @@ import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearanc
 import { useSyncI18nLanguage } from './hooks/use-locale';
 // import { LocaleProvider } from './hooks/use-locale';
 import { getTheme } from './theme';
+import { useTheme } from '@emotion/react';
+import { PALETTE } from '@/theme';
 
 declare global {
     const route: typeof routeFn;
@@ -59,6 +61,6 @@ createInertiaApp({
         );
     },
     progress: {
-        color: '#06B6D4', // Data Cyan — matches theme.ts accent
+        color: PALETTE.accent, // Use PALETTE.accent from theme.ts
     },
 });
