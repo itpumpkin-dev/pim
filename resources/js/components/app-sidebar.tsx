@@ -207,6 +207,7 @@ export function AppSidebar() {
                         width,
                         boxSizing: 'border-box',
                         overflowX: 'hidden',
+                        boxShadow: '4px 0 8px rgba(0, 0, 0, 0.15)',
                         transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
                     },
                 }}

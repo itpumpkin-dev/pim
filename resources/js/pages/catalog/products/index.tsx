@@ -102,6 +102,52 @@ function formatAttributeCellValue(value: unknown): string {
     return String(value);
 }
 
+function AttributeThumbnail({ src, alt }: { src: string; alt: string }) {
+    return (
+        <Box
+            sx={{
+                width: 38,
+                height: 38,
+                bgcolor: '#f5f3ff',
+                borderRadius: 2,
+                border: '1px solid #ede9fe',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+                flexShrink: 0,
+            }}
+        >
+            <Box component="img" src={src} alt={alt} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </Box>
+    );
+}
+
+function renderAttributeCellValue(attrType: string, value: unknown, alt: string): ReactNode {
+    if (attrType === 'image') {
+        return typeof value === 'string' && value ? (
+            <AttributeThumbnail src={value} alt={alt} />
+        ) : (
+            <Typography variant="body2" color="text.disabled">-</Typography>
+        );
+    }
+
+    if (attrType === 'gallery') {
+        const urls = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+        if (urls.length === 0) return <Typography variant="body2" color="text.disabled">-</Typography>;
+        return (
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+                <AttributeThumbnail src={urls[0]} alt={alt} />
+                {urls.length > 1 && (
+                    <Typography variant="caption" color="text.secondary">+{urls.length - 1}</Typography>
+                )}
+            </Stack>
+        );
+    }
+
+    return formatAttributeCellValue(value);
+}
+
 interface ColumnDef {
     key: string;
     label: string;
@@ -213,7 +259,7 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
             .map((attr) => ({
                 key: `attr_${attr.id}`,
                 label: attr.label,
-                render: (row) => formatAttributeCellValue(row.attribute_values?.[attr.id]),
+                render: (row) => renderAttributeCellValue(attr.type, row.attribute_values?.[attr.id], row.name || row.sku),
             }));
 
         return [...systemColumns, ...attributeColumns];
