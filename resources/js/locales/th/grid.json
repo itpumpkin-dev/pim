@@ -16,7 +16,7 @@
         "firstName": "ชื่อจริง",
         "lastName": "นามสกุล",
         "displayName": "ชื่อที่แสดง",
-        "sku": "ขนาด SKU"
+        "sku": "SKU"
     },
     "rowActions": {
         "edit": "แก้ไข",

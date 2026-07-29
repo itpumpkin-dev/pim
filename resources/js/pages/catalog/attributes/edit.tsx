@@ -10,11 +10,18 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+const swatchTypeKeys: Record<string, string> = {
+    text: 'swatchTypeText',
+    color: 'swatchTypeColor',
+    image: 'swatchTypeImage',
+};
+
 interface Attribute {
     id: number;
     code: string;
     name: string;
     type: string;
+    swatch_type: string | null;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -26,6 +33,7 @@ interface Attribute {
 interface AttributeForm {
     code: string;
     type: string;
+    swatch_type: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -68,9 +76,15 @@ export default function AttributeEdit({ attribute, translations, canViewHistory 
         { value: 'checkbox', label: t('attrTypeCheckbox') },
     ];
 
+    const swatchTypes = Object.entries(swatchTypeKeys).map(([value, key]) => ({
+        value,
+        label: t(key),
+    }));
+
     const { data, setData, put, processing, errors } = useForm<AttributeForm>({
         code: attribute.code || '',
         type: attribute.type || 'text',
+        swatch_type: attribute.swatch_type || '',
         is_required: Boolean(attribute.is_required),
         is_unique: Boolean(attribute.is_unique),
         is_locale_based: Boolean(attribute.is_locale_based),
@@ -79,6 +93,15 @@ export default function AttributeEdit({ attribute, translations, canViewHistory 
         is_filterable: Boolean(attribute.is_filterable),
         translations: translations || {},
     });
+
+    const showSwatchType = data.type === 'select' || data.type === 'multiselect';
+
+    const handleTypeChange = (value: string) => {
+        setData('type', value);
+        if (value !== 'select' && value !== 'multiselect') {
+            setData('swatch_type', '');
+        }
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -137,11 +160,20 @@ export default function AttributeEdit({ attribute, translations, canViewHistory 
                             />
                             <FormControl fullWidth required error={Boolean(errors.type)}>
                                 <InputLabel id="attribute-type-label">{t('typeLabel')}</InputLabel>
-                                <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => setData('type', event.target.value)}>
+                                <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>
                                     {attributeTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                                 </Select>
                                 {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
                             </FormControl>
+                            {showSwatchType && (
+                                <FormControl fullWidth required error={Boolean(errors.swatch_type)}>
+                                    <InputLabel id="attribute-swatch-type-label">{t('swatchTypeLabel')}</InputLabel>
+                                    <Select labelId="attribute-swatch-type-label" label={t('swatchTypeLabel')} value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
+                                        {swatchTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                                    </Select>
+                                    {errors.swatch_type && <FormHelperText>{errors.swatch_type}</FormHelperText>}
+                                </FormControl>
+                            )}
                         </Stack>
                     </Paper>
 

@@ -84,7 +84,7 @@ class AttributeController extends Controller
     {
         return Inertia::render('catalog/attributes/edit', [
             'attribute' => $attribute->only([
-                'id', 'code', 'name', 'type', 'is_required', 'is_unique',
+                'id', 'code', 'name', 'type', 'swatch_type', 'is_required', 'is_unique',
                 'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable',
             ]),
             'translations' => $attribute->translations()->get()
@@ -104,6 +104,7 @@ class AttributeController extends Controller
             'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attributes,code'],
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
+            'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],
@@ -145,6 +146,7 @@ class AttributeController extends Controller
             'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attributes,code,'.$attribute->id],
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
+            'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],

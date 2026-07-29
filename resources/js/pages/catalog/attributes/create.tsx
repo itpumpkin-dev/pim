@@ -23,9 +23,16 @@ const attributeTypeKeys: Record<string, string> = {
     checkbox: 'attrTypeCheckbox',
 };
 
+const swatchTypeKeys: Record<string, string> = {
+    text: 'swatchTypeText',
+    color: 'swatchTypeColor',
+    image: 'swatchTypeImage',
+};
+
 interface AttributeForm {
     code: string;
     type: string;
+    swatch_type: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -51,9 +58,15 @@ export default function AttributeCreate() {
         label: t(key),
     }));
 
+    const swatchTypes = Object.entries(swatchTypeKeys).map(([value, key]) => ({
+        value,
+        label: t(key),
+    }));
+
     const { data, setData, post, processing, errors } = useForm<AttributeForm>({
         code: '',
         type: 'text',
+        swatch_type: '',
         is_required: false,
         is_unique: false,
         is_locale_based: false,
@@ -62,6 +75,15 @@ export default function AttributeCreate() {
         is_filterable: false,
         translations: {},
     });
+
+    const showSwatchType = data.type === 'select' || data.type === 'multiselect';
+
+    const handleTypeChange = (value: string) => {
+        setData('type', value);
+        if (value !== 'select' && value !== 'multiselect') {
+            setData('swatch_type', '');
+        }
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -105,11 +127,20 @@ export default function AttributeCreate() {
                             />
                             <FormControl fullWidth required error={Boolean(errors.type)}>
                                 <InputLabel id="attribute-type-label">{t('typeLabel')}</InputLabel>
-                                <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => setData('type', event.target.value)}>
+                                <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>
                                     {attributeTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                                 </Select>
                                 {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
                             </FormControl>
+                            {showSwatchType && (
+                                <FormControl fullWidth required error={Boolean(errors.swatch_type)}>
+                                    <InputLabel id="attribute-swatch-type-label">{t('swatchTypeLabel')}</InputLabel>
+                                    <Select labelId="attribute-swatch-type-label" label={t('swatchTypeLabel')} value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
+                                        {swatchTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                                    </Select>
+                                    {errors.swatch_type && <FormHelperText>{errors.swatch_type}</FormHelperText>}
+                                </FormControl>
+                            )}
                         </Stack>
                     </Paper>
 
