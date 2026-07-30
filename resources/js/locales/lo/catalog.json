@@ -1,6 +1,7 @@
 {
     "products": "Products",
     "quickExport": "Quick Export",
+    "download": "Download",
     "createProduct": "Create Product",
     "search": "Search",
     "results": "{{count}} Results",

@@ -1,6 +1,7 @@
 {
     "products": "Productos",
     "quickExport": "Exportación rápida",
+    "download": "Descargar",
     "createProduct": "Crear Producto",
     "search": "Buscar",
     "results": "{{count}} Resultados",

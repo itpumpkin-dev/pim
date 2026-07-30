@@ -13,13 +13,17 @@ use App\Models\FamilyAttribute;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Services\GridManager;
+use App\Services\ImportExport\Importers\ProductRowImporter;
+use App\Services\ImportExport\SpreadsheetWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ProductController extends Controller
 {
@@ -142,6 +146,67 @@ class ProductController extends Controller
             'total_products' => $products->count(),
             'products' => $data,
         ]);
+    }
+
+    /**
+     * Synchronous "quick export" for the product grid — downloads immediately
+     * instead of going through the export-config/job-tracker workflow. Exports
+     * the selected rows if any are checked, otherwise the current search filter.
+     */
+    public function quickExport(Request $request): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'format' => ['required', 'in:csv,xls,xlsx'],
+            'ids' => ['nullable', 'array'],
+            'ids.*' => ['integer'],
+            'search' => ['nullable', 'string'],
+        ]);
+
+        $format = $validated['format'];
+        $ids = $validated['ids'] ?? [];
+
+        $columns = (new ProductRowImporter())->columns();
+        $attributeCodes = array_slice($columns, 4);
+        $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
+
+        $query = Product::with('family')->orderBy('id');
+        if (!empty($ids)) {
+            $query->whereIn('id', $ids);
+        } elseif (!empty($validated['search'])) {
+            $query->where('sku', 'like', '%'.$validated['search'].'%');
+        }
+
+        $rows = (function () use ($query, $attributesByCode) {
+            foreach ($query->cursor() as $product) {
+                $values = ProductValue::where('product_id', $product->id)
+                    ->whereNull('channel_id')
+                    ->whereNull('locale_id')
+                    ->pluck('value', 'attribute_id');
+
+                $row = [
+                    'sku' => $product->sku,
+                    'family_code' => $product->family?->code ?? '',
+                    'type' => $product->type,
+                    'enabled' => $product->enabled ? '1' : '0',
+                ];
+
+                foreach ($attributesByCode as $code => $attribute) {
+                    $row[$code] = $values->get($attribute->id, '');
+                }
+
+                yield $row;
+            }
+        })();
+
+        Storage::disk('local')->makeDirectory('tmp-exports');
+        $tempRelativePath = 'tmp-exports/'.Str::uuid().'.'.$format;
+        $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
+
+        SpreadsheetWriter::write($tempAbsolutePath, $format, $columns, $rows, ',');
+
+        $downloadName = 'products_'.now()->format('Ymd_His').'.'.$format;
+
+        return response()->download($tempAbsolutePath, $downloadName)->deleteFileAfterSend(true);
     }
 
     private function formatAttributeValue(Attribute $attribute, ?string $rawValue): mixed

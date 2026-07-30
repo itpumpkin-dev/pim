@@ -1,6 +1,7 @@
 {
     "products": "商品",
     "quickExport": "急速エクスポート",
+    "download": "ダウンロード",
     "createProduct": "製品作成",
     "search": "検索",
     "results": "{{count}}件数",

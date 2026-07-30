@@ -1,6 +1,7 @@
 {
     "products": "产品",
     "quickExport": "快速导出",
+    "download": "下载",
     "createProduct": "创建产品",
     "search": "搜索",
     "results": "{{count}} 结果",

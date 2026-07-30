@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function () {
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
+    Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');

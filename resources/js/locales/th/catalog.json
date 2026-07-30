@@ -1,6 +1,7 @@
 {
     "products": "สินค้า",
     "quickExport": "ส่งออกด่วน",
+    "download": "ดาวน์โหลด",
     "createProduct": "สร้างสินค้า",
     "search": "ค้นหา",
     "results": "{{count}} รายการ",

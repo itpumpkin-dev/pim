@@ -14,7 +14,9 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import CloseIcon from '@mui/icons-material/Close';
 import {
+    Autocomplete,
     Box,
     Button,
     Checkbox,
@@ -24,6 +26,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -174,6 +177,8 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
+    const [quickExportOpen, setQuickExportOpen] = useState(false);
+    const [exportFormat, setExportFormat] = useState<'CSV' | 'XLS' | 'XLSX'>('CSV');
     const firstRender = useRef(true);
 
     const allColumns: ColumnDef[] = useMemo(() => {
@@ -332,6 +337,18 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
         }
     };
 
+    const handleQuickExport = () => {
+        const params = new URLSearchParams();
+        params.set('format', exportFormat.toLowerCase());
+        if (selectedIds.length > 0) {
+            selectedIds.forEach((id) => params.append('ids[]', String(id)));
+        } else if (search) {
+            params.set('search', search);
+        }
+        window.location.href = `/catalog/products/quick-export?${params.toString()}`;
+        setQuickExportOpen(false);
+    };
+
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
 
@@ -349,6 +366,7 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                         <Button
                             variant="text"
                             startIcon={<FileUploadOutlinedIcon />}
+                            onClick={() => setQuickExportOpen(true)}
                             sx={{
                                 color: 'primary.main',
                                 textTransform: 'none',
@@ -543,6 +561,37 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                     </Table>
                 </TableContainer>
             </Box>
+
+            {/* Quick Export Dialog */}
+            <Dialog open={quickExportOpen} onClose={() => setQuickExportOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
+                    {t('download')}
+                    <IconButton size="small" onClick={() => setQuickExportOpen(false)}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <Divider />
+                <DialogContent sx={{ pt: 3 }}>
+                    <Autocomplete
+                        disableClearable
+                        options={['CSV', 'XLS', 'XLSX'] as const}
+                        value={exportFormat}
+                        onChange={(_e, value) => value && setExportFormat(value)}
+                        renderInput={(params) => (
+                            <TextField {...params} label={t('selectOption')} size="small" />
+                        )}
+                    />
+                </DialogContent>
+                <Divider />
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={() => setQuickExportOpen(false)} color="inherit" sx={{ textTransform: 'none' }}>
+                        {t('cancel')}
+                    </Button>
+                    <Button onClick={handleQuickExport} variant="contained" sx={{ textTransform: 'none', fontWeight: 700, px: 3 }}>
+                        {t('download')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <ManageColumnsDialog
                 open={columnsDialogOpen}
