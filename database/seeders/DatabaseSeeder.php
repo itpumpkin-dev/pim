@@ -18,6 +18,13 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         $this->call(LocaleSeeder::class);
+        $this->call(AssociationTypeSeeder::class);
+        $this->call(ChannelSeeder::class);
+        $this->call(CategoryTaxonomySeeder::class);
+        $this->call(AttributeCatalogSeeder::class);
+        $this->call(AttributeGroupSeeder::class);
+        $this->call(AttributeFamilySeeder::class);
+        $this->call(ProductCatalogSeeder::class);
 
         $admin = Role::firstOrCreate(['label' => 'Administrator']);
 

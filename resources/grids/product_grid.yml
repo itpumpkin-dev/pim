@@ -8,18 +8,26 @@ datagrid:
         label: SKU
         type: string
         sortable: true
+        filterable: true
       type:
         label: Type
         type: string
         sortable: true
+        filterable: true
       enabled:
         label: Status
         type: boolean
         sortable: true
+        filterable: true
       created_at:
         label: Created At
         type: datetime
         sortable: true
+        filterable: true
+      family_id:
+        label: Attribute Family
+        type: select
+        filterable: true
     filters:
       global:
         type: string

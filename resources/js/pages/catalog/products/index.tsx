@@ -45,11 +45,18 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
+import {
+    ProductFilterDrawer,
+    type AttributeFilterRow,
+    type ProductFamilyOption,
+    type ProductFilters,
+} from '@/components/product-filter-drawer';
 
 interface GridColumn {
     label: string;
     type: string;
     sortable?: boolean;
+    filterable?: boolean;
 }
 interface GridAction {
     icon: string;
@@ -87,12 +94,14 @@ interface AttributeMeta {
     code: string;
     label: string;
     type: string;
+    is_filterable?: boolean;
 }
 interface Props {
     gridConfig: GridConfig;
     gridData: GridData;
-    filters: { search?: string; sort?: string; dir?: string };
+    filters: { search?: string; sort?: string; dir?: string; filters?: ProductFilters; attribute_filters?: AttributeFilterRow[] };
     attributes: AttributeMeta[];
+    families: ProductFamilyOption[];
 }
 
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
@@ -158,7 +167,7 @@ interface ColumnDef {
     headerRender?: () => ReactNode;
 }
 
-export default function ProductIndex({ gridData, filters, attributes }: Props) {
+export default function ProductIndex({ gridData, filters, attributes, families }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { auth } = usePage<SharedData>().props;
@@ -173,11 +182,14 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
     const canDelete = permissions.includes('products.delete_products') || true;
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [perPage, setPerPage] = useState<number>(10);
+    const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
     const [quickExportOpen, setQuickExportOpen] = useState(false);
+    const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
+    const [activeAttributeFilters, setActiveAttributeFilters] = useState<AttributeFilterRow[]>(filters.attribute_filters ?? []);
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const [exportFormat, setExportFormat] = useState<'CSV' | 'XLS' | 'XLSX'>('CSV');
     const firstRender = useRef(true);
 
@@ -315,11 +327,42 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/products', { search }, { preserveState: true, replace: true });
+            router.get(
+                '/catalog/products',
+                { search, filters: activeFilters, attribute_filters: activeAttributeFilters },
+                { preserveState: true, replace: true },
+            );
         }, 300);
 
         return () => clearTimeout(timeout);
     }, [search]);
+
+    const goToPage = (page: number) => {
+        router.get(
+            '/catalog/products',
+            { search, page, per_page: perPage, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { preserveState: true },
+        );
+    };
+
+    const handlePerPageChange = (value: number) => {
+        setPerPage(value);
+        router.get(
+            '/catalog/products',
+            { search, page: 1, per_page: value, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { preserveState: true },
+        );
+    };
+
+    const applyFilters = (next: ProductFilters, nextAttributeFilters: AttributeFilterRow[]) => {
+        setActiveFilters(next);
+        setActiveAttributeFilters(nextAttributeFilters);
+        router.get(
+            '/catalog/products',
+            { search, filters: next, attribute_filters: nextAttributeFilters },
+            { preserveState: true },
+        );
+    };
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
@@ -443,6 +486,7 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                         <Button
                             variant="outlined"
                             startIcon={<FilterListIcon />}
+                            onClick={() => setFilterDrawerOpen(true)}
                             sx={{
                                 color: '#64748b',
                                 borderColor: '#cbd5e1',
@@ -452,11 +496,13 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                             }}
                         >
                             {t('filter')}
+                            {Object.keys(activeFilters).length + activeAttributeFilters.length > 0 &&
+                                ` (${Object.keys(activeFilters).length + activeAttributeFilters.length})`}
                         </Button>
 
                         <Select
                             value={perPage}
-                            onChange={(e) => setPerPage(Number(e.target.value))}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
                             size="small"
                             sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 60, height: 36 }}
                         >
@@ -478,16 +524,16 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1}>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
                                 <FirstPageIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1}>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
                                 <ChevronLeftIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
                                 <ChevronRightIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
                                 <LastPageIcon fontSize="small" />
                             </IconButton>
                         </Stack>
@@ -628,6 +674,15 @@ export default function ProductIndex({ gridData, filters, attributes }: Props) {
                     </Button>
                 </DialogActions>
             </Dialog>
+            <ProductFilterDrawer
+                open={filterDrawerOpen}
+                onClose={() => setFilterDrawerOpen(false)}
+                families={families}
+                attributes={attributes}
+                filters={activeFilters}
+                attributeFilters={activeAttributeFilters}
+                onApply={applyFilters}
+            />
         </AppLayout>
     );
 }

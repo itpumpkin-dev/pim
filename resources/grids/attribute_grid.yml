@@ -8,34 +8,42 @@ datagrid:
         label: fields.code
         type: string
         sortable: true
+        filterable: true
       name:
         label: fields.name
         type: string
         sortable: true
+        filterable: true
       type:
         label: fields.type
         type: string
         sortable: true
+        filterable: true
       is_required:
         label: fields.required
         type: boolean
         sortable: true
+        filterable: true
       is_unique:
         label: fields.unique
         type: boolean
         sortable: true
+        filterable: true
       is_locale_based:
         label: fields.localeBased
         type: boolean
         sortable: true
+        filterable: true
       is_channel_based:
         label: fields.channelBased
         type: boolean
         sortable: true
+        filterable: true
       created_at:
         label: fields.createdAt
         type: datetime
         sortable: true
+        filterable: true
     filters:
       global:
         type: string

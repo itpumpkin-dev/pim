@@ -9,10 +9,12 @@ import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
+import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 
 interface CategoryFieldItem {
     id: number;
@@ -35,10 +37,11 @@ interface PaginatedData<T> {
 
 interface Props {
     fields: PaginatedData<CategoryFieldItem>;
-    filters: { search?: string };
+    filters: { search?: string; filters?: Record<string, FilterValue> };
+    filterColumns: Record<string, GridColumn>;
 }
 
-export default function CategoryFieldIndex({ fields, filters }: Props) {
+export default function CategoryFieldIndex({ fields, filters, filterColumns }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tGrid } = useTranslation('grid');
     const { t: tNav } = useTranslation('nav');
@@ -58,6 +61,8 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(fields.per_page ?? 15);
     const [deleteFieldId, setDeleteFieldId] = useState<number | null>(null);
+    const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -67,7 +72,7 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categoryFields', { search, per_page: perPage }, { preserveState: true, replace: true });
+            router.get('/catalog/categoryFields', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -77,12 +82,17 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
     const lastPage = fields.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/categoryFields', { search, page, per_page: perPage }, { preserveState: true });
+        router.get('/catalog/categoryFields', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/categoryFields', { search, page: 1, per_page: value }, { preserveState: true });
+        router.get('/catalog/categoryFields', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true });
+    };
+
+    const applyFilters = (next: Record<string, FilterValue>) => {
+        setActiveFilters(next);
+        router.get('/catalog/categoryFields', { search, per_page: perPage, filters: next }, { preserveState: true });
     };
 
     const getFieldLabel = (item: CategoryFieldItem) => {
@@ -116,20 +126,26 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
                 </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                    <TextField
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Search fields..."
-                        size="small"
-                        sx={{ minWidth: 280 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <TextField
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Search fields..."
+                            size="small"
+                            sx={{ minWidth: 280 }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
+                            {tGrid('filter')}
+                            {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                        </Button>
+                    </Stack>
 
                     <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Select
@@ -274,6 +290,14 @@ export default function CategoryFieldIndex({ fields, filters }: Props) {
                     </Button>
                 </DialogActions>
             </Dialog>
+            <GridFilterDrawer
+                open={filterDrawerOpen}
+                onClose={() => setFilterDrawerOpen(false)}
+                columns={filterColumns}
+                value={activeFilters}
+                onApply={applyFilters}
+                t={t}
+            />
         </AppLayout>
     );
 }

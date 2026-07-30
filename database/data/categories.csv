@@ -1,0 +1,20 @@
+pCatID,pCatName,pCatNameENG,pCatStatus
+A,เครื่องมือไฟฟ้า,"Power Tools",Active
+B,อุปกรณ์เสริมเครื่องมือไฟฟ้า,"Cutting Tools & Power Tools Accessories",Active
+C,เครื่องมือสำหรับช่างก่อสร้าง,"Tools for contruction uses",Active
+D,อุปกรณ์ฮาร์ดแวร์และมีดคัตเตอร์,"Cutility knife & Hardware",Active
+E,เครื่องมือสำหรับงานช่างอุตสาหกรรม,"Tools for Industrial uses",Active
+F,เครื่องมือลมและอุปกรณ์เสริม,"Air Tools",Active
+G,อุปกรณ์เพื่อความปลอดภัย,"Safety Equipment",Active
+H,เครื่องมือทำสวน-การเกษตรและเครื่องยนต์,"Garden Tools, Agricultural Equipment & Engines",Active
+I,เคมีภัณฑ์และกาว,"Chemical and Glue",Active
+J,กล่องเคริ่องมือและอุปกรณ์จัดเก็บ,"Tool Boxes & Storage Equipment",Active
+K,เบ็ดเตล็ด,Miscellaneous,Active
+L,ปั๊มน้ำ,"Water Pump",Active
+T,บรรจุภัณฑ์,Packaging,Active
+U,"Customer Brand","Customer Brand",Active
+V,วัตถุดิบ,Material,Active
+W,พรีเมี่ยมและของแถม,"Premium product & Free products",Active
+X,หมายเหตุ,Remark,Active
+Y,อื่นๆ,Other,Active
+Z,อะไหล่,"Part of Tools",Active

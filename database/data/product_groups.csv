@@ -1,0 +1,888 @@
+ProductGroupID,ProductGroupName,ProductGroupNameENG,ProductGroupStatus
+A001001,เครื่องฉีดน้ำแรงดันสูง,"High Pressure Washer",Active
+A001002,อุปกรณ์เสริมเครื่องฉีดน้ำแรงดัน,"High-Pressure Washer Accessories",Active
+A002001,เครื่องดูดฝุ่น,"Vacuum Cleaner",Active
+A002002,เครื่องเป่าลม,Blowers,Active
+A002003,เครื่องเป่าลม-ดูดฝุ่น,"Blower - Vacuum",Active
+A002004,เครื่องเป่าลมร้อน,"Hot Air Blower",Active
+A003001,เครื่องเจาะอลูมิเนียมทำรูกุญแจ,"Aluminum Punching Machine",Active
+A003002,เครื่องบากเฟรม,"Frame Machine",Active
+A003003,เครื่องปั๊มรูบานเลื่อน,"Pneum Pump",Active
+A003004,โต๊ะเจาะอลูมิเนียม,"Aluminum Drilling Table",Active
+A003005,โต๊ะตัดกรอบมุ้งลวดอลูมิเนียม,"Aluminum Frame Window Frame",Active
+A003006,โต๊ะตัดอลูมิเนียม,"Aluminum Cutting Table",Active
+A004001,เครื่องจี้ปูน,"Tilting Machine",Active
+A004002,เครื่องเซาะร่องปูน,"Grooving Machine",Active
+A004003,เครื่องตัดหิน,"Stone Cutting Machine",Active
+A004004,เครื่องยิงตะปูไฟฟ้า,"Electric Nail Gun",Active
+A004005,สว่านแท่นเจาะคอย์ลิ่ง,"Drilling Rig",Active
+A004006,สายจี้ปูน,Pendant,Active
+A004007,เครื่องดูด-สั่นกระเบื้อง,"TILE VIBRATOR",Active
+A004008,อุปกรณ์เสริมเครื่องมืองานก่อสร้าง,"Construction Tool Accessories",Active
+A005001,"เครื่องเจียร / เครื่องขัด","Grinding / Polishing Machine",Active
+A006001,"เครื่องขัดไม้ 20 โวลต์","20V Cordless Sander",Active
+A006002,เครื่องเซาะร่องไม้,"Grooving Machine",Active
+A006003,เครื่องเลื่อยไม้,"Sawing Machine",Active
+A006004,เครื่องเลื่อยองศา,"Sawing Machine",Active
+A006005,เครื่องไสไม้,Planer,Active
+A006006,มีดกรีดยางไฟฟ้า,"Electric Rubber Tapping Knife",Active
+A007001,เครื่องเชื่อม,"Welding Equipment",Active
+A007002,เครื่องดัดเหล็ก,"Bending Machine",Active
+A007003,เครื่องตัดเหล็ก,"Steel Cutter",Active
+A007004,เครื่องลบมุมเหล็ก,"Steel Angle Grinder",Active
+A007005,แท่นตัดเหล็ก,"Steel Cutter",Active
+A007006,สว่านแท่นแม่เหล็ก,"Magnetic Drill",Active
+A008001,เครื่องผสมสี,Mixer,Active
+A008002,เครื่องพ่นสี,Sprayer,Active
+A009001,ปั้มน้ำหอยโข่ง,"Water Pump",Active
+A010001,สว่านกระแทก,"Impact Drill",Active
+A010002,สว่านไฟฟ้า,"Electric Drill",Active
+A011001,สว่านโรตารี่-สกัด,"Rotary Hammer",Active
+A011002,สว่านสกัด,"Drill Bit",Active
+A011003,หัวจับดอกสว่านโรตารี่,"Rotary Hammer",Active
+A012001,"สว่านกระแทกไร้สาย 16 โวลต์","16V Cordless Impact Drill",Active
+A012002,"อุปกรณ์ชาร์จ 20 โวลต์","20V Charger",Active
+A012003,"สว่านไร้สาย 12 โวลต์","12V Cordless Drill",Active
+A012004,"สว่านไร้สาย 20 โวลต์","20V Cordless Drill",Active
+A012005,"สว่านกระแทกไร้สาย 16 โวลต์","16V Cordless Impact Drill",Active
+A012006,"สว่านกระแทกไร้สาย 20 โวลต์","20V Cordless Impact Drill",Active
+A012007,"ไขควงไร้สาย 4 โวลต์","4V Cordless Screwdriver",Active
+A013001,แท่นตัดหินอ่อน/แท่นตัดกระเบื้อง,"Mable and Tile cutter",Active
+A014001,พัดลม,Fan,Active
+A015001,"ไฟฉาย / ไฟสปอร์ตไลท์ / ไฟLED / โคมไฟ","Flashlight / Spotlight / LED light / Lamp",Active
+A016001,เครื่องกำเนิดไฟฟ้า,Generator,Active
+A017001,กรรไกรตัดกิ่งไร้สาย,"Cordless Pruning Shear",Active
+A017002,เลื่อยโซ่ไร้สาย,"Cordless Chainsaw",Active
+A018001,ประแจด้ามฟรีไร้สาย,"Cordless Ratchet Wrench",Active
+A018002,บล็อกกระแทกมุมฉากไร้สาย,"Cordless ANGLE IMPACT WRENCH",Active
+A019001,บล็อกกระแทกไร้สาย,"Cordless Impact Wrench",Active
+A020001,"แบตเตอรี่ 12 โวลต์","12V Battery",Active
+A020002,"อุปกรณ์ชาร์จ 12 โวลต์","12V Charger",Active
+A020003,"แบตเตอรี่ 16 โวลต์","16V Battery",Active
+A020004,"อุปกรณ์ชาร์จ 16 โวลต์","16V Charger",Active
+A020005,"แบตเตอรี่ 20 โวลต์","20V Battery",Active
+A020006,"อุปกรณ์ชาร์จ 20 โวลต์","20V Charger",Active
+A020007,"อุปกรณ์ชาร์จ 4 โวลต์","4V Charger",Active
+A020008,"แบตเตอรี่และอุปกรณ์ชาร์จ 20 โวลต์","20V Batteries & Chargers",Active
+A021001,อุปกรณ์เสริมเครื่องฉีดน้ำแรงดัน,"Accessories for Pressure Washers",Active
+A021002,หัวสว่าน,"Drill Bits",Active
+A022001,เครื่องขัดหน้าปูนฉาบ,"Plaster Sander",Active
+A023001,"เครื่องยิงตะปูไฟฟ้าไร้สาย 20  โวลต์","20V Cordless Electric Nail Gun",Active
+A023002,"เครื่องดูด-สั่นกระเบื้องไร้สาย 16.8 โวลต์","16.8V Cordless Tile Vibrator with Vacuum",Active
+A023003,"เครื่องยิงรีเวทไร้สาย 20  โวลต์","20V Cordless Rivet Gun",Active
+A023004,"เครื่องดูด-สั่นกระเบื้องไร้สาย 4 โวลต์","4V Cordless Tile Vibrator with Vacuum",Active
+A023005,"เครื่องดูด-สั่นกระเบื้องไร้สาย 12 โวลต์","12V Cordless Tile Vibrator with Vacuum",Active
+A023006,"เครื่องดูด-สั่นกระเบื้องไร้สาย 20 โวลต์","20V Cordless Tile Vibrator with Vacuum",Active
+A023007,"เครื่องยิงตะปูคอนกรีตไร้สาย20 โวลต์","20V Cordless Concrete Nailer",Active
+A024001,"เครื่องมือไร้สายงานสวน 20 โวลต์","20V Cordless Garden Tools",Active
+A024002,"เครื่องขัดอเนกประสงค์ไร้สาย 4 โวลต์","4V Cordless Multi Sander",Active
+A024003,"เครื่องมือไร้สายงานสวน 20 โวลต์","20V Cordless Garden Tools",Active
+A024004,เครื่องขัดไม้,"Wood Sander",Active
+A024006,"ไขควงกระแทกไร้สาย 20 โวลต์","20V Cordless Impact Driver",Active
+A024007,"สว่านโรตารี่ /เจียรมือ/ สว่านกระแทกไร้สาย 20 โวลต์","20V Cordless Rotary Hammer / Angle Grinder / Impact Drill",Active
+A024008,"สว่านโรตารี่/เจียรมือ/สว่านกระแทก/ไขควงกระแทกไร้สาย 20 โวลต์","20V Cordless Rotary Hammer / Angle Grinder / Impact Drill / Impact Driver",Active
+A024009,"สว่านโรตารี่-เจียรมือไร้สาย 20 โวลต์","20V Cordless Rotary Hammer & Angle Grinder",Active
+A024010,"สว่านโรตารี่-เจียรมือ-สว่านกระแทกไร้สาย 20 โวลต์","20V Cordless Rotary Hammer / Angle Grinder / Impact Drill",Active
+A024011,สว่านไร้สาย,"Cordless Drill",Active
+A024012,"สว่านกระแทก-เจียรมือไร้สาย 20 โวลต์","20V Cordless Impact Drill & Angle Grinder",Active
+A024013,"สว่านกระแทก-ไขควงกระแทกไร้สาย 20 โวลต์","20V Cordless Impact Drill & Impact Driver",Active
+A025001,"สว่านโรตารี่-สกัดไร้สาย 20 โวลต์","20V Cordless Rotary Hammer Drill",Active
+A026001,"บล็อกกระแทกไร้สาย 20 โวลต์","20V Cordless Impact Wrench",Active
+A026002,"เครื่องสูบลมยางไร้สาย 20 โวลต์","20V Cordless Tire Inflator",Active
+A026003,"ประแจบล็อกไร้สาย 20 โวลต์","20V Cordless Socket Wrench",Active
+A026004,"บล็อกกระแทกมุมฉากไร้สาย 20 โวลต์","20V Cordless Right Angle Impact Wrench",Active
+A027001,"เครื่องเจียร / เครื่องขัด ไร้สาย 20 โวลต์","20V Cordless Angle Grinder / Polisher",Active
+A028001,"สว่านกระแทก-ไขควงไร้สาย 20 โวลต์","20V Cordless Impact Drill Driver",Active
+A029001,"เครื่องเลื่อยไม้ไร้สาย 12 โวลต์","12V Cordless Wood Saw",Active
+A029002,"เครื่องเลื่อยไม้ไร้สาย 20 โวลต์","20V Cordless Wood Saw",Active
+A029003,"เครื่องเซาะร่องไม้ไร้สาย 20 โวลต์","20V Cordless Wood Router",Active
+A029004,"เครื่องไสไม้ไร้สาย 20 โวลต์","20V Cordless Planer",Active
+A029005,"เครื่องขัดไม้ไร้สาย 20 โวลต์","20V Cordless Wood Sander",Active
+A030001,"เครื่องฉีดน้ำแรงดันสูง-ไร้สาย 20  โวลต์","20V Cordless Pressure Washer",Active
+A031001,"เครื่องดูดฝุ่น-ไร้สาย 20  โวลต์","20V Cordless Vacuum Cleaner",Active
+A031002,"เครื่องเป่าลม-ไร้สาย 20  โวลต์","20V Cordless Air Blower",Active
+A031003,"เครื่องดูดฝุ่น-ไร้สาย 20  โวลต์","20V Cordless Vacuum Cleaner",Active
+A031004,"เครื่องเป่าลมร้อน-ไร้สาย 20  โวลต์","20V Cordless Heat Gun",Active
+A031005,"เครื่องเป่าลม-ดูดฝุ่นไร้สาย 20  โวลต์","20V Cordless Blower & Vacuum",Active
+A032001,"เครื่องพ่นสีไร้สาย 20 โวลต์","20V Cordless Paint Sprayer",Active
+A034001,เครื่องยิงตะปู,"Nail Gun",Active
+A035001,"ลำโพงไร้สาย 20 โวลต์","20V Cordless BT Speaker",Active
+B001001,"ชุดดอกเจียร Netto","Netto Grinder",Active
+B001002,"ชุดดอกเจียร Texas Bull","Texas Buller",Active
+B002001,ข้อต่อหัวสว่าน,"Drill Bit",Active
+B002002,ดอกคัตเตอร์ฟันคาร์ไบด์,"Carbide Cutter",Active
+B002003,ดอกนำศูนย์,"Lead Center",Active
+B003001,ดอกเจาะไม้สี่เหลี่ยม,"Drill Square",Active
+B004001,"ดอกสกัดคอนกรีต Hex แบน","Hex Concrete Block",Active
+B004002,"ดอกสกัดคอนกรีต Hex แหลม","Hex Concrete Cutter",Active
+B004003,"ดอกสกัดคอนกรีต Sds-Max แบน","Sds-Max Flat Concrete Blade",Active
+B004004,"ดอกสกัดคอนกรีต Sds-Max แหลม","Sds-Max Concrete Cutter",Active
+B004005,ดอกสกัดเซาะร่องไร้ฝุ่น,"Dust Extraction Groove.",Active
+B004006,"ดอกสกัดโรตารี่ แบน","Rotary Cutter",Active
+B004007,"ดอกสกัดโรตารี่ แหลม","Rotary Cutter",Active
+B005001,ดอกสว่านโคบอลต์(มิล),"Cobalt Drill (Mil)",Active
+B005002,ดอกสว่านโคบอลต์(หุน),"Cobalt Drill Bits",Active
+B006001,ดอกสว่านเจาะกระจก,"Glass Drill",Active
+B007001,ดอกสว่านเจาะปูนแกนกลม,"Drill Bits",Active
+B007002,"ดอกสว่านโรตารี่ Sds Plus","Rotary Hammer Sds Plus",Active
+B007003,"ดอกสว่านโรตารี่ Sds X","Rotary Hammer Sds X",Active
+B008001,"ดอกสว่านเจาะสแตนเลสกล่องเขียว (หุน)","Stainless Steel Drill (Green)",Active
+B008002,"ดอกสว่านเจาะสแตนเลสกล่องแดง (หุน)","Stainless Steel Drill (Red)",Active
+B008003,"ดอกสว่านเจาะเหล็กกล่องเขียว (มิล)","Steel Drill Hammer (Green)",Active
+B009001,"ดอกสว่านเจาะเหล็กสีดำ (หุน)","Black Drill Hammer",Active
+B010001,ใบเพชรตัดหินอ่อน,"Diamond Cut Diamond Blade",Active
+B011001,ใบมีดกบไฟฟ้า,"Frog Knife",Active
+B012001,ใบมีดตัดหญ้า,Mower,Active
+B012002,"ใบมีดตัดหญ้า 4"" 3รู","4 ""Mower Cutter",Active
+B013001,"ใบเลื่อยจิ๊กซอว์ Rs","Jigsaw Saw Rs Jigsaw",Active
+B013002,"ใบเลื่อยจิ๊กซอว์ ตัดไม้","Saw Blade Jigsaw",Active
+B013003,"ใบเลื่อยจิ๊กซอว์ ตัดเหล็ก","Saw Blade, Steel Cutting Jigsaw",Active
+B014001,ใบเลื่อยวงเดือนตัดไม้,"Saw Blade",Active
+B014002,ใบเลื่อยวงเดือนตัดเหล็ก,"Circular Saw Blades",Active
+B014003,"ใบเลื่อยวงเดือนตัดเหล็ก / สแตนเลส","Circular Saw Blade Cut Steel / Stainless Steel.",Active
+B014004,ใบเลื่อยวงเดือนตัดอลูมิเนียม,"Circular Saw Blade Cutting",Active
+B014005,ใบเลื่อยวงเดือนตัดสแตนเลส,"Saw Blade Aluminium",Active
+B015001,"กระดาษทรายซ้อน หลังแข็ง","Sandpaper Disc, Hard Backing",Active
+B015002,"กระดาษทรายซ้อน หลังอ่อน","Sandpaper Disc, Soft Backing",Active
+B015003,แผ่นเจียรหนา,"Thickness Grinder",Active
+B015004,แผ่นเจียรอ่อน,"Soft Grinding",Active
+B015005,แผ่นตัด,"Cutting Board",Active
+B015006,ถ้วยเพชรขัดพื้น,"Diamond cup wheel",Active
+B016001,กระบอกฉีดน้ำ,"Spray Bottle",Active
+B016002,"ตัวนำร่องเจาะกระเบื้อง Pumpkin","Pumpkin Tile Drill Pilot",Active
+B016003,"โฮลซอเจาะกระเบื้อง 16ถึง85 มม.","Holos Drilling Tile 16 To 85 Mm",Active
+B016004,"โฮลซอเจาะกระเบื้อง 4ถึง12 มม.","Hole Saw Tile 4 To 12 Mm",Active
+B017001,โฮลซอเจาะดาวไลท์,"Holiday Star Hole",Active
+B017002,โฮลซอเจาะไม้,"Hole Drill",Active
+B017003,โฮลซอเจาะลูกบิด,"Hole Drill Knob",Active
+B017004,โฮลซอเจาะสแตนเลส,"Holographic Drilling Stainless Steel",Active
+B017005,โฮลซอเจาะสแตนเลสลึกพิเศษ,"Stainless Steel Special Depth Hole Saw",Active
+B017006,โฮลซอเจาะเหล็ก,"Steel Hole Saw",Active
+B018001,ดอกเจาะขยายรูขั้นบันได,"Step Drill",Active
+B019001,ดอกเจาะไม้ใบพาย,"Flat Wood Drill Bits",Active
+C001001,กรรไกรตัดเหล็กเส้น,"Bolt Cutter",Active
+C001002,กรรไกรตัดเหล็กเส้นมินิ,"Mini Bolt Cutter",Active
+C001003,กรรไกรตัดเหล็กอเนกประสงค์,"Multi-Purpose Snip",Active
+C002001,"กรรไกรตัดท่อ Pvc","Pvc Cutter",Active
+C002002,"ใบมีดกรรไกรตัดท่อ Pvc","Pvc Cutter Shears",Active
+C003001,"เกียงฉาบฝ้า / ปูกระเบื้องยาง","Gypsum Ceiling / Tile",Active
+C003002,เกียงโป้วสี,Rainbow,Active
+C003003,เกียงสามเหลี่ยม,"Triangular Triangle",Active
+C003004,เกียงสี่เหลี่ยม,Squares,Active
+C003005,เกียงหวีสามเหลี่ยม,"Triangular Comb Triangle",Active
+C004001,ขวานด้ามไฟเบอร์,"Fiber Hook",Active
+C004002,ขวานด้ามไม้,"Wooden Handle",Active
+C005001,ค้อนช่างเคาะด้ามไฟเบอร์,"Hammer Knuckle Fiber Holder",Active
+C005002,ค้อนช่างทองด้ามไฟเบอร์,"Hammer Goldsmith",Active
+C005003,ค้อนช่างทองด้ามไม้,"Gold Plated Hammer",Active
+C005004,ค้อนตุ้มหัวกลม,Spoon,Active
+C005005,ค้อนปอนด์,Hammer,Active
+C005006,ค้อนไม้,"Wooden Hammer",Active
+C005007,หัวค้อนปอนด์,Hammer,Active
+C006001,ค้อนหงอนด้ามไฟเบอร์,"Fiber Rope Hammer",Active
+C006002,ค้อนหงอนด้ามไฟเบอร์หุ้มpvc,"Pvc Cradle",Active
+C006003,ค้อนหงอนด้ามไม้,Hammer,Active
+C006004,หัวค้อนหงอน,"Hammer Head",Active
+C007001,คีมคัดคลองเลื่อย,Pliers,Active
+C007002,คีมตัดตะปู,"Nail Cutter",Active
+C007003,คีมผูกลวด,"Wire Ties",Active
+C008001,คีมย้ำ,Pliers,Active
+C008002,ตะปูรีเวท,Steak,Active
+C008003,หัวคีมย้ำ,"Head Pliers",Active
+C009001,"เครื่องตัดหินอ่อน / กระเบื้องไฟฟ้า","Marble Cutter / Electric Tile",Active
+C009002,เครื่องตัดอิฐบล็อค,"Brick Cutter",Active
+C009003,เครื่องมืองานกระเบื้อง,"Tile Tool",Active
+C009004,แท่นตัดกระเบื้อง,"Tile Cutter",Active
+C009005,"แท่นตัดกระเบื้อง Texas Bull","Texas Bull Tile Bullet",Active
+C009006,"แท่นตัดกระเบื้อง แกนh Jh / Ah","Tile Cutter H Jh / Ah",Active
+C009007,"แท่นตัดกระเบื้อง ด้ามโค้ง Jp / Jn","Tile Cutter Jp / Jn",Active
+C009008,"แท่นตัดกระเบื้อง ด้ามตรง Aec","Tile Cutter Straight Aec",Active
+C009009,"แท่นตัดกระเบื้อง ด้ามตรง Ea","Tile Cutter Handle Ea",Active
+C009010,"แท่นตัดกระเบื้อง ด้ามตรง Ex","Ex Tile Cutting Board",Active
+C009011,"แท่นตัดกระเบื้อง ด้ามตรง Mc","Tile Cutter Handle Mc",Active
+C009012,ใบตัดเพชร,"Diamond Cutter",Active
+C009013,ใบมีดแท่นตัดกระเบื้อง,"Tile Cutter",Active
+C009014,อะไหล่แท่นตัดกระเบื้อง,"Tile Cutting Unit",Active
+C010001,ที่ดูดกระจก,"Glass Sucker",Active
+C010002,มีดกรีดกระจก,"Glass Knife",Active
+C011001,เครื่องตรวจสอบวัตถุ,"Object Inspector",Active
+C011002,"เครื่องวัดระดับ / อุปกรณ์เสริม","Level Meter",Active
+C011003,เครื่องวัดระยะ,Gauges,Active
+C011004,ระดับน้ำเลเซอร์,"Laser Water Level",Active
+C012001,ฉากวัดไม้หน้าใหญ่,"Big Wooden Temple",Active
+C012002,ฉากวัดไม้เอนกประสงค์,"Multi-Purpose Wooden Temple",Active
+C012003,ฉากสามเหลี่ยมโบกปูนหลังโค้ง,"Triangle Scene Waving The Curve.",Active
+C012004,ฉากสามเหลี่ยมโบกปูนหลังเหลี่ยม,"Triangle Waving Triangles.",Active
+C013001,"ตลับเมตร Antz-Man",Antz-Man,Active
+C013002,"ตลับเมตร Bb","Bb Meter",Active
+C013003,"ตลับเมตร Cnd","Cnd Meter",Active
+C013004,"ตลับเมตร Da","Da Cartridge",Active
+C013005,"ตลับเมตร E","E Meter Cartridge",Active
+C013006,"ตลับเมตร Eagle One","Eagle One",Active
+C013007,"ตลับเมตร Emperor","Emperor Ink Cartridges",Active
+C013008,"ตลับเมตร Empire","Empire Meter",Active
+C013009,"ตลับเมตร Ironman","Ironman Meter",Active
+C013010,"ตลับเมตร Turbo",Turbo,Active
+C013011,"ตลับเมตร Magic-Grip","Magic-Grip Magnetic Cartridge",Active
+C013012,"ตลับเมตร Mh","Mh Cartridge",Active
+C013013,"ตลับเมตร Nd / Tj / Mt","Measuring Cartridges Nd / Tj / Mt",Active
+C013014,"ตลับเมตร Nt","Nt Meter",Active
+C013015,"ตลับเมตร Ny","Ny Meter",Active
+C013016,"ตลับเมตร Origin","Origin Meter",Active
+C013017,"ตลับเมตร Pc","Pc Meter",Active
+C013018,"ตลับเมตร Pk","Pk Meter",Active
+C013019,"ตลับเมตร Pr","Pr Meter Cartridge",Active
+C013020,"ตลับเมตร R","R Meter",Active
+C013021,"ตลับเมตร S","S Meter",Active
+C013022,"ตลับเมตร Spark","Spark Meter",Active
+C013023,"ตลับเมตร Sq","Sq Meter",Active
+C013024,"ตลับเมตร Texas Bull","Texas Bullet",Active
+C013025,"ตลับเมตร Tr","Tr Meter",Active
+C013026,"ตลับเมตร Ts","Ts Cartridge",Active
+C013027,"ตลับเมตร Tsm","Tsm Meter",Active
+C013028,"ตลับเมตร X",X-Cartridge,Active
+C013029,"ตลับเมตร หมอดู","Proof Meter",Active
+C013030,"ตลับเมตรpumpkin Pro-Assist Pro","Pumpkin Pro-Assist Pro",Active
+C013031,ตลับเมตรอัจฉริยะ,"Intelligent Meter",Active
+C013032,ลูกดิ่ง,Plumb,Active
+C013033,ลูกดิ่งแม่เหล็ก,"Magnetic Plumb",Active
+C013034,"ตลับเมตร XTREME","XTREME Measuring Tape",Active
+C014001,เทปวัดที่สายใยแก้ว,"Tape Measure At Fiber Glass.",Active
+C014002,เทปวัดที่สายใยแก้วหน้าใหญ่,"Tape Measure At The Fiberglass Front.",Active
+C014003,เทปวัดที่สายเหล็ก,"Tape Measure At Steel Wire",Active
+C014004,"เทปวัดที่สายเหล็ก เคลือบไนล่อน","Measuring Tape On Nylon Coated Steel Wire",Active
+C014005,ล้อวัดระยะ,"Wheel Gauge",Active
+C015001,บักเต้า,Bugs,Active
+C015002,สีฝุ่น,"Dust Color",Active
+C016001,"แปรงทาสี #628","Paint Brush # 628",Active
+C016002,"แปรงทาสี #635","Paint Brush # 635",Active
+C016003,"แปรงทาสี #636","Paint Brush # 636",Active
+C016004,"แปรงทาสี #638","Paint Brush # 638",Active
+C016005,"แปรงทาสี #666","Paint Brush # 666",Active
+C016006,"แปรงทาสี #888","Paint Brush # 888",Active
+C016007,"แปรงทาสี Pro-111","Paint Brush Pro-111",Active
+C016008,"แปรงทาสี Pro-888","Paint Brush Pro-888",Active
+C016009,"แปรงทาสี Pro-999","Paint Brush Pro-999",Active
+C016010,แปรงทาสีอเมริกาขนขาว,"Brushes Painted America White",Active
+C016011,"แปรงวานิช No.168","Varnish Brush No.168",Active
+C016012,"แปรงวานิช Pro-111","Pro-111 Varnish Brush",Active
+C016013,"แปรงทาสี ECO-FRIENDLY","Paint brush ECO-FRIENDLY",Active
+C017001,ด้ามจับฟองน้ำกระดาษทราย,"Sponge Handle, Sandpaper",Active
+C017002,ถ้วยทาสี,"Painted Cup",Active
+C017003,ถังทาสี,"Paint Bucket",Active
+C017004,ถาดลูกกลิ้ง,"Roller Tray",Active
+C017005,ถาดลูกกลิ้งทาสี,"Paint Roller Tray",Active
+C017006,ที่โกยขยะ,"Dust Pan",Active
+C017007,"เทป / พลาสติกกันเปื้อน","Tape / Plastic Apron",Active
+C017008,แปรงลูกกลิ้งทาสี,"Brush Roller",Active
+C017009,"แปรงลูกกลิ้งทาสี Davinci","Davinci Paint Roller Brush",Active
+C017010,"แปรงลูกกลิ้งทาสี Epoxy","Epoxy Paint Roller Brush",Active
+C017011,แปรงลูกกลิ้งทาสีขนแกะ,"Brush, Roller, Paint, Wool",Active
+C017012,แปรงลูกกลิ้งทาสีน้ำ,"Brush Roller, Paint Water",Active
+C017013,"แปรงลูกกลิ้งทาสีน้ำ Pro","Brush Brush",Active
+C017014,แปรงลูกกลิ้งทาสีปิกัสโซ่,"Picasso Brush Roller Brush",Active
+C017015,แปรงลูกกลิ้งทาสีฟองน้ำ,"Sponge Roller Brush",Active
+C017016,แผ่นทาสี,"Paint Sheet",Active
+C017017,ฟองน้ำกระดาษทราย,"Sponge Sandpaper",Active
+C017018,ลูกกลิ้งขนแกะ,Roller,Active
+C017019,อะไหล่แผ่นทาสี,"Paint Sheet Parts",Active
+C017020,อะไหล่ลูกกลิ้ง,"Roller Parts",Active
+C018001,ระดับน้ำ,"Water Level",Active
+C018002,"ระดับน้ำ I-Beam",I-Beam,Active
+C018003,"ระดับน้ำ รุ่นซุปเปอร์ฮิต","Super Model Water Hits",Active
+C018004,"ระดับน้ำ รุ่นปรับขยาย","Expanded Water Level",Active
+C018005,"ระดับน้ำ รุ่นแม่เหล็ก","Magnetic Water Level",Active
+C018006,"ระดับน้ำ รุ่นสุดประหยัด","Water Level.",Active
+C018007,"ระดับน้ำ รุ่นหนาพิเศษ","Special Water Level",Active
+C018008,ระดับน้ำตอร์ปิโด,"Water Level Torpedo",Active
+C018009,ระดับน้ำแม่เหล็กซ่อน,"Magnetic Water",Active
+C018010,ระดับน้ำแม่เหล็กแถบ,"Magnetic Stripe Water Bar",Active
+C018011,ระดับน้ำแม่เหล็กแถบ+หน้าต่าง,"Magnetic Water Bar + Window",Active
+C018012,ระดับน้ำอลูมิเนียมหล่อ,"Aluminum Water Level Casting",Active
+C018013,ระดับน้ำอินฟาเรด,"Water Levels Infrared",Active
+C019001,เลื่อยฉลุฝ้า,Jar,Active
+C019002,เลื่อยดึงพลูซอ,"Sawing Plow",Active
+C019003,เลื่อยตัดอิฐมวลเบา,"Lightweight Brick Saw",Active
+C019004,เลื่อยปังตอ,Chopper,Active
+C019005,"เลื่อยลันดา Master Cut ชุบแข็งฟัน(ดำ)","Major Cutting Master Cut (Black)",Active
+C019006,"เลื่อยลันดา Master Cut ฟันขาว","Land Master Cut White Teeth",Active
+C019007,"เลื่อยลันดา Matsumoto","Landscape Matsumoto",Active
+C019008,"เลื่อยลันดา Netto","Landscape Net",Active
+C019009,"เลื่อยลันดา Spark","Little Spark",Active
+C019010,"เลื่อยลันดา ด้ามดำ","Lathe Black Handle",Active
+C020001,"สิ่ว รุ่นตอกได้",Chisel,Active
+C021001,เหล็กมาร์ค,"Mark Iron",Active
+C021002,เหล็กสกัด,"Iron Extract",Active
+C021003,เหล็กส่ง,"Steel Transmission",Active
+C021004,คีมเจาะรูเข็มขัด,"Revolving Punch",Active
+C022001,ไม้บรรทัด,Ruler,Active
+C023001,ปากกาจับ-ถ่างชิ้นงาน,"Clamp - Stretch",Active
+C023002,ปากกาตัวf-ทรงเยอรมัน,"F-Shaped German Pen",Active
+C023003,ปากกาตัวf-แบบฟันเฟือง,"F-Type Sprocket",Active
+C023004,ปากกาจับชิ้นงาน,"T-Bar Clamp",Active
+C024001,ปืนยิงซิลิโคน,"Clauking Gun",Active
+C025001,แม่เหล็กจับฉากงานเชื่อม,แม่เหล็กจับฉากงานเชื่อม,Active
+C026001,บันไดเหล็ก,"Steel Ladder",Active
+C026002,บันไดอลูมิเนียม,Aluminium,Active
+C027001,"อุปกรณ์ปาด / ขูด / ตัดร่องยาแนว และซิลิโคน","Spreader / Scraper / Cutting Tools",Active
+D001001,กิ๊บรัดท่อสแตนเลส,"Stainless Steel Pipes",Active
+D001002,"กิ๊บรัดท่อสแตนเลส 304","Stainless Steel Pipes 304",Active
+D001003,กิ๊บรัดท่อสแตนเลสทรงหางปลา,"Stainless Steel Tube",Active
+D001004,กิ๊บรัดท่อเหล็กทอง,"Gold Steel Pipes",Active
+D002001,"กุญแจแขวน มาสเตอร์คีย์ ระบบลูกปืน","Master Key Holder, Bearing System",Active
+D002002,"กุญแจแขวน ระบบลูกปืน","Hanging System Bearing",Active
+D002003,"กุญแจแขวน รุ่นเหลี่ยม คอยาว","Hanging Hanger With Long Neck.",Active
+D002004,"กุญแจแขวน รุ่นเหลี่ยม คอสั้น","Key Holder",Active
+D002005,"กุญแจแขวน รุ่น Lucky Lock","Lucky Lock",Active
+D003001,"ถ่าน Fujitsu","Fujitsu Charger",Active
+D003002,"ถ่าน Fujitsu  Alk","Fujitsu Alk Charcoal",Active
+D003003,"ถ่าน Fujitsu Cz","Charcoal Fujitsu Cz",Active
+D003004,"ถ่าน Fujitsu Alk","Fujitsu Alk Charcoal",Active
+D004001,ใบมีดคัตเตอร์ลามิเนต,"Laminated Knife Cutter",Active
+D004002,ใบมีดเล็ก,"Small Knife",Active
+D004003,ใบมีดสี่เหลี่ยมคางหมู,"Trapezium Knife",Active
+D004004,ใบมีดใหญ่,"Big Knife",Active
+D005001,พุกผีเสื้อพลาสติก,"Plastic Butterfly",Active
+D006001,มีดคัดเตอร์เล็ก,"Small Knife",Active
+D006002,"มีดคัตเตอร์ 9 Mm.","9 Mm Cutter",Active
+D006003,มีดคัตเตอร์-ใบมีดสี่เหลี่ยมคางหมู,"Cutter Knife - Trapezoid Blade",Active
+D006004,มีดคัตเตอร์ลามิเนต,"Laminated Knife Cutter",Active
+D006005,มีดคัตเตอร์เล็ก,"Small Cutter",Active
+D006006,มีดคัตเตอร์สแตนเลสเล็ก,"Small Stainless Steel Cutter",Active
+D006007,มีดคัตเตอร์สแตนเลสใหญ่,"Large Stainless Steel Knife Cutter",Active
+D006008,มีดคัตเตอร์ใหญ่,"Big Cutter",Active
+D006009,"มีดคัตเตอร์ใหญ่ สปริง","Large Spring Cutter",Active
+D006010,"มีดคัตเตอร์ใหญ่ ออโต้โหลด","Large Auto Cutter",Active
+D006011,มีดอิเล็กทรอนิกส์,"Electronic Knife",Active
+D007001,บานพับข้อศอก,"Elbow Hinges",Active
+D007002,บานพับสแตนเลส,"Stainless Steel Hinges",Active
+D007003,บานพับเหล็ก,"Steel Hinge",Active
+D007004,"ลูกบิดประตู ระบบ6Pin","6Pin Door Knob",Active
+D007005,"ลูกบิดประตู ระบบสปริง","Door Knob Spring System",Active
+D007006,"ลูกบิดประตู ห้องน้ำ","Bathroom Knob",Active
+D008001,กลอนประตู,"Door Lock",Active
+D008002,กันชนประตู,"Door Bumper",Active
+D008003,ตะขอสับหน้าต่าง,"Hooked Windows",Active
+D008004,ท่อน้ำทิ้ง,Sewer,Active
+D009001,"สวิทช์ลูกลอย Texas Bull","Toggle Switches Texas Bull",Active
+E001001,กรรไกรช่างทอง,"Gold Machinist Scissors",Active
+E001002,กรรไกรตัดลวดสลิง,"Wire Rope Cutter",Active
+E001003,กรรไกรตัดสังกะสี,Snip,Active
+E001004,"กรรไกรตัดสาย Acsr","Acsr Cutter",Active
+E001005,กรรไกรตัดสายเคเบิ้ล,"Cable Cutter",Active
+E001006,กรรไกรตัดเหล็กแผ่น,Snip,Active
+E001007,กรรไกรเอนกประสงค์,Scissors,Active
+E002001,กระบอกอัดจารบี,"Grease Gun",Active
+E002002,กาหยอดน้ำมัน,"Oil Can",Active
+E002003,"สายกาหยอดน้ำมัน สายแข็ง","Oil Line",Active
+E002004,"สายกาหยอดน้ำมัน สายอ่อน","Oil Line",Active
+E003001,"กุญแจเลื่อน Columbus","Columbus Lock",Active
+E003002,"กุญแจเลื่อน Cr-V","Crane V",Active
+E003003,"กุญแจเลื่อน Specialist",Specialist,Active
+E003004,"กุญแจเลื่อน Tiger Paw","Spanner  Tiger Paw",Active
+E003005,"กุญแจเลื่อน แบบสั้น","Short Spanner",Active
+E003006,"กุญแจเลื่อน ปากกว้าง-บางพิเศษ","Wide Angle - Some Special",Active
+E003007,"กุญแจเลื่อน ปากเปิดเร็ว-พิเศษ","Special Fasteners",Active
+E003008,"กุญแจเลื่อน ผิวสีขาว","White Skin Prism",Active
+E003009,"กุญแจเลื่อน ผิวสีดำ","Black Spanner",Active
+E003010,"กุญแจเลื่อน เฮอร์คิวลิส","Spanner  Hercules",Active
+E004001,กุญแจตัวแอลท็อกซ์,"Alkaline Key",Active
+E004002,"กุญแจตัวแอลท็อกซ์ โอซาก้า","Osaka Body Wash",Active
+E004003,"กุญแจหกเหลียม โอซาก้า","Six Keys Osaka",Active
+E004004,"กุญแจหกเหลียม(ชุด) มิล","Hex Key (Set)",Active
+E004005,"กุญแจหกเหลียม(ชุด) มิล พวงกุญแจ","Six-Key (Set) Milky Keychain",Active
+E004006,"กุญแจหกเหลียม(ชุด) หุน","Hex Key (Set)",Active
+E004007,"กุญแจหกเหลี่ยมตัวt ไม่บอล","Hexagon Key, Not T Ball",Active
+E004008,"กุญแจหกเหลี่ยมตัวt หัวบอล","Hexagon Key T",Active
+E004009,"กุญแจหกเหลี่ยมตัวปลีกมิล ยาวพิเศษ","Hex Key",Active
+E004010,"กุญแจหกเหลี่ยมตัวปลีกมิล สั้น","Hex Key",Active
+E004011,"กุญแจหกเหลี่ยมตัวปลีกหุน ยาวพิเศษ","Hexagon Key",Active
+E004012,"กุญแจหกเหลี่ยมตัวปลีกหุน สั้น","Hex Key",Active
+E004013,"กุญแจหกเหลียมหัวบอล โอซาก้า","Six Keys Head Osaka",Active
+E004014,"กุญแจหกเหลียมหัวบอล(ชุด) มิล","Six-Pointed Ball Head (Set)",Active
+E004015,"กุญแจหกเหลียมหัวบอล(ชุด) หุน","Six-Headed Ball Head (Set)",Active
+E004016,"กุญแจหกเหลียหัวบอล(ชุด) หุน","Six-Headed Ball Head (Set)",Active
+E004017,"หกเหลี่ยม/ชุด เบอร์ละเอียด",Hexagon,Active
+E004018,"หกเหลี่ยม/ชุด สั้น","Hexagon / Set Short",Active
+E004019,"หกเหลี่ยม/ชุด หัวบอล","Hexagon / Set Ball",Active
+E005001,"ไขควง Arca Hb","Arca Hb Screwdriver",Active
+E005002,"ไขควง Denko","Screwdriver Denko",Active
+E005003,"ไขควง Je Tech รุ่น 6 In 1","Je Tech 6 In 1 Screwdriver",Active
+E005004,"ไขควง Je Tech รุ่น Denko","Je Tech Screwdriver Denko",Active
+E005005,"ไขควง Je Tech รุ่น Soft Grip","Screwdriver Je Tech Soft Grip",Active
+E005006,"ไขควง Je Tech รุ่นหัวบ๊อกด้ามยาง","Je Tech Screwdriver",Active
+E005007,"ไขควง Je Tech รุ่นท็อคมีรู","Jigsaw Screwdriver Je Tech",Active
+E005008,"ไขควง Je Tech รุ่นท็อคไม่มีรู","No-Hole Je Tech Screwdriver",Active
+E005009,"ไขควง Line Color",Screwdrivers,Active
+E005010,"ไขควง Standard Grip","Standard Grip Screwdriver",Active
+E005011,ไขควงจิ๋ว,Screwdriver,Active
+E005012,ไขควงซ่อมนาฬิกา,"Screwdriver Repair Clock",Active
+E005013,ไขควงซ่อมอิเล็คทรอนิก,"Electronic Screwdriver",Active
+E005014,ไขควงตอก,Screwdriver,Active
+E005015,"ไขควงทวินเมท รุ่นหุ้มยาง","Twin Tire Screwdriver",Active
+E005016,ไขควงลองไฟ,Screwdriver,Active
+E005017,ไขควงลองไฟดิจิตอล,"Screwdriver, Digital Light",Active
+E005018,ไขควงลองไฟแบตเตอรี่,"Long Battery Screwdriver",Active
+E005019,ไขควงลองไฟหัวสลับ,"Screwdriver, Head Light Switch",Active
+E005020,ไขควงสลับ,Screwdriver,Active
+E005021,"ไขควงสลับด้าม Dlc Line Color","Screwdriver Dlc Line Color",Active
+E005022,"ไขควงสลับด้ามยาง Excel","Excel Rubber Handle",Active
+E005023,"ไขควงหัวทะลุ Ergo-Striker","Ergo-Striker Screwdriver",Active
+E005024,"ไขควงหัวทะลุ Extreme","Screwdriver Extreme",Active
+E005025,"ไขควงหัวทะลุ Gth",Screwdrivers,Active
+E005026,"ไขควงหัวทะลุ Tank Grip","Tank Grip",Active
+E005027,"ไขควงหัวฟรี Surfix","Free Screwdriver Surfix",Active
+E005028,"ไขควงทวินเมท รุ่นบลอสเตอร์",Screwdriver,Active
+E005029,ไขควงFranken,"Franken Screwdriver",Active
+E006001,ค้อนเคาะไร้แรงสะท้อน,"Hammered Knocking",Active
+E006002,ค้อนยูรีเทน,"Polyurethane Hammer",Active
+E006003,ค้อนหัวพลาสติกด้ามไม้,"Plastic Hammer",Active
+E006004,ค้อนหัวยาง,"Rubber Hammer",Active
+E007001,"คีม Alpha","Alpha Pliers",Active
+E007002,"คีม Arca","Arca Pliers",Active
+E007003,"คีม Excel","Excel Pliers",Active
+E007004,"คีม Expert","Expert Pliers",Active
+E007005,"คีม Je Tech","Je Tech",Active
+E007006,"คีม Netto",Netto,Active
+E007007,"คีม Origin","Origin Pliers",Active
+E007008,"คีม Pumpkin","Pumpkin Pliers",Active
+E007009,"คีม Texas Bull","Texas Bull Pliers",Active
+E007010,"คีม Tsunoda","Tsunoda Pliers",Active
+E007011,"คีม Tsunoda-Japan","Tsunoda-Japan Pliers",Active
+E007012,"คีม Tsunoda-ใช้3อย่าง","Tsunoda - Use 3",Active
+E007013,"คีม Tsunoda-ด้ามบาง","Tsunoda Pliers - Thin Handle",Active
+E007014,"คีม Tsunoda-ด้ามหนา","Pliers Tsunoda-Thick Handle",Active
+E007015,"คีม Tsunoda-มินิ","Pliers Tsunoda-Mini",Active
+E007016,"คีม Ultra","Ultra Pliers",Active
+E007017,"คีมbigbossมินิ 4.5""","Bigboss Mini Bowl 4.5 """,Active
+E007018,คีมตัดอิเล็กทรอนิค,"Electronic Cutting Pliers",Active
+E007019,คีมหุบ-ถ่างแหวน,"Pliers - Stretch Ring",Active
+E007020,"แหนบสแตนเลส ปากกว้าง","Stainless Tongs, Mouth Wide",Active
+E007021,"แหนบสแตนเลส ปากเข็ม","Stainless Steel Tongs",Active
+E007022,"แหนบสแตนเลส ปากโค้ง","Stainless Tongs, Curved Mouth",Active
+E007023,"แหนบสแตนเลส ปากตรง","Stainless Steel Tongue Straight",Active
+E007024,"แหนบสแตนเลส ปากแหลม","Stainless Steel Tongs",Active
+E008001,คีมคอม้า,Pliers,Active
+E008002,"ประแจจับแป๊ป 2 ขา","2-Pin Wrench",Active
+E008003,ประแจจับแป๊ปขาเดี่ยว,"Single Leg Hook",Active
+E009001,คีมปอกสาย,Pliers,Active
+E010001,คีมล็อค,"Locking Pliers",Active
+E010002,"คีมล็อค Arca","Arca Locking Pliers",Active
+E010003,"คีมล็อค Quick Release","Quick Release Pliers",Active
+E010004,"คีมล็อค Steeler","Steeler Pliers",Active
+E010005,ชุดคีมล็อค,"Locking Pliers Set",Active
+E010006,"คีมล็อค Netto","Locking Pliers Netto",Active
+E010007,"คีมล็อค Pumpkin","Locking Pliers Pumpkin",Active
+E010008,"คีมล็อค Spark","Locking Pliers Spark",Active
+E011001,กากบาทขันล้อ,"Cross Wheel",Active
+E011002,"กากบาทขันล้อ Cr-V","Cross Wheel, Cr-V",Active
+E011003,เครื่องมือช่างยนต์,Tools,Active
+E011004,บ๊อกขันล้อ,Wheelbase,Active
+E011005,"ประแจแหวนผ่า Cr-V","Cr-V Ring Crimping Tool",Active
+E011006,แม่แรงกระปุก,Gearbox,Active
+E011007,แม่แรงตะเข้,Jack,Active
+E011008,เหล็กงัดยาง,"Tire Treadmill",Active
+E011009,"เหล็กงัดยาง Cr-V","Crimping Tools",Active
+E012001,เครื่องวัดลมยาง,"Tire Gauge",Active
+E012002,ดิจิตอลแคลมป์มิเตอร์,"Digital Clamp Meter",Active
+E012003,ดิจิตอลมัลติมิเตอร์,"Digital Multimeter",Active
+E012004,เวอร์เนีย,Caliper,Active
+E013001,"ไขควง Vde","Screwdriver vde",Active
+E013002,"ไขควง Provde","Screwdriver Provde",Active
+E013003,"ไขควง Je Tech หุ้มฉนวน 1000V","Je Tech Insulated Screwdriver 1000V",Active
+E013004,"คีม Pro Vde","Pro Vde Pliers",Active
+E013005,"คีม Je Tech หุ้มฉนวน Vde","Jde Insulated Vde Insulated Vde",Active
+E013006,"คีม Pro หุ้มฉนวน Vde","Vde Insulated Pliers",Active
+E013007,"ชุดเครื่องมืองานไฟฟ้า Vde","Vde Power Tool Kit",Active
+E013008,"ชุดลูกบ๊อก Vde","Socket VDE (Set)",Active
+E014001,เครื่องยิงบอร์ด,"Board Machine",Active
+E014002,เครื่องยิงพร้อมลูกแมกซ์,"Shooter With Max Ball",Active
+E015001,โครงเลื่อยฉลุ,Jigsaw,Active
+E015002,โครงเลื่อยตัดเหล็ก,"Cutting Steel Frame",Active
+E015003,"ใบเลื่อยตัดเหล็ก Bi-Metal","Bi-Metal Cutting Saw",Active
+E015004,"ใบเลื่อยตัดเหล็ก Hss","Hss Saw Blades",Active
+E015005,"ใบเลื่อยตัดเหล็ก Viking","Viking Saw Blade",Active
+E015006,"ใบเลื่อยตัดเหล็ก หน้าใหญ่","Saw Blade",Active
+E015007,"ใบเลื่อยตัดเหล็ก ไฮคาร์บอน","High Carbon Steel Saw Blades",Active
+E015008,ใบเลื่อยตัดเหล็กมินิ,"Mini Saw Blades",Active
+E015009,เลื่อยมือตัดเหล็ก,"Saw cutter",Active
+E016001,กระเป๋าพร้อมชุดเครื่องมือ,"Bag With Tool Kit",Active
+E016002,ชุดเครื่องมือช่าง,Tools,Active
+E016003,ชุดถาดเครื่องมือช่าง,"Tool Tray Set",Active
+E017001,"ชุดเครื่องมือ 1/2""","Tool Set 1/2""",Active
+E017002,"ชุดเครื่องมือ 1/2"" & 1/4""","Tool Set 1/2"" & 1/4""",Active
+E017003,"ชุดเครื่องมือ 1/2"" Xi-On","Tool Set 1/2"" XI-ON",Active
+E017004,"ชุดเครื่องมือ 3/8""","Tool Set 3/8""",Active
+E017005,"ชุดบ๊อก 1/2""","Socket Set 1/2""",Active
+E017006,"ชุดบ๊อก 1/2"" & 1/4""","Socket Set 1/2"" & 1/4""",Active
+E017007,"ชุดบ๊อก 1/2"" & 1/4"" Xi-On","Socket Set 1/2"" & 1/4"" XI-ON",Active
+E017008,"ชุดบ๊อก 1/2"" & 1/4"" ผิวหยาบ","Socket Set 1/2"" & 1/4"" Rough",Active
+E017009,"ชุดบ๊อก 1/2"" & 3/8"" & 1/4""","Socket Set 1/2"" & 3/8"" & 1/4""",Active
+E017010,"ชุดบ๊อก 1/2"" Evo(Xi-On)","Socket Set 1/2"" EVO (XI-ON)",Active
+E017011,"ชุดบ๊อก 1/2"" Xi-On","Socket Set 1/2"" XI-ON",Active
+E017012,"ชุดบ๊อก 1/2"" ผิวหยาบ","Socket Set 1/2"" Rough",Active
+E017013,"ชุดบ๊อก 1/4""","Socket Set 1/4""",Active
+E017014,"ชุดบ๊อก 1/4"" Xi-On","Socket Set 1/4"" XI-ON",Active
+E017015,"ชุดบ๊อก 1/4"" ผิวหยาบ","Socket Set 1/4"" Rough",Active
+E017016,"ชุดบ๊อก 3/8""","Socket Set 3/8""",Active
+E017017,"ลูกบ๊อกชุด 3/4""","Socket Set 3/4""",Active
+E017018,"ลูกบ๊อกซ์ XTREME (ชุด)","Socket Set 3/4"" XTREME",Active
+E018001,ดอกไขควงไฟฟ้า,"Electric Screwdriver",Active
+E018002,"ดอกไขควงลม 2 หัว คอ 13 มม.","13Mm Head Screwdriver",Active
+E018003,"ดอกไขควงลม 2 หัว คอ 9 มม.","9Mm Head Screwdriver",Active
+E018004,ดอกไขควงลมหัวเดี่ยว,"Single Head Screwdriver",Active
+E018005,ดอกไขควงลมหัวลด,"Head Screwdriver",Active
+E018006,ดอกบ๊อกลม,Roundabout,Active
+E018007,ดอกหกเหลี่ยมลม,"Hexagonal Wind",Active
+E019001,ตะไบจิ๋ว,"Small Fillet",Active
+E019002,"ตะไบช่าง พร้อมด้าม","Notebook With Handle.",Active
+E019003,"ตะไบช่าง ไม่มีด้าม","File Usage On Other Wikis",Active
+E019004,"ตะไบช่าง ไม่มีด้าม บรรจุแผง","File Not Included.",Active
+E019005,ตะไบถูไม้,"Wood Filing",Active
+E019006,ตะไบท้องปลิงหยาบ,"Filthy Rough Tongue",Active
+E019007,"ตะไบบุ้ง พร้อมด้าม","Snapshot With The Handle.",Active
+E019008,"ตะไบบุ้ง ไม่มีด้าม","No Slippers",Active
+E019009,"ตะไบบุ้ง ไม่มีด้าม บรรจุแผง","File No.",Active
+E019010,ตะไบแบนหยาบ,"Flat Fillet",Active
+E019011,ตะไบเพชร,"Diamond Filings",Active
+E019012,"ตะไบเลื่อย พร้อมด้าม","Saw Blade With Handle",Active
+E019013,"ตะไบเลื่อย ไม่มีด้าม","No Saw Blade",Active
+E019014,"ตะไบเลื่อย ไม่มีด้าม บรรจุแผง","File No.",Active
+E020001,ด้ามไดร์,"Hand Held",Active
+E020002,ด้ามต๊าบ,Handle,Active
+E020003,"ด้ามต๊าบตัว T",T-Handle,Active
+E020004,"ไดร์ต๊าบกลม Bsw","Round Bsw",Active
+E020005,"ไดร์ต๊าบกลม Mm","Round Mm",Active
+E020006,"ต๊าปเกลียวตัวผู้ Bsw","Bsw Screw Thread",Active
+E020007,"ต๊าปเกลียวตัวผู้ Mm","Spike Mm",Active
+E021001,แปรงขัดกันไฟฟ้าสถิตย์,"Anti-Static Brush",Active
+E021002,ผงขจัดคราบรอยเปื้อน,"Powder Stain Remover",Active
+E022001,ประแจถอดไส้หม้อกรองทรงถ้วย,Wrenches,Active
+E022002,"ประแจถอดไส้หม้อกรองแบบ 3 ขา","3-Pin Filter Plug Wrench",Active
+E022003,ประแจถอดไส้หม้อกรองแบบโซ่,"Chainsaw Chain Removal Tool",Active
+E022004,ประแจถอดไส้หม้อกรองสายพาน,Wrenches,Active
+E023001,ประแจขันนั่งร้าน,Scaffolding,Active
+E023002,"ประแจขันบ๊อก ตัว T",T-Knuckle,Active
+E023003,"ประแจขันบ๊อก ตัว Y","Y Screws",Active
+E023004,"ประแจบ๊อกตัวแอล Cr-V","Cr-V Lock Board",Active
+E023005,"ประแจปากตาย Cr-V","Cr-V Mouth Die",Active
+E023006,"ประแจปากตาย Cr-V Ows","Cr-V Ows",Active
+E023007,"ประแจปากตาย Hcs ผิวกระจก","Hcs Die-Cut Glass Face",Active
+E023008,ประแจแหวน,"Ring Wrench",Active
+E023009,"ประแจแหวน Cr-V คอ 45 องศา","45-Degree Cr-V Neck Wrench",Active
+E023010,"ประแจแหวน Cr-V คอ 75 องศา","Cr-V Neck Crimping Valve 75 Degree",Active
+E023011,"ประแจแหวนข้างด้ามนูน Cr-V","Cr-V Round Handle",Active
+E023012,"ประแจแหวนข้างปากตาย Cr-V รุ่นประหยัด","Cr-V Ring Mortar",Active
+E023013,"ประแจแหวนข้างปากตายข้าง Cr-V","Cr-V Side Rings",Active
+E023014,"ประแจแหวนข้างปากตายข้าง Cr-V Com","Cr-V Com",Active
+E023015,"ประแจแหวนข้างปากตายข้าง Cr-V(ชุด)","Cr-V (Wrench)",Active
+E023016,"ประแจแหวนข้างปากตายข้าง Viking","Combination Wrench Viking",Active
+E023017,"ประแจแหวนข้างปากตายข้าง Cr-V ยาวพิเศษ","Cr-V Long-Side Die Wrench",Active
+E023018,"ประแจแหวนคอ 45องศา Hcs ผิวกระจก","45S Round Hole Rings",Active
+E023019,"ประแจแหวนคอ Cr-V Ofs","Cr-V Ofs",Active
+E023020,ประแจแหวนตี,"Strike Wrench",Active
+E023021,ประแจแหวนฟรี,"Free Ring Wrench",Active
+E023022,"ประแจแหวนฟรี Ultra Cr-V","Ultra Cr-V Free Ring Wrench",Active
+E023023,"ประแจแหวนฟรี ผิวกระจก","Free Mirror Ring Wrench",Active
+E023024,ประแจแหวนฟรีปากตายข้าง,"Ring-Shaped Mouth Free Die",Active
+E023025,ประแจแหวนฟรีปากตายข้าง(ตัวสั้น),"Straight-Through Ring (Short)",Active
+E023026,ประแจแหวนฟรีองศา-ปากตายข้าง,"Ring Wrenches - Dead End Mouth",Active
+E023027,ประแจแหวนฟรีองศา-ปากตายข้าง(ตัวสั้น),"Ring Wrenches - Dead Mouth (Short Body)",Active
+E023028,ประแจแหวนเฟือง,"Gear Rope Wrench",Active
+E023029,"ประแจแหวนเฟือง 25 องศา","25 Degree Gear Ring",Active
+E023030,"ประแจแหวนเฟือง 4 In 1","Gear Rope Wrench 4In1",Active
+E023031,"แหวนข้างปากตายข้าง Hcs ผิวกระจก","Side-By-Side Death Ring Hcs",Active
+E023032,"แหวนข้างปากตายด้ามนูน Hcs","Dead-End Ring With Hcs Cone",Active
+E024001,ที่ดูดตะกั่ว,Sucker,Active
+E024002,ปืนยิงกาว,"Glue Gun",Active
+E024004,"หัวแร้งบัดกรี แบบปากกา","Soldering Iron Pen",Active
+E024005,"หัวแร้งบัดกรี แบบปากกา รุ่นหัวเล็ก","Soldering Equipment Small Pen Model",Active
+E025001,รอกกว้านมือ,Winch,Active
+E025002,รอกเชือก,"Rope Hoist",Active
+E025003,รอกลวดสลิง,"Wire Rope Hoist",Active
+E025004,สายรัดมือ,"Hand Strap",Active
+E026001,"ข้อต่อ / ข้อต่อบ๊อก 1/2""","Joint / Box Joint 1/2""",Active
+E026002,"ข้อต่อ / ข้อต่อบ๊อก 1/2"" ผิวเงา","Joint / Box Joint 1/2"" Shadow",Active
+E026003,"ข้อต่อ / ข้อต่อบ๊อก 1/2"" ผิวหยาบ","Joint / Box Joint 1/2"" Rough Skin",Active
+E026004,"ข้อต่อ / ข้อต่อบ๊อก 1/2""X5""","Joint / Box Joint 1/2""x5""",Active
+E026005,"ข้อต่อ / ข้อต่อบ๊อก 1/2""X10""","Joint / Box Joint 1/2""x10""",Active
+E026006,"ข้อต่อ / ข้อต่อบ๊อก 1/4""","Joint / Box Joint 1/4""",Active
+E026007,"ข้อต่อ / ข้อต่อบ๊อก 3/4""","Joint / Box Joint 3/4""",Active
+E026008,"ข้อต่อ / ข้อต่อบ๊อก 3/8""","Joint / Box Joint 3/8""",Active
+E026009,"ข้อต่อดอกไขควง 1/2""","Joint Screwdriver 1/2""",Active
+E026010,"ข้อต่อบ๊อก 1/2""","Box Joint 1/2""",Active
+E026011,"ข้อต่อบ๊อก 1/4""","Box Joint 1/4""",Active
+E026012,"ข้อต่อบ๊อก 3/8""","Box Joint 3/8""",Active
+E026013,"ข้อต่ออ่อนชนิดลูกปืน 1/2""","Ball Bearing 1/2""",Active
+E026014,ข้อต่อหัวปรับองศา,"Ball Bearing Ball Bearing",Active
+E026015,"ข้อเพิ่ม 1/2""","Added 1/2 """,Active
+E026016,"ข้อเพิ่ม 3/4""","Added 3/4 """,Active
+E026017,"ข้อเพิ่ม 3/8""","Added 3/8""",Active
+E026018,"ข้อลด 1/2""","Reduction 1/2""",Active
+E026019,"ข้อลด 1/4""","Reduction 1/4""",Active
+E026020,"ข้อลด 3/4""","Reduction 3/4""",Active
+E026021,"ข้อลด 3/8""","Reduction 3/8""",Active
+E026022,"ข้อลดทีเวย์ 1/2""","Reduction 1/2""",Active
+E026023,"ข้อลดทีเวย์ 1/4""","Reduction 1/4""",Active
+E026024,"ข้อลดทีเวย์ 3/8""","Reduction 3/8""",Active
+E026025,"ข้ออ่อนบ๊อก 1/2""","Flexible Thread 1/2""",Active
+E026026,"ข้ออ่อนบ๊อก 1/4""","Flexible Thread 1/4""",Active
+E026027,"ข้ออ่อนบ๊อก 3/4""","Flexible Thread 3/4""",Active
+E026028,"ข้ออ่อนบ๊อก 3/8""","Flexible Thread 3/8""",Active
+E026029,"ไขควงด้ามบ๊อก 1/4""","Screwdriver Box 1/4""",Active
+E026030,ด้ามขันบ๊อกหัวเทียน,Spout,Active
+E026031,ด้ามขันแบบสวิง,"Swing Handle",Active
+E026032,ด้ามขันปอนด์ดิจิตอล,"Digital Torque Wrenches",Active
+E026033,ด้ามไขควงบ๊อกซ์,"Screwdriver Box",Active
+E026034,"ด้ามตัว L 3/4""","Ratchet L-Handle 3/4",Active
+E026035,ด้ามบ๊อก,"Ratchet Handle",Active
+E026036,"ด้ามบ๊อก 1/4""","Ratchet Handle 1/4""",Active
+E026037,"ด้ามบ๊อก 1/4-6""","Ratchet Handle 1/4-6""",Active
+E026038,"ด้ามบ๊อก 3/4""","Ratchet Handle 3/4""",Active
+E026039,"ด้ามบ๊อก 3/8""","Ratchet Handle 3/8""",Active
+E026040,"ด้ามบ๊อก 3/8-10""","Ratchet Handle 3/8-10""",Active
+E026041,"ด้ามบ๊อก 1/2""","Ratchet Handle 1/2""",Active
+E026042,"ด้ามฟรี หัวกลม 1/2""","Reversible Ratchet Handle 1/2""",Active
+E026043,"ด้ามฟรี หัวกลม 1/4""","Reversible Ratchet Handle 1/4""",Active
+E026044,"ด้ามฟรี หัวกลม 3/8""","Reversible Ratchet Handle 3/8""",Active
+E026045,"ด้ามฟรี หัวไข่ 1/2""","Reversible Ratchet Handle 1/2""",Active
+E026046,"ด้ามฟรี หัวไข่ 1/4""","Reversible Ratchet Handle 1/4""",Active
+E026047,"ด้ามฟรี หัวไข่ 3/4""","Reversible Ratchet Handle 3/4""",Active
+E026048,"ด้ามฟรี หัวไข่ 3/8""","Reversible Ratchet Handle 3/8""",Active
+E026049,"ด้ามฟรี หัวไข่ Rts 1/2""","Reversible Ratchet Handle RTS 1/2""",Active
+E026050,"ด้ามฟรี หัวไข่ Rts 1/4""","Reversible Ratchet Handle RTS 1/4""",Active
+E026051,"ด้ามฟรี หัวไข่ Rts 3/8""","Reversible Ratchet Handle RTS 3/8""",Active
+E026052,"ด้ามฟรีหัวไข่ ขัดเงา 1/2""","Reversible Ratchet Handle 1/2""",Active
+E026053,"ด้ามฟรีหัวไข่ ขัดเงา 1/4""","Reversible Ratchet Handle 1/4""",Active
+E026054,"ด้ามฟรีหัวไข่ ขัดเงา 3/8""","Reversible Ratchet Handle 3/8""",Active
+E026055,"ด้ามเลื่อน 1/2""","Sliding T-Bar 1/2""",Active
+E026056,"ด้ามเลื่อน 1/4""","Sliding T-Bar 1/4""",Active
+E026057,"ด้ามเลื่อน 3/4""","Sliding T-Bar 3/4""",Active
+E026058,"ด้ามเลื่อน 3/8""","Sliding T-Bar 3/8""",Active
+E026059,"บ๊อกจับดอกไขควง 3/8""","Bit Adapter 3/8""",Active
+E026060,"บ๊อกจับดอกไขควง 1/4""","Bit Adapter 1/4""",Active
+E026061,"บ๊อกเดี่ยวยาว 1/2""","Deep Socket 1/2""",Active
+E026062,"บ๊อกถอดหัวเทียน 1/2""","Socket 1/2""",Active
+E026063,"บ๊อกถอดหัวเทียน 3/8""","Socket 3/8""",Active
+E026064,"บ๊อกหัวเทียน 1/2""","Socket 1/2""",Active
+E026065,"บ๊อกหัวเทียน 1/2"" ผิวหยาบ","Socket 1/2"" Rough",Active
+E026066,"บ๊อกหัวเทียน 21 มม.","Socket 21 mm.",Active
+E026067,"ลูกบ๊อกซ์ XTREME","Socket XTREME",Active
+E026068,"ลูกบ๊อกเดี่ยวยาว 1/2""","Deep Socket 1/2""",Active
+E026069,"ลูกบ๊อกเดี่ยวยาว 1/4""","Deep Socket 1/4""",Active
+E026070,"ลูกบ๊อกเดี่ยวยาว 3/8""","Deep Socket 3/8""",Active
+E026071,"ลูกบ๊อกเดี่ยวสั้น 1/2""","Socket 1/2""",Active
+E026072,"ลูกบ๊อกเดี่ยวสั้น 1/4""","Socket 1/4""",Active
+E026073,"ลูกบ๊อกเดี่ยวสั้น 3/8""","Socket 3/8""",Active
+E026074,"ลูกบ๊อกเดือยยาว 1/2""","Socket 1/2""",Active
+E026075,"ลูกบ๊อกเดือยโผล่ 1/2""","Socket 1/2 """,Active
+E026076,"ลูกบ๊อกเดือยโผล่ ท็อค 1/2""","Torx Socket 1/2""",Active
+E026077,"ลูกบ๊อกเดือยโผล่ ท็อค ยาว 1/2""","Deep Socket Torx 1/2""",Active
+E026078,"ลูกบ๊อกเดือยโผล่ ยาว 1/2""","Deep Socket 1/2""",Active
+E026079,"ลูกบ๊อกยาว 1/2""","Deep Socket 1/2""",Active
+E026080,"ลูกบ๊อกยาว 1/2"" Xi-On","Deep Socket 1/2"" XI-ON",Active
+E026081,"ลูกบ๊อกยาว 1/2"" ผิวหยาบ","Deep Socket 1/2"" Rough",Active
+E026082,"ลูกบ๊อกยาว 1/4""","Deep Socket 1/4""",Active
+E026083,"ลูกบ๊อกยาว 3/8""","Deep Socket 3/8""",Active
+E026084,"ลูกบ๊อกสั้น 1/2""","Socket 1/2""",Active
+E026085,"ลูกบ๊อกสั้น 1/2"" Xi-On","Socket 1/2"" XI-ON",Active
+E026086,"ลูกบ๊อกสั้น 1/2"" ผิวหยาบ","Socket 1/2"" Rough",Active
+E026087,"ลูกบ๊อกสั้น 1/4""","Socket 1/4""",Active
+E026088,"ลูกบ๊อกสั้น 3/4""","Socket 3/4""",Active
+E026089,"ลูกบ๊อกสั้น 3/8""","Socket 3/8""",Active
+E027001,"ด้ามต่อบ๊อกลม ชนิดลูกปืน","Extension Impact Bar",Active
+E027002,"ลูกบ็อกลมยาว 1/2""","Deep Socket 3/8""",Active
+E027003,"ลูกบ็อกลมสั้น 1/2""","Socket 1/2""",Active
+E028001,ชะแลงปลายโค้ง,Twist,Active
+E028002,เหล็กตอก,"Steel Hammer",Active
+E028003,"เหล็กตอกและสกัด (ชุด)","Steel Hammer And Extract (Set)",Active
+E028004,เหล็กตอกหัวกลม,"Round Head",Active
+E028005,"เหล็กมาร์ค Jetech","Mark Iron JETECH",Active
+E028006,"เหล็กสกัด Jetech","Iron Extract JETECH",Active
+E028007,"เหล็กสกัด (ชุด)","Iron Extract (Set)",Active
+E028008,เหล็กส่งหัวเตเปอร์,Steel,Active
+E029001,กระเป๋าเครื่องมือ,"Tool Bag",Active
+E029002,กระเป๋าผ้าใส่เครื่องมือ,"Tool Bag",Active
+E029003,กล่องเครื่องมือพลาสติก,"Plastic Tool Box",Active
+E029004,กล่องเครื่องมือเหล็ก,"Tool Box",Active
+E029005,ตู้เครื่องมือแบบรถเข็น,Toolbox,Active
+E029006,"โต๊ะทำงานช่าง / อุปกรณ์เสริม","Work Desk / Accessories",Active
+E029007,ตู้รถเข็นเครื่องมือช่าง,"Tool Cart",Active
+E029008,ชั้นแขวนเครื่องมือ,"Tool Organizer",Active
+E029009,อุปกรณ์เสริมสำหรับกล่องเครื่องมือ,"Tool Box Accessories",Active
+E030002,แคลมป์เข้ามุม,"Clamp Corner",Active
+E030003,ฉากวัดไม้พลาสติก,"Plastic Wood Measurement",Active
+E030004,ปากกาจับชิ้นงาน,Clamp,Active
+E030005,"ปากกาจับชิ้นงาน เหล็กเหนียว","Stainless Steel Handle",Active
+E030006,ปากกาตัวซี,Zipper,Active
+E030007,กล่องจับชิ้นงาน,"Workpiece Holder",Active
+E031001,ชุดดูดลูกปืน,"Bearing Kit",Active
+E031002,"เหล็กดูด 2 ขา","2-Leg Suction Cup",Active
+E031003,"เหล็กดูด 3 ขา","3-Leg Suction Cup",Active
+E031004,"เหล็กดูดลูกปืน Cr-V","Cr-V Ball Bearing",Active
+E032001,ตัวดูดแม่เหล็ก,"Magnetic Holder",Active
+E032002,ถาดแม่เหล็ก,"Magnetic Tray",Active
+E032003,"อุปกรณ์เพิ่ม / ลดแรงดึงดูด","Gravity Booster",Active
+E033001,ไฟฉายled,"Led Flashlight",Active
+E033002,ไฟฉายอลูมิเนียม,"Flashlight Aluminum",Active
+F001001,"ก๊อกลมบอลวาว์ล ทองเหลือง 1/4""","Brass Ball Valve, Brass 1/4 """,Active
+F002001,ข้อต่อ,Joint,Active
+F002002,"ข้อต่อ แบบกลม","Round Connectors",Active
+F002003,"ข้อต่อ แบบแถว",Joints,Active
+F002004,"คอปเปอร์ (พ่วง)","Copper (Trailer)",Active
+F002005,"คอปเปอร์ One Touch","Copper One Touch",Active
+F002006,"คอปเปอร์ ตัวผู้",Copperhead,Active
+F002007,"คอปเปอร์ ตัวเมีย","Copper Female",Active
+F003001,ปั๊มลม,"Air Compressor",Active
+F004001,เครื่องขัดกระดาษทรายลม,Sandpaper,Active
+F004002,เครื่องขันสกรูลม,Windscrew,Active
+F004003,เครื่องยิงบ๊อกลม,Shooter,Active
+F004004,"เครื่องยิงบ๊อกลม Steeler",Steeler,Active
+F004005,เจียรลม,Grinding,Active
+F004006,ด้ามฟรีลม,"Freehand Windshield",Active
+F004007,สว่านลม,"Wind Drill",Active
+F005001,เครื่องถอนตะปู,"Nail Remover",Active
+F005002,เครื่องยิงตะปู,"Nail Gun",Active
+F005003,เครื่องยิงตะปูเข็ม,Shotgun,Active
+F005004,เครื่องยิงตะปูคอนกรีต-ทะลุเหล็ก,"Nail Machine - Penetrating Steel",Active
+F005005,เครื่องยิงตะปูม้วน,"Nail Gun",Active
+F005006,เครื่องยิงลวด,"Wire Shot Machine",Active
+F006001,ตะปูขาเดี่ยว,"Single Nail",Active
+F006002,ตะปูคอนกรีตขาเดี่ยว,"Nail Concrete Single Leg",Active
+F006003,ตะปูคอนกรีต-เหล็ก,"Concrete Nails - Steel",Active
+F006004,ลวดเย็บขาคู่,"Double Stitch",Active
+F006005,ตะปูขาคู่,"Double Screw",Active
+F007001,เกจ์วัดลม,"Wind Gauge",Active
+F007002,ปืนฉีดลม,"Spray Gun",Active
+F007003,"ปืนฉีดลม Netto",Netto,Active
+F007004,"ปืนฉีดลม ทรงญี่ปุ่น","Japanese Injector",Active
+F007005,"หัวเติมลม Netto",Netto,Active
+F007006,"ปืนฉีดลม Texas Bull","Air Blow Gun Texas Bull",Active
+F007007,"หัวเติมลม Texas Bull","Tire Air Chuck Texas Bull",Active
+F008001,รอกสปริงแบบสายปลั๊กไฟ,"Spring Jacket",Active
+F008002,รอกสปริงแบบสายลม,"Spring Blower",Active
+F008003,"รอกสปริงแบบสายลม / น้ำ","Spring / Wind Springs",Active
+F008004,"รอกสปริงสายลม Asgard","Asgard Wind Spring",Active
+F009001,สปริงบาลาซเซอร์,"Spring Balazer",Active
+F010001,"สายลม Pu ขดสปริง","Pu Coil Springs",Active
+F010002,"สายลม Pu ถัก เยอรมัน","Pu Knit German Wind",Active
+F010003,"สายลม Pu เยอรมัน","German Pu Wind",Active
+F010004,"สายลม Pu","Pu Wind",Active
+F010005,สายลมpuขดสปริง,"Pu Coil Springs",Active
+F010006,"สายลม Pu สายตรง","Straight Line Pu Cable",Active
+F011001,อุปกรณ์เสริมเครื่องยิงตะปู,"Nail Gun Accessories",Active
+G001001,กรวยจราจร,"Traffic Cone",Active
+G001002,"กรวยจราจร รุ่นทับไม่แตก","Traffic Cone, Unbreakable",Active
+G001003,ป้ายเสียบ,"Pin Plug",Active
+G001004,ไฟจราจร,"Traffic Light Baton",Active
+G002001,กระจกโค้ง,"Curved Glass",Active
+G003001,เข็มขัดนิรภัย,"Safety Belt",Active
+G003002,เข็มขัดพยุงหลัง,"Back Support Belt",Active
+G004001,ถุงมือ,Glove,Active
+G005001,รองเท้านิรภัย,"Safety Shoes",Active
+G005002,รองเท้านิรภัยป้องกันความเย็น,"Safety Shoes",Active
+G005003,รองเท้านิรภัยหัวเหล็ก,"Steel Head Safety Helmet",Active
+G005004,รองเท้าบู๊ท,Boots,Active
+G005005,รองเท้าเปิดส้น,"Open Heel Shoes",Active
+G005006,รองเท้ายาง,"Rubber Boots",Active
+G005007,รองเท้าหุ้มข้อ,"Ankle Sneakers",Active
+G005008,"รองเท้าหุ้มข้อ ติดแถบเวลโคล่","Ankle Sneakers Welcome",Active
+G005009,"รองเท้าหุ้มข้อ ลิ้นปิด","Gloves Closed",Active
+G005010,"รองเท้าหุ้มข้อ หนังเรียบ","Shoe Cushion",Active
+G005011,"รองเท้าหุ้มข้อ หนังลาย","Shoe Cover",Active
+G005012,รองเท้าหุ้มส้น,Shoes,Active
+G005013,"รองเท้าหุ้มส้น หนังแท้","Shoe Leather",Active
+G005014,"รองเท้าหุ้มส้น หนังลาย","Leather Shoes",Active
+G006001,แว่นครอบตา,Eyewear,Active
+G006002,แว่นตานิรภัย,"Safety Glasses",Active
+G007001,แถบสะท้อนแสง,"Reflective Strip",Active
+G007002,เสื้อจราจร,"Traffic Shirt",Active
+G008001,หน้ากาก,Mask,Active
+G009001,กระจกอ๊อก,"Welding Glass",Active
+G009002,หน้ากากเชื่อม,"Welding Mask",Active
+G010001,รองในหมวก,"Secondary In The Hat",Active
+G010002,สายรัดคาง,Chinstrap,Active
+G010003,หมวกปรับเลื่อน,"Adjustable Scooter",Active
+G010004,หมวกปรับหมุน,"Rotation Cap",Active
+G010005,หมวกหนังท้องล้วน,Hats,Active
+G011001,เทปกาว,"Sticky Tape",Active
+G011002,ยูโรเทป,"Euro Tapes",Active
+G011003,สติกเกอร์,Sticker,Active
+G012001,ที่ครอบหู,"Ear Cushion",Active
+G012002,ที่อุดหูลดเสียง,"Ear Plugs",Active
+G012003,ปลั๊กอุดหู,"Ear Plugs",Active
+G012004,ปลั๊กอุดหูลดเสียง,"Ear Plugs Reduce Noise.",Active
+H001001,กรรไกรจีน,"Chinese Scissors",Active
+H002001,"กรรไกรตัด / เล็มกิ่ง","Pruning Snip",Active
+H002002,กรรไกรตัดกิ่ง,"Pruning Shear",Active
+H002003,กรรไกรตัดกิ่ง-ด้ามพลาสติก,"Pruning Shear, Plastic Handle",Active
+H002004,"กรรไกรตัดกิ่ง-ด้ามไม้ / เหล็ก","Pruning Shear, Wood Handle / Steel",Active
+H002005,กรรไกรตัดกิ่ง-ด้ามเหล็ก,"Pruning Shear, Steel Handle",Active
+H002006,กรรไกรตัดกิ่ง-ด้ามอลูมิเนียม,"Pruning Shear, Aluminum Handle",Active
+H002007,กรรไกรตัดกิ่งผลไม้,"Fruit Cutting Pruning Shear",Active
+H002008,กรรไกรตัดกิ่งไม้ใหญ่,Lopper,Active
+H003001,กรรไกรตัดหญ้าด้ามไฟเบอร์,"Grass Cutter, Fiberglass Handle",Active
+H003002,กรรไกรตัดหญ้าด้ามไม้,"Grass Cutter, Wooden Handle",Active
+H003003,กรรไกรตัดหญ้าด้ามอลูมิเนียม,"Grass Cutter, Aluminum Handle",Active
+H004001,"เครื่องมือทำสวน (ชุด)","Gardening Tools (Set)",Active
+H005001,"ใบเลื่อยคันธนู Matsumoto","Saw Blade Bows Matsumoto",Active
+H005002,"ใบเลื่อยคันธนู Piranha","Band Saw Band Piranha",Active
+H006001,โครงเลื่อยคันธนู,"Saw Blade",Active
+H006002,"โครงเลื่อยคันธนู Matsumoto","Bowls Matsumoto",Active
+H006003,"โครงเลื่อยคันธนู รุ่น Pirainha","Pirainha Band Saws",Active
+H006004,"โครงเลื่อยคันธนู รุ่นประหยัด","Cutting Band Saw",Active
+H006005,โครงเลื่อยคันธนูทรงอิตาลี,"Italy Bow",Active
+H006006,โครงเลื่อยต่อด้าม,"Sawing Frame",Active
+H006007,เลื่อยโค้งตัดกิ่ง,"Saw Blade",Active
+H006008,เลื่อยพูลซอ,Saws,Active
+H008001,ข้อต่อก็อกน้ำ,"TAP ADAPTOR",Active
+H008002,ข้อต่อสวมก็อกน้ำ,"MULTI TAP ADAPTOR",Active
+H008003,วาล์วก็อกน้ำ,"VALVE CONNECTOR WITH TAP ADAPTOR",Active
+H008004,ข้อต่อสายยาง,"HOSE CONNECTOR",Active
+H008005,หัวฉีดน้ำ,"ADJUSTABLE  NOZZLE",Active
+H008006,ชุดปืนฉีดน้ำ,"WATER PISTOL AND  HOSE CONNECTOR",Active
+H008007,สปริงเกอร์,SPRINGKLER,Active
+H009001,เลื่อยโซ่ยนต์,Chainsaw,Active
+H010001,เครื่องปั่นไฟเบนซิน,"Gasoline Generator",Active
+H010002,เครื่องกำเนิดไฟฟ้า,"Power Generator",Active
+H010003,เครื่องปั่นไฟดีเซล,"Diesel Generator",Active
+H011001,เครื่องยนต์เบนซิน,"Gasoline Engine",Active
+H012001,เครื่องตัดหญ้า,"Brush Cutter",Active
+I001001,กาวซิลิโคน,"Silicone Adhesive",Active
+I001002,"กาวแทนตะปู Sunnic","Nail Glue SUNNIC",Active
+I001003,กาวแท่ง,"Glue Stick",Active
+I001004,กาวพัทที่,Adhesive,Active
+I001005,กาวร้อน,"Hot Glue",Active
+I001006,กาวอีพ็อกซี่,"Epoxy Adhesives",Active
+I002001,กาวล็อคเกลียว,"Threadlocking Screws",Active
+I002002,น้ำยาตรึงเพลา,Stacker,Active
+I003001,"Fix All","Fix All",Active
+I003002,กาวตะปู,"Nail Glue",Active
+I003003,"ซิลิโคน ชนิดเป็นกลาง","Silicone Type",Active
+I003004,"ซิลิโคน ชนิดมีกรด","Acidic Acid",Active
+I003005,พียูโฟม,"Pu Foam",Active
+I003006,โพลียูริเทน,Polyurethane,Active
+I003007,อะคริลิค,Acrylic,Active
+I003008,กาวตะปู,"CONSTRUCTION ADHESIVE",Active
+I003009,น้ำมันอเนกประสงค์,"PK-40 MULTI-PURPOSE PENETRANT & LUBRICANT SPRAY",Active
+I004001,เทปกาวไจแอ้นท์แรป,"Adhesive Tape Giant Wap",Active
+J001001,เครื่องตัดหญ้า,"Brush Cutter",Active
+K001001,เซิร์ฟสเก็ตบอร์ด,SurfSkate,Active
+K002001,เครื่องเขียน,Stationery,Active
+K003001,เครื่องครัวของใช้ในบ้าน,"Kitchenware and household items",Active
+L001001,ปั้มน้ำหอยโข่ง,"Centrifugal Water Pump",Active
+L002001,ปั๊มเครื่องยนต์เบนซิน,"Gasoline Engine Water Pump",Active
+L003001,ปั๊มแช่ดูดน้ำดี,"Submersible Clean Water Pump",Active
+L003002,ปั๊มแช่ดูดน้ำเสีย,"Submersible Sewage Pump",Active
+L004001,ปั๊มแช่ดูดน้ำดี,"Submersible Clean Water Pump",Active
+L005001,ปั๊มอินเวอร์เตอร์,"Inverter Water Pump",Active
+L006001,ปั๊มแช่ดูดน้ำดี,"Submersible Clean Water Pump",Active
+L006002,ปั้มน้ำหอยโข่ง,"Centrifugal Water Pump",Active
+T001001,บรรจุภัณฑ์,Packaging,Active
+U001001,"Customer Brand","Customer Brand",Active
+U002001,"แบตเตอรี่ 21 โวลต์","21V Battery",Active
+V001001,วัตถุดิบ,Material,Active
+W001001,พรีเมี่ยมและของแถม,"Premium Product & Free Products",Active
+X001001,หมายเหตุ,Remark,Active
+Y001001,อื่นๆ,Other,Active
+Z001001,อะไหล่,"Part of Tools",Active

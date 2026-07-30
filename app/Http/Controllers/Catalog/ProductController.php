@@ -8,10 +8,12 @@ use App\Events\ProductDataChanged;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
+use App\Models\AssociationType;
 use App\Models\AuditLog;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\Product;
+use App\Models\ProductAssociation;
 use App\Models\ProductValue;
 use App\Services\GridManager;
 use App\Services\ImportExport\Importers\ProductRowImporter;
@@ -35,9 +37,35 @@ class ProductController extends Controller
     {
         $grid = new GridManager('product_grid');
 
-        $gridData = $grid->getData($request);
-
         $nameAttributeId = Attribute::where('code', 'name')->value('id');
+
+        // `name` and any dynamic "Add Filter" attribute filters are EAV
+        // (ProductValue), not real columns on `products`, so GridManager's
+        // plain column-based applyFilters() can't express them — apply them
+        // as an extra query constraint before pagination instead.
+        $filtersInput = $request->input('filters', []);
+        $attributeFilters = $request->input('attribute_filters', []);
+
+        $gridData = $grid->getData($request, function ($query) use ($filtersInput, $attributeFilters, $nameAttributeId) {
+            $nameValue = $filtersInput['name'] ?? null;
+            if ($nameValue !== null && $nameValue !== '' && $nameAttributeId) {
+                $query->whereHas('values', function ($q) use ($nameAttributeId, $nameValue) {
+                    $q->where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$nameValue}%");
+                });
+            }
+
+            foreach ((array) $attributeFilters as $filter) {
+                $attributeId = $filter['attribute_id'] ?? null;
+                $value = $filter['value'] ?? null;
+                if (!$attributeId || $value === null || $value === '') {
+                    continue;
+                }
+
+                $query->whereHas('values', function ($q) use ($attributeId, $value) {
+                    $q->where('attribute_id', $attributeId)->where('value', 'like', '%'.$value.'%');
+                });
+            }
+        });
 
         $imageAttributeIdByFamily = FamilyAttribute::query()
             ->join('attributes', 'attributes.id', '=', 'family_attributes.attribute_id')
@@ -51,7 +79,7 @@ class ProductController extends Controller
             ? Product::whereIn('id', $parentIds)->pluck('sku', 'id')
             : collect();
 
-        $allAttributes = Attribute::orderBy('code')->get(['id', 'code', 'name', 'type']);
+        $allAttributes = Attribute::orderBy('code')->get(['id', 'code', 'name', 'type', 'is_filterable']);
 
         $values = ProductValue::whereIn('product_id', $productIds)
             ->get(['product_id', 'attribute_id', 'value']);
@@ -86,12 +114,14 @@ class ProductController extends Controller
         return Inertia::render('catalog/products/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
-            'filters' => $request->only(['search', 'sort', 'dir']),
+            'filters' => $request->only(['search', 'sort', 'dir', 'filters', 'attribute_filters']),
+            'families' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
             'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
                 'id' => $attribute->id,
                 'code' => $attribute->code,
                 'label' => $attribute->name,
                 'type' => $attribute->type,
+                'is_filterable' => (bool) $attribute->is_filterable,
             ]),
         ]);
     }
@@ -147,6 +177,47 @@ class ProductController extends Controller
             'total_products' => $products->count(),
             'products' => $data,
         ]);
+    }
+
+    /**
+     * Lightweight product search for the "Add related/up-sell/cross-sell
+     * product" picker on the edit page — matches by SKU or by the `pname`
+     * attribute value, excluding whatever's already picked.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+        $excludeIds = array_filter(array_map('intval', (array) $request->query('exclude', [])));
+
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+
+        $matchingProductIds = $nameAttributeId
+            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$query}%")->pluck('product_id')
+            : collect();
+
+        $products = Product::where(function ($q) use ($query, $matchingProductIds) {
+                $q->where('sku', 'like', "%{$query}%");
+                if ($matchingProductIds->isNotEmpty()) {
+                    $q->orWhereIn('id', $matchingProductIds);
+                }
+            })
+            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
+            ->limit(20)
+            ->get(['id', 'sku']);
+
+        $names = $nameAttributeId
+            ? ProductValue::whereIn('product_id', $products->pluck('id'))->where('attribute_id', $nameAttributeId)->pluck('value', 'product_id')
+            : collect();
+
+        return response()->json($products->map(fn (Product $product) => [
+            'id' => $product->id,
+            'sku' => $product->sku,
+            'name' => $names->get($product->id) ?: $product->sku,
+        ])->values());
     }
 
     /**
@@ -429,6 +500,8 @@ class ProductController extends Controller
             'productValues' => $values,
             'variants' => $variantsData,
             'channels' => $channels,
+            'categoryIds' => $product->categories()->pluck('categories.id')->all(),
+            'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
         ]);
     }
@@ -445,6 +518,15 @@ class ProductController extends Controller
             'family_id' => ['required', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['exists:categories,id'],
+            'associations' => ['nullable', 'array'],
+            'associations.related' => ['nullable', 'array'],
+            'associations.related.*' => ['exists:products,id'],
+            'associations.up_sell' => ['nullable', 'array'],
+            'associations.up_sell.*' => ['exists:products,id'],
+            'associations.cross_sell' => ['nullable', 'array'],
+            'associations.cross_sell.*' => ['exists:products,id'],
             'values' => ['nullable', 'array'],
             'variants' => ['nullable', 'array'],
             'variants.*.id' => ['nullable', 'integer'],
@@ -454,6 +536,8 @@ class ProductController extends Controller
         ]);
 
         DB::transaction(function () use ($validated, $request, $product) {
+            $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
             $product->update([
                 'sku' => $validated['sku'],
                 'family_id' => $validated['family_id'],
@@ -461,6 +545,12 @@ class ProductController extends Controller
                 'enabled' => $validated['enabled'],
                 'updated_by' => $request->user()?->id,
             ]);
+
+            $newCategoryIds = collect($validated['category_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $product->categories()->sync($newCategoryIds);
+            $categoryChanged = $oldCategoryIds !== $newCategoryIds;
+
+            $this->syncAssociations($product, $validated['associations'] ?? []);
 
             // $values is nested: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value.
             // The frontend already resolves each attribute's channelKey/localeKey against its
@@ -532,7 +622,7 @@ class ProductController extends Controller
             $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
             $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
 
-            if ($valuesChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
+            if ($valuesChanged || $categoryChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
                 event(new ProductDataChanged($product->id, $product->enabled));
             }
 
@@ -710,6 +800,67 @@ class ProductController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Related/Up-sell/Cross-sell products for the edit page's Associations
+     * panel, keyed by association type code, each entry {id, sku, name}.
+     */
+    private function associationsFor(Product $product): array
+    {
+        $records = $product->associations()->with(['associatedProduct', 'associationType'])->get();
+
+        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+        $names = $nameAttributeId
+            ? ProductValue::whereIn('product_id', $records->pluck('associated_product_id'))
+                ->where('attribute_id', $nameAttributeId)
+                ->pluck('value', 'product_id')
+            : collect();
+
+        $grouped = ['related' => [], 'up_sell' => [], 'cross_sell' => []];
+
+        foreach ($records as $record) {
+            $code = $record->associationType?->code;
+            if (!isset($grouped[$code]) || !$record->associatedProduct) {
+                continue;
+            }
+
+            $grouped[$code][] = [
+                'id' => $record->associatedProduct->id,
+                'sku' => $record->associatedProduct->sku,
+                'name' => $names->get($record->associatedProduct->id) ?: $record->associatedProduct->sku,
+            ];
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Replace-all-on-save sync for the 3 association types, mirroring the
+     * delete-then-recreate pattern already used for variants above.
+     */
+    private function syncAssociations(Product $product, array $associations): void
+    {
+        foreach (['related', 'up_sell', 'cross_sell'] as $code) {
+            $typeId = AssociationType::where('code', $code)->value('id');
+            if (!$typeId) {
+                continue;
+            }
+
+            ProductAssociation::where('owner_product_id', $product->id)
+                ->where('association_type_id', $typeId)
+                ->delete();
+
+            $ids = collect($associations[$code] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+
+            foreach ($ids as $associatedProductId) {
+                ProductAssociation::create([
+                    'owner_product_id' => $product->id,
+                    'associated_product_id' => $associatedProductId,
+                    'association_type_id' => $typeId,
+                ]);
+            }
+        }
     }
 
     /**

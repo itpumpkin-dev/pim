@@ -34,11 +34,13 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 
 interface GridColumn {
     label: string;
     type: string;
     sortable?: boolean;
+    filterable?: boolean;
 }
 interface GridAction {
     icon: string;
@@ -64,7 +66,7 @@ interface GridData {
 interface Props {
     gridConfig: GridConfig;
     gridData: GridData;
-    filters: { search?: string; sort?: string; dir?: string };
+    filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> };
 }
 
 export default function AttributeGroupIndex({ gridConfig, gridData, filters }: Props) {
@@ -85,6 +87,8 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(10);
     const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
+    const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -94,11 +98,16 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/attributeGroups', { search }, { preserveState: true, replace: true });
+            router.get('/catalog/attributeGroups', { search, filters: activeFilters }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
     }, [search]);
+
+    const applyFilters = (next: Record<string, FilterValue>) => {
+        setActiveFilters(next);
+        router.get('/catalog/attributeGroups', { search, filters: next }, { preserveState: true });
+    };
 
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
@@ -163,6 +172,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         <Button
                             variant="outlined"
                             startIcon={<FilterListIcon />}
+                            onClick={() => setFilterDrawerOpen(true)}
                             sx={{
                                 color: '#64748b',
                                 borderColor: '#cbd5e1',
@@ -172,6 +182,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                             }}
                         >
                             {t('filter')}
+                            {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
                         </Button>
 
                         <Select
@@ -286,6 +297,14 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                     </Button>
                 </DialogActions>
             </Dialog>
+            <GridFilterDrawer
+                open={filterDrawerOpen}
+                onClose={() => setFilterDrawerOpen(false)}
+                columns={gridConfig.columns}
+                value={activeFilters}
+                onApply={applyFilters}
+                t={t}
+            />
         </AppLayout>
     );
 }

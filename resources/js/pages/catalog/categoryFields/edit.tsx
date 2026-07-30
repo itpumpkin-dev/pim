@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { OptionListEditor } from '@/components/catalog/option-list-editor';
 import { HistoryPanel } from '@/components/history-panel';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -14,6 +15,7 @@ interface CategoryFieldItem {
     code: string;
     type: string;
     labels: Record<string, string>;
+    options: string[] | null;
     is_required: boolean;
     status: boolean;
     position: number;
@@ -40,6 +42,7 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
         code: field.code || '',
         type: field.type || 'Text',
         labels: field.labels || {},
+        options: field.options || ([] as string[]),
         is_required: Boolean(field.is_required),
         status: Boolean(field.status),
         position: field.position || 0,
@@ -108,9 +111,25 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                                 >
                                     <MenuItem value="Text">Text</MenuItem>
                                     <MenuItem value="Textarea">Textarea</MenuItem>
+                                    <MenuItem value="Boolean">Boolean</MenuItem>
                                     <MenuItem value="Select">Select</MenuItem>
+                                    <MenuItem value="Multiselect">Multiselect</MenuItem>
+                                    <MenuItem value="Datetime">Datetime</MenuItem>
+                                    <MenuItem value="Date">Date</MenuItem>
+                                    <MenuItem value="Image">Image</MenuItem>
+                                    <MenuItem value="File">File</MenuItem>
+                                    <MenuItem value="Checkbox">Checkbox</MenuItem>
                                 </Select>
                             </FormControl>
+
+                            {(data.type === 'Select' || data.type === 'Multiselect') && (
+                                <Box>
+                                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                                        Options
+                                    </Typography>
+                                    <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
+                                </Box>
+                            )}
 
                             <TextField
                                 label="Position"

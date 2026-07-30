@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\CategoryField;
+use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,20 +29,30 @@ class CategoryFieldController extends Controller
             $perPage = 15;
         }
 
-        $fields = CategoryField::query()
+        $filterColumns = [
+            'code' => ['label' => 'Code', 'type' => 'string', 'filterable' => true],
+            'type' => ['label' => 'Type', 'type' => 'string', 'filterable' => true],
+            'is_required' => ['label' => 'Required', 'type' => 'boolean', 'filterable' => true],
+            'status' => ['label' => 'Status', 'type' => 'boolean', 'filterable' => true],
+        ];
+
+        $query = CategoryField::query()
             ->when($search, function ($query, $search) {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('type', 'like', "%{$search}%")
                     ->orWhere('display_section', 'like', "%{$search}%");
             })
             ->orderBy('position')
-            ->orderBy('id', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('id', 'desc');
+
+        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+
+        $fields = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('catalog/categoryFields/index', [
             'fields' => $fields,
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'filters']),
+            'filterColumns' => $filterColumns,
         ]);
     }
 
@@ -60,9 +71,11 @@ class CategoryFieldController extends Controller
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:category_fields,code'],
-            'type' => ['required', 'in:Text,Textarea,Select'],
+            'type' => ['required', 'in:Text,Textarea,Boolean,Select,Multiselect,Datetime,Date,Image,File,Checkbox'],
             'labels' => ['required', 'array'],
             'labels.*' => ['nullable', 'string', 'max:255'],
+            'options' => ['nullable', 'array', 'required_if:type,Select,Multiselect'],
+            'options.*' => ['string', 'max:255'],
             'is_required' => ['required', 'boolean'],
             'status' => ['required', 'boolean'],
             'position' => ['required', 'integer'],
@@ -101,9 +114,11 @@ class CategoryFieldController extends Controller
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:category_fields,code,' . $categoryField->id],
-            'type' => ['required', 'in:Text,Textarea,Select'],
+            'type' => ['required', 'in:Text,Textarea,Boolean,Select,Multiselect,Datetime,Date,Image,File,Checkbox'],
             'labels' => ['required', 'array'],
             'labels.*' => ['nullable', 'string', 'max:255'],
+            'options' => ['nullable', 'array', 'required_if:type,Select,Multiselect'],
+            'options.*' => ['string', 'max:255'],
             'is_required' => ['required', 'boolean'],
             'status' => ['required', 'boolean'],
             'position' => ['required', 'integer'],

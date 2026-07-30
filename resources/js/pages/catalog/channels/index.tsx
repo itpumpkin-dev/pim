@@ -5,9 +5,11 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 
 interface ChannelItem {
     id: number;
@@ -27,10 +29,11 @@ interface PaginatedData<T> {
 
 interface Props {
     channels: PaginatedData<ChannelItem>;
-    filters: { search?: string };
+    filters: { search?: string; filters?: Record<string, FilterValue> };
+    filterColumns: Record<string, GridColumn>;
 }
 
-export default function ChannelIndex({ channels, filters }: Props) {
+export default function ChannelIndex({ channels, filters, filterColumns }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tGrid } = useTranslation('grid');
     const { t: tNav } = useTranslation('nav');
@@ -48,6 +51,8 @@ export default function ChannelIndex({ channels, filters }: Props) {
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [deleteChannelId, setDeleteChannelId] = useState<number | null>(null);
+    const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -57,14 +62,19 @@ export default function ChannelIndex({ channels, filters }: Props) {
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/channels', { search }, { preserveState: true, replace: true });
+            router.get('/catalog/channels', { search, filters: activeFilters }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
     }, [search]);
 
     const handlePageChange = (_: unknown, page: number) => {
-        router.get('/catalog/channels', { search, page }, { preserveState: true });
+        router.get('/catalog/channels', { search, page, filters: activeFilters }, { preserveState: true });
+    };
+
+    const applyFilters = (next: Record<string, FilterValue>) => {
+        setActiveFilters(next);
+        router.get('/catalog/channels', { search, filters: next }, { preserveState: true });
     };
 
     return (
@@ -88,20 +98,26 @@ export default function ChannelIndex({ channels, filters }: Props) {
                     )}
                 </Box>
 
-                <TextField
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={t('searchChannels')}
-                    size="small"
-                    sx={{ mb: 3, minWidth: 280 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mb: 3 }}>
+                    <TextField
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder={t('searchChannels')}
+                        size="small"
+                        sx={{ minWidth: 280 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                    <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
+                        {tGrid('filter')}
+                        {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                    </Button>
+                </Box>
 
                 <TableContainer component={Paper}>
                     <Table>
@@ -206,6 +222,14 @@ export default function ChannelIndex({ channels, filters }: Props) {
                     </Button>
                 </DialogActions>
             </Dialog>
+            <GridFilterDrawer
+                open={filterDrawerOpen}
+                onClose={() => setFilterDrawerOpen(false)}
+                columns={filterColumns}
+                value={activeFilters}
+                onApply={applyFilters}
+                t={t}
+            />
         </AppLayout>
     );
 }

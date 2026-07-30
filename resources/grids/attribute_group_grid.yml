@@ -12,10 +12,12 @@ datagrid:
         label: fields.code
         type: string
         sortable: true
+        filterable: true
       name:
         label: fields.name
         type: string
         sortable: true
+        filterable: true
     filters:
       global:
         type: string

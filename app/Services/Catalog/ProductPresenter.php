@@ -3,9 +3,12 @@
 namespace App\Services\Catalog;
 
 use App\Models\Attribute;
+use App\Models\Category;
+use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -32,9 +35,24 @@ class ProductPresenter
 
         $attributesByCode = Attribute::whereIn('code', self::CODES)->get(['id', 'code'])->keyBy('id');
 
+        // Locale-based attributes (pname, spec_*, ...) store one ProductValue
+        // row per locale. Only ever display the site's default locale, and
+        // order null-locale (global) rows before it so a locale-specific row
+        // always wins when both exist for the same attribute — otherwise
+        // whichever row the DB happens to return last would win at random.
+        $defaultLocaleId = Locale::where('code', 'th')->value('id');
+
         $values = ProductValue::whereIn('product_id', $products->pluck('id'))
             ->whereIn('attribute_id', $attributesByCode->keys())
-            ->get(['product_id', 'attribute_id', 'value']);
+            ->whereNull('channel_id')
+            ->where(function ($query) use ($defaultLocaleId) {
+                $query->whereNull('locale_id');
+                if ($defaultLocaleId) {
+                    $query->orWhere('locale_id', $defaultLocaleId);
+                }
+            })
+            ->orderByRaw('CASE WHEN locale_id IS NULL THEN 0 ELSE 1 END ASC')
+            ->get(['product_id', 'attribute_id', 'locale_id', 'value']);
 
         $valuesByProduct = $values->groupBy('product_id')->map(
             fn (Collection $rows) => $rows->mapWithKeys(
@@ -42,12 +60,53 @@ class ProductPresenter
             )
         );
 
+        $categoryNamesByProduct = self::rootCategoryNames($products);
+
         return $products->map(
-            fn (Product $product) => self::mapOne($product, $valuesByProduct->get($product->id, collect()))
+            fn (Product $product) => self::mapOne(
+                $product,
+                $valuesByProduct->get($product->id, collect()),
+                $categoryNamesByProduct->get($product->id)
+            )
         )->values()->all();
     }
 
-    private static function mapOne(Product $product, Collection $values): array
+    /**
+     * Real category assignment (product_category pivot) takes precedence
+     * over the legacy `pcatname` free-text attribute. Products are typically
+     * tagged at the most specific (product-group) level, so this walks each
+     * one up to its top-level ancestor — the storefront's category filter
+     * shows the ~19 root categories, not hundreds of product groups.
+     *
+     * @return Collection<int, string> keyed by product id
+     */
+    private static function rootCategoryNames(Collection $products): Collection
+    {
+        $assignedCategoryId = DB::table('product_category')
+            ->whereIn('product_id', $products->pluck('id'))
+            ->get(['product_id', 'category_id'])
+            ->groupBy('product_id')
+            ->map(fn (Collection $rows) => $rows->first()->category_id);
+
+        if ($assignedCategoryId->isEmpty()) {
+            return collect();
+        }
+
+        // The tree is only 3 levels deep and small (~1,000 rows) — loading it
+        // whole is simpler than walking parent_id with per-level queries.
+        $categoriesById = Category::all(['id', 'name', 'parent_id'])->keyBy('id');
+
+        return $assignedCategoryId->map(function (int $categoryId) use ($categoriesById) {
+            $category = $categoriesById->get($categoryId);
+            while ($category?->parent_id && $categoriesById->has($category->parent_id)) {
+                $category = $categoriesById->get($category->parent_id);
+            }
+
+            return $category?->name;
+        })->filter();
+    }
+
+    private static function mapOne(Product $product, Collection $values, ?string $categoryName): array
     {
         $get = fn (string $code) => $values->get($code) ?: null;
 
@@ -67,7 +126,7 @@ class ProductPresenter
             'sku' => $product->sku,
             'name' => $get('pname') ?? $product->sku,
             'brand' => $get('pbrand') ?? '-',
-            'category' => $get('pcatname') ?? 'ทั่วไป',
+            'category' => $categoryName ?? $get('pcatname') ?? 'ทั่วไป',
             'size' => $get('unitinfo') ?? '',
             'packUnit' => $get('pbaseunit') ?? 'ชิ้น',
             'packQty' => (int) ($get('packaging_box') ?? 1),

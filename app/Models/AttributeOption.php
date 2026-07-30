@@ -12,7 +12,17 @@ class AttributeOption extends Model
     protected $fillable = [
         'attribute_id',
         'code',
+        'admin_label',
+        'swatch_value',
+        'sort_order',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'sort_order' => 'integer',
+        ];
+    }
 
     public function attribute(): BelongsTo
     {

@@ -8,23 +8,13 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
+import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 
 interface ParentCategoryOption {
     id: number;
     code: string;
     name: string;
     display_name: string;
-}
-
-interface CategoryFieldItem {
-    id: number;
-    code: string;
-    type: string;
-    labels: Record<string, string>;
-    is_required: boolean;
-    status: boolean;
-    position: number;
-    display_section: string | null;
 }
 
 interface Props {
@@ -157,40 +147,12 @@ export default function CategoryCreate({ parentCategories, categoryFields = [] }
                                             <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
                                                 {fieldLabel} {field.is_required && '*'}
                                             </Typography>
-                                            {field.type === 'Textarea' ? (
-                                                <TextField
-                                                    multiline
-                                                    rows={4}
-                                                    fullWidth
-                                                    value={fieldValue}
-                                                    onChange={(e) => setData('additional_data', { ...data.additional_data, [field.code]: e.target.value })}
-                                                    error={Boolean(fieldError)}
-                                                    helperText={fieldError}
-                                                />
-                                            ) : field.type === 'Select' ? (
-                                                <Select
-                                                    fullWidth
-                                                    size="small"
-                                                    value={fieldValue}
-                                                    onChange={(e) => setData('additional_data', { ...data.additional_data, [field.code]: e.target.value })}
-                                                    error={Boolean(fieldError)}
-                                                >
-                                                    <MenuItem value="">
-                                                        <em>None</em>
-                                                    </MenuItem>
-                                                    <MenuItem value="Option 1">Option 1</MenuItem>
-                                                    <MenuItem value="Option 2">Option 2</MenuItem>
-                                                </Select>
-                                            ) : (
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    value={fieldValue}
-                                                    onChange={(e) => setData('additional_data', { ...data.additional_data, [field.code]: e.target.value })}
-                                                    error={Boolean(fieldError)}
-                                                    helperText={fieldError}
-                                                />
-                                            )}
+                                            <CategoryFieldInput
+                                                field={field}
+                                                value={fieldValue}
+                                                onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
+                                                error={fieldError}
+                                            />
                                         </Box>
                                     );
                                 })}

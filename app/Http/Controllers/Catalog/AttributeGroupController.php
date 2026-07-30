@@ -27,7 +27,7 @@ class AttributeGroupController extends Controller
         return Inertia::render('catalog/attribute-groups/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
-            'filters' => $request->only(['search', 'sort', 'dir']),
+            'filters' => $request->only(['search', 'sort', 'dir', 'filters']),
         ]);
     }
 

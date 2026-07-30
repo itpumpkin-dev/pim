@@ -3,7 +3,6 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import {
     Alert,
     Box,
@@ -35,6 +34,8 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { HistoryPanel } from '@/components/history-panel';
+import { CategoryTreePicker } from '@/components/category-tree-picker';
+import { ProductPicker, type ProductOption } from '@/components/product-picker';
 
 interface AttributeOption {
     id: number;
@@ -99,6 +100,8 @@ interface Props {
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
     channels?: ChannelOption[];
+    categoryIds?: number[];
+    associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
 }
 
@@ -112,6 +115,8 @@ interface ProductForm {
     enabled: boolean;
     values: Record<string | number, Record<string, Record<string | number, AttributeValue>>>;
     variants: VariantItem[];
+    category_ids: number[];
+    associations: { related: number[]; up_sell: number[]; cross_sell: number[] };
     [key: string]: any;
 }
 
@@ -121,9 +126,22 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT PRODUCT', href: '#' },
 ];
 
-export default function ProductEdit({ product, families, assignedGroups, productValues, variants = [], channels = [], canViewHistory = false }: Props) {
+export default function ProductEdit({
+    product,
+    families,
+    assignedGroups,
+    productValues,
+    variants = [],
+    channels = [],
+    categoryIds = [],
+    associations = { related: [], up_sell: [], cross_sell: [] },
+    canViewHistory = false,
+}: Props) {
     const { locales, locale: currentLocaleCode } = useLocale();
     const [tabIndex, setTabIndex] = useState(0);
+    const [relatedProducts, setRelatedProducts] = useState<ProductOption[]>(associations.related);
+    const [upSellProducts, setUpSellProducts] = useState<ProductOption[]>(associations.up_sell);
+    const [crossSellProducts, setCrossSellProducts] = useState<ProductOption[]>(associations.cross_sell);
 
     // Find active locale ID matching system language
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
@@ -149,6 +167,12 @@ export default function ProductEdit({ product, families, assignedGroups, product
         enabled: Boolean(product.enabled),
         values: initialValues,
         variants: variants,
+        category_ids: categoryIds,
+        associations: {
+            related: associations.related.map((p) => p.id),
+            up_sell: associations.up_sell.map((p) => p.id),
+            cross_sell: associations.cross_sell.map((p) => p.id),
+        },
     });
 
     // Resolves which nested keys a given attribute's value lives under for the
@@ -554,12 +578,7 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                     <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                         Categories
                                     </Typography>
-                                    <Stack direction="row" alignItems="center" spacing={1}>
-                                        <KeyboardArrowRightIcon fontSize="small" sx={{ color: '#64748b' }} />
-                                        <Typography variant="body2" color="#334155">
-                                            [root]
-                                        </Typography>
-                                    </Stack>
+                                    <CategoryTreePicker value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
                                 </Paper>
 
                                 {/* Associations Panel */}
@@ -569,64 +588,43 @@ export default function ProductEdit({ product, families, assignedGroups, product
                                     </Typography>
 
                                     <Stack spacing={2.5}>
-                                        {/* Related Products */}
                                         <Box>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary">
-                                                    Related Products
-                                                </Typography>
-                                                <Button size="small" variant="outlined" sx={{ color: 'primary.main', borderColor: 'primary.main', py: 0.2, px: 1, minWidth: 'auto', textTransform: 'none' }}>
-                                                    Add
-                                                </Button>
-                                            </Stack>
-                                            <Box sx={{ border: '1px dashed #cbd5e1', borderRadius: 1.5, p: 2, textAlign: 'center' }}>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Add Product
-                                                </Typography>
-                                                <Typography variant="caption" color="text.disabled">
-                                                    Add related association products.
-                                                </Typography>
-                                            </Box>
+                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                                Related Products
+                                            </Typography>
+                                            <ProductPicker
+                                                value={relatedProducts}
+                                                onChange={(next) => {
+                                                    setRelatedProducts(next);
+                                                    setData('associations', { ...data.associations, related: next.map((p) => p.id) });
+                                                }}
+                                            />
                                         </Box>
 
-                                        {/* Up-Sell Products */}
                                         <Box>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary">
-                                                    Up-Sell Products
-                                                </Typography>
-                                                <Button size="small" variant="outlined" sx={{ color: 'primary.main', borderColor: 'primary.main', py: 0.2, px: 1, minWidth: 'auto', textTransform: 'none' }}>
-                                                    Add
-                                                </Button>
-                                            </Stack>
-                                            <Box sx={{ border: '1px dashed #cbd5e1', borderRadius: 1.5, p: 2, textAlign: 'center' }}>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Add Product
-                                                </Typography>
-                                                <Typography variant="caption" color="text.disabled">
-                                                    Add up sell association products.
-                                                </Typography>
-                                            </Box>
+                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                                Up-Sell Products
+                                            </Typography>
+                                            <ProductPicker
+                                                value={upSellProducts}
+                                                onChange={(next) => {
+                                                    setUpSellProducts(next);
+                                                    setData('associations', { ...data.associations, up_sell: next.map((p) => p.id) });
+                                                }}
+                                            />
                                         </Box>
 
-                                        {/* Cross-Sell Products */}
                                         <Box>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary">
-                                                    Cross-Sell Products
-                                                </Typography>
-                                                <Button size="small" variant="outlined" sx={{ color: 'primary.main', borderColor: 'primary.main', py: 0.2, px: 1, minWidth: 'auto', textTransform: 'none' }}>
-                                                    Add
-                                                </Button>
-                                            </Stack>
-                                            <Box sx={{ border: '1px dashed #cbd5e1', borderRadius: 1.5, p: 2, textAlign: 'center' }}>
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    Add Product
-                                                </Typography>
-                                                <Typography variant="caption" color="text.disabled">
-                                                    Add cross sell association products.
-                                                </Typography>
-                                            </Box>
+                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                                                Cross-Sell Products
+                                            </Typography>
+                                            <ProductPicker
+                                                value={crossSellProducts}
+                                                onChange={(next) => {
+                                                    setCrossSellProducts(next);
+                                                    setData('associations', { ...data.associations, cross_sell: next.map((p) => p.id) });
+                                                }}
+                                            />
                                         </Box>
                                     </Stack>
                                 </Paper>

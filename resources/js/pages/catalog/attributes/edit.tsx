@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { AttributeOptionsPanel, type AttributeOptionItem } from '@/components/catalog/attribute-options-panel';
 import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
@@ -47,10 +48,11 @@ interface AttributeForm {
 interface Props {
     attribute: Attribute;
     translations: Record<string, string>;
+    options?: AttributeOptionItem[];
     canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations, canViewHistory = false }: Props) {
+export default function AttributeEdit({ attribute, translations, options = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -200,6 +202,10 @@ export default function AttributeEdit({ attribute, translations, canViewHistory 
                         values={data.translations}
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
+
+                    {showSwatchType && (
+                        <AttributeOptionsPanel attributeId={attribute.id} swatchType={data.swatch_type} options={options} />
+                    )}
                 </Stack>
 
                 {Object.keys(errors).length > 0 && <Alert severity="error" sx={{ mt: 2 }}>{t('correctHighlightedFields')}</Alert>}

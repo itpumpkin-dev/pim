@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,20 +30,29 @@ class CategoryController extends Controller
             $perPage = 15;
         }
 
+        $filterColumns = [
+            'code' => ['label' => 'Code', 'type' => 'string', 'filterable' => true],
+            'name' => ['label' => 'Name', 'type' => 'string', 'filterable' => true],
+            'description' => ['label' => 'Description', 'type' => 'string', 'filterable' => true],
+        ];
+
         // Fetch categories with their parent to show in list
-        $categories = Category::with('parent')
+        $query = Category::with('parent')
             ->when($search, function ($query, $search) {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             })
-            ->orderBy('id', 'desc')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy('id', 'desc');
+
+        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+
+        $categories = $query->paginate($perPage)->withQueryString();
 
         return Inertia::render('catalog/categories/index', [
             'categories' => $categories,
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'filters']),
+            'filterColumns' => $filterColumns,
         ]);
     }
 
@@ -128,6 +138,26 @@ class CategoryController extends Controller
     public function history(Category $category): JsonResponse
     {
         return response()->json(['history' => $this->versionHistoryFor($category)]);
+    }
+
+    /**
+     * The full category tree, nested, for the product edit page's
+     * multi-select tree picker.
+     */
+    public function tree(): JsonResponse
+    {
+        $roots = Category::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
+
+        $map = function (Category $category) use (&$map) {
+            return [
+                'id' => $category->id,
+                'code' => $category->code,
+                'name' => $category->name,
+                'children' => $category->recursiveChildren->map($map)->values(),
+            ];
+        };
+
+        return response()->json($roots->map($map)->values());
     }
 
     /**

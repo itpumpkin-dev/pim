@@ -15,6 +15,7 @@ class CategoryField extends Model
         'code',
         'type',
         'labels',
+        'options',
         'is_required',
         'value_per_locale',
         'status',
@@ -32,6 +33,7 @@ class CategoryField extends Model
             'status' => 'boolean',
             'position' => 'integer',
             'labels' => 'array',
+            'options' => 'array',
         ];
     }
 

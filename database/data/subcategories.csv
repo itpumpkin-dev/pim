@@ -1,0 +1,181 @@
+pSubCatID,pCatID,pSubCatName,pSubCatNameENG,pSubCatStatus
+A001,A,เครื่องฉีดน้ำแรงดันสูงและอุปกรณ์เสริม,"High Pressure Washers And Accessories",Active
+A002,A,เครื่องเป่าลม-ดูดฝุ่น,"Blower - Vacuum",Active
+A003,A,เครื่องไฟฟ้าแบบตั้งโต๊ะงานอลูมิเนียม,"Electric Table Saw",Active
+A004,A,เครื่องมือไฟฟ้างานก่อสร้าง,"Power Tools For Construction",Active
+A005,A,"เครื่องมือไฟฟ้างานเจียร / ขัดโลหะ","Grinding / Polishing Power Tools",Active
+A006,A,เครื่องมือไฟฟ้างานไม้,"Wood Working Power Tools",Active
+A007,A,เครื่องมือไฟฟ้างานโลหะ,"Metal Working Power Tools",Active
+A008,A,เครื่องมือไฟฟ้างานสี,"Painting Power Tools",Active
+A009,A,ปั้มน้ำ,"Water Pump",Active
+A010,A,"สว่านกระแทก / สว่านไฟฟ้า / ไขควงไฟฟ้า","Impact Drill / Electric Drill / Electric Screwdriver",Active
+A011,A,สว่านโรตารี่และสว่านเจาะทำลาย,"Rotary Hammers And Breakers",Active
+A012,A,"สว่านไร้สาย / ไขควงไร้สาย","Cordless Drill / Cordless Screwdriver",Active
+A013,A,เครื่องตัดกระเบื้อง/ตัดหินอ่อนและอุปกรณ์เสริม,"Marble cutter/Tile cutter and accessories",Active
+A014,A,"เครื่องระบายอากาศ / ทำความเย็น","Air Flow / Cooling machine",Active
+A015,A,เครื่องส่องสว่าง,Lighting,Active
+A016,A,เครื่องมือสร้างพลังงานไฟฟ้าและเครื่องยนต์เกษตร,"Electric power & Agricultural Engine systems",Active
+A017,A,เครื่องมือไฟฟ้างานสวน,"Power Tools for Garden",Active
+A018,A,เครื่องมือไฟฟ้างานยานยนตร์,"Power Tools for Automotive",Active
+A019,A,บล็อกกระแทก,"Impact Wrench",Active
+A020,A,แบตเตอรี่และอุปกรณ์ชาร์จ,"BATTERY AND CHARGER",Active
+A021,A,"อุปกรณ์เสริมเครื่องไฟฟ้า / ไร้สาย","Power Tool Accessories / Cordless Tool Accessories",Active
+A022,A,เครื่องมือไฟฟ้างานก่อสร้าง,"Construction Power Tools",Active
+A023,A,เครื่องมือไร้สาย-งานก่อสร้าง,"Cordless Construction Tools",Active
+A024,A,เครื่องมือไร้สายงานบ้านและสวน,"Cordless Home & Garden Tools",Active
+A025,A,สว่านโรตารี่และสว่านเจาะทำลายไร้สาย,"Cordless Rotary & Demolition Hammers",Active
+A026,A,เครื่องมือไร้สาย-งานยานยนต์,"Cordless Automotive Tools",Active
+A027,A,"เครื่องมือไร้สาย งานเจียร / ขัดโลหะ","Cordless Grinding & Metalworking Tools",Active
+A028,A,ชุดเครื่องมือไร้สาย,"Cordless Tool Sets",Active
+A029,A,เครื่องมือไร้สาย-งานไม้,"Cordless Woodworking Tools",Active
+A030,A,เครื่องฉีดน้ำแรงดันสูงไร้สาย,"Cordless Pressure Washers",Active
+A031,A,"เครื่องมือไร้สาย เป่าลม-ดูดฝุ่น","Cordless Blower & Vacuum Tools",Active
+A032,A,เครื่องมือไร้สาย-งานสี,"Cordless Painting Tools",Active
+A033,A,"เครื่องระบายอากาศ / ทำความเย็น","Ventilation and cooling equipment",Active
+A034,A,"เครื่องยิงตะปู / เครื่องยิงลวดลม","Nail Gun / Air Stapler",Active
+A035,A,"ลำโพง BT","BT Speaker",Active
+B001,B,ชุดดอกเจียร,"Grinding Tools Set",Active
+B002,B,ดอกคัดเตอร์ฟันคาร์ไบด์(เจ็ทบอส),"Annular Cutter",Active
+B003,B,ดอกเจาะไม้สี่เหลี่ยม,"Wooden Square Drill Bits",Active
+B004,B,"ดอกสกัดปูน / คอนกรีต","Concrete Chisel Bits",Active
+B005,B,ดอกสว่านโคบอลต์,"M35 Cobalt Drill Bits",Active
+B006,B,ดอกสว่านเจาะกระจก,"Glass Drill Bits",Active
+B007,B,ดอกสว่านเจาะปูน,"Concrete Drill Bits",Active
+B008,B,ดอกสว่านเจาะสแตนเลส,"M2 High Speed Steel Drill Bits",Active
+B009,B,ดอกสว่านเจาะเหล็ก,"High Speed Steel Drill Bits",Active
+B010,B,ใบตัดเพชร,"Diamond Cutting Wheel",Active
+B011,B,ใบมีดกบไฟฟ้า,"Planner Blade",Active
+B012,B,ใบมีดตัดหญ้า,"Mower Blade",Active
+B013,B,"ใบเลื่อยจิ๊กซอว์ / Rs","Jigsaw Saw Blade / Reciprocating Saw Blade",Active
+B014,B,ใบเลื่อยวงเดือน,"Circular Saw Blade",Active
+B015,B,"แผ่นตัด / แผ่นเจียร / แผ่นขัด","Abrasive Cutting / Grinding / Polishing Wheel",Active
+B016,B,โฮลซอเจาะกระเบื้องและอุปกรณ์เสริม,"Diamond Hole Saws And Accessories",Active
+B017,B,"โฮลซอเจาะเหล็ก / เจาะสแตนเลส / เจาะไม้","Steel / Stainless Steel / Wood Hole Saw",Active
+B018,B,"ดอกเจาะอเนกประสงค์ เหล็ก / สแตนเลส  / ไม้","Multi Purpose Bit / Steel /Stainless Steel / Wood",Active
+B019,B,ดอกสว่านเจาะไม้,"Wood Drill Bits",Active
+C001,C,กรรไกรช่างก่อสร้าง,"Construction Cutter",Active
+C002,C,"กรรไกรตัดท่อ Pvc และอุปกรณ์เสริม","Pvc Cutter And Accessories",Active
+C003,C,เกียง,Trowel,Active
+C004,C,ขวาน,Axe,Active
+C005,C,"ค้อนช่างทอง / ค้อนปอนด์ / ค้อนตุ้มหัวกลม / ค้อนอื่นๆ","Machinist Hammer / Sledge Hammer / Ball Pien Hammer",Active
+C006,C,"ค้อนหงอน / หัวค้อนหงอน","Claw Hammer / Claw Hammer Head",Active
+C007,C,คีม,Pliers,Active
+C008,C,"คีมย้ำ / ตะปูรีเวท","Hand Riveter / Riveter",Active
+C009,C,"เครื่องตัดกระเบื้อง / ตัดหินอ่อนและอุปกรณ์เสริม","Tile Cutter / Marble Cutter And Accessories",Active
+C010,C,เครื่องมือช่างกระจก,"Glass Tools",Active
+C011,C,เครื่องมือวัดดิจิตอลและอุปกรณ์เสริม,"Digital Measurement & Accessories",Active
+C012,C,"ฉากสามเหลี่ยมโปกปูน / ฉากวัดไม้","Long Trowel / T-Square",Active
+C013,C,ตลับเมตร,"Measuring Tape",Active
+C014,C,"เทปวัดที่ / ล้อวัดระยะ","Long Tape Measurer / Measuring Wheel",Active
+C015,C,"บักเต้า / สีฝุ่น","Chalk Liner / Chalk",Active
+C016,C,"แปรงทาสี / แปรงวานิช","Paintbrush / Lacquer Brush",Active
+C017,C,แปรงลูกกลิ้งทาสีและอุปกรณ์เสริม,"Paint Roller And Accessories",Active
+C018,C,ระดับน้ำ,"Water Level",Active
+C019,C,เลื่อย,"Hand Saw",Active
+C020,C,สิ่ว,"Wooden Chisel",Active
+C021,C,"เหล็กสกัด / เหล็กส่ง","Steel Mark / Stone Chisel",Active
+C022,C,ไม้บรรทัด,Ruler,Active
+C023,C,"ปากกา-แคลมป์ จับยึดชิ้นงาน","Clamping Tools",Active
+C024,C,ปืนยิงซิลิโคน,"Clauking Gun",Active
+C025,C,แม่เหล็กจับยึดชิ้นงาน,"Welding Magnetic tools",Active
+C026,C,บันได,Ladder,Active
+C027,C,อุปกรณ์เสริมสำหรับงานกระเบื้อง,"Tile Tools",Active
+D001,D,กิ๊บรัดท่อ,"Hose Clamp",Active
+D002,D,กุญแจแขวน,Padlock,Active
+D003,D,ถ่าน,Battery,Active
+D004,D,ใบมีดคัตเตอร์,"Utility Knife Blade",Active
+D005,D,พุกยิปซั่ม,"Gypsum Anchor",Active
+D006,D,มีดคัตเตอร์,"Utility Knife",Active
+D007,D,"ลูกบิด / บานพับ","Door Knobs / Hinges",Active
+D008,D,อุปกรณ์โฮมฟิตติ้ง,"Home Fitting",Active
+D009,D,"อุปกรณ์การวัด / ควบคุมอัตราการไหล","Float Level Sensor",Active
+E001,E,กรรไกรช่าง,"Snip / Cutter",Active
+E002,E,"กระบอกอัดจารบี / กาหยอดน้ำมัน","Grease Gun",Active
+E003,E,กุญแจเลื่อน,"Adjustable Wrench",Active
+E004,E,"กุญแจหกเหลี่ยม / ท็อคซ์","Hexagon Key / Torx Wrench",Active
+E005,E,"ไขควง / ไขควงลองไฟ","Screwdriver / Electric Tester Screwdriver",Active
+E006,E,"ค้อนเคาะ / ค้อนยาง","Striking Hammer / Rubber Hammer",Active
+E007,E,"คีม / แหนบ","Pliers / Tweezers",Active
+E008,E,"คีมคอม้า / ประแจจับแป๊บ","Water Pump Pliers / Pipe Wrench",Active
+E009,E,"คีมปอกสาย / คีมย้ำสาย","Wire Strippers Pliers / Crimper Pliers",Active
+E010,E,คีมล็อค,"Locking Pliers",Active
+E011,E,เครื่องมือช่างยนต์,Automativetools,Active
+E012,E,เครื่องมือวัดและทดสอบ,"Measuring & Testing Instruments",Active
+E013,E,"เครื่องมือหุ้มฉนวนไฟฟ้า 1000Volt","1000-Volt Insulated Tools",Active
+E014,E,"เครื่องเย็บกระดาษ / ลวดเย็บกระดาษ","Stapler / Staple",Active
+E015,E,"โครงเลื่อย / ใบเลื่อยตัดเหล็ก","Hack Saw / Hack Saw Blade",Active
+E016,E,ชุดเครื่องมือช่าง,"Tools Set / Tools Kits",Active
+E017,E,"ชุดบ๊อก / ชุดเครื่องมือ","Socket Set / Combination Set",Active
+E018,E,"ดอกไขควง / ดอกบ๊อกลม","Screwdriver Bits / Socket Bits",Active
+E019,E,ตะไบ,Rasp,Active
+E020,E,"ต๊าป / ไดร์","Taps And Dies",Active
+E021,E,น้ำยาและผลิตภัณฑ์ทำความสะอาด,"Cleaning Solvent",Active
+E022,E,ประแจถอดไส้หม้อกรอง,"Filter Wrench",Active
+E023,E,"ประแจ-ปากตาย / ตัวที / ตัววาย","Wrenches  / T-Wrench / Y-Wrench",Active
+E024,E,"ปืนยิงกาว / หัวแร้ง / ตัวดูดตะกั่ว","Adhesive Gun / Soldering Gun / Lead Suction",Active
+E025,E,"รอกมือ / กว้านมือ / สายรัด","Hand Puller / Winch",Active
+E026,E,"ลูกบ๊อก / อุปกรณ์เสริม","Hand Socket And  Accessories",Active
+E027,E,"ลูกบ๊อกลม / อุปกรณ์เสริม","Impact Socket And  Accessories",Active
+E028,E,"เหล็กส่ง / เหล็กมาร์ค / เหล็กสกัด-ตอก / ชะแรง","Steel Mark / Steel Chisel / Crowbar",Active
+E029,E,อุปกรณ์จัดเก็บเครื่องมือ,"Tool Storage",Active
+E030,E,อุปกรณ์จับยึดชิ้นงาน,"Bench Vice / C-Clamp",Active
+E031,E,อุปกรณ์ถอดลูกปืน-เฟือง,"Gear-Bearing Puller",Active
+E032,E,อุปกรณ์แม่เหล็ก,"Magnetic Equipment",Active
+E033,E,อุปกรณ์ส่องสว่าง,"Lighting Devices",Active
+F001,F,ก๊อกลม,"Air Valve",Active
+F002,F,"คอปเปอร์ / อุปกรณ์ข้อต่อลม","Couplers / Air Fittings",Active
+F003,F,เครื่องปั๊มลม,"Air Compressor",Active
+F004,F,"เครื่องมือลม / เครื่องยิงบ๊อกลม","Air Tools / Impact  Wrench",Active
+F005,F,"เครื่องยิงตะปู / เครื่องยิงลวดลม","Air Nailer / Air Stapler-Tacker",Active
+F006,F,"ตะปู / ลวดเย็บ","Nails / Stitches",Active
+F007,F,"ปืนฉีดลม / หัวเติมลม","Air Blow Gun",Active
+F008,F,"รอกสปริงแบบสายลม / สายน้ำและสายปลั๊กไฟ","Air Hose Reel / Cable Reel",Active
+F009,F,สปริงบาลาซเซอร์,"Spring Balancer",Active
+F010,F,"สายลมถัก / สายลมPU","Pu Air Hose",Active
+F011,F,"อุปกรณ์เสริมเครื่องยิงตะปู / ชุดอะไหล่เครื่องยิงตะปู","Accessories And Spare Part For Air Nailer",Active
+G001,G,กรวยจราจรและอุปกรณ์เสริมงานจารจร,"Traffic Cone And Accessories",Active
+G002,G,กระจกโค้งจราจร,"Convex Traffic Mirror",Active
+G003,G,"เข็มขัดพยุงหลัง / เข็มขัดนิรภัย","Back Support Belt / Safety Belt",Active
+G004,G,ถุงมือนิรภัย,Gloves,Active
+G005,G,รองเท้านิรภัย,"Safety Shoes",Active
+G006,G,แว่นตาเซฟตี้,"Safety Eyewear / Goggle",Active
+G007,G,"เสื้อจราจร / แถบสะท้อนแสง","Traffic Vest / Reflective Strips",Active
+G008,G,"หน้ากากกันสารเคมี / กันฝุ่น","Chemical-Dust  Mask",Active
+G009,G,"หมวกช่างเชื่อม / หน้ากากช่างเชื่อม","Welding Helmet / Welding Mask",Active
+G010,G,"หมวกนิรภัย / อุปกรณ์เสริมหมวกนิรภัย","Helmet / Helmet Accessories",Active
+G011,G,"อุปกรณ์กั้นเขตอันตราย / ธงเซฟตี้","Hazard Barrier / Safety Flag",Active
+G012,G,อุปกรณ์ลดเสียง,"Noise Reduction Device",Active
+H001,H,กรรไกรจีน,"Chinese Scissors",Active
+H002,H,กรรไกรตัดกิ่ง,"Pruning Shears",Active
+H003,H,กรรไกรตัดหญ้า,Loppers,Active
+H004,H,เครื่องมือทำสวน,"Gardening Tools",Active
+H005,H,ใบเลื่อยคันธนู,"Bow Saw Blade",Active
+H006,H,"เลื่อยตัดกิ่ง / เลื่อยคันธนู / โครงเลื่อย","Pruning Saw / Bow Saw",Active
+H007,H,กรรไกรเอนกประสงค์,"Multi-Purpose Scissors",Active
+H008,H,อุปกรณ์งานสวน-งานน้ำ,"Water Gardening Tools",Active
+H009,H,เครื่องยนต์งานไม้,"Woodworking Engines / Motors",Active
+H010,H,เครื่องกำเนิดไฟฟ้า,"Power Generators",Active
+H011,H,เครื่องยนต์การเกษตร,"Agricultural Engines",Active
+H012,H,เครื่องมือการเกษตร,"Agricultural Tools & Equipment",Active
+I001,I,กาว,Glue,Active
+I002,I,"น้ำยาล็อคเกลียว / ตรึงเพลา","Thread-Lockers / Spindle-Lockers",Active
+I003,I,"ผลิตภัณฑ์ซิลิโคนยาแนว / โฟมยาแนว / กาวยาแนว","Silicone / Grout / Grout Products",Active
+I004,I,เทปกาว,"Adhesive Tape",Active
+J001,J,เครื่องมือการเกษตร,"Garden tools",Active
+K001,K,อุปกรณ์กีฬา,Sports,Active
+K002,K,เครื่องเขียน,Stationery,Active
+K003,K,เครื่องครัวของใช้ในบ้าน,"Kitchenware and household items",Active
+L001,L,ปั้มน้ำหอยโข่ง,"Centrifugal Water Pumps",Active
+L002,L,ปั๊มเครื่องยนต์,"Engine-Driven Water Pumps",Active
+L003,L,ปั้มแช่,"Submersible Pumps",Active
+L004,L,ปั้มน้ำ,"Water Pumps",Active
+L005,L,ปั๊มอินเวอร์เตอร์,"Inverter Water Pumps",Active
+L006,L,ปั้มไร้สาย,"Cordless Water Pumps",Active
+T001,T,บรรจุภัณฑ์,Packaging,Active
+U001,U,"Customer Brand","Customer Brand",Active
+U002,U,แบตเตอรี่และอุปกรณ์ชาร์จ,"Batteries & Chargers",Active
+V001,V,วัตถุดิบ,Material,Active
+W001,W,พรีเมี่ยมและของแถม,"Premium Product & Free Products",Active
+X001,X,หมายเหตุ,Remark,Active
+Y001,Y,อื่นๆ,Other,Active
+Z001,Z,อะไหล่,"Part of Tools",Active

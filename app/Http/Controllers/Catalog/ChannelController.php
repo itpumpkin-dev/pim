@@ -9,6 +9,7 @@ use App\Models\Channel;
 use App\Models\ChannelTranslation;
 use App\Models\Currency;
 use App\Models\Locale;
+use App\Services\GridManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,20 +21,29 @@ class ChannelController extends Controller
     {
         $search = $request->input('search');
 
-        $channels = Channel::with(['rootCategory'])
+        // Only `code` is a real, simple-typed column on `channels` — `name` is
+        // a translation-based accessor, not filterable via a plain where clause.
+        $filterColumns = [
+            'code' => ['label' => 'Code', 'type' => 'string', 'filterable' => true],
+        ];
+
+        $query = Channel::with(['rootCategory'])
             ->when($search, function ($query, $search) {
                 $query->where('code', 'like', "%{$search}%")
                     ->orWhereHas('translations', function ($q) use ($search) {
                         $q->where('name', 'like', "%{$search}%");
                     });
             })
-            ->orderBy('id', 'desc')
-            ->paginate(15)
-            ->withQueryString();
+            ->orderBy('id', 'desc');
+
+        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+
+        $channels = $query->paginate(15)->withQueryString();
 
         return Inertia::render('catalog/channels/index', [
             'channels' => $channels,
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'filters']),
+            'filterColumns' => $filterColumns,
         ]);
     }
 

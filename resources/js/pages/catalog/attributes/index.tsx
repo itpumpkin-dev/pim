@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -9,15 +10,16 @@ import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Badge, Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
 
-interface GridColumn { label: string; type: string; sortable?: boolean; }
+interface GridColumn extends FilterableGridColumn {}
 interface GridAction { icon: string; label: string; }
 interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<string, GridAction>; }
 interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; current_page: number; last_page: number; per_page: number; }
-interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string }; }
+interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> }; }
 
 function cellValue(value: unknown, type: string, t: (key: string) => string) {
     if (type === 'boolean') return <Chip label={value ? t('yes') : t('no')} size="small" color={value ? 'primary' : 'default'} variant={value ? 'filled' : 'outlined'} />;
@@ -40,6 +42,8 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteAttributeId, setDeleteAttributeId] = useState<number | null>(null);
+    const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
+    const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
 
     const visibleActions = Object.entries(gridConfig.actions ?? {}).filter(([actionKey]) => {
@@ -54,7 +58,10 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
             return;
         }
 
-        const timeout = setTimeout(() => router.get('/catalog/attributes', { search, per_page: perPage }, { preserveState: true, replace: true }), 300);
+        const timeout = setTimeout(
+            () => router.get('/catalog/attributes', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true }),
+            300,
+        );
         return () => clearTimeout(timeout);
     }, [search]);
 
@@ -62,12 +69,17 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const lastPage = gridData.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/attributes', { search, page, per_page: perPage }, { preserveState: true });
+        router.get('/catalog/attributes', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/attributes', { search, page: 1, per_page: value }, { preserveState: true });
+        router.get('/catalog/attributes', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true });
+    };
+
+    const applyFilters = (next: Record<string, FilterValue>) => {
+        setActiveFilters(next);
+        router.get('/catalog/attributes', { search, per_page: perPage, filters: next }, { preserveState: true });
     };
 
     return <AppLayout
@@ -81,7 +93,14 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                     <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
             </Box>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                    <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
+                    <Badge badgeContent={Object.keys(activeFilters).length} color="primary">
+                        <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
+                            Filter
+                        </Button>
+                    </Badge>
+                </Stack>
 
                 <Stack direction="row" alignItems="center" spacing={1.5}>
                     <Select
@@ -196,6 +215,14 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                 </Button>
             </DialogActions>
         </Dialog>
+        <GridFilterDrawer
+            open={filterDrawerOpen}
+            onClose={() => setFilterDrawerOpen(false)}
+            columns={gridConfig.columns}
+            value={activeFilters}
+            onApply={applyFilters}
+            t={t}
+        />
     </AppLayout >;
 }
 

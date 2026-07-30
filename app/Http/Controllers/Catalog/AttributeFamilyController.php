@@ -30,7 +30,7 @@ class AttributeFamilyController extends Controller
         return Inertia::render('catalog/attribute-families/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
-            'filters' => $request->only(['search', 'sort', 'dir']),
+            'filters' => $request->only(['search', 'sort', 'dir', 'filters']),
         ]);
     }
 

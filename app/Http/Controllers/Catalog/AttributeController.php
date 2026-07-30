@@ -14,6 +14,7 @@ use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +30,7 @@ class AttributeController extends Controller
         return Inertia::render('catalog/attributes/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
-            'filters' => $request->only(['search', 'sort', 'dir']),
+            'filters' => $request->only(['search', 'sort', 'dir', 'filters']),
         ]);
     }
 
@@ -89,6 +90,17 @@ class AttributeController extends Controller
             ]),
             'translations' => $attribute->translations()->get()
                 ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
+            'options' => $attribute->options()->orderBy('sort_order')->orderBy('id')->get([
+                'id', 'attribute_id', 'code', 'admin_label', 'swatch_value', 'sort_order',
+            ])->map(fn ($option) => [
+                'id' => $option->id,
+                'code' => $option->code,
+                'admin_label' => $option->admin_label,
+                'swatch_value' => $attribute->swatch_type === 'image' && $option->swatch_value
+                    ? Storage::url($option->swatch_value)
+                    : $option->swatch_value,
+                'sort_order' => $option->sort_order,
+            ]),
             'canViewHistory' => auth()->user()?->hasPermission('attributes', 'view_history') ?? false,
         ]);
     }

@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { OptionListEditor } from '@/components/catalog/option-list-editor';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -22,6 +23,7 @@ export default function CategoryFieldCreate() {
         code: '',
         type: 'Text',
         labels: {} as Record<string, string>,
+        options: [] as string[],
         is_required: false,
         status: true,
         position: 0,
@@ -79,9 +81,25 @@ export default function CategoryFieldCreate() {
                                 >
                                     <MenuItem value="Text">Text</MenuItem>
                                     <MenuItem value="Textarea">Textarea</MenuItem>
+                                    <MenuItem value="Boolean">Boolean</MenuItem>
                                     <MenuItem value="Select">Select</MenuItem>
+                                    <MenuItem value="Multiselect">Multiselect</MenuItem>
+                                    <MenuItem value="Datetime">Datetime</MenuItem>
+                                    <MenuItem value="Date">Date</MenuItem>
+                                    <MenuItem value="Image">Image</MenuItem>
+                                    <MenuItem value="File">File</MenuItem>
+                                    <MenuItem value="Checkbox">Checkbox</MenuItem>
                                 </Select>
                             </FormControl>
+
+                            {(data.type === 'Select' || data.type === 'Multiselect') && (
+                                <Box>
+                                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                                        Options
+                                    </Typography>
+                                    <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
+                                </Box>
+                            )}
 
                             <TextField
                                 label="Position"
