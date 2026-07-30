@@ -1,26 +1,18 @@
 import { ProductCard } from '@/components/product-card';
-import { productCsvHeaders, products, productToCsvRow, type IconType } from '@/data/products';
+import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { downloadCsv } from '@/lib/csv';
-import { type BreadcrumbItem, type SharedData } from '@/types';
+import { getCategoryIcon } from '@/lib/category-icon';
+import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
+import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import BlurOnIcon from '@mui/icons-material/BlurOn';
-import BuildIcon from '@mui/icons-material/Build';
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
-import ColorizeIcon from '@mui/icons-material/Colorize';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import HandymanIcon from '@mui/icons-material/Handyman';
-import LayersIcon from '@mui/icons-material/Layers';
-import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
-import OpacityIcon from '@mui/icons-material/Opacity';
-import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
-import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import LoginIcon from '@mui/icons-material/Login';
 import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Skeleton, Stack, TextField, Toolbar, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
@@ -46,21 +38,6 @@ const slides: { title: string; subtitle: string; icon: IconType; gradient: strin
         icon: LocalOfferOutlinedIcon,
         gradient: 'linear-gradient(135deg, #EA580C 0%, #F97316 100%)',
     },
-];
-
-const categories: { label: string; icon: IconType }[] = [
-    { label: 'กาวยาแนว MS-Polymer', icon: ScienceIcon },
-    { label: 'กาวตะปู', icon: ConstructionIcon },
-    { label: 'ซิลิโคน', icon: WaterDropIcon },
-    { label: 'โพลียูรีเทนยาแนว', icon: OpacityIcon },
-    { label: 'พียูโฟม', icon: BlurOnIcon },
-    { label: 'อุปกรณ์ทำความสะอาด', icon: CleaningServicesIcon },
-    { label: 'ปืนยาแนว/ปืนยิงโฟม', icon: HandymanIcon },
-    { label: 'น้ำยาล็อกเกลียว/ตรึงเพลา', icon: PrecisionManufacturingIcon },
-    { label: 'กาวร้อน', icon: LocalFireDepartmentIcon },
-    { label: 'เทปซ่อมแซม', icon: LayersIcon },
-    { label: 'กาวอะคริลิคยาแนว', icon: ColorizeIcon },
-    { label: 'กาวอีพ็อกซี่/เอนกประสงค์', icon: BuildIcon }, 
 ];
 
 function HeroCarousel() {
@@ -163,7 +140,15 @@ function HeroCarousel() {
     );
 }
 
-function CategoryStrip({ selected, onSelect }: { selected: string | null; onSelect: (label: string) => void }) {
+function CategoryStrip({
+    categories,
+    selected,
+    onSelect,
+}: {
+    categories: { label: string; icon: IconType }[];
+    selected: string | null;
+    onSelect: (label: string) => void;
+}) {
     return (
         <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 6 } }}>
             {categories.map(({ label, icon: Icon }) => (
@@ -188,7 +173,7 @@ function CategoryStrip({ selected, onSelect }: { selected: string | null; onSele
     );
 }
 
-export default function Home() {
+export default function Home({ products, categories }: { products: Product[]; categories: string[] }) {
     const { auth } = usePage<SharedData>().props;
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -201,6 +186,10 @@ export default function Home() {
         return () => clearTimeout(timer);
     }, []);
 
+    const categoryOptions = useMemo(() => categories.map((label) => ({ label, icon: getCategoryIcon(label) })), [categories]);
+
+    useStorefrontWatcher(reloadStorefrontLists);
+
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase();
         return products.filter((product) => {
@@ -208,7 +197,7 @@ export default function Home() {
             const matchesQuery = !query || product.name.toLowerCase().includes(query) || product.category.toLowerCase().includes(query);
             return matchesCategory && matchesQuery;
         });
-    }, [selectedCategory, search]);
+    }, [products, selectedCategory, search]);
 
     const handleExport = () => {
         const filename = `products-${selectedCategory ?? 'all'}.csv`;
@@ -337,6 +326,7 @@ export default function Home() {
                                 หมวดหมู่สินค้า
                             </Typography>
                             <CategoryStrip
+                                categories={categoryOptions}
                                 selected={selectedCategory}
                                 onSelect={(label) => setSelectedCategory((current) => (current === label ? null : label))}
                             />

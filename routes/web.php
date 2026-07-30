@@ -1,13 +1,12 @@
 <?php
 
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\StorefrontController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('home');
-})->name('home');
+Route::get('/', [StorefrontController::class, 'home'])->name('home');
 
 Route::put('locale', [LocaleController::class, 'update'])->name('locale.update');
 
@@ -42,9 +41,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('dashboard')->middleware('permission:dashboards,list_dashboards');
 });
 
-Route::get('products/{id}', function (int $id) {
-    return Inertia::render('products/show', ['id' => $id]);
-})->name('products.show');
+Route::get('products/{id}', [StorefrontController::class, 'show'])->name('products.show');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

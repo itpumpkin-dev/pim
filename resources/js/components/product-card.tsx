@@ -1,5 +1,6 @@
 import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Product } from '@/data/products';
 import { useLocale } from '@/hooks/use-locale';
+import { getCategoryIcon } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
 import { Link } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 
 export function ProductCard({ product }: { product: Product }) {
     const { t } = useTranslation();
-    const Icon = product.icon;
+    const Icon = product.icon ?? getCategoryIcon(product.category);
     const [imageFailed, setImageFailed] = useState(false);
     const [hovering, setHovering] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);

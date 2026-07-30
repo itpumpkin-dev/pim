@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\HasVersionHistory;
+use App\Events\ProductDataChanged;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
@@ -529,7 +530,11 @@ class ProductController extends Controller
             }
 
             $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
-            $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
+            $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
+
+            if ($valuesChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
+                event(new ProductDataChanged($product->id, $product->enabled));
+            }
 
             // Sync Variants (Cartesian Product Children)
             if (strtolower($validated['type']) === 'configurable' && !empty($validated['variants'])) {
@@ -624,8 +629,12 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        $productId = $product->id;
+
         ProductValue::where('product_id', $product->id)->delete();
         $product->delete();
+
+        event(new ProductDataChanged($productId, false));
 
         return to_route('catalog.products.index')->with('success', 'Product deleted successfully.');
     }
@@ -694,7 +703,11 @@ class ProductController extends Controller
         }
 
         $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
-        $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
+        $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
+
+        if ($valuesChanged) {
+            event(new ProductDataChanged($product->id, $product->enabled));
+        }
 
         return response()->json(['success' => true]);
     }
@@ -730,9 +743,10 @@ class ProductController extends Controller
 
     /**
      * Diff two productValueSnapshot() results and, if anything changed,
-     * record it against the product's audit trail.
+     * record it against the product's audit trail. Returns whether anything
+     * actually changed, so callers can decide whether to notify the storefront.
      */
-    private function recordProductValueChanges(Product $product, array $oldValues, array $newValues): void
+    private function recordProductValueChanges(Product $product, array $oldValues, array $newValues): bool
     {
         $changedOld = [];
         $changedNew = [];
@@ -747,9 +761,13 @@ class ProductController extends Controller
             }
         }
 
-        if (!empty($changedOld) || !empty($changedNew)) {
-            AuditLog::record('attribute_values_updated', $product, $changedOld, $changedNew);
+        if (empty($changedOld) && empty($changedNew)) {
+            return false;
         }
+
+        AuditLog::record('attribute_values_updated', $product, $changedOld, $changedNew);
+
+        return true;
     }
 
     /**

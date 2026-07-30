@@ -22,7 +22,7 @@ import { type OverridableComponent } from '@mui/material/OverridableComponent';
 
 export type IconType = OverridableComponent<SvgIconTypeMap>;
 
-export type Brand = 'SOUDAL' | 'SUNNIC' | 'PUMPKIN';
+export type Brand = 'SOUDAL' | 'SUNNIC' | 'PUMPKIN' | (string & {});
 
 export interface Product {
     id: number;
@@ -41,7 +41,7 @@ export interface Product {
     highlights: string[];
     specs: Record<string, string>;
     discountNote?: string;
-    icon: IconType;
+    icon?: IconType;
     image?: string;
     videoUrl?: string;
 }
