@@ -61,12 +61,9 @@ class CategoryController extends Controller
      */
     public function create(): Response
     {
-        // Load the flat hierarchical tree options for selection
-        $parentCategories = Category::getTreeOptions();
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
         return Inertia::render('catalog/categories/create', [
-            'parentCategories' => $parentCategories,
             'categoryFields' => $categoryFields,
         ]);
     }
@@ -123,13 +120,10 @@ class CategoryController extends Controller
      */
     public function edit(Category $category): Response
     {
-        // Prevent selecting itself or its children as parent to avoid cycles
-        $parentCategories = Category::getTreeOptions($category->id);
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
         return Inertia::render('catalog/categories/edit', [
             'category' => $category,
-            'parentCategories' => $parentCategories,
             'categoryFields' => $categoryFields,
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
@@ -141,23 +135,31 @@ class CategoryController extends Controller
     }
 
     /**
-     * The full category tree, nested, for the product edit page's
-     * multi-select tree picker.
+     * The full category tree, nested — used by the product edit page's
+     * multi-select tree picker and the category create/edit page's parent
+     * picker. `exclude` (optional) drops that category and its whole
+     * subtree, so a category being edited can't be chosen as its own parent.
      */
-    public function tree(): JsonResponse
+    public function tree(Request $request): JsonResponse
     {
+        $excludeId = $request->integer('exclude') ?: null;
+
         $roots = Category::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
 
-        $map = function (Category $category) use (&$map) {
+        $map = function (Category $category) use (&$map, $excludeId) {
+            if ($excludeId && $category->id === $excludeId) {
+                return null;
+            }
+
             return [
                 'id' => $category->id,
                 'code' => $category->code,
                 'name' => $category->name,
-                'children' => $category->recursiveChildren->map($map)->values(),
+                'children' => $category->recursiveChildren->map($map)->filter()->values(),
             ];
         };
 
-        return response()->json($roots->map($map)->values());
+        return response()->json($roots->map($map)->filter()->values());
     }
 
     /**

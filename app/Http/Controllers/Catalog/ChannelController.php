@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Category;
@@ -10,6 +11,7 @@ use App\Models\ChannelTranslation;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Services\GridManager;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,6 +19,8 @@ use Inertia\Response;
 
 class ChannelController extends Controller
 {
+    use HasVersionHistory;
+
     public function index(Request $request): Response
     {
         $search = $request->input('search');
@@ -94,7 +98,13 @@ class ChannelController extends Controller
             'rootCategories' => Category::getTreeOptions(),
             'locales' => Locale::where('enabled', true)->get(['id', 'code', 'display_name']),
             'currencies' => Currency::orderBy('code')->get(['id', 'code', 'name']),
+            'canViewHistory' => auth()->user()?->hasPermission('channels', 'view_history') ?? false,
         ]);
+    }
+
+    public function history(Channel $channel): JsonResponse
+    {
+        return response()->json(['history' => $this->versionHistoryFor($channel)]);
     }
 
     public function update(Request $request, Channel $channel): RedirectResponse

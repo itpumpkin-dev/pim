@@ -14,6 +14,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
+    Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
@@ -81,4 +82,5 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('channels/{channel}', [ChannelController::class, 'update'])->name('channels.update')->middleware('permission:channels,edit_channels');
     Route::put('channels/{channel}/edit', [ChannelController::class, 'update']);
     Route::delete('channels/{channel}', [ChannelController::class, 'destroy'])->name('channels.destroy')->middleware('permission:channels,delete_channels');
+    Route::get('channels/{channel}/history', [ChannelController::class, 'history'])->name('channels.history')->middleware('permission:channels,view_history');
 });

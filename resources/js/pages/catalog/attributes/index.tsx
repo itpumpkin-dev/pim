@@ -10,7 +10,7 @@ import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { Badge, Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
@@ -93,16 +93,24 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                     <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
             </Box>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                    <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
-                    <Badge badgeContent={Object.keys(activeFilters).length} color="primary">
-                        <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
-                            Filter
-                        </Button>
-                    </Badge>
-                </Stack>
+                <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
 
                 <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<FilterListIcon />}
+                        onClick={() => setFilterDrawerOpen(true)}
+                        sx={{
+                            color: '#64748b',
+                            borderColor: '#cbd5e1',
+                            textTransform: 'none',
+                            borderRadius: 1.5,
+                            bgcolor: '#fff',
+                        }}
+                    >
+                        {t('filter')}
+                        {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                    </Button>
                     <Select
                         value={perPage}
                         onChange={(e) => handlePerPageChange(Number(e.target.value))}

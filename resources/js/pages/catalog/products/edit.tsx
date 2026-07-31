@@ -9,6 +9,7 @@ import {
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     FormControl,
     FormControlLabel,
     Grid,
@@ -30,7 +31,7 @@ import {
     TableHead,
     TableRow,
 } from '@mui/material';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState, useTransition } from 'react';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { HistoryPanel } from '@/components/history-panel';
@@ -152,6 +153,17 @@ export default function ProductEdit({
     const defaultChannelId = channels.length > 0 ? channels[0].id : null;
     const [activeChannelId, setActiveChannelId] = useState<number | null>(defaultChannelId);
 
+    // Switching locale/channel re-renders every field in this large form. Deferring
+    // that update via a transition keeps the select itself responsive immediately
+    // and lets us show a pending indicator instead of the UI silently freezing.
+    const [isSwitchingScope, startScopeTransition] = useTransition();
+    const handleLocaleChange = (nextLocaleId: number) => {
+        startScopeTransition(() => setActiveLocaleId(nextLocaleId));
+    };
+    const handleChannelChange = (nextChannelId: number | null) => {
+        startScopeTransition(() => setActiveChannelId(nextChannelId));
+    };
+
     // Collect initial values for all real attributes (already nested channel -> locale by the backend)
     const initialValues: Record<string, Record<string, Record<string | number, any>>> = {};
     assignedGroups.forEach((group) => {
@@ -200,6 +212,7 @@ export default function ProductEdit({
     // Only channel/locale-based fields are re-fetched on switch; non-scopable
     // fields always live under the constant 'global'/'default' keys and never change.
     const visitedCombosRef = useRef<Set<string>>(new Set(locales.map((l) => `${defaultChannelId ?? 'none'}:${l.id}`)));
+    const [loadingValues, setLoadingValues] = useState(false);
 
     useEffect(() => {
         const comboKey = `${activeChannelId ?? 'none'}:${activeLocaleId}`;
@@ -212,6 +225,7 @@ export default function ProductEdit({
         if (activeChannelId) params.set('channel_id', String(activeChannelId));
         params.set('locale_id', String(activeLocaleId));
 
+        setLoadingValues(true);
         fetch(`/catalog/products/${product.id}/attribute-values?${params.toString()}`, {
             headers: { Accept: 'application/json' },
         })
@@ -241,7 +255,8 @@ export default function ProductEdit({
             })
             .catch(() => {
                 // best-effort re-fetch; leave already-loaded values untouched on failure
-            });
+            })
+            .finally(() => setLoadingValues(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeChannelId, activeLocaleId]);
 
@@ -287,7 +302,7 @@ export default function ProductEdit({
                                 size="small"
                                 displayEmpty
                                 value={activeChannelId ?? ''}
-                                onChange={(e) => setActiveChannelId(e.target.value === '' ? null : Number(e.target.value))}
+                                onChange={(e) => handleChannelChange(e.target.value === '' ? null : Number(e.target.value))}
                                 sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 160 }}
                             >
                                 {channels.length === 0 && (
@@ -304,7 +319,7 @@ export default function ProductEdit({
                             <Select
                                 size="small"
                                 value={activeLocaleId}
-                                onChange={(e) => setActiveLocaleId(Number(e.target.value))}
+                                onChange={(e) => handleLocaleChange(Number(e.target.value))}
                                 sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 180 }}
                             >
                                 {locales.map((loc) => (
@@ -313,6 +328,7 @@ export default function ProductEdit({
                                     </MenuItem>
                                 ))}
                             </Select>
+                            {(loadingValues || isSwitchingScope) && <CircularProgress size={18} thickness={5} />}
                             <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
                                 More
                             </Button>
@@ -356,8 +372,32 @@ export default function ProductEdit({
                 <Box sx={{ px: { xs: 2, md: 4 } }}>
                     <Grid container spacing={3}>
                         {/* Left Main Area: Real Attribute Groups from Database */}
-                        <Grid item xs={12} md={8.5}>
-                            <Stack spacing={3}>
+                        <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
+                            {(loadingValues || isSwitchingScope) && (
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        inset: 0,
+                                        zIndex: 1,
+                                        display: 'flex',
+                                        alignItems: 'flex-start',
+                                        justifyContent: 'center',
+                                        pt: 8,
+                                        bgcolor: 'rgba(255,255,255,0.6)',
+                                        borderRadius: 2,
+                                    }}
+                                >
+                                    <CircularProgress size={32} />
+                                </Box>
+                            )}
+                            <Stack
+                                spacing={3}
+                                sx={{
+                                    opacity: loadingValues || isSwitchingScope ? 0.5 : 1,
+                                    pointerEvents: loadingValues || isSwitchingScope ? 'none' : 'auto',
+                                    transition: 'opacity 0.15s',
+                                }}
+                            >
                                 {/* General Card containing SKU and real General Attributes */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
                                     <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>

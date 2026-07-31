@@ -39,6 +39,7 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    TableSortLabel,
     TextField,
     Typography,
 } from '@mui/material';
@@ -105,7 +106,16 @@ interface Props {
 }
 
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
-const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete'];
+const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete', 'created_at', 'updated_at'];
+
+/** UI column key -> real, sortable `products` column (per resources/grids/product_grid.yml). */
+const SORTABLE_FIELDS: Record<string, string> = {
+    sku: 'sku',
+    status: 'enabled',
+    type: 'type',
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+};
 
 function formatAttributeCellValue(value: unknown): string {
     if (value === null || value === undefined || value === '') return '-';
@@ -160,6 +170,15 @@ function renderAttributeCellValue(attrType: string, value: unknown, alt: string)
     return formatAttributeCellValue(value);
 }
 
+function formatDateTime(value: string | null | undefined): string {
+    if (!value) return '-';
+    try {
+        return new Date(value).toLocaleString();
+    } catch {
+        return value;
+    }
+}
+
 interface ColumnDef {
     key: string;
     label: string;
@@ -190,6 +209,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
     const [activeAttributeFilters, setActiveAttributeFilters] = useState<AttributeFilterRow[]>(filters.attribute_filters ?? []);
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+    const [sortField, setSortField] = useState(typeof filters.sort === 'string' ? filters.sort : '');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
     const [exportFormat, setExportFormat] = useState<'CSV' | 'XLS' | 'XLSX'>('CSV');
     const firstRender = useRef(true);
 
@@ -267,8 +288,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     />
                 ),
             },
-            { key: 'created_at', label: t('createdAt'), render: (row) => row.created_at || '-' },
-            { key: 'updated_at', label: t('updatedAt'), render: (row) => row.updated_at || '-' },
+            { key: 'created_at', label: t('createdAt'), render: (row) => formatDateTime(row.created_at) },
+            { key: 'updated_at', label: t('updatedAt'), render: (row) => formatDateTime(row.updated_at) },
         ];
 
         const attributeColumns: ColumnDef[] = attributes
@@ -329,7 +350,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         const timeout = setTimeout(() => {
             router.get(
                 '/catalog/products',
-                { search, filters: activeFilters, attribute_filters: activeAttributeFilters },
+                { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
                 { preserveState: true, replace: true },
             );
         }, 300);
@@ -340,7 +361,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const goToPage = (page: number) => {
         router.get(
             '/catalog/products',
-            { search, page, per_page: perPage, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { search, page, per_page: perPage, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
             { preserveState: true },
         );
     };
@@ -349,7 +370,18 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         setPerPage(value);
         router.get(
             '/catalog/products',
-            { search, page: 1, per_page: value, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { search, page: 1, per_page: value, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { preserveState: true },
+        );
+    };
+
+    const handleSort = (field: string) => {
+        const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        setSortField(field);
+        setSortDir(nextDir);
+        router.get(
+            '/catalog/products',
+            { search, sort: field, dir: nextDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
             { preserveState: true },
         );
     };
@@ -359,7 +391,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         setActiveAttributeFilters(nextAttributeFilters);
         router.get(
             '/catalog/products',
-            { search, filters: next, attribute_filters: nextAttributeFilters },
+            { search, sort: sortField, dir: sortDir, filters: next, attribute_filters: nextAttributeFilters },
             { preserveState: true },
         );
     };
@@ -552,11 +584,27 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                         onChange={(e) => handleSelectAll(e.target.checked)}
                                     />
                                 </TableCell>
-                                {visibleColumns.map((col) => (
-                                    <TableCell key={col.key} sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
-                                        {col.headerRender ? col.headerRender() : col.label}
-                                    </TableCell>
-                                ))}
+                                {visibleColumns.map((col) => {
+                                    const sortKey = SORTABLE_FIELDS[col.key];
+
+                                    return (
+                                        <TableCell key={col.key} sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
+                                            {col.headerRender ? (
+                                                col.headerRender()
+                                            ) : sortKey ? (
+                                                <TableSortLabel
+                                                    active={sortField === sortKey}
+                                                    direction={sortField === sortKey ? sortDir : 'asc'}
+                                                    onClick={() => handleSort(sortKey)}
+                                                >
+                                                    {col.label}
+                                                </TableSortLabel>
+                                            ) : (
+                                                col.label
+                                            )}
+                                        </TableCell>
+                                    );
+                                })}
                                 <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actions')}</TableCell>
                             </TableRow>
                         </TableHead>

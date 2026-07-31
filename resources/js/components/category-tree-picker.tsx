@@ -1,7 +1,8 @@
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { Box, Checkbox, Collapse, IconButton, Stack, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
+import { Box, Checkbox, Collapse, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { useEffect, useMemo, useState } from 'react';
 
 interface CategoryNode {
     id: number;
@@ -20,6 +21,46 @@ function findAncestorIds(nodes: CategoryNode[], targetId: number, path: number[]
 }
 
 /**
+ * A node stays visible while searching if it (or any descendant) matches —
+ * that's what keeps the ancestor chain down to a match visible even though
+ * the ancestor's own name doesn't match.
+ */
+function collectVisible(nodes: CategoryNode[], query: string): Set<number> {
+    const visibleIds = new Set<number>();
+
+    const walk = (node: CategoryNode): boolean => {
+        const selfMatch = node.name.toLowerCase().includes(query);
+        const hasVisibleChild = node.children.map(walk).some(Boolean);
+
+        if (selfMatch || hasVisibleChild) {
+            visibleIds.add(node.id);
+            return true;
+        }
+        return false;
+    };
+
+    nodes.forEach(walk);
+    return visibleIds;
+}
+
+function highlightMatch(name: string, query: string) {
+    if (!query) return name;
+
+    const index = name.toLowerCase().indexOf(query);
+    if (index === -1) return name;
+
+    return (
+        <>
+            {name.slice(0, index)}
+            <Box component="mark" sx={{ bgcolor: '#fef08a', color: 'inherit', borderRadius: 0.5, px: 0.25 }}>
+                {name.slice(index, index + query.length)}
+            </Box>
+            {name.slice(index + query.length)}
+        </>
+    );
+}
+
+/**
  * Multi-select category tree: tick any node at any depth. Fetches the whole
  * tree once (catalog.categories.tree, ~1,086 rows) and renders it collapsed
  * except for the ancestors of whatever's already selected.
@@ -28,6 +69,7 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
     const [tree, setTree] = useState<CategoryNode[]>([]);
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
 
     useEffect(() => {
         fetch('/catalog/categories/tree', { headers: { Accept: 'application/json' } })
@@ -46,6 +88,9 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const query = search.trim().toLowerCase();
+    const visibleIds = useMemo(() => (query ? collectVisible(tree, query) : null), [tree, query]);
+
     const toggleExpand = (id: number) => {
         setExpanded((prev) => {
             const next = new Set(prev);
@@ -63,15 +108,18 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
     };
 
     const renderNode = (node: CategoryNode, depth: number) => {
-        const hasChildren = node.children.length > 0;
-        const isExpanded = expanded.has(node.id);
+        const children = visibleIds ? node.children.filter((c) => visibleIds.has(c.id)) : node.children;
+        const hasChildren = children.length > 0;
+        // While searching, every visible branch is auto-expanded so matches
+        // deep in the tree are never hidden behind a collapsed ancestor.
+        const isExpanded = visibleIds ? true : expanded.has(node.id);
         const isChecked = value.includes(node.id);
 
         return (
             <Box key={node.id}>
                 <Stack direction="row" alignItems="center" spacing={0.5} sx={{ pl: depth * 2.5 }}>
                     {hasChildren ? (
-                        <IconButton size="small" onClick={() => toggleExpand(node.id)}>
+                        <IconButton size="small" onClick={() => toggleExpand(node.id)} disabled={Boolean(visibleIds)}>
                             {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
                         </IconButton>
                     ) : (
@@ -79,12 +127,10 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
                     )}
                     <Checkbox size="small" checked={isChecked} onChange={() => toggleCheck(node.id)} sx={{ p: 0.5 }} />
                     <Typography variant="body2" sx={{ cursor: 'pointer' }} onClick={() => toggleCheck(node.id)}>
-                        {node.name}
+                        {highlightMatch(node.name, query)}
                     </Typography>
                 </Stack>
-                {hasChildren && (
-                    <Collapse in={isExpanded}>{node.children.map((child) => renderNode(child, depth + 1))}</Collapse>
-                )}
+                {hasChildren && <Collapse in={isExpanded}>{children.map((child) => renderNode(child, depth + 1))}</Collapse>}
             </Box>
         );
     };
@@ -97,9 +143,33 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
         );
     }
 
+    const visibleRoots = visibleIds ? tree.filter((node) => visibleIds.has(node.id)) : tree;
+
     return (
-        <Box sx={{ maxHeight: 320, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
-            {tree.map((node) => renderNode(node, 0))}
+        <Box>
+            <TextField
+                size="small"
+                fullWidth
+                placeholder="ค้นหาหมวดหมู่..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                sx={{ mb: 1 }}
+                InputProps={{
+                    startAdornment: (
+                        <InputAdornment position="start">
+                            <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                        </InputAdornment>
+                    ),
+                }}
+            />
+            <Box sx={{ maxHeight: 320, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
+                {visibleRoots.map((node) => renderNode(node, 0))}
+                {query && visibleRoots.length === 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
+                        ไม่พบหมวดหมู่ที่ตรงกับ &quot;{search}&quot;
+                    </Typography>
+                )}
+            </Box>
         </Box>
     );
 }

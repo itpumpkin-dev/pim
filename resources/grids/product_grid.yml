@@ -24,6 +24,11 @@ datagrid:
         type: datetime
         sortable: true
         filterable: true
+      updated_at:
+        label: Updated At
+        type: datetime
+        sortable: true
+        filterable: true
       family_id:
         label: Attribute Family
         type: select

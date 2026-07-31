@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
+use App\Models\AuditLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -38,12 +39,14 @@ class AttributeOptionController extends Controller
             $swatchValue = $request->file('swatch_image')->store('attribute-options', 'public');
         }
 
-        $attribute->options()->create([
+        $option = $attribute->options()->create([
             'code' => $validated['code'],
             'admin_label' => $validated['admin_label'] ?? null,
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
+
+        AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
         return back()->with('success', 'Option added successfully.');
     }
@@ -66,6 +69,8 @@ class AttributeOptionController extends Controller
             $swatchValue = $request->file('swatch_image')->store('attribute-options', 'public');
         }
 
+        $oldFields = $this->optionAuditFields($option);
+
         $option->update([
             'code' => $validated['code'],
             'admin_label' => $validated['admin_label'] ?? null,
@@ -73,13 +78,37 @@ class AttributeOptionController extends Controller
             'sort_order' => $validated['sort_order'] ?? $option->sort_order,
         ]);
 
+        $newFields = $this->optionAuditFields($option);
+        if ($oldFields !== $newFields) {
+            AuditLog::record('option_updated', $attribute, $oldFields, $newFields);
+        }
+
         return back()->with('success', 'Option updated successfully.');
     }
 
     public function destroy(Attribute $attribute, AttributeOption $option): RedirectResponse
     {
+        $oldFields = $this->optionAuditFields($option);
         $option->delete();
 
+        AuditLog::record('option_deleted', $attribute, $oldFields, null);
+
         return back()->with('success', 'Option deleted successfully.');
+    }
+
+    /**
+     * Option create/update/delete are recorded against the parent attribute
+     * (not the option itself) since options only ever get viewed via the
+     * attribute's edit page — this is what shows up in its History tab.
+     * Keys are prefixed by option id so a rename doesn't get mistaken for a
+     * different option going missing.
+     */
+    private function optionAuditFields(AttributeOption $option): array
+    {
+        $prefix = "option#{$option->id}";
+
+        return collect($option->only(['code', 'admin_label', 'swatch_value', 'sort_order']))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
     }
 }

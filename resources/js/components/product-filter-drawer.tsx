@@ -72,7 +72,7 @@ export function ProductFilterDrawer({
     const addFilterRow = () => setDraftAttrFilters((prev) => [...prev, { attribute_id: '', value: '' }]);
 
     const updateFilterRow = (index: number, patch: Partial<AttributeFilterRow>) =>
-        setDraftAttrFilters((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+        setDraftAttrFilters((prev) => prev.map((row, i) => (i === index ? ({ ...row, ...patch } as AttributeFilterRow) : row)));
 
     const removeFilterRow = (index: number) => setDraftAttrFilters((prev) => prev.filter((_, i) => i !== index));
 

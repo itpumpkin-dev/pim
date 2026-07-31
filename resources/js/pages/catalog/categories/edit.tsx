@@ -4,12 +4,13 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
+import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 
 interface CategoryItem {
     id: number;
@@ -20,21 +21,13 @@ interface CategoryItem {
     additional_data: Record<string, any> | null;
 }
 
-interface ParentCategoryOption {
-    id: number;
-    code: string;
-    name: string;
-    display_name: string;
-}
-
 interface Props {
     category: CategoryItem;
-    parentCategories: ParentCategoryOption[];
     categoryFields: CategoryFieldItem[];
     canViewHistory?: boolean;
 }
 
-export default function CategoryEdit({ category, parentCategories, categoryFields = [], canViewHistory = false }: Props) {
+export default function CategoryEdit({ category, categoryFields = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -123,25 +116,18 @@ export default function CategoryEdit({ category, parentCategories, categoryField
                                 error={Boolean(errors.code)}
                                 helperText={errors.code ?? t('codeHelperText')}
                             />
-                            <FormControl fullWidth error={Boolean(errors.parent_id)}>
-                                <InputLabel id="parent-category-label">{t('parentCategory')}</InputLabel>
-                                <Select
-                                    labelId="parent-category-label"
-                                    label={t('parentCategory')}
-                                    value={data.parent_id}
-                                    onChange={(e) => setData('parent_id', e.target.value)}
-                                >
-                                    <MenuItem value="">
-                                        <em>{t('rootCategory')}</em>
-                                    </MenuItem>
-                                    {parentCategories.map((cat) => (
-                                        <MenuItem key={cat.id} value={cat.id}>
-                                            {cat.display_name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
+                            <Box>
+                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                    {t('parentCategory')}
+                                </Typography>
+                                <CategoryParentTreePicker
+                                    value={typeof data.parent_id === 'number' ? data.parent_id : ''}
+                                    onChange={(id) => setData('parent_id', id)}
+                                    excludeId={category.id}
+                                    rootLabel={t('rootCategory')}
+                                />
                                 {errors.parent_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.parent_id}</Alert>}
-                            </FormControl>
+                            </Box>
                             <TextField
                                 label={t('description')}
                                 fullWidth

@@ -10,6 +10,7 @@ use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
 use App\Models\AssociationType;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\Product;
@@ -37,7 +38,7 @@ class ProductController extends Controller
     {
         $grid = new GridManager('product_grid');
 
-        $nameAttributeId = Attribute::where('code', 'name')->value('id');
+        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
 
         // `name` and any dynamic "Add Filter" attribute filters are EAV
         // (ProductValue), not real columns on `products`, so GridManager's
@@ -114,7 +115,18 @@ class ProductController extends Controller
         return Inertia::render('catalog/products/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
-            'filters' => $request->only(['search', 'sort', 'dir', 'filters', 'attribute_filters']),
+            // Explicit keys (not $request->only(), which omits absent ones) so this
+            // always serializes as a JSON object, never `[]` — an empty array's
+            // `.sort` resolves to Array.prototype.sort, which breaks `filters.sort
+            // ?? ''` on the frontend (a truthy function slips past `??`, and
+            // useState() then calls it unbound as a lazy initializer and throws).
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'sort' => $request->input('sort', ''),
+                'dir' => $request->input('dir', ''),
+                'filters' => $request->input('filters', []),
+                'attribute_filters' => $request->input('attribute_filters', []),
+            ],
             'families' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
             'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
                 'id' => $attribute->id,
@@ -218,6 +230,62 @@ class ProductController extends Controller
             'sku' => $product->sku,
             'name' => $names->get($product->id) ?: $product->sku,
         ])->values());
+    }
+
+    /**
+     * Look up which category (or categories) a product belongs to by its
+     * (partial) SKU — for every product whose `sku` matches, returns the
+     * full root->leaf path for each category it's attached to via
+     * `product_category`, not just the top-level parent.
+     */
+    public function categoryPathBySku(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'sku' => ['required', 'string', 'min:1'],
+        ]);
+
+        $products = Product::where('sku', 'like', '%'.$validated['sku'].'%')->get(['id', 'sku']);
+
+        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+
+        $names = $nameAttributeId
+            ? ProductValue::whereIn('product_id', $products->pluck('id'))->where('attribute_id', $nameAttributeId)->pluck('value', 'product_id')
+            : collect();
+
+        $productCategoryIds = DB::table('product_category')
+            ->whereIn('product_id', $products->pluck('id'))
+            ->get(['product_id', 'category_id'])
+            ->groupBy('product_id');
+
+        $categoriesById = Category::all(['id', 'code', 'name', 'parent_id'])->keyBy('id');
+
+        $buildPath = function (int $categoryId) use ($categoriesById): array {
+            $path = [];
+            $category = $categoriesById->get($categoryId);
+
+            while ($category) {
+                array_unshift($path, ['id' => $category->id, 'code' => $category->code, 'name' => $category->name]);
+                $category = $category->parent_id ? $categoriesById->get($category->parent_id) : null;
+            }
+
+            return $path;
+        };
+
+        $results = $products->map(function (Product $product) use ($names, $productCategoryIds, $buildPath) {
+            $categoryIds = $productCategoryIds->get($product->id, collect())->pluck('category_id');
+
+            return [
+                'id' => $product->id,
+                'sku' => $product->sku,
+                'name' => $names->get($product->id) ?: $product->sku,
+                'categories' => $categoryIds->map(fn ($id) => $buildPath((int) $id))->values(),
+            ];
+        })->values();
+
+        return response()->json([
+            'query' => $validated['sku'],
+            'results' => $results,
+        ]);
     }
 
     /**
@@ -381,6 +449,9 @@ class ProductController extends Controller
                         }
                     }
                 }
+
+                $newVariantValues = $this->variantValueSnapshot($parentProduct);
+                $this->recordProductValueChanges($parentProduct, [], $newVariantValues, 'variant_values_updated');
             }
         });
 
@@ -627,6 +698,8 @@ class ProductController extends Controller
             }
 
             // Sync Variants (Cartesian Product Children)
+            $oldVariantValues = $this->variantValueSnapshot($product);
+
             if (strtolower($validated['type']) === 'configurable' && !empty($validated['variants'])) {
                 $priceAttr = Attribute::where('code', 'price')->first();
                 $qtyAttr = Attribute::where('code', 'qty')->first();
@@ -709,9 +782,14 @@ class ProductController extends Controller
                     }
                 }
 
-                // Delete variants removed from frontend
-                Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->delete();
+                // Delete variants removed from frontend. Deleted one-by-one (not a
+                // bulk query delete) so Eloquent fires the `deleted` event and
+                // Auditable actually records the removal.
+                Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->get()->each->delete();
             }
+
+            $newVariantValues = $this->variantValueSnapshot($product);
+            $this->recordProductValueChanges($product, $oldVariantValues, $newVariantValues, 'variant_values_updated');
         });
 
         return to_route('catalog.products.index')->with('success', 'Product updated successfully.');
@@ -720,6 +798,11 @@ class ProductController extends Controller
     public function destroy(Product $product): RedirectResponse
     {
         $productId = $product->id;
+
+        // Delete variant children one-by-one (not relying on the parent_id
+        // cascadeOnDelete FK) so Eloquent fires `deleted` and Auditable
+        // actually records their removal.
+        Product::where('parent_id', $product->id)->get()->each->delete();
 
         ProductValue::where('product_id', $product->id)->delete();
         $product->delete();
@@ -739,14 +822,28 @@ class ProductController extends Controller
         $channelId = $request->query('channel_id');
         $localeId = $request->query('locale_id');
 
+        $attributes = $this->scopableAttributesFor($product);
+
         $values = [];
-        foreach ($this->scopableAttributesFor($product) as $attribute) {
-            $values[$attribute->id] = ProductValue::where('product_id', $product->id)
-                ->where('attribute_id', $attribute->id)
-                ->where('channel_id', $attribute->is_channel_based ? $channelId : null)
-                ->where('locale_id', $attribute->is_locale_based ? $localeId : null)
-                ->value('value');
+        foreach ($attributes as $attribute) {
+            $values[$attribute->id] = null;
         }
+
+        // Group attributes by their scoping shape so each group can be fetched with a
+        // single batched query instead of one query per attribute (N+1).
+        $attributes->groupBy(fn ($attribute) => ($attribute->is_channel_based ? '1' : '0') . ($attribute->is_locale_based ? '1' : '0'))
+            ->each(function ($group) use (&$values, $product, $channelId, $localeId) {
+                $first = $group->first();
+
+                ProductValue::where('product_id', $product->id)
+                    ->whereIn('attribute_id', $group->pluck('id'))
+                    ->where('channel_id', $first->is_channel_based ? $channelId : null)
+                    ->where('locale_id', $first->is_locale_based ? $localeId : null)
+                    ->pluck('value', 'attribute_id')
+                    ->each(function ($value, $attributeId) use (&$values) {
+                        $values[$attributeId] = $value;
+                    });
+            });
 
         return response()->json(['values' => $values]);
     }
@@ -897,7 +994,7 @@ class ProductController extends Controller
      * record it against the product's audit trail. Returns whether anything
      * actually changed, so callers can decide whether to notify the storefront.
      */
-    private function recordProductValueChanges(Product $product, array $oldValues, array $newValues): bool
+    private function recordProductValueChanges(Product $product, array $oldValues, array $newValues, string $event = 'attribute_values_updated'): bool
     {
         $changedOld = [];
         $changedNew = [];
@@ -916,9 +1013,37 @@ class ProductController extends Controller
             return false;
         }
 
-        AuditLog::record('attribute_values_updated', $product, $changedOld, $changedNew);
+        AuditLog::record($event, $product, $changedOld, $changedNew);
 
         return true;
+    }
+
+    /**
+     * Snapshot of every ProductValue row (price, qty, combination attributes)
+     * belonging to the parent's current variant children, keyed by
+     * "{variant sku}.{attribute code}" so a diff reads naturally against the
+     * parent product's own audit trail — variants don't have an edit page of
+     * their own, so this is the only place their changes are ever visible.
+     */
+    private function variantValueSnapshot(Product $product): array
+    {
+        $variants = Product::where('parent_id', $product->id)->get(['id', 'sku']);
+
+        if ($variants->isEmpty()) {
+            return [];
+        }
+
+        $codes = Attribute::pluck('code', 'id');
+
+        return ProductValue::whereIn('product_id', $variants->pluck('id'))
+            ->get()
+            ->mapWithKeys(function (ProductValue $value) use ($variants, $codes) {
+                $sku = $variants->firstWhere('id', $value->product_id)?->sku ?? "product#{$value->product_id}";
+                $label = $codes->get($value->attribute_id, "attribute_{$value->attribute_id}");
+
+                return ["{$sku}.{$label}" => $value->value];
+            })
+            ->all();
     }
 
     /**

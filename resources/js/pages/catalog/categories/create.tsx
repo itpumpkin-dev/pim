@@ -3,26 +3,19 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
-
-interface ParentCategoryOption {
-    id: number;
-    code: string;
-    name: string;
-    display_name: string;
-}
+import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 
 interface Props {
-    parentCategories: ParentCategoryOption[];
     categoryFields: CategoryFieldItem[];
 }
 
-export default function CategoryCreate({ parentCategories, categoryFields = [] }: Props) {
+export default function CategoryCreate({ categoryFields = [] }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { locales, locale: currentLocaleCode } = useLocale();
@@ -102,24 +95,16 @@ export default function CategoryCreate({ parentCategories, categoryFields = [] }
                                 error={Boolean(errors.code)}
                                 helperText={errors.code ?? t('codeHelperText')}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel id="parent-category-label">{t('parentCategory')}</InputLabel>
-                                <Select
-                                    labelId="parent-category-label"
-                                    label={t('parentCategory')}
-                                    value={data.parent_id}
-                                    onChange={(e) => setData('parent_id', e.target.value)}
-                                >
-                                    <MenuItem value="root">
-                                        <em>{t('rootCategory')}</em>
-                                    </MenuItem>
-                                    {parentCategories.map((cat) => (
-                                        <MenuItem key={cat.id} value={cat.id}>
-                                            {cat.display_name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Box>
+                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                    {t('parentCategory')}
+                                </Typography>
+                                <CategoryParentTreePicker
+                                    value={typeof data.parent_id === 'number' ? data.parent_id : ''}
+                                    onChange={(id) => setData('parent_id', id === '' ? 'root' : id)}
+                                    rootLabel={t('rootCategory')}
+                                />
+                            </Box>
                             <TextField
                                 label={t('description')}
                                 fullWidth

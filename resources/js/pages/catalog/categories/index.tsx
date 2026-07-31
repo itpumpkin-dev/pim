@@ -114,28 +114,37 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                 </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                        <TextField
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                            placeholder={t('searchCategories')}
-                            size="small"
-                            sx={{ minWidth: 280 }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon />
-                                    </InputAdornment>
-                                ),
+                    <TextField
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder={t('searchCategories')}
+                        size="small"
+                        sx={{ minWidth: 280 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+
+                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<FilterListIcon />}
+                            onClick={() => setFilterDrawerOpen(true)}
+                            sx={{
+                                color: '#64748b',
+                                borderColor: '#cbd5e1',
+                                textTransform: 'none',
+                                borderRadius: 1.5,
+                                bgcolor: '#fff',
                             }}
-                        />
-                        <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
+                        >
                             {tGrid('filter')}
                             {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
                         </Button>
-                    </Stack>
-
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Select
                             value={perPage}
                             onChange={(e) => handlePerPageChange(Number(e.target.value))}
