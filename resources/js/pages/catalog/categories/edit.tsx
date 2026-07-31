@@ -40,7 +40,7 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
         { title: t('editCategory'), href: '#' },
     ];
 
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, post, transform, processing, errors } = useForm({
         code: category.code || '',
         name: category.name || '',
         description: category.description || '',
@@ -50,7 +50,12 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        put(`/catalog/categories/${category.id}`, {
+        // PHP does not parse multipart/form-data bodies for PUT requests, so
+        // saving must go through POST with a spoofed _method — Image/File
+        // category fields put a raw File into additional_data, which forces
+        // this request into multipart.
+        transform((formData) => ({ ...formData, _method: 'put' }));
+        post(`/catalog/categories/${category.id}`, {
             onSuccess: () => router.visit('/catalog/categories', { replace: true }),
         });
     };

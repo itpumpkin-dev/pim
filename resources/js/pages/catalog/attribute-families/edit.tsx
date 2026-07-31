@@ -166,15 +166,21 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         setAssignDialogOpen(false);
     };
 
-    const handleMoveAttributeToGroup = (attr: AttributeItem, targetGroupId: number) => {
+    // Handles both "assign to group" (targetIndex omitted -> appended at the
+    // end) and "reorder within/into a group at a specific position" (dropped
+    // on another attribute row). Always removes the attribute from wherever
+    // it currently is first, so dragging within the same group moves it
+    // rather than duplicating it.
+    const handleDropAttribute = (attr: AttributeItem, targetGroupId: number, targetIndex?: number) => {
         setUnassignedAttrs((prev) => prev.filter((a) => a.id !== attr.id));
         setAssignedGroups((prev) =>
             prev.map((g) => {
                 const cleanAttrs = g.attributes.filter((a) => a.id !== attr.id);
-                if (g.id === targetGroupId) {
-                    return { ...g, attributes: [...cleanAttrs, attr] };
+                if (g.id !== targetGroupId) {
+                    return { ...g, attributes: cleanAttrs };
                 }
-                return { ...g, attributes: cleanAttrs };
+                const insertAt = targetIndex === undefined ? cleanAttrs.length : Math.min(targetIndex, cleanAttrs.length);
+                return { ...g, attributes: [...cleanAttrs.slice(0, insertAt), attr, ...cleanAttrs.slice(insertAt)] };
             })
         );
     };
@@ -350,7 +356,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                         onDrop={(e) => {
                                                             e.preventDefault();
                                                             if (draggedAttr) {
-                                                                handleMoveAttributeToGroup(draggedAttr, group.id);
+                                                                handleDropAttribute(draggedAttr, group.id);
                                                                 setDraggedAttr(null);
                                                             }
                                                         }}
@@ -395,11 +401,20 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                         {/* Group Attributes List */}
                                                         <Collapse in={group.expanded} timeout="auto" unmountOnExit>
                                                             <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
-                                                                {group.attributes.map((attr) => (
+                                                                {group.attributes.map((attr, attrIndex) => (
                                                                     <Stack
                                                                         key={attr.id}
                                                                         draggable
                                                                         onDragStart={() => setDraggedAttr(attr)}
+                                                                        onDragOver={(e) => e.preventDefault()}
+                                                                        onDrop={(e) => {
+                                                                            e.preventDefault();
+                                                                            e.stopPropagation();
+                                                                            if (draggedAttr) {
+                                                                                handleDropAttribute(draggedAttr, group.id, attrIndex);
+                                                                                setDraggedAttr(null);
+                                                                            }
+                                                                        }}
                                                                         direction="row"
                                                                         alignItems="center"
                                                                         justifyContent="space-between"
@@ -410,7 +425,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                                             cursor: 'grab',
                                                                             bgcolor: '#fff',
                                                                             border: '1px solid #e2e8f0',
-                                                                            '&:hover': { bgcolor: '#f1f5f9' },
+                                                                            '&:hover': { bgcolor: '#f1f5f9', borderColor: '#7c3aed' },
                                                                         }}
                                                                     >
                                                                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -503,7 +518,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                     }}
                                                     onClick={() => {
                                                         if (assignedGroups.length > 0) {
-                                                            handleMoveAttributeToGroup(attr, assignedGroups[0].id);
+                                                            handleDropAttribute(attr, assignedGroups[0].id);
                                                         }
                                                     }}
                                                 >
@@ -543,7 +558,15 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                     size="small"
                                     placeholder="Enter Code"
                                     value={data.code}
-                                    onChange={(e) => setData('code', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'code',
+                                            e.target.value
+                                                .toLowerCase()
+                                                .replace(/\s+/g, '_')
+                                                .replace(/[^a-z0-9_]/g, ''),
+                                        )
+                                    }
                                     error={Boolean(errors.code)}
                                     helperText={errors.code}
                                 />

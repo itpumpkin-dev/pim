@@ -5,6 +5,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Checkbox,
@@ -716,6 +717,10 @@ function RenderAttributeInput({
     };
 
     if (attr.type === 'select' || attr.type === 'multiselect') {
+        const options = attr.options ?? [];
+        const optionValue = (opt: AttributeOption) => opt.code || opt.admin_label || String(opt.id);
+        const selectedOption = options.find((opt) => optionValue(opt) === stringValue) ?? null;
+
         return (
             <FormControl fullWidth size="small">
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
@@ -724,16 +729,15 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Select displayEmpty value={stringValue} onChange={(e) => onChange(e.target.value)}>
-                    <MenuItem value="">
-                        <em>Select option</em>
-                    </MenuItem>
-                    {attr.options?.map((opt) => (
-                        <MenuItem key={opt.id} value={opt.code || opt.admin_label || String(opt.id)}>
-                            {opt.admin_label || opt.code}
-                        </MenuItem>
-                    ))}
-                </Select>
+                <Autocomplete
+                    size="small"
+                    options={options}
+                    value={selectedOption}
+                    getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
+                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                    onChange={(_, newValue) => onChange(newValue ? optionValue(newValue) : '')}
+                    renderInput={(params) => <TextField {...params} placeholder="Select option" />}
+                />
             </FormControl>
         );
     }

@@ -22,6 +22,8 @@ interface CategoryItem {
     description: string | null;
     parent_id: number | null;
     parent?: CategoryItem | null;
+    children_count?: number;
+    products_count?: number;
 }
 
 interface PaginatedData<T> {
@@ -260,6 +262,21 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     <DialogContentText>
                         {t('confirmDeleteCategory')}
                     </DialogContentText>
+                    {(() => {
+                        const target = categories.data.find((c) => c.id === deleteCategoryId);
+                        if (!target) return null;
+                        const childCount = target.children_count ?? 0;
+                        const productCount = target.products_count ?? 0;
+                        if (childCount === 0 && productCount === 0) return null;
+
+                        return (
+                            <DialogContentText color="error" sx={{ mt: 1.5, fontWeight: 600 }}>
+                                {childCount > 0 && t('deleteCategoryChildWarning', { count: childCount })}
+                                {childCount > 0 && productCount > 0 && ' '}
+                                {productCount > 0 && t('deleteCategoryProductWarning', { count: productCount })}
+                            </DialogContentText>
+                        );
+                    })()}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeleteCategoryId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>

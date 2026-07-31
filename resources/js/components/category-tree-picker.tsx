@@ -103,8 +103,19 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
         });
     };
 
+    // Checking a node also checks every ancestor up to the root, so the user
+    // never has to tick the parent chain by hand. Unchecking only removes the
+    // clicked node itself — cascading the uncheck upward would be wrong
+    // whenever a sibling under the same parent is still checked.
     const toggleCheck = (id: number) => {
-        onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+        if (value.includes(id)) {
+            onChange(value.filter((v) => v !== id));
+            return;
+        }
+
+        const ancestorIds = findAncestorIds(tree, id) ?? [];
+        const toAdd = [id, ...ancestorIds].filter((nid) => !value.includes(nid));
+        onChange([...value, ...toAdd]);
     };
 
     const renderNode = (node: CategoryNode, depth: number) => {

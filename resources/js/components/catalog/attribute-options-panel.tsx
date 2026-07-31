@@ -1,8 +1,7 @@
 import DeleteIcon from '@mui/icons-material/Delete';
-import SaveIcon from '@mui/icons-material/Save';
 import { Box, Button, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
 import { router } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { KeyboardEvent, useEffect, useState } from 'react';
 
 export interface AttributeOptionItem {
     id: number;
@@ -12,7 +11,25 @@ export interface AttributeOptionItem {
     sort_order: number;
 }
 
+interface EditableOption {
+    id: number;
+    code: string;
+    admin_label: string;
+    swatchText: string;
+    swatchImage: File | null;
+    existingSwatchValue: string | null;
+}
+
 const slugify = (value: string) => value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+const toEditableOption = (option: AttributeOptionItem, swatchType: string): EditableOption => ({
+    id: option.id,
+    code: option.code,
+    admin_label: option.admin_label ?? '',
+    swatchText: swatchType === 'color' ? (option.swatch_value ?? '') : '',
+    swatchImage: null,
+    existingSwatchValue: option.swatch_value,
+});
 
 function SwatchPreview({ swatchType, value }: { swatchType: string; value: string | null }) {
     if (!value) return null;
@@ -28,50 +45,56 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
     return null;
 }
 
-function OptionRow({ attributeId, swatchType, option }: { attributeId: number; swatchType: string; option: AttributeOptionItem }) {
-    const [code, setCode] = useState(option.code);
-    const [adminLabel, setAdminLabel] = useState(option.admin_label ?? '');
-    const [swatchText, setSwatchText] = useState(swatchType === 'color' ? (option.swatch_value ?? '') : '');
-    const [swatchImage, setSwatchImage] = useState<File | null>(null);
-
-    const save = () => {
-        router.post(
-            `/catalog/attributes/${attributeId}/options/${option.id}`,
-            {
-                _method: 'put',
-                code,
-                admin_label: adminLabel,
-                swatch_value: swatchType === 'color' ? swatchText : undefined,
-                swatch_image: swatchImage ?? undefined,
-            },
-            { preserveScroll: true, forceFormData: true },
-        );
-    };
-
+function OptionRow({
+    attributeId,
+    swatchType,
+    row,
+    onChange,
+}: {
+    attributeId: number;
+    swatchType: string;
+    row: EditableOption;
+    onChange: (next: EditableOption) => void;
+}) {
     const destroy = () => {
-        router.delete(`/catalog/attributes/${attributeId}/options/${option.id}`, { preserveScroll: true });
+        router.delete(`/catalog/attributes/${attributeId}/options/${row.id}`, { preserveScroll: true });
     };
 
     return (
         <Stack direction="row" spacing={1} alignItems="center">
-            <TextField size="small" label="Code" value={code} onChange={(e) => setCode(slugify(e.target.value))} sx={{ width: 140 }} />
-            <TextField size="small" label="Label" value={adminLabel} onChange={(e) => setAdminLabel(e.target.value)} sx={{ flex: 1 }} />
+            <TextField
+                size="small"
+                label="Code"
+                value={row.code}
+                onChange={(e) => onChange({ ...row, code: slugify(e.target.value) })}
+                sx={{ width: 140 }}
+            />
+            <TextField
+                size="small"
+                label="Label"
+                value={row.admin_label}
+                onChange={(e) => onChange({ ...row, admin_label: e.target.value })}
+                sx={{ flex: 1 }}
+            />
             {swatchType === 'color' && (
-                <TextField size="small" label="Color (hex)" value={swatchText} onChange={(e) => setSwatchText(e.target.value)} sx={{ width: 140 }} />
+                <TextField
+                    size="small"
+                    label="Color (hex)"
+                    value={row.swatchText}
+                    onChange={(e) => onChange({ ...row, swatchText: e.target.value })}
+                    sx={{ width: 140 }}
+                />
             )}
             {swatchType === 'image' && (
                 <TextField
                     type="file"
                     size="small"
                     sx={{ width: 200 }}
-                    onChange={(e) => setSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
+                    onChange={(e) => onChange({ ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
                     slotProps={{ htmlInput: { accept: 'image/*' } }}
                 />
             )}
-            <SwatchPreview swatchType={swatchType} value={option.swatch_value} />
-            <IconButton size="small" onClick={save} title="Save">
-                <SaveIcon fontSize="small" />
-            </IconButton>
+            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
             <IconButton size="small" onClick={destroy} title="Delete">
                 <DeleteIcon fontSize="small" />
             </IconButton>
@@ -80,10 +103,11 @@ function OptionRow({ attributeId, swatchType, option }: { attributeId: number; s
 }
 
 /**
- * Options CRUD for select/multiselect attributes. Each row saves/deletes
- * independently via a direct Inertia request back to this same edit page
- * (redirect-back pattern, matching every other catalog controller), instead
- * of being folded into the attribute's own save form.
+ * Options CRUD for select/multiselect attributes. Add/delete are still
+ * immediate, independent requests, but edits to existing rows are batched —
+ * some of these option lists run into the hundreds (bulk-imported taxonomy
+ * data), where a save button per row isn't practical. "Save all" sends every
+ * row's current values in one request; rows aren't individually saved.
  */
 export function AttributeOptionsPanel({
     attributeId,
@@ -94,13 +118,28 @@ export function AttributeOptionsPanel({
     swatchType: string;
     options: AttributeOptionItem[];
 }) {
+    const [rows, setRows] = useState<EditableOption[]>(() => options.map((o) => toEditableOption(o, swatchType)));
+    const [saving, setSaving] = useState(false);
+
+    // Reconciles with fresh server data (after add/delete/save-all) without
+    // discarding in-progress edits to rows that are still around — only rows
+    // that are new (just added) or gone (just deleted) actually change here.
+    useEffect(() => {
+        setRows((prevRows) => {
+            const prevById = new Map(prevRows.map((row) => [row.id, row]));
+            return options.map((o) => prevById.get(o.id) ?? toEditableOption(o, swatchType));
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [options]);
+
     const [newCode, setNewCode] = useState('');
     const [newLabel, setNewLabel] = useState('');
     const [newSwatchText, setNewSwatchText] = useState('');
     const [newSwatchImage, setNewSwatchImage] = useState<File | null>(null);
 
-    const addOption = (event: FormEvent) => {
-        event.preventDefault();
+    const addOption = () => {
+        if (!newCode.trim()) return;
+
         router.post(
             `/catalog/attributes/${attributeId}/options`,
             {
@@ -122,40 +161,96 @@ export function AttributeOptionsPanel({
         );
     };
 
+    const saveAll = () => {
+        setSaving(true);
+        // PHP does not parse multipart/form-data bodies for PUT requests, so
+        // this has to go through POST with a spoofed _method — same reason
+        // ProductController's own submit does it (see edit.tsx), otherwise
+        // the batch endpoint sees an empty request and silently no-ops.
+        router.post(
+            `/catalog/attributes/${attributeId}/options/batch`,
+            {
+                _method: 'put',
+                options: rows.map((row) => ({
+                    id: row.id,
+                    code: row.code,
+                    admin_label: row.admin_label,
+                    swatch_value: swatchType === 'color' ? row.swatchText : undefined,
+                    swatch_image: row.swatchImage ?? undefined,
+                })),
+            },
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onFinish: () => setSaving(false),
+            },
+        );
+    };
+
+    // This panel is always rendered inside the attribute edit page's own
+    // <form>, so it can't be a <form> itself (nested forms are invalid HTML
+    // and React warns/hydration-fails on them) — Enter is wired up manually
+    // instead of relying on native form-submit-on-Enter.
+    const submitOnEnter = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            addOption();
+        }
+    };
+
     return (
         <Paper variant="outlined" sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                Options
-            </Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="h6" fontWeight={700}>
+                    Options
+                </Typography>
+                <Button type="button" variant="contained" size="small" disabled={saving || rows.length === 0} onClick={saveAll}>
+                    Save all
+                </Button>
+            </Stack>
 
             <Stack spacing={1.5} sx={{ mb: 2 }}>
-                {options.map((option) => (
-                    <OptionRow key={option.id} attributeId={attributeId} swatchType={swatchType} option={option} />
+                {rows.map((row) => (
+                    <OptionRow
+                        key={row.id}
+                        attributeId={attributeId}
+                        swatchType={swatchType}
+                        row={row}
+                        onChange={(next) => setRows((prev) => prev.map((r) => (r.id === next.id ? next : r)))}
+                    />
                 ))}
-                {options.length === 0 && (
+                {rows.length === 0 && (
                     <Typography variant="body2" color="text.secondary">
                         No options yet
                     </Typography>
                 )}
             </Stack>
 
-            <Box component="form" onSubmit={addOption}>
+            <Box>
                 <Stack direction="row" spacing={1} alignItems="center">
                     <TextField
                         size="small"
                         label="Code"
-                        required
                         value={newCode}
                         onChange={(e) => setNewCode(slugify(e.target.value))}
+                        onKeyDown={submitOnEnter}
                         sx={{ width: 140 }}
                     />
-                    <TextField size="small" label="Label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} sx={{ flex: 1 }} />
+                    <TextField
+                        size="small"
+                        label="Label"
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        onKeyDown={submitOnEnter}
+                        sx={{ flex: 1 }}
+                    />
                     {swatchType === 'color' && (
                         <TextField
                             size="small"
                             label="Color (hex)"
                             value={newSwatchText}
                             onChange={(e) => setNewSwatchText(e.target.value)}
+                            onKeyDown={submitOnEnter}
                             sx={{ width: 140 }}
                         />
                     )}
@@ -168,7 +263,7 @@ export function AttributeOptionsPanel({
                             slotProps={{ htmlInput: { accept: 'image/*' } }}
                         />
                     )}
-                    <Button type="submit" variant="outlined">
+                    <Button type="button" variant="outlined" onClick={addOption}>
                         Add option
                     </Button>
                 </Stack>

@@ -55,7 +55,7 @@ class AttributeFamilyController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'unique:attribute_families,code'],
+            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_families,code'],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -81,11 +81,12 @@ class AttributeFamilyController extends Controller
         }
 
         if (!empty($validated['group_attributes'])) {
-            foreach ($validated['group_attributes'] as $item) {
+            foreach ($validated['group_attributes'] as $index => $item) {
                 FamilyAttribute::create([
                     'family_id' => $family->id,
                     'attribute_id' => $item['attribute_id'],
                     'attribute_group_id' => $item['attribute_group_id'],
+                    'sort_order' => $index,
                 ]);
             }
         }
@@ -105,6 +106,7 @@ class AttributeFamilyController extends Controller
 
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
             ->where('family_id', $attributeFamily->id)
+            ->orderBy('sort_order')
             ->get();
 
         return Inertia::render('catalog/attribute-families/edit', [
@@ -126,7 +128,7 @@ class AttributeFamilyController extends Controller
     public function update(Request $request, AttributeFamily $attributeFamily): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'unique:attribute_families,code,' . $attributeFamily->id],
+            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_families,code,' . $attributeFamily->id],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -156,11 +158,12 @@ class AttributeFamilyController extends Controller
         FamilyAttribute::where('family_id', $attributeFamily->id)->delete();
 
         if (!empty($validated['group_attributes'])) {
-            foreach ($validated['group_attributes'] as $item) {
+            foreach ($validated['group_attributes'] as $index => $item) {
                 FamilyAttribute::create([
                     'family_id' => $attributeFamily->id,
                     'attribute_id' => $item['attribute_id'],
                     'attribute_group_id' => $item['attribute_group_id'],
+                    'sort_order' => $index,
                 ]);
             }
         }

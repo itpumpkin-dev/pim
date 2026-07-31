@@ -71,6 +71,8 @@
     "rootCategory": "[รูท / บนสุด]",
     "searchCategories": "ค้นหาหมวดหมู่",
     "confirmDeleteCategory": "คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้หรือไม่?",
+    "deleteCategoryChildWarning": "หมวดหมู่นี้มีหมวดหมู่ย่อย {{count}} รายการ ซึ่งจะกลายเป็นหมวดหมู่หลักทันที",
+    "deleteCategoryProductWarning": "มีสินค้า {{count}} รายการผูกกับหมวดหมู่นี้อยู่ ซึ่งจะถูกตัดออกจากหมวดหมู่นี้ทันที",
     "noCategoriesFound": "ไม่พบหมวดหมู่",
     "description": "รายละเอียด",
     "parent": "หมวดหมู่หลัก",

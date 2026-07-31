@@ -16,6 +16,7 @@ class FamilyAttribute extends Pivot
         'family_id',
         'attribute_id',
         'attribute_group_id',
+        'sort_order',
     ];
 
     public function family(): BelongsTo

@@ -196,9 +196,9 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         { title: tNav('products').toUpperCase(), href: '/catalog/products' },
     ];
     const permissions = auth.permissions || [];
-    const canCreate = permissions.includes('products.create_products') || true;
-    const canEdit = permissions.includes('products.edit_products') || true;
-    const canDelete = permissions.includes('products.delete_products') || true;
+    const canCreate = permissions.includes('products.create_products');
+    const canEdit = permissions.includes('products.edit_products');
+    const canDelete = permissions.includes('products.delete_products');
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);

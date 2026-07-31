@@ -79,7 +79,8 @@ class Attribute extends Model
     {
         return $this->belongsToMany(AttributeFamily::class, 'family_attributes', 'attribute_id', 'family_id')
             ->using(FamilyAttribute::class)
-            ->withPivot('attribute_group_id');
+            ->withPivot('attribute_group_id', 'sort_order')
+            ->orderByPivot('sort_order');
     }
 
     public function values(): HasMany

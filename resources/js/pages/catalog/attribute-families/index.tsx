@@ -81,12 +81,12 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canCreate = permissions.includes('attribute_families.create_attribute_families') || true;
-    const canEdit = permissions.includes('attribute_families.edit_attribute_families') || true;
-    const canDelete = permissions.includes('attribute_families.delete_attribute_families') || true;
+    const canCreate = permissions.includes('attribute_families.create_attribute_families');
+    const canEdit = permissions.includes('attribute_families.edit_attribute_families');
+    const canDelete = permissions.includes('attribute_families.delete_attribute_families');
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [perPage, setPerPage] = useState<number>(10);
+    const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteFamilyId, setDeleteFamilyId] = useState<number | null>(null);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -99,19 +99,28 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/attributeFamilies', { search, filters: activeFilters }, { preserveState: true, replace: true });
+            router.get('/catalog/attributeFamilies', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
     }, [search]);
 
-    const applyFilters = (next: Record<string, FilterValue>) => {
-        setActiveFilters(next);
-        router.get('/catalog/attributeFamilies', { search, filters: next }, { preserveState: true });
-    };
-
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
+
+    const goToPage = (page: number) => {
+        router.get('/catalog/attributeFamilies', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true });
+    };
+
+    const handlePerPageChange = (value: number) => {
+        setPerPage(value);
+        router.get('/catalog/attributeFamilies', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true });
+    };
+
+    const applyFilters = (next: Record<string, FilterValue>) => {
+        setActiveFilters(next);
+        router.get('/catalog/attributeFamilies', { search, per_page: perPage, filters: next }, { preserveState: true });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -188,7 +197,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
 
                         <Select
                             value={perPage}
-                            onChange={(e) => setPerPage(Number(e.target.value))}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
                             size="small"
                             sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 60, height: 36 }}
                         >
@@ -210,16 +219,16 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1}>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
                                 <FirstPageIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1}>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
                                 <ChevronLeftIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
                                 <ChevronRightIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
                                 <LastPageIcon fontSize="small" />
                             </IconButton>
                         </Stack>

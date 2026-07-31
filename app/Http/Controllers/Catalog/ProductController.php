@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -271,14 +272,31 @@ class ProductController extends Controller
             return $path;
         };
 
-        $results = $products->map(function (Product $product) use ($names, $productCategoryIds, $buildPath) {
-            $categoryIds = $productCategoryIds->get($product->id, collect())->pluck('category_id');
+        // A product tagged at multiple levels of the same branch (the category
+        // picker auto-checks every ancestor up to the root) would otherwise show
+        // one path per level here — growing prefixes of the same path. Only the
+        // deepest pick per branch is worth a row; its path already contains
+        // every ancestor, so drop any assigned id that's an ancestor of another.
+        $ancestorIdsOf = function (int $categoryId) use ($categoriesById): array {
+            $ids = [];
+            $category = $categoriesById->get($categoryId);
+            while ($category?->parent_id) {
+                $ids[] = $category->parent_id;
+                $category = $categoriesById->get($category->parent_id);
+            }
+            return $ids;
+        };
+
+        $results = $products->map(function (Product $product) use ($names, $productCategoryIds, $buildPath, $ancestorIdsOf) {
+            $categoryIds = $productCategoryIds->get($product->id, collect())->pluck('category_id')->map(fn ($id) => (int) $id);
+            $allAncestorIds = $categoryIds->flatMap($ancestorIdsOf)->unique();
+            $leafCategoryIds = $categoryIds->diff($allAncestorIds);
 
             return [
                 'id' => $product->id,
                 'sku' => $product->sku,
                 'name' => $names->get($product->id) ?: $product->sku,
-                'categories' => $categoryIds->map(fn ($id) => $buildPath((int) $id))->values(),
+                'categories' => $leafCategoryIds->map(fn ($id) => $buildPath($id))->values(),
             ];
         })->values();
 
@@ -316,25 +334,33 @@ class ProductController extends Controller
             $query->where('sku', 'like', '%'.$validated['search'].'%');
         }
 
+        // Chunked instead of one ProductValue query per product (N+1 that made
+        // large exports crawl) — batches the value lookup per 500 products
+        // while `cursor()` still keeps the outer product stream memory-bounded.
         $rows = (function () use ($query, $attributesByCode) {
-            foreach ($query->cursor() as $product) {
-                $values = ProductValue::where('product_id', $product->id)
+            foreach ($query->cursor()->chunk(500) as $products) {
+                $valuesByProduct = ProductValue::whereIn('product_id', $products->pluck('id'))
                     ->whereNull('channel_id')
                     ->whereNull('locale_id')
-                    ->pluck('value', 'attribute_id');
+                    ->get(['product_id', 'attribute_id', 'value'])
+                    ->groupBy('product_id');
 
-                $row = [
-                    'sku' => $product->sku,
-                    'family_code' => $product->family?->code ?? '',
-                    'type' => $product->type,
-                    'enabled' => $product->enabled ? '1' : '0',
-                ];
+                foreach ($products as $product) {
+                    $values = $valuesByProduct->get($product->id, collect())->pluck('value', 'attribute_id');
 
-                foreach ($attributesByCode as $code => $attribute) {
-                    $row[$code] = $values->get($attribute->id, '');
+                    $row = [
+                        'sku' => $product->sku,
+                        'family_code' => $product->family?->code ?? '',
+                        'type' => $product->type,
+                        'enabled' => $product->enabled ? '1' : '0',
+                    ];
+
+                    foreach ($attributesByCode as $code => $attribute) {
+                        $row[$code] = $values->get($attribute->id, '');
+                    }
+
+                    yield $row;
                 }
-
-                yield $row;
             }
         })();
 
@@ -462,9 +488,11 @@ class ProductController extends Controller
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
-        // Load pivot family_attributes for this product's family
+        // Load pivot family_attributes for this product's family, in the
+        // curated order set on the Attribute Family edit page.
         $familyAttributes = FamilyAttribute::with(['attribute.options', 'attributeGroup'])
             ->where('family_id', $product->family_id)
+            ->orderBy('sort_order')
             ->get();
 
         // Group attributes dynamically by attributeGroup
@@ -712,6 +740,20 @@ class ProductController extends Controller
                     }
 
                     if ($childProduct) {
+                        // Renaming an existing variant had no uniqueness check at
+                        // all — colliding with another product/variant's SKU hit
+                        // the DB's unique constraint directly, raising a raw
+                        // QueryException (500) instead of a clean validation error.
+                        $skuTaken = Product::where('sku', $variantData['sku'])
+                            ->where('id', '!=', $childProduct->id)
+                            ->exists();
+
+                        if ($skuTaken) {
+                            throw ValidationException::withMessages([
+                                'variants' => "SKU \"{$variantData['sku']}\" is already in use.",
+                            ]);
+                        }
+
                         $childProduct->update([
                             'sku' => $variantData['sku'],
                             'enabled' => $product->enabled,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Services\Catalog\ProductPresenter;
@@ -45,9 +46,24 @@ class StorefrontController extends Controller
         $mapped = ProductPresenter::mapMany(collect([$product]))[0];
 
         $categoryAttributeId = Attribute::where('code', 'pcatname')->value('id');
+
+        // pcatname is a select field storing an AttributeOption code, not the
+        // label — $mapped['category'] is already the resolved label (see
+        // ProductPresenter::resolvePcatnameLabels), so match products whose
+        // raw value is either that same code, or (for values predating the
+        // dropdown) the literal free-typed label text.
+        $matchingCodes = $categoryAttributeId
+            ? AttributeOption::where('attribute_id', $categoryAttributeId)->where('admin_label', $mapped['category'])->pluck('code')
+            : collect();
+
         $relatedIds = $categoryAttributeId
             ? ProductValue::where('attribute_id', $categoryAttributeId)
-                ->where('value', $mapped['category'])
+                ->where(function ($query) use ($mapped, $matchingCodes) {
+                    $query->where('value', $mapped['category']);
+                    if ($matchingCodes->isNotEmpty()) {
+                        $query->orWhereIn('value', $matchingCodes);
+                    }
+                })
                 ->pluck('product_id')
             : collect();
 

@@ -8,6 +8,7 @@ use App\Models\AttributeOption;
 use App\Models\AuditLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -84,6 +85,82 @@ class AttributeOptionController extends Controller
         }
 
         return back()->with('success', 'Option updated successfully.');
+    }
+
+    /**
+     * Saves every option row in one request instead of the usual one-PUT-per-row
+     * flow — needed once an attribute has more than a handful of options (some
+     * of these lists run into the hundreds), where clicking Save on each row
+     * individually isn't practical.
+     */
+    public function batchUpdate(Request $request, Attribute $attribute): RedirectResponse
+    {
+        $validated = $request->validate([
+            'options' => ['required', 'array'],
+            'options.*.id' => [
+                'required', 'integer',
+                Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
+            ],
+            'options.*.code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'options.*.admin_label' => ['nullable', 'string', 'max:255'],
+            'options.*.swatch_value' => ['nullable', 'string', 'max:255'],
+            'options.*.swatch_image' => ['nullable', 'image', 'max:2048'],
+        ]);
+
+        $codes = collect($validated['options'])->pluck('code');
+        if ($codes->count() !== $codes->unique()->count()) {
+            return back()->withErrors(['options' => 'Duplicate option codes are not allowed.']);
+        }
+
+        // Compare against options NOT in this batch, rather than each row
+        // against its own previous code — otherwise swapping/rotating codes
+        // between two rows in the same save (A gets B's code, B gets A's) was
+        // rejected as a false conflict, since neither row's *own* old code had
+        // changed yet when the other row's new code was checked against it.
+        $submittedIds = collect($validated['options'])->pluck('id');
+        $otherExistingCodes = AttributeOption::where('attribute_id', $attribute->id)
+            ->whereNotIn('id', $submittedIds)
+            ->pluck('code');
+
+        foreach ($validated['options'] as $index => $optionData) {
+            if ($otherExistingCodes->contains($optionData['code'])) {
+                return back()->withErrors(["options.{$index}.code" => "Code \"{$optionData['code']}\" is already used by another option."]);
+            }
+        }
+
+        $allOldFields = [];
+        $allNewFields = [];
+
+        DB::transaction(function () use ($validated, $attribute, $request, &$allOldFields, &$allNewFields) {
+            foreach ($validated['options'] as $index => $optionData) {
+                $option = AttributeOption::where('attribute_id', $attribute->id)->findOrFail($optionData['id']);
+
+                $swatchValue = $optionData['swatch_value'] ?? $option->swatch_value;
+                if ($attribute->swatch_type === 'image' && $request->hasFile("options.{$index}.swatch_image")) {
+                    $swatchValue = $request->file("options.{$index}.swatch_image")->store('attribute-options', 'public');
+                }
+
+                $oldFields = $this->optionAuditFields($option);
+
+                $option->update([
+                    'code' => $optionData['code'],
+                    'admin_label' => $optionData['admin_label'] ?? null,
+                    'swatch_value' => $swatchValue,
+                ]);
+
+                $newFields = $this->optionAuditFields($option);
+                if ($oldFields !== $newFields) {
+                    $allOldFields += $oldFields;
+                    $allNewFields += $newFields;
+                }
+            }
+        });
+
+        if (!empty($allOldFields) || !empty($allNewFields)) {
+            AuditLog::record('options_batch_updated', $attribute, $allOldFields, $allNewFields);
+        }
+
+        return back()->with('success', 'Options updated successfully.');
     }
 
     public function destroy(Attribute $attribute, AttributeOption $option): RedirectResponse

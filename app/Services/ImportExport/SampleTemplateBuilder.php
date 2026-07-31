@@ -33,6 +33,9 @@ class SampleTemplateBuilder
                 'is_unique' => '0', 'is_locale_based' => '0', 'is_channel_based' => '0', 'is_filterable' => '1',
             ],
             'attribute_families' => ['code' => 'default', 'name' => 'Default'],
+            'attribute_options' => [
+                'attribute_code' => 'color', 'code' => 'red', 'admin_label' => 'Red', 'swatch_value' => '#ff0000', 'sort_order' => '0',
+            ],
             default => [],
         };
     }

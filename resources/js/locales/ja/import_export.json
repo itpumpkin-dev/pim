@@ -25,6 +25,7 @@
     "typeCategories": "カテゴリ",
     "typeAttributes": "属性",
     "typeAttributeFamilies": "属性ファミリー",
+    "typeAttributeOptions": "属性オプション",
     "exportsTitle": "出口",
     "createExport": "エクスポートの作成",
     "editExport": "エクスポートの編集",

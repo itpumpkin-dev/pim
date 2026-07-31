@@ -92,7 +92,15 @@ export default function AttributeGroupCreate() {
                             size="small"
                             placeholder={t('codePlaceholder')}
                             value={data.code}
-                            onChange={(e) => setData('code', e.target.value)}
+                            onChange={(e) =>
+                                setData(
+                                    'code',
+                                    e.target.value
+                                        .toLowerCase()
+                                        .replace(/\s+/g, '_')
+                                        .replace(/[^a-z0-9_]/g, ''),
+                                )
+                            }
                             error={Boolean(errors.code)}
                             helperText={errors.code}
                         />

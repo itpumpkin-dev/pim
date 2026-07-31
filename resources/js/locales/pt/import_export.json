@@ -25,6 +25,7 @@
     "typeCategories": "Categories",
     "typeAttributes": "Attributes",
     "typeAttributeFamilies": "Attribute Families",
+    "typeAttributeOptions": "Attribute Options",
     "exportsTitle": "Exports",
     "createExport": "Create Export",
     "editExport": "Edit Export",

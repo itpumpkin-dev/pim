@@ -46,7 +46,7 @@ class AttributeGroupController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'unique:attribute_groups,code'],
+            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_groups,code'],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -89,7 +89,7 @@ class AttributeGroupController extends Controller
     public function update(Request $request, AttributeGroup $attributeGroup): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'unique:attribute_groups,code,' . $attributeGroup->id],
+            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_groups,code,' . $attributeGroup->id],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],

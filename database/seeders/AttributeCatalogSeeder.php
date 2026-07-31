@@ -20,7 +20,7 @@ class AttributeCatalogSeeder extends Seeder
         'pname' => ['text', true, true],
         'pbaseunit' => ['select', false, false],
         'pbrand' => ['select', false, false],
-        'pcatid' => ['text', false, false],
+        'pcatid' => ['select', false, false],
         'pcatname' => ['select', false, false],
         'psubcatname' => ['select', false, false],
         'productgroupname' => ['select', false, false],

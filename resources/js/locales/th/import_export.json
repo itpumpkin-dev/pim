@@ -25,6 +25,7 @@
     "typeCategories": "หมวดหมู่",
     "typeAttributes": "แอตทริบิวต์",
     "typeAttributeFamilies": "ตระกูลแอตทริบิวต์",
+    "typeAttributeOptions": "ตัวเลือกแอตทริบิวต์",
     "exportsTitle": "ส่งออกข้อมูล",
     "createExport": "สร้างการส่งออก",
     "editExport": "แก้ไขการส่งออก",

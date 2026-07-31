@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
@@ -60,6 +61,8 @@ class ProductPresenter
             )
         );
 
+        $valuesByProduct = self::resolvePcatnameLabels($valuesByProduct, $attributesByCode);
+
         $categoryNamesByProduct = self::rootCategoryNames($products);
 
         return $products->map(
@@ -69,6 +72,37 @@ class ProductPresenter
                 $categoryNamesByProduct->get($product->id)
             )
         )->values()->all();
+    }
+
+    /**
+     * `pcatname` is now a select field backed by AttributeOption, whose
+     * stored value is the option's `code` (not its label — codes have to be
+     * unique per attribute, and several category names collide, so the
+     * label can't be the code). Resolve it back to the Thai name here so
+     * every consumer of the mapped product still sees a real name instead
+     * of a bare code like "a". Values from before this field became a
+     * dropdown (plain free-typed text) won't match any option code and pass
+     * through unchanged.
+     *
+     * @return Collection<int, Collection<string, string>>
+     */
+    private static function resolvePcatnameLabels(Collection $valuesByProduct, Collection $attributesByCode): Collection
+    {
+        $pcatnameAttributeId = $attributesByCode->search(fn ($attr) => $attr->code === 'pcatname');
+        if ($pcatnameAttributeId === false) {
+            return $valuesByProduct;
+        }
+
+        $labelsByCode = AttributeOption::where('attribute_id', $pcatnameAttributeId)->pluck('admin_label', 'code');
+
+        return $valuesByProduct->map(function (Collection $values) use ($labelsByCode) {
+            if ($values->has('pcatname')) {
+                $raw = $values->get('pcatname');
+                $values = $values->put('pcatname', $labelsByCode->get($raw, $raw));
+            }
+
+            return $values;
+        });
     }
 
     /**
