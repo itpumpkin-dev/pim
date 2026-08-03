@@ -14,7 +14,7 @@ class AttributeFamilyRowImporter implements RowImporterInterface
         return ['code', 'name'];
     }
 
-    public function importRow(array $row, ImportConfig $config): void
+    public function importRow(array $row, ImportConfig $config): array
     {
         $code = trim((string) ($row['code'] ?? ''));
         if ($code === '') {
@@ -28,7 +28,7 @@ class AttributeFamilyRowImporter implements RowImporterInterface
             }
             FamilyAttribute::where('family_id', $family->id)->delete();
             $family->delete();
-            return;
+            return [];
         }
 
         $name = trim((string) ($row['name'] ?? ''));
@@ -37,5 +37,7 @@ class AttributeFamilyRowImporter implements RowImporterInterface
             ['code' => $code],
             ['name' => $name !== '' ? $name : ucfirst($code)]
         );
+
+        return [];
     }
 }

@@ -11,6 +11,8 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
+    Dialog,
+    DialogContent,
     FormControl,
     FormControlLabel,
     Grid,
@@ -696,6 +698,19 @@ function RenderAttributeInput({
     const label = attr.name || attr.code;
     const stringValue = typeof value === 'string' ? value : '';
 
+    const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+
+    useEffect(() => {
+        if (attr.type === 'image' && value instanceof File) {
+            const url = URL.createObjectURL(value);
+            setFilePreviewUrl(url);
+            return () => URL.revokeObjectURL(url);
+        }
+        setFilePreviewUrl(null);
+        return undefined;
+    }, [attr.type, value]);
+
     const renderChips = () => {
         return (
             <>
@@ -848,6 +863,7 @@ function RenderAttributeInput({
                 : [];
 
         let existingLabel = '';
+        let existingImageUrl = '';
         if (selectedNames.length === 0 && stringValue) {
             if (isGallery) {
                 try {
@@ -858,8 +874,15 @@ function RenderAttributeInput({
                 }
             } else {
                 existingLabel = stringValue.split('/').pop() || stringValue;
+                if (isImage) {
+                    existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
+                        ? stringValue
+                        : `/storage/${stringValue}`;
+                }
             }
         }
+
+        const previewSrc = filePreviewUrl || existingImageUrl;
 
         return (
             <Box>
@@ -870,6 +893,23 @@ function RenderAttributeInput({
                     {renderChips()}
                 </Stack>
                 <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                    {isImage && previewSrc && (
+                        <Box
+                            component="img"
+                            src={previewSrc}
+                            alt={label}
+                            onClick={() => setLightboxOpen(true)}
+                            sx={{
+                                width: 48,
+                                height: 48,
+                                objectFit: 'cover',
+                                borderRadius: 1,
+                                border: '1px solid #e2e8f0',
+                                cursor: 'pointer',
+                                '&:hover': { opacity: 0.85 },
+                            }}
+                        />
+                    )}
                     <Button
                         component="label"
                         variant="outlined"
@@ -901,6 +941,13 @@ function RenderAttributeInput({
                         </Typography>
                     )}
                 </Stack>
+                {isImage && previewSrc && (
+                    <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="md">
+                        <DialogContent sx={{ p: 0, lineHeight: 0 }}>
+                            <Box component="img" src={previewSrc} alt={label} sx={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh' }} />
+                        </DialogContent>
+                    </Dialog>
+                )}
             </Box>
         );
     }

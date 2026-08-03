@@ -16,7 +16,10 @@ interface RowImporterInterface
     public function columns(): array;
 
     /**
+     * @return array<int, string> non-fatal warnings about the row (e.g. columns
+     *         that were ignored because they don't match a known field)
+     *
      * @throws RowImportException on invalid/unresolvable row data
      */
-    public function importRow(array $row, ImportConfig $config): void;
+    public function importRow(array $row, ImportConfig $config): array;
 }

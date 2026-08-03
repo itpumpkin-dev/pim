@@ -15,7 +15,7 @@ class AttributeRowImporter implements RowImporterInterface
         return ['code', 'name', 'type', 'is_required', 'is_unique', 'is_locale_based', 'is_channel_based', 'is_filterable'];
     }
 
-    public function importRow(array $row, ImportConfig $config): void
+    public function importRow(array $row, ImportConfig $config): array
     {
         $code = trim((string) ($row['code'] ?? ''));
         if ($code === '' || !preg_match('/^[a-z][a-z0-9_]*$/', $code)) {
@@ -28,7 +28,7 @@ class AttributeRowImporter implements RowImporterInterface
                 throw new RowImportException("Attribute with code '{$code}' not found");
             }
             $attribute->delete();
-            return;
+            return [];
         }
 
         $type = trim((string) ($row['type'] ?? 'text'));
@@ -48,6 +48,8 @@ class AttributeRowImporter implements RowImporterInterface
                 'is_filterable' => $this->toBool($row['is_filterable'] ?? false),
             ]
         );
+
+        return [];
     }
 
     private function toBool(mixed $value): bool

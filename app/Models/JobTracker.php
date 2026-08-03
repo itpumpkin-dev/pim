@@ -53,8 +53,18 @@ class JobTracker extends Model
 
     public function appendError(int $row, string $message): void
     {
+        $this->appendLogEntry($row, $message, 'error');
+    }
+
+    public function appendWarning(int $row, string $message): void
+    {
+        $this->appendLogEntry($row, $message, 'warning');
+    }
+
+    private function appendLogEntry(int $row, string $message, string $level): void
+    {
         $log = $this->error_log ?? [];
-        $log[] = ['row' => $row, 'message' => $message];
+        $log[] = ['row' => $row, 'message' => $message, 'level' => $level];
         $this->error_log = $log;
     }
 }

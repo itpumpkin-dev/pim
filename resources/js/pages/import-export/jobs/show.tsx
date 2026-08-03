@@ -17,6 +17,7 @@ interface UserSummary {
 interface ErrorLogEntry {
     row: number;
     message: string;
+    level?: 'error' | 'warning';
 }
 
 interface JobDetail {
@@ -179,6 +180,7 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 700 }}>{t('row')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{t('level')}</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>{t('message')}</TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -186,6 +188,13 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                                     {job.error_log.map((entry, index) => (
                                         <TableRow key={index}>
                                             <TableCell>{entry.row}</TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={entry.level === 'warning' ? t('levelWarning') : t('levelError')}
+                                                    color={entry.level === 'warning' ? 'warning' : 'error'}
+                                                    size="small"
+                                                />
+                                            </TableCell>
                                             <TableCell>{entry.message}</TableCell>
                                         </TableRow>
                                     ))}

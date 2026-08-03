@@ -1,5 +1,7 @@
 {
     "language": "Idioma",
     "toggleSidebar": "Alternar barra lateral",
-    "permissionsChangedLoggingOut": "Sus permisos de acceso han cambiado. Serás deslogueado en un momento — por favor, inicia sesión nuevamente."
+    "permissionsChangedLoggingOut": "Sus permisos de acceso han cambiado. Serás deslogueado en un momento — por favor, inicia sesión nuevamente.",
+    "packLabel": "{{qty}} {{unit}}/paquete",
+    "exportThisProduct": "Exportar este producto"
 }

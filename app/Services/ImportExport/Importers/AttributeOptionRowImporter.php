@@ -21,7 +21,7 @@ class AttributeOptionRowImporter implements RowImporterInterface
         return ['attribute_code', 'code', 'admin_label', 'swatch_value', 'sort_order'];
     }
 
-    public function importRow(array $row, ImportConfig $config): void
+    public function importRow(array $row, ImportConfig $config): array
     {
         $attributeCode = trim((string) ($row['attribute_code'] ?? ''));
         $attribute = Attribute::where('code', $attributeCode)->first();
@@ -44,7 +44,7 @@ class AttributeOptionRowImporter implements RowImporterInterface
             $oldFields = $this->auditFields($existing);
             $existing->delete();
             AuditLog::record('option_deleted', $attribute, $oldFields, null, $config->created_by);
-            return;
+            return [];
         }
 
         $sortOrderRaw = $row['sort_order'] ?? null;
@@ -62,13 +62,15 @@ class AttributeOptionRowImporter implements RowImporterInterface
 
         if (!$existing) {
             AuditLog::record('option_created', $attribute, null, $newFields, $config->created_by);
-            return;
+            return [];
         }
 
         $oldFields = $this->auditFields($existing);
         if ($oldFields !== $newFields) {
             AuditLog::record('option_updated', $attribute, $oldFields, $newFields, $config->created_by);
         }
+
+        return [];
     }
 
     /**

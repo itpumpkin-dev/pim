@@ -1,5 +1,7 @@
 {
     "language": "语言",
     "toggleSidebar": "切换侧边栏",
-    "permissionsChangedLoggingOut": "您的访问权限已更改 。 请再次登录."
+    "permissionsChangedLoggingOut": "您的访问权限已更改 。 请再次登录.",
+    "packLabel": "{{qty}} {{unit}}/包",
+    "exportThisProduct": "导出此产品"
 }

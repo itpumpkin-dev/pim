@@ -1,0 +1,18 @@
+{
+    "slide1Title": "Catálogo de productos químicos y adhesivos",
+    "slide1Subtitle": "Especificaciones, precios y detalles de Soudal, Sunnic y Pumpkin en un solo lugar",
+    "slide2Title": "Categorías organizadas sistemáticamente",
+    "slide2Subtitle": "Encuentra y consulta los datos de productos por categoría de forma rápida y ordenada",
+    "slide3Title": "Consulta precios y descuentos fácilmente",
+    "slide3Subtitle": "Ve el precio unitario y los descuentos por volumen de cada producto al instante",
+    "signIn": "Iniciar sesión",
+    "goToDashboard": "Ir al Panel",
+    "categoriesHeading": "Categorías de productos",
+    "productListHeading": "Lista de productos",
+    "totalItems": "{{count}} artículos en total",
+    "categoryFilterSuffix": " · categoría \"{{category}}\"",
+    "searchPlaceholder": "Buscar productos o categorías",
+    "exportAll": "Exportar Todo",
+    "exportCategory": "Exportar Esta Categoría",
+    "noResults": "No se encontraron productos"
+}

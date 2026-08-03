@@ -28,7 +28,7 @@ class ProductRowImporter implements RowImporterInterface
         return array_merge(self::FIXED_COLUMNS, $attributeCodes);
     }
 
-    public function importRow(array $row, ImportConfig $config): void
+    public function importRow(array $row, ImportConfig $config): array
     {
         $sku = trim((string) ($row['sku'] ?? ''));
         if ($sku === '') {
@@ -42,7 +42,7 @@ class ProductRowImporter implements RowImporterInterface
             }
             ProductValue::where('product_id', $product->id)->delete();
             $product->delete();
-            return;
+            return [];
         }
 
         $familyCode = trim((string) ($row['family_code'] ?? ''));
@@ -71,6 +71,8 @@ class ProductRowImporter implements RowImporterInterface
             ]
         );
 
+        $unknownColumns = [];
+
         foreach ($row as $key => $value) {
             if (in_array($key, self::FIXED_COLUMNS, true) || $value === null || $value === '') {
                 continue;
@@ -78,6 +80,7 @@ class ProductRowImporter implements RowImporterInterface
 
             $attribute = Attribute::where('code', $key)->first();
             if (!$attribute) {
+                $unknownColumns[] = $key;
                 continue;
             }
 
@@ -86,5 +89,11 @@ class ProductRowImporter implements RowImporterInterface
                 ['value' => (string) $value]
             );
         }
+
+        if (empty($unknownColumns)) {
+            return [];
+        }
+
+        return ["Column(s) ignored, no matching attribute found: ".implode(', ', $unknownColumns)];
     }
 }

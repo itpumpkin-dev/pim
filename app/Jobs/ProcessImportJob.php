@@ -57,7 +57,10 @@ class ProcessImportJob implements ShouldQueue
             $processed++;
 
             try {
-                $importer->importRow($row, $config);
+                $warnings = $importer->importRow($row, $config);
+                foreach ($warnings as $warning) {
+                    $tracker->appendWarning($rowNumber, $warning);
+                }
                 $created++;
             } catch (\Throwable $e) {
                 $skipped++;

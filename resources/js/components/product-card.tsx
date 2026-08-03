@@ -129,11 +129,11 @@ export function ProductCard({ product }: { product: Product }) {
                         </Typography>
                         <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
                             <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                            <Typography variant="caption">{t('common.packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
+                            <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
                         </Stack>
                     </Stack>
- 
-                    <Tooltip title={t('common.exportThisProduct')}>
+
+                    <Tooltip title={t('exportThisProduct')}>
                         <IconButton
                             size="small"
                             onClick={handleExport}

@@ -1,0 +1,18 @@
+{
+    "slide1Title": "化学品与胶粘剂产品目录",
+    "slide1Subtitle": "汇集 Soudal、Sunnic 和 Pumpkin 的规格、价格与产品详情",
+    "slide2Title": "系统化的产品分类",
+    "slide2Subtitle": "按分类快速、有序地查找和参考产品数据",
+    "slide3Title": "轻松查看价格与折扣",
+    "slide3Subtitle": "即时查看每款产品的单价和数量折扣",
+    "signIn": "登录",
+    "goToDashboard": "前往控制台",
+    "categoriesHeading": "产品分类",
+    "productListHeading": "产品列表",
+    "totalItems": "共 {{count}} 项",
+    "categoryFilterSuffix": " · 分类“{{category}}”",
+    "searchPlaceholder": "搜索产品或分类",
+    "exportAll": "导出全部",
+    "exportCategory": "导出此分类",
+    "noResults": "未找到相关产品"
+}

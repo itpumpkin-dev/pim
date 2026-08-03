@@ -1,0 +1,18 @@
+{
+    "slide1Title": "Chemical & adhesive product catalog",
+    "slide1Subtitle": "All specs, prices, and product details from Soudal, Sunnic, and Pumpkin in one place",
+    "slide2Title": "Systematically organized categories",
+    "slide2Subtitle": "Find and reference product data by category quickly and neatly",
+    "slide3Title": "Check prices and discounts easily",
+    "slide3Subtitle": "See unit price and volume discounts for each product instantly",
+    "signIn": "Sign in",
+    "goToDashboard": "Go to Dashboard",
+    "categoriesHeading": "Product Categories",
+    "productListHeading": "Product List",
+    "totalItems": "{{count}} items total",
+    "categoryFilterSuffix": " · category \"{{category}}\"",
+    "searchPlaceholder": "Search products or categories",
+    "exportAll": "Export All",
+    "exportCategory": "Export This Category",
+    "noResults": "No products found"
+}

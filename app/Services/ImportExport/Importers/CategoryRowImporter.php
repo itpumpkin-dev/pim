@@ -13,7 +13,7 @@ class CategoryRowImporter implements RowImporterInterface
         return ['code', 'name', 'description', 'parent_code'];
     }
 
-    public function importRow(array $row, ImportConfig $config): void
+    public function importRow(array $row, ImportConfig $config): array
     {
         $code = trim((string) ($row['code'] ?? ''));
         if ($code === '' || !preg_match('/^[a-z][a-z0-9_]*$/', $code)) {
@@ -26,7 +26,7 @@ class CategoryRowImporter implements RowImporterInterface
                 throw new RowImportException("Category with code '{$code}' not found");
             }
             $category->delete();
-            return;
+            return [];
         }
 
         $parentCode = trim((string) ($row['parent_code'] ?? ''));
@@ -51,5 +51,7 @@ class CategoryRowImporter implements RowImporterInterface
                 'parent_id' => $parent?->id,
             ]
         );
+
+        return [];
     }
 }

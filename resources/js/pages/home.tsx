@@ -1,6 +1,7 @@
 import { ProductCard } from '@/components/product-card';
 import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import AppLogoIcon from '@/components/app-logo-icon';
+import LocaleDropdown from '@/components/locale-dropdown';
 import { downloadCsv } from '@/lib/csv';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
@@ -16,32 +17,29 @@ import SearchIcon from '@mui/icons-material/Search';
 import LoginIcon from '@mui/icons-material/Login';
 import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Skeleton, Stack, TextField, Toolbar, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-
-
-const slides: { title: string; subtitle: string; icon: IconType; gradient: string }[] = [
-    {
-        title: 'คลังข้อมูลสินค้าเคมีภัณฑ์และกาว',
-        subtitle: 'รวมข้อมูลสเปค ราคา และรายละเอียดสินค้าจากซูดาล ซันนิค และพัมคินไว้ในที่เดียว',
-        icon: ScienceIcon,
-        gradient: 'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
-    },
-    {
-        title: 'จัดหมวดหมู่สินค้าอย่างเป็นระบบ',
-        subtitle: 'ค้นหาและอ้างอิงข้อมูลสินค้าตามหมวดหมู่ได้อย่างรวดเร็วและเป็นระเบียบ',
-        icon: ConstructionIcon,
-        gradient: 'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
-    },
-    {
-        title: 'ตรวจสอบราคาและส่วนลดได้ง่าย',
-        subtitle: 'ดูราคาต่อหน่วยและส่วนลดตามจำนวนสั่งซื้อของแต่ละสินค้าได้ทันที',
-        icon: LocalOfferOutlinedIcon,
-        gradient: 'linear-gradient(135deg, #EA580C 0%, #F97316 100%)',
-    },
+const SLIDE_ICONS: IconType[] = [ScienceIcon, ConstructionIcon, LocalOfferOutlinedIcon];
+const SLIDE_GRADIENTS = [
+    'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
+    'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
+    'linear-gradient(135deg, #EA580C 0%, #F97316 100%)',
 ];
 
 function HeroCarousel() {
+    const { t } = useTranslation('home');
     const [index, setIndex] = useState(0);
+
+    const slides: { title: string; subtitle: string; icon: IconType; gradient: string }[] = useMemo(
+        () =>
+            [1, 2, 3].map((n) => ({
+                title: t(`slide${n}Title`),
+                subtitle: t(`slide${n}Subtitle`),
+                icon: SLIDE_ICONS[n - 1],
+                gradient: SLIDE_GRADIENTS[n - 1],
+            })),
+        [t],
+    );
 
     useEffect(() => {
         const timer = setInterval(() => setIndex((current) => (current + 1) % slides.length), 5000);
@@ -174,6 +172,7 @@ function CategoryStrip({
 }
 
 export default function Home({ products, categories }: { products: Product[]; categories: string[] }) {
+    const { t } = useTranslation('home');
     const { auth } = usePage<SharedData>().props;
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
@@ -227,7 +226,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
                 },
             }}
         >
-            Sign in
+            {t('signIn')}
         </Button>
     ) : (
         <Button
@@ -252,7 +251,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
                 },
             }}
         >
-            ไปที่ Dashboard
+            {t('goToDashboard')}
         </Button>
     );
 
@@ -269,7 +268,10 @@ export default function Home({ products, categories }: { products: Product[]; ca
                             PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
                         </Typography>
                     </Box>
-                    {actions}
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                        <LocaleDropdown />
+                        {actions}
+                    </Stack>
                 </Toolbar>
             </AppBar>
 
@@ -323,7 +325,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
 
                         <Box>
                             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                                หมวดหมู่สินค้า
+                                {t('categoriesHeading')}
                             </Typography>
                             <CategoryStrip
                                 categories={categoryOptions}
@@ -336,17 +338,17 @@ export default function Home({ products, categories }: { products: Product[]; ca
                             <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
                                 <Box>
                                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        รายการสินค้า
+                                        {t('productListHeading')}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        ทั้งหมด {filtered.length} รายการ
-                                        {selectedCategory && ` · หมวดหมู่ "${selectedCategory}"`}
+                                        {t('totalItems', { count: filtered.length })}
+                                        {selectedCategory && t('categoryFilterSuffix', { category: selectedCategory })}
                                     </Typography>
                                 </Box>
                                 <Stack direction="row" spacing={1.5}>
                                     <TextField
                                         size="small"
-                                        placeholder="ค้นหาสินค้าหรือหมวดหมู่"
+                                        placeholder={t('searchPlaceholder')}
                                         value={search}
                                         onChange={(event) => setSearch(event.target.value)}
                                         slotProps={{
@@ -365,7 +367,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
                                         onClick={handleExport}
                                         disabled={filtered.length === 0}
                                     >
-                                        {`Export ${selectedCategory ? 'หมวดหมู่นี้' : 'ทั้งหมด'}`}
+                                        {selectedCategory ? t('exportCategory') : t('exportAll')}
                                     </Button>
                                 </Stack>
                             </Stack>
@@ -385,7 +387,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
                                 ))}
                                 {filtered.length === 0 && (
                                     <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
-                                        ไม่พบสินค้าที่ค้นหา
+                                        {t('noResults')}
                                     </Typography>
                                 )}
                             </Box>

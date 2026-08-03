@@ -1,0 +1,18 @@
+{
+    "slide1Title": "化学製品・接着剤カタログ",
+    "slide1Subtitle": "Soudal、Sunnic、Pumpkinの仕様、価格、製品詳細を一箇所に集約",
+    "slide2Title": "体系的に整理されたカテゴリー",
+    "slide2Subtitle": "カテゴリーごとに製品データを素早く整理して検索・参照できます",
+    "slide3Title": "価格と割引を簡単にチェック",
+    "slide3Subtitle": "各製品の単価と数量割引をすぐに確認できます",
+    "signIn": "サインイン",
+    "goToDashboard": "ダッシュボードへ",
+    "categoriesHeading": "商品カテゴリー",
+    "productListHeading": "商品リスト",
+    "totalItems": "合計 {{count}} 件",
+    "categoryFilterSuffix": " · カテゴリー「{{category}}」",
+    "searchPlaceholder": "商品またはカテゴリーを検索",
+    "exportAll": "すべてエクスポート",
+    "exportCategory": "このカテゴリーをエクスポート",
+    "noResults": "商品が見つかりません"
+}
