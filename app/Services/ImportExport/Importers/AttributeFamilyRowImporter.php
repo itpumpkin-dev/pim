@@ -14,6 +14,11 @@ class AttributeFamilyRowImporter implements RowImporterInterface
         return ['code', 'name'];
     }
 
+    public function requiredColumns(): array
+    {
+        return ['code'];
+    }
+
     public function importRow(array $row, ImportConfig $config): array
     {
         $code = trim((string) ($row['code'] ?? ''));

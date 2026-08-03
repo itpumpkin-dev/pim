@@ -28,6 +28,11 @@ class ProductRowImporter implements RowImporterInterface
         return array_merge(self::FIXED_COLUMNS, $attributeCodes);
     }
 
+    public function requiredColumns(): array
+    {
+        return ['sku'];
+    }
+
     public function importRow(array $row, ImportConfig $config): array
     {
         $sku = trim((string) ($row['sku'] ?? ''));

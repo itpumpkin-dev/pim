@@ -13,6 +13,11 @@ class CategoryRowImporter implements RowImporterInterface
         return ['code', 'name', 'description', 'parent_code'];
     }
 
+    public function requiredColumns(): array
+    {
+        return ['code', 'name'];
+    }
+
     public function importRow(array $row, ImportConfig $config): array
     {
         $code = trim((string) ($row['code'] ?? ''));

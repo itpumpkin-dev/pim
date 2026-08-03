@@ -10,6 +10,7 @@ import {
     Alert,
     Box,
     Button,
+    Chip,
     FormControl,
     FormHelperText,
     InputLabel,
@@ -39,9 +40,10 @@ interface ImportConfigItem {
 interface Props {
     config: ImportConfigItem;
     types: string[];
+    requiredColumnsByType: Record<string, string[]>;
 }
 
-export default function ImportEdit({ config, types }: Props) {
+export default function ImportEdit({ config, types, requiredColumnsByType }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -160,6 +162,16 @@ export default function ImportEdit({ config, types }: Props) {
                                         {t('downloadSample')}
                                     </Button>
                                 </Stack>
+                                {(requiredColumnsByType[data.type] ?? []).length > 0 && (
+                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {t('requiredFields')}:
+                                        </Typography>
+                                        {requiredColumnsByType[data.type].map((column) => (
+                                            <Chip key={column} label={column} size="small" variant="outlined" />
+                                        ))}
+                                    </Stack>
+                                )}
                                 {errors.file && <FormHelperText error>{errors.file}</FormHelperText>}
                             </Box>
 

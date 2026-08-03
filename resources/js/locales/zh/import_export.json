@@ -8,6 +8,7 @@
     "uploadedFile": "上传的文件",
     "noFileUploaded": "没有上传文件",
     "downloadSample": "下载样本",
+    "requiredFields": "必填字段",
     "chooseFile": "选择文件",
     "importNow": "立即导入",
     "typeLabel": "类型",

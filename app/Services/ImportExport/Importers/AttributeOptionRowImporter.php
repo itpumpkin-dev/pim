@@ -21,6 +21,11 @@ class AttributeOptionRowImporter implements RowImporterInterface
         return ['attribute_code', 'code', 'admin_label', 'swatch_value', 'sort_order'];
     }
 
+    public function requiredColumns(): array
+    {
+        return ['attribute_code', 'code'];
+    }
+
     public function importRow(array $row, ImportConfig $config): array
     {
         $attributeCode = trim((string) ($row['attribute_code'] ?? ''));

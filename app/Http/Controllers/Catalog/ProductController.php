@@ -16,6 +16,7 @@ use App\Models\FamilyAttribute;
 use App\Models\Product;
 use App\Models\ProductAssociation;
 use App\Models\ProductValue;
+use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\GridManager;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\ImportExport\SpreadsheetWriter;
@@ -377,21 +378,7 @@ class ProductController extends Controller
 
     private function formatAttributeValue(Attribute $attribute, ?string $rawValue): mixed
     {
-        if ($rawValue === null || $rawValue === '') {
-            return null;
-        }
-
-        if ($attribute->type === 'gallery') {
-            $paths = json_decode($rawValue, true) ?: [];
-
-            return array_map(fn ($path) => Storage::url($path), $paths);
-        }
-
-        if (in_array($attribute->type, ['image', 'file'], true)) {
-            return Storage::url($rawValue);
-        }
-
-        return $rawValue;
+        return AttributeValueFormatter::format($attribute, $rawValue);
     }
 
     public function create(): Response

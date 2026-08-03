@@ -37,6 +37,7 @@ class ImportConfigController extends Controller
     {
         return Inertia::render('import-export/imports/create', [
             'types' => ImportExportRegistry::TYPES,
+            'requiredColumnsByType' => $this->requiredColumnsByType(),
         ]);
     }
 
@@ -64,6 +65,7 @@ class ImportConfigController extends Controller
         return Inertia::render('import-export/imports/edit', [
             'config' => $importConfig,
             'types' => ImportExportRegistry::TYPES,
+            'requiredColumnsByType' => $this->requiredColumnsByType(),
         ]);
     }
 
@@ -130,6 +132,16 @@ class ImportConfigController extends Controller
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$type}_sample.csv\"",
         ]);
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredColumnsByType(): array
+    {
+        return collect(ImportExportRegistry::TYPES)
+            ->mapWithKeys(fn (string $type) => [$type => ImportExportRegistry::importer($type)->requiredColumns()])
+            ->all();
     }
 
     private function validateConfig(Request $request, ?int $configId = null): array

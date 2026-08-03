@@ -8,6 +8,7 @@
     "uploadedFile": "アップロードしたファイル",
     "noFileUploaded": "ファイルが選択されていません",
     "downloadSample": "サンプルをダウンロード",
+    "requiredFields": "必須フィールド",
     "chooseFile": "ファイルを選択",
     "importNow": "今すぐインポート",
     "typeLabel": "タイプ",

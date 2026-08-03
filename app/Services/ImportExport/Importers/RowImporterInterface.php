@@ -16,6 +16,14 @@ interface RowImporterInterface
     public function columns(): array;
 
     /**
+     * Subset of columns() that must be non-empty for a row to import
+     * successfully, surfaced to the UI next to the sample download.
+     *
+     * @return array<int, string>
+     */
+    public function requiredColumns(): array;
+
+    /**
      * @return array<int, string> non-fatal warnings about the row (e.g. columns
      *         that were ignored because they don't match a known field)
      *

@@ -8,6 +8,7 @@
     "uploadedFile": "ไฟล์ที่อัปโหลด",
     "noFileUploaded": "ยังไม่ได้อัปโหลดไฟล์",
     "downloadSample": "ดาวน์โหลดไฟล์ตัวอย่าง",
+    "requiredFields": "ฟิลด์ที่จำเป็นต้องกรอก",
     "chooseFile": "เลือกไฟล์",
     "importNow": "นำเข้าทันที",
     "typeLabel": "ประเภท",
