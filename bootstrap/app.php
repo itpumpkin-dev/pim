@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'api_key' => \App\Http\Middleware\VerifyApiKey::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

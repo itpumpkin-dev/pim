@@ -6,7 +6,10 @@ use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Models\LazadaCategory;
+use App\Models\LazadaSellerAccount;
 use App\Services\GridManager;
+use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -83,6 +86,7 @@ class CategoryController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
+            'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
             'additional_data' => ['nullable', 'array'],
         ];
 
@@ -117,6 +121,7 @@ class CategoryController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'],
             'parent_id' => $validated['parent_id'],
+            'lazada_category_id' => $validated['lazada_category_id'] ?? null,
             'additional_data' => $validated['additional_data'],
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
@@ -162,7 +167,7 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
         return Inertia::render('catalog/categories/edit', [
-            'category' => $category,
+            'category' => $category->load('lazadaCategory:id,name,parent_id'),
             'categoryFields' => $categoryFields,
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
@@ -213,6 +218,7 @@ class CategoryController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
+            'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
             'additional_data' => ['nullable', 'array'],
         ];
 
@@ -283,6 +289,7 @@ class CategoryController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'],
             'parent_id' => $validated['parent_id'],
+            'lazada_category_id' => $validated['lazada_category_id'] ?? null,
             'additional_data' => $validated['additional_data'] ?? [],
             'updated_by' => $request->user()?->id,
         ]);
@@ -299,5 +306,74 @@ class CategoryController extends Controller
         $category->delete();
 
         return to_route('catalog.categories.index')->with('success', 'Category deleted successfully.');
+    }
+
+    /**
+     * Refreshes the local lazada_categories cache from Lazada's live
+     * category tree, so the mapping picker doesn't hit their API on every
+     * page load. Any active seller account can authenticate this — the
+     * tree itself isn't shop-specific.
+     */
+    public function syncLazadaCategories(Request $request): RedirectResponse
+    {
+        $account = LazadaSellerAccount::active()->first();
+        if (!$account) {
+            return back()->with('error', 'No active Lazada seller account found to authenticate the sync.');
+        }
+
+        $tree = (new LazadaClient($account))->getCategoryTree();
+
+        $rows = [];
+        $this->flattenLazadaCategoryNodes($tree['data'] ?? [], null, $rows);
+
+        $now = now();
+        foreach (array_chunk($rows, 500) as $chunk) {
+            LazadaCategory::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['id'],
+                ['parent_id', 'name', 'is_leaf', 'updated_at']
+            );
+        }
+
+        return back()->with('success', 'Synced '.count($rows).' Lazada categories.');
+    }
+
+    /**
+     * Depth-first flatten so parent rows always precede their children in
+     * $rows — required because lazada_categories.parent_id is a real FK
+     * back onto the same table, checked per row as each upsert chunk runs.
+     */
+    private function flattenLazadaCategoryNodes(array $nodes, ?int $parentId, array &$rows): void
+    {
+        foreach ($nodes as $node) {
+            $rows[] = [
+                'id' => $node['category_id'],
+                'parent_id' => $parentId,
+                'name' => $node['name'],
+                'is_leaf' => (bool) ($node['leaf'] ?? false),
+            ];
+
+            if (!empty($node['children'])) {
+                $this->flattenLazadaCategoryNodes($node['children'], $node['category_id'], $rows);
+            }
+        }
+    }
+
+    /**
+     * Search endpoint backing the Lazada category Autocomplete on the
+     * category edit form — only leaf categories are selectable, since
+     * Lazada requires products to be assigned to a leaf, not a parent node.
+     */
+    public function searchLazadaCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = LazadaCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
     }
 }

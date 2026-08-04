@@ -16,10 +16,12 @@ use App\Models\FamilyAttribute;
 use App\Models\Product;
 use App\Models\ProductAssociation;
 use App\Models\ProductValue;
+use App\Models\SalesPlatformShop;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\GridManager;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\ImportExport\SpreadsheetWriter;
+use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -521,6 +523,31 @@ class ProductController extends Controller
         $channels = Channel::all()->map(fn (Channel $c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
         $defaultChannelId = $channels->first()['id'] ?? null;
 
+        // Groups the flat channel list by sales platform (Lazada, ...) for the
+        // Edit Product sidebar's collapsible tree — channels with no linked
+        // shop (e.g. the default web channel) fall under a "Website" bucket
+        // and carry no shop_id, since there's nothing to publish a checkbox for.
+        $shopByChannelId = SalesPlatformShop::with('platform:id,name')
+            ->whereNotNull('channel_id')
+            ->get()
+            ->keyBy('channel_id');
+
+        $channelGroups = $channels
+            ->map(function ($channel) use ($shopByChannelId) {
+                $shop = $shopByChannelId->get($channel['id']);
+
+                return [
+                    'id' => $channel['id'],
+                    'code' => $channel['code'],
+                    'name' => $channel['name'],
+                    'shop_id' => $shop?->id,
+                    'platform' => $shop?->platform?->name ?? 'Website',
+                ];
+            })
+            ->groupBy('platform')
+            ->map(fn ($group, $platform) => ['platform' => $platform, 'channels' => $group->values()])
+            ->values();
+
         $rawValues = ProductValue::where('product_id', $product->id)
             ->where(function ($q) use ($defaultChannelId) {
                 $q->whereNull('channel_id');
@@ -586,7 +613,9 @@ class ProductController extends Controller
             'productValues' => $values,
             'variants' => $variantsData,
             'channels' => $channels,
+            'channelGroups' => $channelGroups,
             'categoryIds' => $product->categories()->pluck('categories.id')->all(),
+            'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
         ]);
@@ -595,6 +624,32 @@ class ProductController extends Controller
     public function history(Product $product): JsonResponse
     {
         return response()->json(['history' => $this->versionHistoryFor($product)]);
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO LAZADA — creates or updates an actual
+     * listing on the seller's storefront. Only reachable for a shop the
+     * product is explicitly marked "published" for (see platformShops()),
+     * so this can't be triggered for a shop nobody opted into.
+     */
+    public function pushToLazada(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
+        if (!$isPublished) {
+            return response()->json([
+                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
+            ], 422);
+        }
+
+        try {
+            $result = LazadaProductSyncService::forShop($shop)->push($product, $shop);
+
+            AuditLog::record('pushed_to_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
+
+            return response()->json(['message' => "Pushed to '{$shop->name}' successfully.", 'result' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     public function update(Request $request, Product $product): RedirectResponse
@@ -606,6 +661,8 @@ class ProductController extends Controller
             'enabled' => ['required', 'boolean'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
+            'published_shop_ids' => ['nullable', 'array'],
+            'published_shop_ids.*' => ['exists:sales_platform_shops,id'],
             'associations' => ['nullable', 'array'],
             'associations.related' => ['nullable', 'array'],
             'associations.related.*' => ['exists:products,id'],
@@ -635,6 +692,13 @@ class ProductController extends Controller
             $newCategoryIds = collect($validated['category_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
             $product->categories()->sync($newCategoryIds);
             $categoryChanged = $oldCategoryIds !== $newCategoryIds;
+
+            $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $newShopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $product->platformShops()->sync($newShopIds);
+            if ($oldShopIds !== $newShopIds) {
+                AuditLog::record('published_shops_updated', $product, ['shop_ids' => $oldShopIds], ['shop_ids' => $newShopIds]);
+            }
 
             $this->syncAssociations($product, $validated['associations'] ?? []);
 

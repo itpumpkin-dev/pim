@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'ecommerce_api' => [
+        'key' => env('ECOMMERCE_API_KEY'),
+    ],
+
+    'lazada' => [
+        'base_url' => env('LAZADA_API_BASE_URL', 'https://api.lazada.co.th/rest'),
+    ],
+
 ];

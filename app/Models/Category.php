@@ -18,6 +18,7 @@ class Category extends Model
         'description',
         'additional_data',
         'parent_id',
+        'lazada_category_id',
         'created_by',
         'updated_by',
     ];
@@ -49,6 +50,11 @@ class Category extends Model
     public function children(): HasMany
     {
         return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    public function lazadaCategory(): BelongsTo
+    {
+        return $this->belongsTo(LazadaCategory::class, 'lazada_category_id');
     }
 
     /**

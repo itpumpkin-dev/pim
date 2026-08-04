@@ -53,6 +53,15 @@ class Product extends Model
         return $this->belongsToMany(Category::class, 'product_category');
     }
 
+    /**
+     * Shops this product is marked to be published/pushed to. Editable from
+     * Edit Product's Sales Channels panel; consumed by the Lazada push job.
+     */
+    public function platformShops(): BelongsToMany
+    {
+        return $this->belongsToMany(SalesPlatformShop::class, 'product_platform_shops');
+    }
+
     public function versions(): HasMany
     {
         return $this->hasMany(ProductVersion::class);

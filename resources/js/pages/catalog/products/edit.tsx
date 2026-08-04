@@ -2,7 +2,10 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PublishIcon from '@mui/icons-material/Publish';
 import {
     Alert,
     Autocomplete,
@@ -11,8 +14,12 @@ import {
     Checkbox,
     Chip,
     CircularProgress,
+    Collapse,
     Dialog,
+    DialogActions,
     DialogContent,
+    DialogContentText,
+    DialogTitle,
     FormControl,
     FormControlLabel,
     Grid,
@@ -21,6 +28,7 @@ import {
     MenuItem,
     Paper,
     Select,
+    Snackbar,
     Stack,
     Switch,
     Tab,
@@ -76,6 +84,12 @@ interface ChannelOption {
     id: number;
     code: string;
     name: string | null;
+    shop_id?: number | null;
+}
+
+interface ChannelGroup {
+    platform: string;
+    channels: ChannelOption[];
 }
 
 interface Product {
@@ -104,7 +118,9 @@ interface Props {
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
     channels?: ChannelOption[];
+    channelGroups?: ChannelGroup[];
     categoryIds?: number[];
+    publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
 }
@@ -120,6 +136,7 @@ interface ProductForm {
     values: Record<string | number, Record<string, Record<string | number, AttributeValue>>>;
     variants: VariantItem[];
     category_ids: number[];
+    published_shop_ids: number[];
     associations: { related: number[]; up_sell: number[]; cross_sell: number[] };
     [key: string]: any;
 }
@@ -137,7 +154,9 @@ export default function ProductEdit({
     productValues,
     variants = [],
     channels = [],
+    channelGroups = [],
     categoryIds = [],
+    publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
 }: Props) {
@@ -155,6 +174,24 @@ export default function ProductEdit({
     // switching to any other channel triggers a re-fetch of scopable fields.
     const defaultChannelId = channels.length > 0 ? channels[0].id : null;
     const [activeChannelId, setActiveChannelId] = useState<number | null>(defaultChannelId);
+
+    // Only the platform group containing the active channel starts expanded —
+    // the rest stay collapsed until the user clicks into them.
+    const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(() => {
+        const group = channelGroups.find((g) => g.channels.some((c) => c.id === defaultChannelId));
+        return new Set(group ? [group.platform] : []);
+    });
+    const togglePlatform = (platform: string) => {
+        setExpandedPlatforms((prev) => {
+            const next = new Set(prev);
+            if (next.has(platform)) {
+                next.delete(platform);
+            } else {
+                next.add(platform);
+            }
+            return next;
+        });
+    };
 
     // Switching locale/channel re-renders every field in this large form. Deferring
     // that update via a transition keeps the select itself responsive immediately
@@ -183,12 +220,60 @@ export default function ProductEdit({
         values: initialValues,
         variants: variants,
         category_ids: categoryIds,
+        published_shop_ids: publishedShopIds,
         associations: {
             related: associations.related.map((p) => p.id),
             up_sell: associations.up_sell.map((p) => p.id),
             cross_sell: associations.cross_sell.map((p) => p.id),
         },
     });
+
+    const toggleShopPublished = (shopId: number) => {
+        const current = data.published_shop_ids;
+        setData(
+            'published_shop_ids',
+            current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId],
+        );
+    };
+
+    // Pushing sends a real, live create/update to Lazada — a confirm step
+    // and explicit trigger (never automatic) are deliberate given that.
+    const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string } | null>(null);
+    const [pushing, setPushing] = useState(false);
+    const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
+
+    const confirmPushToLazada = () => {
+        if (!pushConfirmShop) return;
+        const shopId = pushConfirmShop.id;
+        setPushing(true);
+
+        // This app has no <meta name="csrf-token">; Laravel's VerifyCsrfToken
+        // also accepts the XSRF-TOKEN cookie it already sets on every
+        // response (mirrored back as a header), so read that instead.
+        const xsrfToken = decodeURIComponent(
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1] ?? '',
+        );
+
+        fetch(`/catalog/products/${product.id}/push-lazada/${shopId}`, {
+            method: 'POST',
+            headers: {
+                'X-XSRF-TOKEN': xsrfToken,
+                Accept: 'application/json',
+            },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
+            })
+            .catch(() => setPushResult({ severity: 'error', message: 'Network error while pushing to Lazada.' }))
+            .finally(() => {
+                setPushing(false);
+                setPushConfirmShop(null);
+            });
+    };
 
     // Resolves which nested keys a given attribute's value lives under for the
     // currently selected channel/locale, based on its own scoping flags.
@@ -301,24 +386,6 @@ export default function ProductEdit({
                         </Typography>
 
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Select
-                                size="small"
-                                displayEmpty
-                                value={activeChannelId ?? ''}
-                                onChange={(e) => handleChannelChange(e.target.value === '' ? null : Number(e.target.value))}
-                                sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 160 }}
-                            >
-                                {channels.length === 0 && (
-                                    <MenuItem value="">
-                                        <em>No channels</em>
-                                    </MenuItem>
-                                )}
-                                {channels.map((ch) => (
-                                    <MenuItem key={ch.id} value={ch.id}>
-                                        {ch.name || ch.code}
-                                    </MenuItem>
-                                ))}
-                            </Select>
                             <Select
                                 size="small"
                                 value={activeLocaleId}
@@ -671,6 +738,131 @@ export default function ProductEdit({
                                         </Box>
                                     </Stack>
                                 </Paper>
+
+                                {/* Sales Channels Panel */}
+                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                        Sales Channels
+                                    </Typography>
+                                    <Stack spacing={0.5}>
+                                        {channelGroups.map((group) => {
+                                            const isExpanded = expandedPlatforms.has(group.platform);
+                                            const groupShopIds = group.channels
+                                                .map((c) => c.shop_id)
+                                                .filter((id): id is number => id != null);
+                                            const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
+                                            const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
+                                            const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
+
+                                            return (
+                                                <Box key={group.platform}>
+                                                    <Box
+                                                        onClick={() => togglePlatform(group.platform)}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 0.5,
+                                                            py: 0.75,
+                                                            px: 1,
+                                                            borderRadius: 1,
+                                                            cursor: 'pointer',
+                                                            '&:hover': { bgcolor: 'action.hover' },
+                                                        }}
+                                                    >
+                                                        {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
+                                                        {groupShopIds.length > 0 && (
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={allInGroupChecked}
+                                                                indeterminate={someInGroupChecked}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onChange={() => {
+                                                                    setData(
+                                                                        'published_shop_ids',
+                                                                        allInGroupChecked
+                                                                            ? data.published_shop_ids.filter((id) => !groupShopIds.includes(id))
+                                                                            : Array.from(new Set([...data.published_shop_ids, ...groupShopIds])),
+                                                                    );
+                                                                }}
+                                                                sx={{ p: 0.5 }}
+                                                            />
+                                                        )}
+                                                        <Typography variant="body2" fontWeight={700}>
+                                                            {group.platform}
+                                                        </Typography>
+                                                        <Chip label={group.channels.length} size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
+                                                        {groupShopIds.length > 0 && (
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                ({checkedInGroup}/{groupShopIds.length} published)
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    <Collapse in={isExpanded}>
+                                                        <Stack sx={{ pl: 4 }}>
+                                                            {group.channels.map((ch) => {
+                                                                const active = activeChannelId === ch.id;
+                                                                const isShop = ch.shop_id != null;
+                                                                const published = isShop && data.published_shop_ids.includes(ch.shop_id as number);
+                                                                return (
+                                                                    <Box
+                                                                        key={ch.id}
+                                                                        onClick={() => handleChannelChange(ch.id)}
+                                                                        sx={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            py: 0.25,
+                                                                            pr: 1.5,
+                                                                            pl: isShop ? 0.5 : 1.5,
+                                                                            borderRadius: 1,
+                                                                            cursor: 'pointer',
+                                                                            bgcolor: active ? 'primary.main' : 'transparent',
+                                                                            color: active ? '#fff' : 'text.primary',
+                                                                            '&:hover': { bgcolor: active ? 'primary.dark' : 'action.hover' },
+                                                                        }}
+                                                                    >
+                                                                        {isShop && (
+                                                                            <Checkbox
+                                                                                size="small"
+                                                                                checked={published}
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                                onChange={() => toggleShopPublished(ch.shop_id as number)}
+                                                                                sx={{
+                                                                                    color: active ? '#fff' : undefined,
+                                                                                    '&.Mui-checked': { color: active ? '#fff' : undefined },
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                        <Typography variant="body2" sx={{ flex: 1 }}>
+                                                                            {ch.name || ch.code}
+                                                                        </Typography>
+                                                                        {published && (
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                title="Push to Lazada"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code });
+                                                                                }}
+                                                                                sx={{ color: active ? '#fff' : 'primary.main' }}
+                                                                            >
+                                                                                <PublishIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
+                                                                    </Box>
+                                                                );
+                                                            })}
+                                                        </Stack>
+                                                    </Collapse>
+                                                </Box>
+                                            );
+                                        })}
+                                        {channelGroups.length === 0 && (
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                No sales channels available.
+                                            </Typography>
+                                        )}
+                                    </Stack>
+                                </Paper>
                             </Stack>
                         </Grid>
                     </Grid>
@@ -679,6 +871,35 @@ export default function ProductEdit({
 
                 {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
             </Box>
+
+            <Dialog open={pushConfirmShop !== null} onClose={() => setPushConfirmShop(null)}>
+                <DialogTitle>Push to Lazada?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This creates or updates a <strong>real, live listing</strong> on Lazada for <strong>{pushConfirmShop?.name}</strong>,
+                        visible to real customers. This action can&apos;t be undone from here.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPushConfirmShop(null)} color="inherit" disabled={pushing}>
+                        Cancel
+                    </Button>
+                    <Button onClick={confirmPushToLazada} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>
+                        {pushing ? 'Pushing...' : 'Push'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Snackbar
+                open={pushResult !== null}
+                autoHideDuration={6000}
+                onClose={() => setPushResult(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert onClose={() => setPushResult(null)} severity={pushResult?.severity ?? 'success'} sx={{ width: '100%' }}>
+                    {pushResult?.message}
+                </Alert>
+            </Snackbar>
         </AppLayout>
     );
 }

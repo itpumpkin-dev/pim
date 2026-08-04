@@ -28,6 +28,7 @@ class AttributeFamilySeeder extends Seeder
         'price_std' => 'pricing_packaging', 'price_recommend' => 'pricing_packaging', 'shelflife' => 'pricing_packaging',
         'cover_month' => 'pricing_packaging', 'leadtime' => 'pricing_packaging', 'moq' => 'pricing_packaging',
         'bom' => 'pricing_packaging', 'min_stock' => 'pricing_packaging', 'max_stock' => 'pricing_packaging',
+        'qty' => 'pricing_packaging',
 
         // specifications
         'spec_specifications' => 'specifications', 'spec_features' => 'specifications', 'spec_accessories' => 'specifications',

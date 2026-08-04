@@ -7,6 +7,7 @@ use App\Models\AttributeFamily;
 use App\Models\ImportConfig;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\ImportExport\RowImportException;
 
 class ProductRowImporter implements RowImporterInterface
@@ -94,6 +95,12 @@ class ProductRowImporter implements RowImporterInterface
                 ['value' => (string) $value]
             );
         }
+
+        ProductCategoryLinker::linkFromCodes($product, [
+            $row['pcatname'] ?? null,
+            $row['psubcatname'] ?? null,
+            $row['productgroupname'] ?? null,
+        ]);
 
         if (empty($unknownColumns)) {
             return [];

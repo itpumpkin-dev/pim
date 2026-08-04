@@ -6,7 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
+import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -81,6 +81,15 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('channels')} />
             <Box sx={{ p: 4 }}>
+                <Tabs
+                    value="channels"
+                    onChange={(_, val) => router.visit(val === 'platforms' ? '/catalog/sales-platforms' : '/catalog/channels')}
+                    sx={{ mb: 3 }}
+                >
+                    <Tab value="channels" label={t('channelsTab')} />
+                    <Tab value="platforms" label={t('salesPlatformsTab')} />
+                </Tabs>
+
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h4" fontWeight={700}>{tNav('channels')}</Typography>

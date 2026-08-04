@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
+import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/catalog/lazada-category-picker';
 
 interface CategoryItem {
     id: number;
@@ -19,6 +20,8 @@ interface CategoryItem {
     description: string | null;
     parent_id: number | null;
     additional_data: Record<string, any> | null;
+    lazada_category_id: number | null;
+    lazada_category: LazadaCategoryOption | null;
 }
 
 interface Props {
@@ -40,11 +43,14 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
         { title: t('editCategory'), href: '#' },
     ];
 
+    const [lazadaCategory, setLazadaCategory] = useState<LazadaCategoryOption | null>(category.lazada_category);
+
     const { data, setData, post, transform, processing, errors } = useForm({
         code: category.code || '',
         name: category.name || '',
         description: category.description || '',
         parent_id: (category.parent_id !== null ? category.parent_id : '') as string | number,
+        lazada_category_id: category.lazada_category_id,
         additional_data: (category.additional_data || {}) as Record<string, any>,
     });
 
@@ -132,6 +138,20 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
                                     rootLabel={t('rootCategory')}
                                 />
                                 {errors.parent_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.parent_id}</Alert>}
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                    {t('lazadaCategoryLabel')}
+                                </Typography>
+                                <LazadaCategoryPicker
+                                    value={lazadaCategory}
+                                    onChange={(next) => {
+                                        setLazadaCategory(next);
+                                        setData('lazada_category_id', next?.id ?? null);
+                                    }}
+                                    placeholder={t('lazadaCategoryPlaceholder')}
+                                />
+                                {errors.lazada_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.lazada_category_id}</Alert>}
                             </Box>
                             <TextField
                                 label={t('description')}

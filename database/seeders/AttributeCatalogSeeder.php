@@ -13,7 +13,8 @@ class AttributeCatalogSeeder extends Seeder
      * seeding pipeline is reproducible from a blank database, instead of
      * silently depending on these already existing by chance.
      *
-     * code => [type, is_locale_based, is_required]
+     * code => [type, is_locale_based, is_required, is_channel_based?]
+     * (4th element defaults to false when omitted)
      */
     private const ATTRIBUTES = [
         'pid' => ['text', false, true],
@@ -51,7 +52,10 @@ class AttributeCatalogSeeder extends Seeder
         'warranty_period' => ['price', false, false],
         'warranty_conditions' => ['textarea', true, false],
         'warranty_notes' => ['textarea', true, false],
-        'price_std' => ['price', false, false],
+        // Channel-based so each sales platform shop (see SalesPlatformShop's
+        // linked Channel) can carry its own price, separate from the base/
+        // web price — see the "sales platforms vs channels" design work.
+        'price_std' => ['price', false, false, true],
         'price_recommend' => ['price', false, false],
         'search' => ['text', false, false],
         'product_details_features' => ['textarea', true, false],
@@ -78,18 +82,22 @@ class AttributeCatalogSeeder extends Seeder
         'bom' => ['textarea', false, false],
         'min_stock' => ['price', false, false],
         'max_stock' => ['price', false, false],
+        'qty' => ['price', false, false],
     ];
 
     public function run(): void
     {
-        foreach (self::ATTRIBUTES as $code => [$type, $isLocaleBased, $isRequired]) {
+        foreach (self::ATTRIBUTES as $code => $config) {
+            [$type, $isLocaleBased, $isRequired] = $config;
+            $isChannelBased = $config[3] ?? false;
+
             Attribute::updateOrCreate(
                 ['code' => $code],
                 [
                     'name' => ucfirst(str_replace('_', ' ', $code)),
                     'type' => $type,
                     'is_locale_based' => $isLocaleBased,
-                    'is_channel_based' => false,
+                    'is_channel_based' => $isChannelBased,
                     'is_required' => $isRequired,
                     'swatch_type' => in_array($type, ['select', 'multiselect'], true) ? 'text' : null,
                 ]

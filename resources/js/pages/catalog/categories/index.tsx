@@ -10,6 +10,7 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import SyncIcon from '@mui/icons-material/Sync';
 import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,6 +61,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 15);
     const [deleteCategoryId, setDeleteCategoryId] = useState<number | null>(null);
+    const [syncingLazada, setSyncingLazada] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -103,16 +105,31 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         <Typography variant="h4" fontWeight={700}>{tNav('categories')}</Typography>
                         <Typography color="text.secondary">{tGrid('results', { count: categories.total })}</Typography>
                     </Box>
-                    {canCreate && (
-                        <Button
-                            sx={{ color: "white" }}
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/categories/create')}
-                        >
-                            {t('createCategory')}
-                        </Button>
-                    )}
+                    <Stack direction="row" spacing={1.5}>
+                        {canEdit && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<SyncIcon />}
+                                disabled={syncingLazada}
+                                onClick={() => {
+                                    setSyncingLazada(true);
+                                    router.post('/catalog/categories/sync-lazada', {}, { onFinish: () => setSyncingLazada(false) });
+                                }}
+                            >
+                                {t('syncLazadaCategories')}
+                            </Button>
+                        )}
+                        {canCreate && (
+                            <Button
+                                sx={{ color: "white" }}
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={() => router.visit('/catalog/categories/create')}
+                            >
+                                {t('createCategory')}
+                            </Button>
+                        )}
+                    </Stack>
                 </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>

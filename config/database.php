@@ -97,6 +97,23 @@ return [
             'sslmode' => 'prefer',
         ],
 
+        // n8n's Postgres instance — hosts seller/marketplace integration
+        // state (e.g. lazada_tokens) that n8n workflows already manage.
+        // Read from here for outbound marketplace sync; don't write.
+        'n8n' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_HOST_N8N', '127.0.0.1'),
+            'port' => env('DB_PORT_N8N', '5432'),
+            'database' => env('DB_DATABASE_N8N', 'n8n_database'),
+            'username' => env('DB_USERNAME_N8N', 'postgres'),
+            'password' => env('DB_PASSWORD_N8N', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),

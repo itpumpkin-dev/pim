@@ -5,6 +5,7 @@ use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\AttributeOptionController;
 use App\Http\Controllers\Catalog\ChannelController;
+use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
@@ -24,6 +25,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
     Route::put('products/{product}/attribute-values', [ProductController::class, 'updateAttributeValue'])->name('products.updateAttributeValue')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
+    Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
@@ -62,6 +64,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:categories,edit_categories');
     Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy')->middleware('permission:categories,delete_categories');
     Route::get('categories/{category}/history', [CategoryController::class, 'history'])->name('categories.history')->middleware('permission:categories,view_history');
+    Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
+    Route::get('categories/search-lazada', [CategoryController::class, 'searchLazadaCategories'])->name('categories.searchLazada')->middleware('permission:categories,edit_categories');
 
     Route::get('categoryFields', [CategoryFieldController::class, 'index'])->name('categoryFields.index')->middleware('permission:category_fields,list_category_fields');
     Route::get('categoryFields/create', [CategoryFieldController::class, 'create'])->name('categoryFields.create')->middleware('permission:category_fields,create_category_fields');
@@ -78,4 +82,13 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('channels/{channel}', [ChannelController::class, 'update'])->name('channels.update')->middleware('permission:channels,edit_channels');
     Route::delete('channels/{channel}', [ChannelController::class, 'destroy'])->name('channels.destroy')->middleware('permission:channels,delete_channels');
     Route::get('channels/{channel}/history', [ChannelController::class, 'history'])->name('channels.history')->middleware('permission:channels,view_history');
+
+    Route::get('sales-platforms', [SalesPlatformController::class, 'index'])->name('salesPlatforms.index')->middleware('permission:sales_platforms,list_sales_platforms');
+    Route::post('sales-platforms', [SalesPlatformController::class, 'storePlatform'])->name('salesPlatforms.store')->middleware('permission:sales_platforms,create_sales_platforms');
+    Route::put('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'updatePlatform'])->name('salesPlatforms.update')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::delete('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'destroyPlatform'])->name('salesPlatforms.destroy')->middleware('permission:sales_platforms,delete_sales_platforms');
+    Route::post('sales-platforms/sync-lazada', [SalesPlatformController::class, 'syncLazadaShops'])->name('salesPlatforms.syncLazada')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::post('sales-platforms/{salesPlatform}/shops', [SalesPlatformController::class, 'storeShop'])->name('salesPlatforms.shops.store')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::put('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'updateShop'])->name('salesPlatforms.shops.update')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::delete('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'destroyShop'])->name('salesPlatforms.shops.destroy')->middleware('permission:sales_platforms,edit_sales_platforms');
 });
