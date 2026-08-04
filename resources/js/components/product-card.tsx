@@ -2,6 +2,7 @@ import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Pro
 import { useLocale } from '@/hooks/use-locale';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
+import { trackEvent } from '@/lib/track-event';
 import { Link } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
@@ -32,6 +33,10 @@ export function ProductCard({ product }: { product: Product }) {
         downloadCsv(`product-${product.sku}.csv`, productCsvHeaders, [productToCsvRow(product)]);
     };
 
+    const handleCardClick = () => {
+        trackEvent({ eventType: 'click', productId: product.id, category: product.category ?? null });
+    };
+
     return (
         <Box
             onMouseEnter={() => setHovering(true)}
@@ -42,6 +47,7 @@ export function ProductCard({ product }: { product: Product }) {
                 component={Link}
                 href={`/products/${product.id}`}
                 prefetch
+                onClick={handleCardClick}
                 elevation={0}
                 sx={{
                     position: 'relative',

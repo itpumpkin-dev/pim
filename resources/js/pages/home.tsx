@@ -5,6 +5,7 @@ import LocaleDropdown from '@/components/locale-dropdown';
 import { downloadCsv } from '@/lib/csv';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
+import { trackEvent } from '@/lib/track-event';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
@@ -330,7 +331,15 @@ export default function Home({ products, categories }: { products: Product[]; ca
                             <CategoryStrip
                                 categories={categoryOptions}
                                 selected={selectedCategory}
-                                onSelect={(label) => setSelectedCategory((current) => (current === label ? null : label))}
+                                onSelect={(label) =>
+                                    setSelectedCategory((current) => {
+                                        const next = current === label ? null : label;
+                                        if (next) {
+                                            trackEvent({ eventType: 'category_select', category: next });
+                                        }
+                                        return next;
+                                    })
+                                }
                             />
                         </Box>
 
