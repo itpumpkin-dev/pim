@@ -6,7 +6,10 @@ use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Models\ProductViewEvent;
 use App\Services\Catalog\ProductPresenter;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -79,5 +82,22 @@ class StorefrontController extends Controller
             'product' => $mapped,
             'related' => ProductPresenter::mapMany($related),
         ]);
+    }
+
+    public function trackEvent(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'event_type' => ['required', 'string', 'in:click,category_select'],
+            'product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'category' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        ProductViewEvent::record(
+            eventType: $validated['event_type'],
+            productId: $validated['product_id'] ?? null,
+            category: $validated['category'] ?? null,
+        );
+
+        return response()->json(['status' => 'ok']);
     }
 }

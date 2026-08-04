@@ -1,16 +1,12 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import { xsrfToken } from '@/lib/csrf';
 
 declare global {
     interface Window {
         Pusher: typeof Pusher;
         Echo: Echo<'pusher'>;
     }
-}
-
-function xsrfToken(): string {
-    const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : '';
 }
 
 window.Pusher = Pusher;

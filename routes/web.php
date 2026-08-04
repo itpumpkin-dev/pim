@@ -42,6 +42,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('products/{id}', [StorefrontController::class, 'show'])->name('products.show');
+Route::post('storefront/events', [StorefrontController::class, 'trackEvent'])->name('storefront.events.track');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
