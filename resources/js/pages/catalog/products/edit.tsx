@@ -1033,6 +1033,7 @@ function RenderAttributeInput({
                         attributeId={attr.id}
                         attributeLabel={label}
                         swatchType={attr.swatch_type}
+                        existingOptions={options}
                         onClose={() => setAddOptionOpen(false)}
                         onCreated={(code) => onChange(code)}
                     />

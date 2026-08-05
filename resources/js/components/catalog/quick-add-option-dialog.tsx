@@ -1,9 +1,30 @@
 import { router } from '@inertiajs/react';
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material';
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography,
+} from '@mui/material';
 import { KeyboardEvent, useState } from 'react';
-import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useLocale } from '@/hooks/use-locale';
 
 const slugify = (value: string) => value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+export interface ExistingOption {
+    id: number;
+    code?: string;
+    admin_label?: string;
+}
 
 /**
  * Lets a user add a new option to a select/multiselect attribute without
@@ -20,6 +41,7 @@ export function QuickAddOptionDialog({
     attributeId,
     attributeLabel,
     swatchType,
+    existingOptions = [],
     onClose,
     onCreated,
 }: {
@@ -27,9 +49,11 @@ export function QuickAddOptionDialog({
     attributeId: number;
     attributeLabel: string;
     swatchType?: string | null;
+    existingOptions?: ExistingOption[];
     onClose: () => void;
     onCreated: (code: string) => void;
 }) {
+    const { locales } = useLocale();
     const [code, setCode] = useState('');
     const [translations, setTranslations] = useState<Record<string, string>>({});
     const [swatchText, setSwatchText] = useState('');
@@ -93,10 +117,39 @@ export function QuickAddOptionDialog({
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+        <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
             <DialogTitle>Add option — {attributeLabel}</DialogTitle>
             <DialogContent>
-                <Stack spacing={2} sx={{ mt: 1 }}>
+                {existingOptions.length > 0 && (
+                    <>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
+                            Existing options ({existingOptions.length})
+                        </Typography>
+                        <TableContainer sx={{ maxHeight: 220, mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                            <Table size="small" stickyHeader>
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>Label</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {existingOptions.map((option) => (
+                                        <TableRow key={option.id}>
+                                            <TableCell>{option.code}</TableCell>
+                                            <TableCell>{option.admin_label || '—'}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </>
+                )}
+
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                    New option
+                </Typography>
+                <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                     <TextField
                         label="Code"
                         size="small"
@@ -104,9 +157,19 @@ export function QuickAddOptionDialog({
                         onChange={(e) => setCode(slugify(e.target.value))}
                         onKeyDown={submitOnEnter}
                         autoFocus
-                        fullWidth
+                        sx={{ width: 160 }}
                     />
-                    <LocaleLabelFields title="Label" values={translations} onChange={(localeId, value) => setTranslations((prev) => ({ ...prev, [localeId]: value }))} />
+                    {locales.map((locale) => (
+                        <TextField
+                            key={locale.id}
+                            label={locale.display_name ?? locale.code}
+                            size="small"
+                            value={translations[String(locale.id)] ?? ''}
+                            onChange={(e) => setTranslations((prev) => ({ ...prev, [String(locale.id)]: e.target.value }))}
+                            onKeyDown={submitOnEnter}
+                            sx={{ minWidth: 160, flex: 1 }}
+                        />
+                    ))}
                     {swatchType === 'color' && (
                         <TextField
                             label="Color (hex)"
@@ -114,16 +177,16 @@ export function QuickAddOptionDialog({
                             value={swatchText}
                             onChange={(e) => setSwatchText(e.target.value)}
                             onKeyDown={submitOnEnter}
-                            fullWidth
+                            sx={{ width: 140 }}
                         />
                     )}
                     {swatchType === 'image' && (
                         <TextField
                             type="file"
                             size="small"
-                            fullWidth
                             onChange={(e) => setSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
                             slotProps={{ htmlInput: { accept: 'image/*' } }}
+                            sx={{ width: 220 }}
                         />
                     )}
                     {error && (

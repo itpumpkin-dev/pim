@@ -1,9 +1,30 @@
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TranslateIcon from '@mui/icons-material/Translate';
-import { Box, Button, IconButton, Paper, Popover, Stack, TextField, Typography } from '@mui/material';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import SearchIcon from '@mui/icons-material/Search';
+import {
+    Box,
+    Button,
+    IconButton,
+    InputAdornment,
+    MenuItem,
+    Paper,
+    Select,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Typography,
+} from '@mui/material';
 import { router } from '@inertiajs/react';
-import { KeyboardEvent, MouseEvent, useEffect, useState } from 'react';
-import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { useLocale } from '@/hooks/use-locale';
 
 export interface AttributeOptionItem {
     id: number;
@@ -17,7 +38,6 @@ export interface AttributeOptionItem {
 interface EditableOption {
     id: number;
     code: string;
-    admin_label: string;
     translations: Record<string, string>;
     swatchText: string;
     swatchImage: File | null;
@@ -29,7 +49,6 @@ const slugify = (value: string) => value.toLowerCase().replace(/\s+/g, '_').repl
 const toEditableOption = (option: AttributeOptionItem, swatchType: string): EditableOption => ({
     id: option.id,
     code: option.code,
-    admin_label: option.admin_label ?? '',
     translations: option.translations ?? {},
     swatchText: swatchType === 'color' ? (option.swatch_value ?? '') : '',
     swatchImage: null,
@@ -50,111 +69,16 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
     return null;
 }
 
-/**
- * Small "Translate" trigger + popover, used both for an existing row and for
- * the new-option row — kept as a popover rather than inline fields per row
- * since some option lists run into the hundreds and N locale fields per row
- * would make the table unusable.
- */
-function TranslateButton({
-    translations,
-    onChange,
-}: {
-    translations: Record<string, string>;
-    onChange: (localeId: string, value: string) => void;
-}) {
-    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-    const filledCount = Object.values(translations).filter((v) => v.trim() !== '').length;
-
-    return (
-        <>
-            <IconButton
-                size="small"
-                title="Translate"
-                onClick={(e: MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)}
-                sx={{ border: '1px solid', borderColor: filledCount > 0 ? 'primary.main' : 'divider' }}
-            >
-                <TranslateIcon fontSize="small" />
-            </IconButton>
-            <Popover
-                open={Boolean(anchorEl)}
-                anchorEl={anchorEl}
-                onClose={() => setAnchorEl(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Box sx={{ p: 2, width: 320 }}>
-                    <LocaleLabelFields title="Label per language" values={translations} onChange={onChange} />
-                </Box>
-            </Popover>
-        </>
-    );
-}
-
-function OptionRow({
-    attributeId,
-    swatchType,
-    row,
-    onChange,
-}: {
-    attributeId: number;
-    swatchType: string;
-    row: EditableOption;
-    onChange: (next: EditableOption) => void;
-}) {
-    const destroy = () => {
-        router.delete(`/catalog/attributes/${attributeId}/options/${row.id}`, { preserveScroll: true });
-    };
-
-    return (
-        <Stack direction="row" spacing={1} alignItems="center">
-            <TextField
-                size="small"
-                label="Code"
-                value={row.code}
-                onChange={(e) => onChange({ ...row, code: slugify(e.target.value) })}
-                sx={{ width: 140 }}
-            />
-            <TextField
-                size="small"
-                label="Label"
-                value={row.admin_label}
-                onChange={(e) => onChange({ ...row, admin_label: e.target.value })}
-                sx={{ flex: 1 }}
-            />
-            <TranslateButton translations={row.translations} onChange={(localeId, value) => onChange({ ...row, translations: { ...row.translations, [localeId]: value } })} />
-            {swatchType === 'color' && (
-                <TextField
-                    size="small"
-                    label="Color (hex)"
-                    value={row.swatchText}
-                    onChange={(e) => onChange({ ...row, swatchText: e.target.value })}
-                    sx={{ width: 140 }}
-                />
-            )}
-            {swatchType === 'image' && (
-                <TextField
-                    type="file"
-                    size="small"
-                    sx={{ width: 200 }}
-                    onChange={(e) => onChange({ ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
-                    slotProps={{ htmlInput: { accept: 'image/*' } }}
-                />
-            )}
-            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
-            <IconButton size="small" onClick={destroy} title="Delete">
-                <DeleteIcon fontSize="small" />
-            </IconButton>
-        </Stack>
-    );
-}
+const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 /**
- * Options CRUD for select/multiselect attributes. Add/delete are still
- * immediate, independent requests, but edits to existing rows are batched —
- * some of these option lists run into the hundreds (bulk-imported taxonomy
- * data), where a save button per row isn't practical. "Save all" sends every
- * row's current values in one request; rows aren't individually saved.
+ * Options CRUD for select/multiselect attributes, laid out as a grid with one
+ * column per active locale — rather than a per-row "Translate" popover — so
+ * every language is visible and editable at a glance without an extra click.
+ * Add/delete are still immediate, independent requests, but edits to existing
+ * rows are batched: some of these option lists run into the hundreds
+ * (bulk-imported taxonomy data), where a save button per row isn't practical.
+ * "Save all" sends every row's current values in one request.
  */
 export function AttributeOptionsPanel({
     attributeId,
@@ -165,8 +89,12 @@ export function AttributeOptionsPanel({
     swatchType: string;
     options: AttributeOptionItem[];
 }) {
+    const { locales } = useLocale();
     const [rows, setRows] = useState<EditableOption[]>(() => options.map((o) => toEditableOption(o, swatchType)));
     const [saving, setSaving] = useState(false);
+    const [search, setSearch] = useState('');
+    const [perPage, setPerPage] = useState(10);
+    const [page, setPage] = useState(1);
 
     // Reconciles with fresh server data (after add/delete/save-all) without
     // discarding in-progress edits to rows that are still around — only rows
@@ -221,7 +149,6 @@ export function AttributeOptionsPanel({
                 options: rows.map((row) => ({
                     id: row.id,
                     code: row.code,
-                    admin_label: row.admin_label,
                     translations: row.translations,
                     swatch_value: swatchType === 'color' ? row.swatchText : undefined,
                     swatch_image: row.swatchImage ?? undefined,
@@ -235,6 +162,10 @@ export function AttributeOptionsPanel({
         );
     };
 
+    const destroy = (id: number) => {
+        router.delete(`/catalog/attributes/${attributeId}/options/${id}`, { preserveScroll: true });
+    };
+
     // This panel is always rendered inside the attribute edit page's own
     // <form>, so it can't be a <form> itself (nested forms are invalid HTML
     // and React warns/hydration-fails on them) — Enter is wired up manually
@@ -245,6 +176,26 @@ export function AttributeOptionsPanel({
             addOption();
         }
     };
+
+    const updateRow = (id: number, next: EditableOption) => {
+        setRows((prev) => prev.map((r) => (r.id === id ? next : r)));
+    };
+
+    const filteredRows = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) return rows;
+
+        return rows.filter((row) => {
+            if (row.code.toLowerCase().includes(term)) return true;
+            return Object.values(row.translations).some((label) => label.toLowerCase().includes(term));
+        });
+    }, [rows, search]);
+
+    const pageCount = Math.max(1, Math.ceil(filteredRows.length / perPage));
+    const currentPage = Math.min(page, pageCount);
+    const pagedRows = filteredRows.slice((currentPage - 1) * perPage, currentPage * perPage);
+    const showSwatchColumn = swatchType === 'color' || swatchType === 'image';
+    const columnCount = 2 + locales.length + (showSwatchColumn ? 1 : 0);
 
     return (
         <Paper variant="outlined" sx={{ p: 3 }}>
@@ -257,58 +208,185 @@ export function AttributeOptionsPanel({
                 </Button>
             </Stack>
 
-            <Stack spacing={1.5} sx={{ mb: 2 }}>
-                {rows.map((row) => (
-                    <OptionRow
-                        key={row.id}
-                        attributeId={attributeId}
-                        swatchType={swatchType}
-                        row={row}
-                        onChange={(next) => setRows((prev) => prev.map((r) => (r.id === next.id ? next : r)))}
-                    />
-                ))}
-                {rows.length === 0 && (
+            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
+                <TextField
+                    size="small"
+                    placeholder="Search"
+                    value={search}
+                    onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                    }}
+                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
+                    sx={{ width: 240 }}
+                />
+                <Stack direction="row" spacing={1} alignItems="center">
                     <Typography variant="body2" color="text.secondary">
-                        No options yet
+                        {filteredRows.length} Results
                     </Typography>
-                )}
+                    <Select size="small" value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
+                        {PER_PAGE_OPTIONS.map((n) => (
+                            <MenuItem key={n} value={n}>{n}</MenuItem>
+                        ))}
+                    </Select>
+                    <Typography variant="body2" color="text.secondary">Per Page</Typography>
+                    <IconButton size="small" disabled={currentPage <= 1} onClick={() => setPage(1)}>
+                        <FirstPageIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>
+                        <ChevronLeftIcon fontSize="small" />
+                    </IconButton>
+                    <Typography variant="body2">{currentPage} of {pageCount}</Typography>
+                    <IconButton size="small" disabled={currentPage >= pageCount} onClick={() => setPage((p) => p + 1)}>
+                        <ChevronRightIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" disabled={currentPage >= pageCount} onClick={() => setPage(pageCount)}>
+                        <LastPageIcon fontSize="small" />
+                    </IconButton>
+                </Stack>
             </Stack>
 
-            <Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                    <TextField
-                        size="small"
-                        label="Code"
-                        value={newCode}
-                        onChange={(e) => setNewCode(slugify(e.target.value))}
-                        onKeyDown={submitOnEnter}
-                        sx={{ width: 140 }}
-                    />
-                    <TranslateButton translations={newTranslations} onChange={(localeId, value) => setNewTranslations((prev) => ({ ...prev, [localeId]: value }))} />
-                    {swatchType === 'color' && (
-                        <TextField
-                            size="small"
-                            label="Color (hex)"
-                            value={newSwatchText}
-                            onChange={(e) => setNewSwatchText(e.target.value)}
-                            onKeyDown={submitOnEnter}
-                            sx={{ width: 140 }}
-                        />
-                    )}
-                    {swatchType === 'image' && (
-                        <TextField
-                            type="file"
-                            size="small"
-                            sx={{ width: 200 }}
-                            onChange={(e) => setNewSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
-                            slotProps={{ htmlInput: { accept: 'image/*' } }}
-                        />
-                    )}
-                    <Button type="button" variant="outlined" onClick={addOption}>
-                        Add option
-                    </Button>
-                </Stack>
-            </Box>
+            <TableContainer sx={{ mb: 1 }}>
+                <Table size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 700, width: 160 }}>Code</TableCell>
+                            {locales.map((locale) => (
+                                <TableCell key={locale.id} sx={{ fontWeight: 700 }}>
+                                    {locale.display_name ?? locale.code}
+                                </TableCell>
+                            ))}
+                            {showSwatchColumn && <TableCell sx={{ fontWeight: 700 }}>Swatch</TableCell>}
+                            <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        <TableRow sx={{ bgcolor: 'action.hover' }}>
+                            <TableCell>
+                                <TextField
+                                    size="small"
+                                    placeholder="new_code"
+                                    value={newCode}
+                                    onChange={(e) => setNewCode(slugify(e.target.value))}
+                                    onKeyDown={submitOnEnter}
+                                    fullWidth
+                                />
+                            </TableCell>
+                            {locales.map((locale) => (
+                                <TableCell key={locale.id}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        value={newTranslations[String(locale.id)] ?? ''}
+                                        onChange={(e) => setNewTranslations((prev) => ({ ...prev, [String(locale.id)]: e.target.value }))}
+                                        onKeyDown={submitOnEnter}
+                                    />
+                                </TableCell>
+                            ))}
+                            {swatchType === 'color' && (
+                                <TableCell>
+                                    <TextField
+                                        size="small"
+                                        placeholder="#hex"
+                                        value={newSwatchText}
+                                        onChange={(e) => setNewSwatchText(e.target.value)}
+                                        onKeyDown={submitOnEnter}
+                                    />
+                                </TableCell>
+                            )}
+                            {swatchType === 'image' && (
+                                <TableCell>
+                                    <TextField
+                                        type="file"
+                                        size="small"
+                                        onChange={(e) => setNewSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
+                                        slotProps={{ htmlInput: { accept: 'image/*' } }}
+                                    />
+                                </TableCell>
+                            )}
+                            <TableCell align="right">
+                                <Button size="small" variant="outlined" onClick={addOption} disabled={!newCode.trim()}>
+                                    Add Row
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+
+                        {pagedRows.map((row) => (
+                            <TableRow key={row.id}>
+                                <TableCell>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        value={row.code}
+                                        onChange={(e) => updateRow(row.id, { ...row, code: slugify(e.target.value) })}
+                                    />
+                                </TableCell>
+                                {locales.map((locale) => (
+                                    <TableCell key={locale.id}>
+                                        <TextField
+                                            size="small"
+                                            fullWidth
+                                            value={row.translations[String(locale.id)] ?? ''}
+                                            onChange={(e) => updateRow(row.id, {
+                                                ...row,
+                                                translations: { ...row.translations, [String(locale.id)]: e.target.value },
+                                            })}
+                                        />
+                                    </TableCell>
+                                ))}
+                                {swatchType === 'color' && (
+                                    <TableCell>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <TextField
+                                                size="small"
+                                                value={row.swatchText}
+                                                onChange={(e) => updateRow(row.id, { ...row, swatchText: e.target.value })}
+                                                sx={{ width: 100 }}
+                                            />
+                                            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
+                                        </Stack>
+                                    </TableCell>
+                                )}
+                                {swatchType === 'image' && (
+                                    <TableCell>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <TextField
+                                                type="file"
+                                                size="small"
+                                                onChange={(e) => updateRow(row.id, { ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
+                                                slotProps={{ htmlInput: { accept: 'image/*' } }}
+                                                sx={{ width: 160 }}
+                                            />
+                                            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
+                                        </Stack>
+                                    </TableCell>
+                                )}
+                                <TableCell align="right">
+                                    <IconButton size="small" onClick={() => destroy(row.id)} title="Delete">
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+
+                        {rows.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={columnCount} align="center" sx={{ py: 3 }}>
+                                    <Typography variant="body2" color="text.secondary">No options yet</Typography>
+                                </TableCell>
+                            </TableRow>
+                        )}
+
+                        {rows.length > 0 && filteredRows.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={columnCount} align="center" sx={{ py: 3 }}>
+                                    <Typography variant="body2" color="text.secondary">No options match your search.</Typography>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
         </Paper>
     );
 }

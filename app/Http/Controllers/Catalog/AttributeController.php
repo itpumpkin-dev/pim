@@ -10,6 +10,7 @@ use App\Models\AttributeGroup;
 use App\Models\AttributeTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
+use App\Services\AttributeAutoTranslator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -151,6 +152,7 @@ class AttributeController extends Controller
         ]);
 
         $this->syncTranslations($attribute, $translations);
+        $this->autoTranslate($attribute, $translations);
 
         $newTranslations = $this->currentTranslations($attribute);
         if (!empty($newTranslations)) {
@@ -193,6 +195,7 @@ class AttributeController extends Controller
         ]);
 
         $this->syncTranslations($attribute, $translations);
+        $this->autoTranslate($attribute, $translations);
 
         $newTranslations = $this->currentTranslations($attribute);
         if ($oldTranslations !== $newTranslations) {
@@ -224,6 +227,35 @@ class AttributeController extends Controller
         $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
 
         return $firstNonEmpty !== null ? trim($firstNonEmpty) : ($name ?? ucfirst($code));
+    }
+
+    /**
+     * When "AI translate" is enabled and the default locale's label is
+     * filled in, pre-fills every other active locale that doesn't already
+     * have a translation. Skipped entirely if the default locale's own
+     * label is empty, since we'd otherwise have no reliable source text/
+     * language to translate from.
+     */
+    private function autoTranslate(Attribute $attribute, array $translations): void
+    {
+        if (!$attribute->is_ai_translate) {
+            return;
+        }
+
+        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
+        $sourceLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId === null || $sourceLabel === '') {
+            return;
+        }
+
+        app(AttributeAutoTranslator::class)->fillMissing(
+            AttributeTranslation::class,
+            'attribute_id',
+            $attribute->id,
+            $defaultLocaleId,
+            $sourceLabel,
+        );
     }
 
     private function syncTranslations(Attribute $attribute, array $translations): void

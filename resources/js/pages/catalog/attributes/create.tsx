@@ -4,7 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -100,7 +100,15 @@ export default function AttributeCreate() {
                     <Typography variant="h4" fontWeight={700}>{t('addAttributeTitle')}</Typography>
                     <Stack direction="row" spacing={1}>
                         <Button component={Link} href="/catalog/attributes" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>{t('back')}</Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={<SaveIcon />}>{t('saveAttribute')}</Button>
+                        <Button
+                            sx={{ color: "white" }}
+                            type="submit"
+                            variant="contained"
+                            disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                        >
+                            {processing ? t('saving') : t('saveAttribute')}
+                        </Button>
                     </Stack>
                 </Stack>
 

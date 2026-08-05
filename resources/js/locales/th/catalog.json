@@ -47,6 +47,7 @@
     "skuPlaceholder": "50***",
     "correctErrorsBeforeSaving": "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก",
     "save": "บันทึก",
+    "saving": "กำลังบันทึก...",
     "back": "ย้อนกลับ",
     "saveProduct": "บันทึกสินค้า",
     "configurableAttributesTitle": "แอตทริบิวต์ที่กำหนดค่าได้",

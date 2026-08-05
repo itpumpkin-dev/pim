@@ -8,6 +8,7 @@ use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
+use App\Services\AttributeAutoTranslator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +55,7 @@ class AttributeOptionController extends Controller
         ]);
 
         $this->syncTranslations($option, $translations);
+        $this->autoTranslate($attribute, $option, $translations);
 
         AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
@@ -92,6 +94,7 @@ class AttributeOptionController extends Controller
         ]);
 
         $this->syncTranslations($option, $translations);
+        $this->autoTranslate($attribute, $option, $translations);
 
         $newFields = $this->optionAuditFields($option);
         if ($oldFields !== $newFields) {
@@ -106,6 +109,12 @@ class AttributeOptionController extends Controller
      * flow — needed once an attribute has more than a handful of options (some
      * of these lists run into the hundreds), where clicking Save on each row
      * individually isn't practical.
+     *
+     * Deliberately does not run auto-translation (see store()/update()'s
+     * autoTranslate()): with rows potentially in the hundreds, firing one
+     * translation-provider call per missing locale per row synchronously here
+     * would risk timing out the request. Options saved through this path keep
+     * whatever labels were typed and are left for a manual translate pass.
      */
     public function batchUpdate(Request $request, Attribute $attribute): RedirectResponse
     {
@@ -230,6 +239,34 @@ class AttributeOptionController extends Controller
         }
 
         return $adminLabel !== null && trim($adminLabel) !== '' ? trim($adminLabel) : null;
+    }
+
+    /**
+     * Same pre-fill behavior as AttributeController::autoTranslate(), keyed
+     * off the parent attribute's "AI translate" flag since options don't
+     * carry their own — an option only ever exists under one attribute, so
+     * that flag is the natural place for the admin to opt in.
+     */
+    private function autoTranslate(Attribute $attribute, AttributeOption $option, array $translations): void
+    {
+        if (!$attribute->is_ai_translate) {
+            return;
+        }
+
+        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
+        $sourceLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId === null || $sourceLabel === '') {
+            return;
+        }
+
+        app(AttributeAutoTranslator::class)->fillMissing(
+            AttributeOptionTranslation::class,
+            'attribute_option_id',
+            $option->id,
+            $defaultLocaleId,
+            $sourceLabel,
+        );
     }
 
     private function syncTranslations(AttributeOption $option, array $translations): void

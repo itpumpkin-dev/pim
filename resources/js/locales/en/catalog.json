@@ -49,6 +49,7 @@
     "skuPlaceholder": "50xxx",
     "correctErrorsBeforeSaving": "Please correct the errors before saving.",
     "save": "Save",
+    "saving": "Saving...",
     "back": "Back",
     "saveProduct": "Save Product",
     "configurableAttributesTitle": "Configurable Attributes",
