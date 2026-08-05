@@ -172,7 +172,15 @@ function CategoryStrip({
     );
 }
 
-export default function Home({ products, categories }: { products: Product[]; categories: string[] }) {
+export default function Home({
+    products,
+    categories,
+    topViewedProducts = [],
+}: {
+    products: Product[];
+    categories: string[];
+    topViewedProducts?: Product[];
+}) {
     const { t } = useTranslation('home');
     const { auth } = usePage<SharedData>().props;
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -187,6 +195,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
     }, []);
 
     const categoryOptions = useMemo(() => categories.map((label) => ({ label, icon: getCategoryIcon(label) })), [categories]);
+    const popularIds = useMemo(() => new Set(topViewedProducts.map((product) => product.id)), [topViewedProducts]);
 
     useStorefrontWatcher(reloadStorefrontLists);
 
@@ -392,7 +401,7 @@ export default function Home({ products, categories }: { products: Product[]; ca
                                 }}
                             >
                                 {filtered.map((product) => (
-                                    <ProductCard key={product.id} product={product} />
+                                    <ProductCard key={product.id} product={product} popular={popularIds.has(product.id)} />
                                 ))}
                                 {filtered.length === 0 && (
                                     <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>

@@ -27,6 +27,36 @@ Route::middleware(['auth'])->group(function () {
                 ];
             });
 
+        $topViewedCounts = \App\Models\ProductViewEvent::selectRaw('product_id, COUNT(*) as views')
+            ->where('event_type', 'click')
+            ->whereNotNull('product_id')
+            ->groupBy('product_id')
+            ->orderByDesc('views')
+            ->limit(10)
+            ->get();
+
+        $topViewedProducts = \App\Models\Product::whereIn('id', $topViewedCounts->pluck('product_id'))->get();
+        $mappedTopViewed = collect(\App\Services\Catalog\ProductPresenter::mapMany($topViewedProducts))->keyBy('id');
+
+        $topViewed = $topViewedCounts
+            ->map(function ($row) use ($mappedTopViewed) {
+                $product = $mappedTopViewed->get($row->product_id);
+                if (!$product) {
+                    return null;
+                }
+
+                return [
+                    'id' => $product['id'],
+                    'sku' => $product['sku'],
+                    'name' => $product['name'],
+                    'category' => $product['category'],
+                    'image' => $product['image'] ?? null,
+                    'views' => (int) $row->views,
+                ];
+            })
+            ->filter()
+            ->values();
+
         return Inertia::render('dashboard', [
             'totalProduct' => \App\Models\Product::count(),
             'totalCategory' => \App\Models\Category::count(),
@@ -37,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
             'totalCurrencies' => \App\Models\Currency::count(),
             'totalChannels' => \App\Models\Channel::count(),
             'recentActivities' => $recentLogs,
+            'topViewedProducts' => $topViewed,
         ]);
     })->name('dashboard')->middleware('permission:dashboards,list_dashboards');
 });

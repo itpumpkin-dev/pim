@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { Box, Card, CardContent, Grid, Typography, Button, IconButton, useTheme, Divider } from '@mui/material';
+import { Box, Card, CardContent, Grid, Typography, Button, IconButton, useTheme, Divider, Stack } from '@mui/material';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import CategoryIcon from '@mui/icons-material/Category';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -32,6 +32,15 @@ interface RecentActivity {
     created_at: string;
 }
 
+interface TopViewedProduct {
+    id: number;
+    sku: string;
+    name: string;
+    category: string;
+    image: string | null;
+    views: number;
+}
+
 interface DashboardProps {
     totalProduct: number;
     totalCategory: number;
@@ -42,6 +51,7 @@ interface DashboardProps {
     totalCurrencies: number;
     totalChannels: number;
     recentActivities?: RecentActivity[];
+    topViewedProducts?: TopViewedProduct[];
 }
 
 export default function Dashboard({
@@ -54,6 +64,7 @@ export default function Dashboard({
     totalCurrencies = 0,
     totalChannels = 0,
     recentActivities = [],
+    topViewedProducts = [],
 }: DashboardProps) {
     const theme = useTheme();
     const { t } = useTranslation('dashboard');
@@ -137,12 +148,13 @@ export default function Dashboard({
     ].filter(box => !box.permission || permissions.includes(box.permission));
 
     const canViewConsole = permissions.includes('users.list_users') || permissions.includes('roles.list_roles');
+    const canViewProducts = permissions.includes('products.list_products');
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('dashboard')} />
             <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.default', minHeight: '100%', color: 'text.primary', fontFamily: '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
-                
+
                 {/* Content Header */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
                     <Typography variant="h5" fontWeight={400} sx={{ fontSize: '1rem', color: 'text.secondary' }}>
@@ -253,6 +265,88 @@ export default function Dashboard({
                     ))}
                 </Grid>
 
+                {/* Row 2.5 - Top Viewed Products */}
+                {canViewProducts && (
+                    <Box sx={{ mb: 4 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
+                            <Typography variant="h5" fontWeight={400} sx={{ fontSize: '1rem', color: 'text.secondary' }}>
+                                {t('topViewedSubtitle')}
+                            </Typography>
+                            <Typography variant="h5" fontWeight={700} sx={{ fontSize: '1.8rem', color: 'text.primary' }}>
+                                {t('topViewedProducts')}
+                            </Typography>
+                        </Box>
+
+                        <Card
+                            variant="outlined"
+                            sx={{
+                                borderRadius: '0.25rem',
+                                borderTop: `3px solid ${PALETTE.accent}`,
+                                bgcolor: 'background.paper',
+                                boxShadow: '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.08)',
+                            }}
+                        >
+                            <CardContent sx={{ p: 0 }}>
+                                <Box sx={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
+                                                <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>{t('rank')}</th>
+                                                <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>{t('product')}</th>
+                                                <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>{t('category')}</th>
+                                                <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem', color: 'text.primary' }}>{t('views')}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {topViewedProducts.map((product, index) => (
+                                                <tr key={product.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                                    <td style={{ padding: '12px 20px', fontSize: '0.875rem', fontWeight: 700, color: index < 3 ? PALETTE.accent : undefined }}>
+                                                        #{index + 1}
+                                                    </td>
+                                                    <td style={{ padding: '12px 20px', fontSize: '0.875rem' }}>
+                                                        <Stack direction="row" spacing={1.5} alignItems="center">
+                                                            <Box
+                                                                component="img"
+                                                                src={product.image ?? `https://images.dcpumpkin.com/images/product/500/${product.sku}.jpg`}
+                                                                alt={product.name}
+                                                                onError={(event) => {
+                                                                    (event.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                                                                }}
+                                                                sx={{
+                                                                    width: 36,
+                                                                    height: 36,
+                                                                    objectFit: 'contain',
+                                                                    borderRadius: 1,
+                                                                    border: '1px solid',
+                                                                    borderColor: 'divider',
+                                                                    bgcolor: 'action.hover',
+                                                                    flexShrink: 0,
+                                                                }}
+                                                            />
+                                                            <Typography variant="body2" fontWeight={600}>
+                                                                {product.name}
+                                                            </Typography>
+                                                        </Stack>
+                                                    </td>
+                                                    <td style={{ padding: '12px 20px', fontSize: '0.875rem', color: 'text.secondary' }}>{product.category}</td>
+                                                    <td style={{ padding: '12px 20px', fontSize: '0.875rem', fontWeight: 700 }}>{product.views}</td>
+                                                </tr>
+                                            ))}
+                                            {topViewedProducts.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'text.secondary' }}>
+                                                        {t('noViewData')}
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    </Box>
+                )}
+
                 {/* Row 3 - AdminLTE Classic Card Widget */}
                 {canViewConsole && (
                     <Grid container spacing={3}>
@@ -318,7 +412,7 @@ export default function Dashboard({
                         </Grid>
                     </Grid>
                 )}
-                
+
                 <Divider sx={{ my: 3 }} />
                 {/* Recent Activity */}
                 {canViewConsole && (
@@ -369,9 +463,9 @@ export default function Dashboard({
                                                             color: '#fff',
                                                             backgroundColor:
                                                                 activity.event === 'created' ? '#28a745' :
-                                                                activity.event === 'updated' ? '#007bff' :
-                                                                activity.event === 'deleted' ? '#dc3545' :
-                                                                activity.event === 'login' ? '#17a2b8' : '#6c757d'
+                                                                    activity.event === 'updated' ? '#007bff' :
+                                                                        activity.event === 'deleted' ? '#dc3545' :
+                                                                            activity.event === 'login' ? '#17a2b8' : '#6c757d'
                                                         }}>
                                                             {t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
                                                         </span>

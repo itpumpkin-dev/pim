@@ -26,5 +26,12 @@
     "updated": "Updated",
     "deleted": "Deleted",
     "login": "Login",
-    "logout": "Logout"
+    "logout": "Logout",
+    "topViewedProducts": "Most Viewed Products",
+    "topViewedSubtitle": "Top 10 products by storefront clicks",
+    "rank": "Rank",
+    "product": "Product",
+    "category": "Category",
+    "views": "Views",
+    "noViewData": "No view data yet."
 }
