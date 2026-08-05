@@ -5,6 +5,8 @@ namespace App\Http\Controllers\System;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\System\StoreRoleRequest;
 use App\Http\Requests\System\UpdateRoleRequest;
+use App\Models\Attribute;
+use App\Models\AttributeGroup;
 use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\RolePermission;
@@ -35,6 +37,8 @@ class RoleController extends Controller
         return Inertia::render('system/role/create', [
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
+            'attributeGroups' => AttributeGroup::orderBy('name')->get(['id', 'code', 'name']),
+            'attributes' => Attribute::orderBy('name')->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -73,6 +77,8 @@ class RoleController extends Controller
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
             ],
+            'attributeGroups' => AttributeGroup::orderBy('name')->get(['id', 'code', 'name']),
+            'attributes' => Attribute::orderBy('name')->get(['id', 'code', 'name']),
         ]);
     }
 

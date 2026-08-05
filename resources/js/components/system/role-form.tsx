@@ -63,6 +63,18 @@ interface RoleUserOption {
     last_name: string;
 }
 
+interface AttributeGroup {
+    id: number;
+    code: string;
+    name: string;
+}
+
+interface Attribute {
+    id: number;
+    code: string;
+    name: string;
+}
+
 interface RoleFormProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
@@ -72,6 +84,8 @@ interface RoleFormProps {
         permissions: Record<string, string[]>;
         user_ids: number[];
     };
+    attributeGroups: AttributeGroup[];
+    attributes: Attribute[];
 }
 
 interface RoleForm {
@@ -83,9 +97,11 @@ interface RoleForm {
 
 const TABS = ['General', 'Permissions', 'Users'];
 
-export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
+export default function RoleFormPage({ catalog, users, role, attributeGroups, attributes }: RoleFormProps) {
     const isEdit = Boolean(role);
     const [tab, setTab] = useState(0);
+    const [expandedAttrGroups, setExpandedAttrGroups] = useState(true);
+    const [expandedAttributes, setExpandedAttributes] = useState(true);
 
     const allResources = useMemo(() => {
         const res: Record<string, PermissionResource> = {};
@@ -110,6 +126,14 @@ export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
         permissions: role?.permissions ?? {},
         users: role?.user_ids ?? [],
     });
+
+    // Check if user has both products AND attributes permissions to show Attribute Access
+    const hasProductsPermission = useMemo(
+        () => {
+            return (data.permissions['products'] || []).length > 0;
+        },
+        [data.permissions]
+    );
 
     const cancel = () => router.visit('/system/roles');
 
@@ -292,6 +316,7 @@ export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
                 )}
 
                 {tab === 1 && (
+                    <>
                     <Box sx={{ display: 'flex', gap: 4 }}>
                         <Box sx={{ minWidth: 200 }}>
                             {Object.entries(catalog).map(([moduleKey, module]) => {
@@ -385,7 +410,15 @@ export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
                                                 )}
                                             </Box>
                                             {hasChildren && expanded && (
-                                                <Box sx={{ pl: 4, borderLeft: '1px solid', borderColor: 'divider', ml: 2 }}>
+                                                <Box sx={{
+                                                    pl: 4,
+                                                    borderLeft: '1px solid',
+                                                    borderColor: 'divider',
+                                                    ml: 2,
+                                                    maxHeight: '400px',
+                                                    overflowY: 'auto',
+                                                    pr: 1,
+                                                }}>
                                                     {Object.entries(action.children!).map(([childKey, child]) => (
                                                         <FormControlLabel
                                                             key={childKey}
@@ -409,6 +442,168 @@ export default function RoleFormPage({ catalog, users, role }: RoleFormProps) {
                             </Box>
                         )}
                     </Box>
+
+                    {/* Attribute Access Section - Only show if user has products permission */}
+                    {hasProductsPermission ? (
+                    <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: '2px solid', borderColor: 'divider', width: '100%' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>
+                            📋 Attribute Access
+                        </Typography>
+
+                        {/* Attribute Groups */}
+                        <Box sx={{ mb: 3 }}>
+                            <Box
+                                onClick={() => setExpandedAttrGroups(!expandedAttrGroups)}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    mb: 2,
+                                    cursor: 'pointer',
+                                    p: 1,
+                                    bgcolor: '#f5f5f5',
+                                    borderRadius: 1,
+                                }}
+                            >
+                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
+                                    {expandedAttrGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                </IconButton>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                    🏷️ Attribute Groups
+                                </Typography>
+                            </Box>
+
+                            {expandedAttrGroups && (
+                                <Box>
+                                    <Box sx={{ pl: 3, mb: 2 }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={attributeGroups.length > 0 && attributeGroups.every((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`))}
+                                                    indeterminate={attributeGroups.some((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`)) && !attributeGroups.every((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`))}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            const allGroupPerms = attributeGroups.map((g) => `view_${g.code}`);
+                                                            setData('permissions', { ...data.permissions, view_attribute_groups: allGroupPerms });
+                                                        } else {
+                                                            setData('permissions', { ...data.permissions, view_attribute_groups: [] });
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label={<Typography variant="caption" sx={{ fontWeight: 700 }}>Select All</Typography>}
+                                        />
+                                    </Box>
+                                    <Box sx={{ pl: 3, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1 }}>
+                                        {attributeGroups.map((group) => (
+                                            <FormControlLabel
+                                                key={group.id}
+                                                control={
+                                                    <Checkbox
+                                                        checked={(data.permissions['view_attribute_groups'] || []).includes(`view_${group.code}`)}
+                                                        onChange={(e) => {
+                                                            const current = new Set(data.permissions['view_attribute_groups'] || []);
+                                                            if (e.target.checked) {
+                                                                current.add(`view_${group.code}`);
+                                                            } else {
+                                                                current.delete(`view_${group.code}`);
+                                                            }
+                                                            setData('permissions', { ...data.permissions, view_attribute_groups:Array.from(current) });
+                                                        }}
+                                                    />
+                                                }
+                                                label={<Typography variant="body2">{group.name}</Typography>}
+                                            />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            )}
+                        </Box>
+
+                        {/* Attributes */}
+                        <Box>
+                            <Box
+                                onClick={() => setExpandedAttributes(!expandedAttributes)}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    mb: 2,
+                                    cursor: 'pointer',
+                                    p: 1,
+                                    bgcolor: '#f5f5f5',
+                                    borderRadius: 1,
+                                }}
+                            >
+                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
+                                    {expandedAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                </IconButton>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                    ⚙️ Individual Attributes
+                                </Typography>
+                            </Box>
+
+                            {expandedAttributes && (
+                                <Box>
+                                    <Box sx={{ pl: 3, mb: 2 }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={attributes.length > 0 && attributes.every((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`))}
+                                                    indeterminate={attributes.some((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`)) && !attributes.every((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`))}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            const allAttrPerms = attributes.map((a: Attribute) => `view_${a.code}`);
+                                                            setData('permissions', { ...data.permissions, view_attributes: allAttrPerms });
+                                                        } else {
+                                                            setData('permissions', { ...data.permissions, view_attributes: [] });
+                                                        }
+                                                    }}
+                                                />
+                                            }
+                                            label={<Typography variant="caption" sx={{ fontWeight: 700 }}>Select All</Typography>}
+                                        />
+                                    </Box>
+                                    <Box sx={{
+                                        pl: 3,
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                        gap: 1,
+                                        maxHeight: '500px',
+                                        overflowY: 'auto',
+                                        pr: 1,
+                                    }}>
+                                        {attributes.map((attr: Attribute) => (
+                                            <FormControlLabel
+                                                key={attr.id}
+                                                control={
+                                                    <Checkbox
+                                                        checked={(data.permissions['view_attributes'] || []).includes(`view_${attr.code}`)}
+                                                        onChange={(e) => {
+                                                            const current = new Set(data.permissions['view_attributes'] || []);
+                                                            if (e.target.checked) {
+                                                                current.add(`view_${attr.code}`);
+                                                            } else {
+                                                                current.delete(`view_${attr.code}`);
+                                                            }
+                                                            setData('permissions', { ...data.permissions, view_attributes:Array.from(current) });
+                                                        }}
+                                                    />
+                                                }
+                                                label={<Typography variant="body2">{attr.name}</Typography>}
+                                            />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+                    ) : (
+                        <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#fff3cd', border: '1px solid #ffecb5', borderRadius: 1 }}>
+                            <Typography variant="body2" sx={{ color: '#856404' }}>
+                                ⚠️ กำหนดสิทธิ์ "Products" ก่อนจึงจะสามารถกำหนดสิทธิ์ Attribute Access ได้
+                            </Typography>
+                        </Box>
+                    )}
+                    </>
                 )}
 
                 {tab === 2 && (

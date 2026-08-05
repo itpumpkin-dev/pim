@@ -28,6 +28,18 @@ interface RoleUserOption {
     last_name: string;
 }
 
+interface AttributeGroup {
+    id: number;
+    code: string;
+    name: string;
+}
+
+interface Attribute {
+    id: number;
+    code: string;
+    name: string;
+}
+
 interface EditRoleProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
@@ -37,8 +49,10 @@ interface EditRoleProps {
         permissions: Record<string, string[]>;
         user_ids: number[];
     };
+    attributeGroups: AttributeGroup[];
+    attributes: Attribute[];
 }
 
-export default function RoleEdit({ catalog, users, role }: EditRoleProps) {
-    return <RoleFormPage catalog={catalog} users={users} role={role} />;
+export default function RoleEdit({ catalog, users, role, attributeGroups, attributes }: EditRoleProps) {
+    return <RoleFormPage catalog={catalog} users={users} role={role} attributeGroups={attributeGroups} attributes={attributes} />;
 }

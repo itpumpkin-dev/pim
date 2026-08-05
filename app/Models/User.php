@@ -163,6 +163,27 @@ class User extends Authenticatable
             ->exists();
     }
 
+    public function hasAnyPermissionForResource(string $resource): bool
+    {
+        $hasDirectRolePermission = $this->roles()
+            ->whereHas('permissions', function ($query) use ($resource) {
+                $query->where('resource', $resource)
+                    ->where('granted', true);
+            })
+            ->exists();
+
+        if ($hasDirectRolePermission) {
+            return true;
+        }
+
+        return $this->groups()
+            ->whereHas('roles.permissions', function ($query) use ($resource) {
+                $query->where('resource', $resource)
+                    ->where('granted', true);
+            })
+            ->exists();
+    }
+
     public function getAllPermissions(): array
     {
         $directPermissions = $this->roles()

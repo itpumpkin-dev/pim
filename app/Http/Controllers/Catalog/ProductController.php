@@ -495,12 +495,24 @@ class ProductController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $user = auth()->user();
+
         // Group attributes dynamically by attributeGroup
         $groupsData = [];
         foreach ($familyAttributes as $fa) {
             $group = $fa->attributeGroup;
             $attr = $fa->attribute;
             if (!$group || !$attr) continue;
+
+            // Check if user has permission to view this attribute group
+            if ($user && !$this->canUserViewAttributeGroup($user, $group)) {
+                continue;
+            }
+
+            // Check if user has permission to view this specific attribute
+            if ($user && !$this->canUserViewAttribute($user, $attr)) {
+                continue;
+            }
 
             $groupId = $group->id;
             if (!isset($groupsData[$groupId])) {
@@ -514,15 +526,29 @@ class ProductController extends Controller
             $groupsData[$groupId]['attributes'][] = $attr;
         }
 
-        // If product family has no assigned family attributes yet, show all system attributes under General
-        if (empty($groupsData)) {
+        // Remove empty groups (groups with no visible attributes)
+        $groupsData = array_filter($groupsData, fn ($group) => !empty($group['attributes']));
+
+        // If product family has no assigned family attributes yet, show all system attributes under General.
+        // Note: this must check the family's raw attribute assignments, not $groupsData, so that a family
+        // with assigned attributes the user simply lacks permission to view doesn't fall through to showing
+        // every system attribute instead of correctly appearing empty.
+        if ($familyAttributes->isEmpty()) {
             $allAttributes = Attribute::with('options')->get();
-            $groupsData[] = [
-                'id' => 0,
-                'code' => 'general',
-                'name' => 'General',
-                'attributes' => $allAttributes,
-            ];
+
+            // Filter by user permissions if applicable
+            if ($user) {
+                $allAttributes = $allAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
+            }
+
+            if ($allAttributes->isNotEmpty()) {
+                $groupsData[] = [
+                    'id' => 0,
+                    'code' => 'general',
+                    'name' => 'General',
+                    'attributes' => $allAttributes->values()->all(),
+                ];
+            }
         } else {
             $groupsData = array_values($groupsData);
         }
@@ -746,9 +772,16 @@ class ProductController extends Controller
             $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
 
             if (is_array($values)) {
+                $user = $request->user();
+
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
                     if (!$attribute || !is_array($channelValues)) continue;
+
+                    // Check if user has permission to view/edit this attribute
+                    if ($user && !$this->canUserViewAttribute($user, $attribute)) {
+                        continue;
+                    }
 
                     foreach ($channelValues as $channelKey => $localeValues) {
                         $channelId = $channelKey === 'global' ? null : $channelKey;
@@ -977,9 +1010,16 @@ class ProductController extends Controller
         $touchedAttributeIds = collect($validated['values'])->keys()->map(fn ($id) => (int) $id)->unique()->values();
         $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
 
+        $user = $request->user();
+
         foreach ($validated['values'] as $attributeId => $val) {
             $attribute = Attribute::find($attributeId);
             if (!$attribute) continue;
+
+            // Check if user has permission to view/edit this attribute
+            if ($user && !$this->canUserViewAttribute($user, $attribute)) {
+                continue;
+            }
 
             $channelId = $attribute->is_channel_based ? ($validated['channel_id'] ?? null) : null;
             $localeId = $attribute->is_locale_based ? ($validated['locale_id'] ?? null) : null;
@@ -1176,5 +1216,41 @@ class ProductController extends Controller
                 $q->where('is_channel_based', true)->orWhere('is_locale_based', true);
             })
             ->get(['id', 'is_channel_based', 'is_locale_based']);
+    }
+
+    /**
+     * Check if a user has permission to view an attribute group.
+     * Uses permission format: 'attribute_groups.view_{group_code}'
+     * If no such permission exists, grants access by default (backward compatibility).
+     */
+    private function canUserViewAttributeGroup($user, $group): bool
+    {
+        if (!$user) {
+            return true;
+        }
+
+        if (!$user->hasAnyPermissionForResource('view_attribute_groups')) {
+            return true;
+        }
+
+        return $user->hasPermission('view_attribute_groups', "view_{$group->code}");
+    }
+
+    /**
+     * Check if a user has permission to view a specific attribute.
+     * Uses permission format: 'attributes.view_{attribute_code}'
+     * If no such permission exists, grants access by default (backward compatibility).
+     */
+    private function canUserViewAttribute($user, $attribute): bool
+    {
+        if (!$user) {
+            return true;
+        }
+
+        if (!$user->hasAnyPermissionForResource('view_attributes')) {
+            return true;
+        }
+
+        return $user->hasPermission('view_attributes', "view_{$attribute->code}");
     }
 }
