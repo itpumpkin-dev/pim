@@ -385,7 +385,14 @@ class ProductController extends Controller
 
     public function create(): Response
     {
-        $families = AttributeFamily::select('id', 'code', 'name')->get();
+        // Ordered most-used family first, so the create form's default
+        // selection (families[0]) is the family products are actually
+        // assigned to most often, instead of an arbitrary DB-insertion
+        // order that happened to come back first.
+        $families = AttributeFamily::withCount('products')
+            ->orderByDesc('products_count')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
         $attributes = Attribute::with('options')->select('id', 'code', 'name', 'type')->get();
 
         return Inertia::render('catalog/products/create', [
@@ -418,6 +425,8 @@ class ProductController extends Controller
                 'updated_by' => $request->user()?->id,
             ]);
 
+            $parentProduct->applySmartDefaults();
+
             if ($validated['type'] === 'configurable' && !empty($validated['variants'])) {
                 $priceAttr = Attribute::where('code', 'price')->first();
                 $qtyAttr = Attribute::where('code', 'qty')->first();
@@ -432,6 +441,8 @@ class ProductController extends Controller
                         'created_by' => $request->user()?->id,
                         'updated_by' => $request->user()?->id,
                     ]);
+
+                    $childProduct->applySmartDefaults();
 
                     // Save price
                     if ($priceAttr && isset($variantData['price']) && $variantData['price'] !== '') {
@@ -827,10 +838,12 @@ class ProductController extends Controller
                             'created_by' => $request->user()?->id,
                             'updated_by' => $request->user()?->id,
                         ]);
+
+                        $childProduct->applySmartDefaults();
                     }
 
                     $existingVariantIds[] = $childProduct->id;
-
+                    
                     // Update price
                     if ($priceAttr) {
                         if (isset($variantData['price']) && $variantData['price'] !== '') {
@@ -883,9 +896,15 @@ class ProductController extends Controller
                 Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->get()->each->delete();
             }
 
+            $product->applySmartDefaults();
+            foreach ($product->variants as $variant) {
+                $variant->applySmartDefaults();
+            }
+
             $newVariantValues = $this->variantValueSnapshot($product);
             $this->recordProductValueChanges($product, $oldVariantValues, $newVariantValues, 'variant_values_updated');
         });
+
 
         return to_route('catalog.products.index')->with('success', 'Product updated successfully.');
     }
@@ -984,12 +1003,15 @@ class ProductController extends Controller
             }
         }
 
+        $product->applySmartDefaults();
+
         $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
         $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
 
         if ($valuesChanged) {
             event(new ProductDataChanged($product->id, $product->enabled));
         }
+
 
         return response()->json(['success' => true]);
     }

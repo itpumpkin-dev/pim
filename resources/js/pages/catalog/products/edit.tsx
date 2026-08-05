@@ -44,6 +44,7 @@ import {
     TableRow,
 } from '@mui/material';
 import { FormEvent, useEffect, useRef, useState, useTransition } from 'react';
+import { useTranslation } from 'react-i18next';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { HistoryPanel } from '@/components/history-panel';
@@ -171,7 +172,8 @@ export default function ProductEdit({
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
 }: Props) {
-    const { locales, locale: currentLocaleCode } = useLocale();
+    const { locales, locale: currentLocaleCode, setLocale } = useLocale();
+    const { t } = useTranslation('catalog');
     const { auth } = usePage<SharedData>().props;
     const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
     const [tabIndex, setTabIndex] = useState(0);
@@ -182,6 +184,14 @@ export default function ProductEdit({
     // Find active locale ID matching system language
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
     const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
+
+    // Sync activeLocaleId when currentLocaleCode changes (system language changed at top dropdown)
+    useEffect(() => {
+        const matched = locales.find((l) => l.code === currentLocaleCode);
+        if (matched && matched.id !== activeLocaleId) {
+            startScopeTransition(() => setActiveLocaleId(matched.id));
+        }
+    }, [currentLocaleCode, locales]);
 
     // The server preloads values for this (first) channel across all locales;
     // switching to any other channel triggers a re-fetch of scopable fields.
@@ -210,9 +220,6 @@ export default function ProductEdit({
     // that update via a transition keeps the select itself responsive immediately
     // and lets us show a pending indicator instead of the UI silently freezing.
     const [isSwitchingScope, startScopeTransition] = useTransition();
-    const handleLocaleChange = (nextLocaleId: number) => {
-        startScopeTransition(() => setActiveLocaleId(nextLocaleId));
-    };
     const handleChannelChange = (nextChannelId: number | null) => {
         startScopeTransition(() => setActiveChannelId(nextChannelId));
     };
@@ -399,18 +406,29 @@ export default function ProductEdit({
                         </Typography>
 
                         <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Select
-                                size="small"
-                                value={activeLocaleId}
-                                onChange={(e) => handleLocaleChange(Number(e.target.value))}
-                                sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 180 }}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    px: 2,
+                                    py: 0.75,
+                                    bgcolor: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: 1.5,
+                                    minHeight: 38,
+                                }}
                             >
-                                {locales.map((loc) => (
-                                    <MenuItem key={loc.id} value={loc.id}>
-                                        {loc.display_name || loc.code}
-                                    </MenuItem>
-                                ))}
-                            </Select>
+                                <Typography variant="caption" fontWeight={600} color="#64748b">
+                                    {t('editingLocale') || 'Editing Language'}:
+                                </Typography>
+                                <Typography variant="body2" fontWeight={700} color="primary.main">
+                                    {(() => {
+                                        const loc = locales.find((l) => l.id === activeLocaleId);
+                                        return loc ? (loc.display_name || loc.code) : '';
+                                    })()}
+                                </Typography>
+                            </Box>
                             {(loadingValues || isSwitchingScope) && <CircularProgress size={18} thickness={5} />}
                             <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
                                 More
@@ -520,6 +538,7 @@ export default function ProductEdit({
                                                         onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                         activeLocaleCode={activeLocaleCode}
                                                         canAddOptions={canAddAttributeOptions}
+                                                        sku={data.sku}
                                                     />
                                                 );
                                             })}
@@ -559,6 +578,7 @@ export default function ProductEdit({
                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                                     activeLocaleCode={activeLocaleCode}
                                                                     canAddOptions={canAddAttributeOptions}
+                                                                    sku={data.sku}
                                                                 />
                                                             );
                                                         })
@@ -926,12 +946,14 @@ function RenderAttributeInput({
     onChange,
     activeLocaleCode,
     canAddOptions,
+    sku,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
     onChange: (val: AttributeValue) => void;
     activeLocaleCode?: string;
     canAddOptions?: boolean;
+    sku: string;
 }) {
     const label = attr.name || attr.code;
     const stringValue = typeof value === 'string' ? value : '';
@@ -1227,7 +1249,7 @@ function RenderAttributeInput({
                 fullWidth
                 value={stringValue}
                 onChange={(e) => onChange(e.target.value)}
-                placeholder={`Enter ${label.toLowerCase()}`}
+                placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : `Enter ${label.toLowerCase()}`}
             />
         </Box>
     );

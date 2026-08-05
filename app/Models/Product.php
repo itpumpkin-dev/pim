@@ -76,4 +76,54 @@ class Product extends Model
     {
         return $this->hasMany(ProductAssociation::class, 'associated_product_id');
     }
+
+    /**
+     * Apply smart defaults to this product. Sets pid and pname to the SKU if they are empty/null.
+     */
+    public function applySmartDefaults(): void
+    {
+        // 1. Set `pid` = SKU if empty/not set
+        $pidAttr = Attribute::where('code', 'pid')->first();
+        if ($pidAttr) {
+            $exists = $this->values()
+                ->where('attribute_id', $pidAttr->id)
+                ->whereNull('channel_id')
+                ->whereNull('locale_id')
+                ->first();
+            if (!$exists || $exists->value === null || $exists->value === '') {
+                $this->values()->updateOrCreate(
+                    [
+                        'attribute_id' => $pidAttr->id,
+                        'channel_id' => null,
+                        'locale_id' => null,
+                    ],
+                    ['value' => $this->sku]
+                );
+            }
+        }
+
+        // 2. Set `pname` = SKU for each locale if empty/not set
+        $pnameAttr = Attribute::where('code', 'pname')->first();
+        if ($pnameAttr) {
+            $locales = Locale::all();
+            foreach ($locales as $locale) {
+                $exists = $this->values()
+                    ->where('attribute_id', $pnameAttr->id)
+                    ->whereNull('channel_id')
+                    ->where('locale_id', $locale->id)
+                    ->first();
+                if (!$exists || $exists->value === null || $exists->value === '') {
+                    $this->values()->updateOrCreate(
+                        [
+                            'attribute_id' => $pnameAttr->id,
+                            'channel_id' => null,
+                            'locale_id' => $locale->id,
+                        ],
+                        ['value' => $this->sku]
+                    );
+                }
+            }
+        }
+    }
 }
+

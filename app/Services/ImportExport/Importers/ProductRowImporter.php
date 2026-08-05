@@ -102,9 +102,12 @@ class ProductRowImporter implements RowImporterInterface
             $row['productgroupname'] ?? null,
         ]);
 
+        $product->applySmartDefaults();
+
         if (empty($unknownColumns)) {
             return [];
         }
+
 
         return ["Column(s) ignored, no matching attribute found: ".implode(', ', $unknownColumns)];
     }

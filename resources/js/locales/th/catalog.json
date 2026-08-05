@@ -1,5 +1,6 @@
 {
     "products": "สินค้า",
+    "editingLocale": "กำลังแก้ไขในภาษา",
     "quickExport": "ส่งออกด่วน",
     "download": "ดาวน์โหลด",
     "createProduct": "สร้างสินค้า",
@@ -43,7 +44,7 @@
     "familyRequired": "ตระกูล *",
     "productTypesRequired": "ประเภทสินค้า *",
     "skuRequired": "SKU *",
-    "skuPlaceholder": "50 ม.ค",
+    "skuPlaceholder": "50***",
     "correctErrorsBeforeSaving": "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก",
     "save": "บันทึก",
     "back": "ย้อนกลับ",
