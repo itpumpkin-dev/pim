@@ -5,6 +5,7 @@ import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import SearchIcon from '@mui/icons-material/Search';
 import {
+    Alert,
     Box,
     Button,
     IconButton,
@@ -22,7 +23,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useLocale } from '@/hooks/use-locale';
 
@@ -90,6 +91,7 @@ export function AttributeOptionsPanel({
     options: AttributeOptionItem[];
 }) {
     const { locales } = useLocale();
+    const { errors } = usePage<any>().props;
     const [rows, setRows] = useState<EditableOption[]>(() => options.map((o) => toEditableOption(o, swatchType)));
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
@@ -208,6 +210,20 @@ export function AttributeOptionsPanel({
                 </Button>
             </Stack>
 
+            {/* Option Errors Alert */}
+            {(errors.code || errors.options || Object.keys(errors).some(k => k.startsWith('options.'))) && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {errors.code}
+                    {errors.options}
+                    {Object.entries(errors)
+                        .filter(([key]) => key.startsWith('options.'))
+                        .map(([key, val]) => (
+                            <div key={key}>{String(val)}</div>
+                        ))
+                    }
+                </Alert>
+            )}
+
             <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
                 <TextField
                     size="small"
@@ -269,6 +285,8 @@ export function AttributeOptionsPanel({
                                     value={newCode}
                                     onChange={(e) => setNewCode(slugify(e.target.value))}
                                     onKeyDown={submitOnEnter}
+                                    error={Boolean(errors.code)}
+                                    helperText={errors.code}
                                     fullWidth
                                 />
                             </TableCell>
@@ -311,63 +329,71 @@ export function AttributeOptionsPanel({
                             </TableCell>
                         </TableRow>
 
-                        {pagedRows.map((row) => (
-                            <TableRow key={row.id}>
-                                <TableCell>
-                                    <TextField
-                                        size="small"
-                                        fullWidth
-                                        value={row.code}
-                                        onChange={(e) => updateRow(row.id, { ...row, code: slugify(e.target.value) })}
-                                    />
-                                </TableCell>
-                                {locales.map((locale) => (
-                                    <TableCell key={locale.id}>
+                        {pagedRows.map((row) => {
+                            const absoluteIndex = rows.findIndex((r) => r.id === row.id);
+                            const rowErrorKey = `options.${absoluteIndex}.code`;
+                            const rowError = errors[rowErrorKey];
+
+                            return (
+                                <TableRow key={row.id}>
+                                    <TableCell>
                                         <TextField
                                             size="small"
                                             fullWidth
-                                            value={row.translations[String(locale.id)] ?? ''}
-                                            onChange={(e) => updateRow(row.id, {
-                                                ...row,
-                                                translations: { ...row.translations, [String(locale.id)]: e.target.value },
-                                            })}
+                                            value={row.code}
+                                            onChange={(e) => updateRow(row.id, { ...row, code: slugify(e.target.value) })}
+                                            error={Boolean(rowError)}
+                                            helperText={rowError}
                                         />
                                     </TableCell>
-                                ))}
-                                {swatchType === 'color' && (
-                                    <TableCell>
-                                        <Stack direction="row" spacing={1} alignItems="center">
+                                    {locales.map((locale) => (
+                                        <TableCell key={locale.id}>
                                             <TextField
                                                 size="small"
-                                                value={row.swatchText}
-                                                onChange={(e) => updateRow(row.id, { ...row, swatchText: e.target.value })}
-                                                sx={{ width: 100 }}
+                                                fullWidth
+                                                value={row.translations[String(locale.id)] ?? ''}
+                                                onChange={(e) => updateRow(row.id, {
+                                                    ...row,
+                                                    translations: { ...row.translations, [String(locale.id)]: e.target.value },
+                                                })}
                                             />
-                                            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
-                                        </Stack>
+                                        </TableCell>
+                                    ))}
+                                    {swatchType === 'color' && (
+                                        <TableCell>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <TextField
+                                                    size="small"
+                                                    value={row.swatchText}
+                                                    onChange={(e) => updateRow(row.id, { ...row, swatchText: e.target.value })}
+                                                    sx={{ width: 100 }}
+                                                />
+                                                <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
+                                            </Stack>
+                                        </TableCell>
+                                    )}
+                                    {swatchType === 'image' && (
+                                        <TableCell>
+                                            <Stack direction="row" spacing={1} alignItems="center">
+                                                <TextField
+                                                    type="file"
+                                                    size="small"
+                                                    onChange={(e) => updateRow(row.id, { ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
+                                                    slotProps={{ htmlInput: { accept: 'image/*' } }}
+                                                    sx={{ width: 160 }}
+                                                />
+                                                <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
+                                            </Stack>
+                                        </TableCell>
+                                    )}
+                                    <TableCell align="right">
+                                        <IconButton size="small" onClick={() => destroy(row.id)} title="Delete">
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
                                     </TableCell>
-                                )}
-                                {swatchType === 'image' && (
-                                    <TableCell>
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <TextField
-                                                type="file"
-                                                size="small"
-                                                onChange={(e) => updateRow(row.id, { ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
-                                                slotProps={{ htmlInput: { accept: 'image/*' } }}
-                                                sx={{ width: 160 }}
-                                            />
-                                            <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
-                                        </Stack>
-                                    </TableCell>
-                                )}
-                                <TableCell align="right">
-                                    <IconButton size="small" onClick={() => destroy(row.id)} title="Delete">
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
+                                </TableRow>
+                            );
+                        })}
 
                         {rows.length === 0 && (
                             <TableRow>
