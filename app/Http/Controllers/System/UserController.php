@@ -214,7 +214,9 @@ class UserController extends Controller
         return response()->json([
             'timeline' => $logs->map(fn (AuditLog $log) => [
                 'event' => $log->event,
-                'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                // ISO 8601 with an explicit UTC offset — see the same fix
+                // in HasVersionHistory::versionHistoryFor().
+                'created_at' => $log->created_at?->toIso8601String(),
                 'actor' => $log->user ? ($log->user->name ?: $log->user->email) : 'System',
                 'diff' => $this->diffFor($log),
             ])->values(),

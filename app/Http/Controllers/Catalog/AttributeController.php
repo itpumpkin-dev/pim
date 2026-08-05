@@ -103,6 +103,7 @@ class AttributeController extends Controller
                 'id' => $option->id,
                 'code' => $option->code,
                 'admin_label' => $option->admin_label,
+                'translations' => $option->translations->mapWithKeys(fn ($t) => [(string) $t->locale_id => $t->label]),
                 'swatch_value' => $attribute->swatch_type === 'image' && $option->swatch_value
                     ? Storage::url($option->swatch_value)
                     : $option->swatch_value,

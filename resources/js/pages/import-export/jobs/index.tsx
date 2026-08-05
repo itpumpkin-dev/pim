@@ -37,6 +37,14 @@ interface Props {
     filters: { status?: string; job_type?: string };
 }
 
+// `started_at`/`completed_at` are ISO 8601 with an explicit UTC offset
+// (model cast); this localizes them to the viewer's own timezone.
+function formatLocalDateTime(value: string | null): string {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error'> = {
     pending: 'default',
     processing: 'primary',
@@ -170,8 +178,8 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
                                         />
                                     </TableCell>
                                     <TableCell>{userLabel(row.user)}</TableCell>
-                                    <TableCell>{row.started_at ?? '-'}</TableCell>
-                                    <TableCell>{row.completed_at ?? '-'}</TableCell>
+                                    <TableCell>{formatLocalDateTime(row.started_at)}</TableCell>
+                                    <TableCell>{formatLocalDateTime(row.completed_at)}</TableCell>
                                     <TableCell align="right">
                                         <IconButton size="small" onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
                                             <VisibilityIcon fontSize="small" />

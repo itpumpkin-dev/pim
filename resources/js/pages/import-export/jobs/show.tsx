@@ -40,6 +40,15 @@ interface Props {
     job: JobDetail;
 }
 
+// `started_at`/`completed_at` are ISO 8601 with an explicit UTC offset
+// (model cast on initial load, JobTrackerController::status() on poll);
+// this localizes them to the viewer's own timezone.
+function formatLocalDateTime(value: string | null): string {
+    if (!value) return '-';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error'> = {
     pending: 'default',
     processing: 'primary',
@@ -163,11 +172,11 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <Typography variant="caption" color="text.secondary" display="block">{t('startedAt')}</Typography>
-                            <Typography>{job.started_at ?? '-'}</Typography>
+                            <Typography>{formatLocalDateTime(job.started_at)}</Typography>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                             <Typography variant="caption" color="text.secondary" display="block">{t('completedAt')}</Typography>
-                            <Typography>{job.completed_at ?? '-'}</Typography>
+                            <Typography>{formatLocalDateTime(job.completed_at)}</Typography>
                         </Grid>
                     </Grid>
                 </Paper>

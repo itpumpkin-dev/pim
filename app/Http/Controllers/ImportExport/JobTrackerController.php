@@ -47,7 +47,11 @@ class JobTrackerController extends Controller
             'total_records_created' => $jobTracker->total_records_created,
             'total_records_skipped' => $jobTracker->total_records_skipped,
             'total_rows_processed' => $jobTracker->total_rows_processed,
-            'completed_at' => $jobTracker->completed_at?->toDateTimeString(),
+            // ISO 8601 with an explicit UTC offset, matching how the model
+            // cast itself would serialize it on the initial page load —
+            // toDateTimeString() strips the offset, so once a poll response
+            // lands it would overwrite a correct value with an ambiguous one.
+            'completed_at' => $jobTracker->completed_at?->toIso8601String(),
             'error_log' => $jobTracker->error_log,
         ]);
     }

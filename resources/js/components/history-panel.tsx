@@ -47,7 +47,10 @@ function formatValue(value: unknown): string {
 function formatDateTime(value: string | null): { display: string; relative: string } {
     if (!value) return { display: '-', relative: '' };
 
-    const date = new Date(value.replace(' ', 'T'));
+    // `value` is ISO 8601 with an explicit UTC offset (see
+    // HasVersionHistory::versionHistoryFor()), so this already localizes
+    // to the viewer's own timezone — no manual offset math needed.
+    const date = new Date(value);
     if (Number.isNaN(date.getTime())) return { display: value, relative: '' };
 
     const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });

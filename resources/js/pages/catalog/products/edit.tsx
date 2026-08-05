@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import AddIcon from '@mui/icons-material/Add';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -48,6 +49,7 @@ import { useLocale } from '@/hooks/use-locale';
 import { HistoryPanel } from '@/components/history-panel';
 import { CategoryTreePicker } from '@/components/category-tree-picker';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
+import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 
 interface AttributeOption {
     id: number;
@@ -64,6 +66,7 @@ interface AttributeItem {
     is_unique?: boolean;
     is_locale_based?: boolean;
     is_channel_based?: boolean;
+    swatch_type?: string | null;
     options?: AttributeOption[];
 }
 
@@ -141,6 +144,14 @@ interface ProductForm {
     [key: string]: any;
 }
 
+// `product.created_at`/`updated_at` are ISO 8601 with an explicit UTC
+// offset (see ProductController::edit()); this localizes them to the
+// viewer's own timezone instead of showing the raw UTC string verbatim.
+function formatLocalDateTime(value: string): string {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'CATALOG', href: '#' },
     { title: 'PRODUCTS', href: '/catalog/products' },
@@ -161,6 +172,8 @@ export default function ProductEdit({
     canViewHistory = false,
 }: Props) {
     const { locales, locale: currentLocaleCode } = useLocale();
+    const { auth } = usePage<SharedData>().props;
+    const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
     const [tabIndex, setTabIndex] = useState(0);
     const [relatedProducts, setRelatedProducts] = useState<ProductOption[]>(associations.related);
     const [upSellProducts, setUpSellProducts] = useState<ProductOption[]>(associations.up_sell);
@@ -506,6 +519,7 @@ export default function ProductEdit({
                                                         value={val}
                                                         onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                         activeLocaleCode={activeLocaleCode}
+                                                        canAddOptions={canAddAttributeOptions}
                                                     />
                                                 );
                                             })}
@@ -544,6 +558,7 @@ export default function ProductEdit({
                                                                     value={val}
                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                                     activeLocaleCode={activeLocaleCode}
+                                                                    canAddOptions={canAddAttributeOptions}
                                                                 />
                                                             );
                                                         })
@@ -661,7 +676,7 @@ export default function ProductEdit({
 
                                         <TextField
                                             label="Updated At"
-                                            value={product.updated_at}
+                                            value={formatLocalDateTime(product.updated_at)}
                                             disabled
                                             size="small"
                                             fullWidth
@@ -672,7 +687,7 @@ export default function ProductEdit({
 
                                         <TextField
                                             label="Created At"
-                                            value={product.created_at}
+                                            value={formatLocalDateTime(product.created_at)}
                                             disabled
                                             size="small"
                                             fullWidth
@@ -910,14 +925,17 @@ function RenderAttributeInput({
     value,
     onChange,
     activeLocaleCode,
+    canAddOptions,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
     onChange: (val: AttributeValue) => void;
     activeLocaleCode?: string;
+    canAddOptions?: boolean;
 }) {
     const label = attr.name || attr.code;
     const stringValue = typeof value === 'string' ? value : '';
+    const [addOptionOpen, setAddOptionOpen] = useState(false);
 
     const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
     const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -965,15 +983,38 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Autocomplete
-                    size="small"
-                    options={options}
-                    value={selectedOption}
-                    getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
-                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                    onChange={(_, newValue) => onChange(newValue ? optionValue(newValue) : '')}
-                    renderInput={(params) => <TextField {...params} placeholder="Select option" />}
-                />
+                <Stack direction="row" spacing={1} alignItems="center">
+                    <Autocomplete
+                        size="small"
+                        fullWidth
+                        options={options}
+                        value={selectedOption}
+                        getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
+                        isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                        onChange={(_, newValue) => onChange(newValue ? optionValue(newValue) : '')}
+                        renderInput={(params) => <TextField {...params} placeholder="Select option" />}
+                    />
+                    {canAddOptions && (
+                        <IconButton
+                            size="small"
+                            title={`Add option to "${label}"`}
+                            onClick={() => setAddOptionOpen(true)}
+                            sx={{ border: '1px solid #cbd5e1', borderRadius: 1 }}
+                        >
+                            <AddIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Stack>
+                {canAddOptions && (
+                    <QuickAddOptionDialog
+                        open={addOptionOpen}
+                        attributeId={attr.id}
+                        attributeLabel={label}
+                        swatchType={attr.swatch_type}
+                        onClose={() => setAddOptionOpen(false)}
+                        onCreated={(code) => onChange(code)}
+                    />
+                )}
             </FormControl>
         );
     }

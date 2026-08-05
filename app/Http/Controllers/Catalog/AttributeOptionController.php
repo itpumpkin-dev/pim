@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
+use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
+use App\Models\Locale;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,10 +32,14 @@ class AttributeOptionController extends Controller
                 Rule::unique('attribute_options', 'code')->where('attribute_id', $attribute->id),
             ],
             'admin_label' => ['nullable', 'string', 'max:255'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
             'swatch_value' => ['nullable', 'string', 'max:255'],
             'swatch_image' => ['nullable', 'image', 'max:2048'],
             'sort_order' => ['nullable', 'integer'],
         ]);
+
+        $translations = $validated['translations'] ?? [];
 
         $swatchValue = $validated['swatch_value'] ?? null;
         if ($attribute->swatch_type === 'image' && $request->hasFile('swatch_image')) {
@@ -42,10 +48,12 @@ class AttributeOptionController extends Controller
 
         $option = $attribute->options()->create([
             'code' => $validated['code'],
-            'admin_label' => $validated['admin_label'] ?? null,
+            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
+
+        $this->syncTranslations($option, $translations);
 
         AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
@@ -60,10 +68,14 @@ class AttributeOptionController extends Controller
                 Rule::unique('attribute_options', 'code')->where('attribute_id', $attribute->id)->ignore($option->id),
             ],
             'admin_label' => ['nullable', 'string', 'max:255'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
             'swatch_value' => ['nullable', 'string', 'max:255'],
             'swatch_image' => ['nullable', 'image', 'max:2048'],
             'sort_order' => ['nullable', 'integer'],
         ]);
+
+        $translations = $validated['translations'] ?? [];
 
         $swatchValue = $validated['swatch_value'] ?? $option->swatch_value;
         if ($attribute->swatch_type === 'image' && $request->hasFile('swatch_image')) {
@@ -74,10 +86,12 @@ class AttributeOptionController extends Controller
 
         $option->update([
             'code' => $validated['code'],
-            'admin_label' => $validated['admin_label'] ?? null,
+            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? $option->sort_order,
         ]);
+
+        $this->syncTranslations($option, $translations);
 
         $newFields = $this->optionAuditFields($option);
         if ($oldFields !== $newFields) {
@@ -103,6 +117,8 @@ class AttributeOptionController extends Controller
             ],
             'options.*.code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/'],
             'options.*.admin_label' => ['nullable', 'string', 'max:255'],
+            'options.*.translations' => ['nullable', 'array'],
+            'options.*.translations.*' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_value' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_image' => ['nullable', 'image', 'max:2048'],
         ]);
@@ -134,6 +150,7 @@ class AttributeOptionController extends Controller
         DB::transaction(function () use ($validated, $attribute, $request, &$allOldFields, &$allNewFields) {
             foreach ($validated['options'] as $index => $optionData) {
                 $option = AttributeOption::where('attribute_id', $attribute->id)->findOrFail($optionData['id']);
+                $translations = $optionData['translations'] ?? [];
 
                 $swatchValue = $optionData['swatch_value'] ?? $option->swatch_value;
                 if ($attribute->swatch_type === 'image' && $request->hasFile("options.{$index}.swatch_image")) {
@@ -144,9 +161,11 @@ class AttributeOptionController extends Controller
 
                 $option->update([
                     'code' => $optionData['code'],
-                    'admin_label' => $optionData['admin_label'] ?? null,
+                    'admin_label' => $this->resolveAdminLabel($translations, $optionData['admin_label'] ?? null),
                     'swatch_value' => $swatchValue,
                 ]);
+
+                $this->syncTranslations($option, $translations);
 
                 $newFields = $this->optionAuditFields($option);
                 if ($oldFields !== $newFields) {
@@ -187,5 +206,49 @@ class AttributeOptionController extends Controller
         return collect($option->only(['code', 'admin_label', 'swatch_value', 'sort_order']))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
             ->all();
+    }
+
+    /**
+     * The raw `admin_label` column doubles as the fallback shown wherever a
+     * translation is missing (see AttributeOption::adminLabel()) and as the
+     * plain value read by callers that bypass the accessor entirely (e.g.
+     * ProductPresenter's `pluck('admin_label', ...)`). Keep it in sync with
+     * whatever the app's default locale is set to, same as
+     * AttributeGroupController::resolveName().
+     */
+    private function resolveAdminLabel(array $translations, ?string $adminLabel): ?string
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+
+        if ($defaultLocaleId !== null && !empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
+            return trim($translations[$defaultLocaleId]);
+        }
+
+        $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+        if ($firstNonEmpty !== null) {
+            return trim($firstNonEmpty);
+        }
+
+        return $adminLabel !== null && trim($adminLabel) !== '' ? trim($adminLabel) : null;
+    }
+
+    private function syncTranslations(AttributeOption $option, array $translations): void
+    {
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+
+            if ($label === '') {
+                AttributeOptionTranslation::where('attribute_option_id', $option->id)
+                    ->where('locale_id', $localeId)
+                    ->delete();
+
+                continue;
+            }
+
+            AttributeOptionTranslation::updateOrCreate(
+                ['attribute_option_id' => $option->id, 'locale_id' => $localeId],
+                ['label' => $label]
+            );
+        }
     }
 }

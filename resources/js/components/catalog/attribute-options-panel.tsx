@@ -1,12 +1,15 @@
 import DeleteIcon from '@mui/icons-material/Delete';
-import { Box, Button, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import TranslateIcon from '@mui/icons-material/Translate';
+import { Box, Button, IconButton, Paper, Popover, Stack, TextField, Typography } from '@mui/material';
 import { router } from '@inertiajs/react';
-import { KeyboardEvent, useEffect, useState } from 'react';
+import { KeyboardEvent, MouseEvent, useEffect, useState } from 'react';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 
 export interface AttributeOptionItem {
     id: number;
     code: string;
     admin_label: string | null;
+    translations?: Record<string, string>;
     swatch_value: string | null;
     sort_order: number;
 }
@@ -15,6 +18,7 @@ interface EditableOption {
     id: number;
     code: string;
     admin_label: string;
+    translations: Record<string, string>;
     swatchText: string;
     swatchImage: File | null;
     existingSwatchValue: string | null;
@@ -26,6 +30,7 @@ const toEditableOption = (option: AttributeOptionItem, swatchType: string): Edit
     id: option.id,
     code: option.code,
     admin_label: option.admin_label ?? '',
+    translations: option.translations ?? {},
     swatchText: swatchType === 'color' ? (option.swatch_value ?? '') : '',
     swatchImage: null,
     existingSwatchValue: option.swatch_value,
@@ -43,6 +48,47 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
     }
 
     return null;
+}
+
+/**
+ * Small "Translate" trigger + popover, used both for an existing row and for
+ * the new-option row — kept as a popover rather than inline fields per row
+ * since some option lists run into the hundreds and N locale fields per row
+ * would make the table unusable.
+ */
+function TranslateButton({
+    translations,
+    onChange,
+}: {
+    translations: Record<string, string>;
+    onChange: (localeId: string, value: string) => void;
+}) {
+    const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const filledCount = Object.values(translations).filter((v) => v.trim() !== '').length;
+
+    return (
+        <>
+            <IconButton
+                size="small"
+                title="Translate"
+                onClick={(e: MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget)}
+                sx={{ border: '1px solid', borderColor: filledCount > 0 ? 'primary.main' : 'divider' }}
+            >
+                <TranslateIcon fontSize="small" />
+            </IconButton>
+            <Popover
+                open={Boolean(anchorEl)}
+                anchorEl={anchorEl}
+                onClose={() => setAnchorEl(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Box sx={{ p: 2, width: 320 }}>
+                    <LocaleLabelFields title="Label per language" values={translations} onChange={onChange} />
+                </Box>
+            </Popover>
+        </>
+    );
 }
 
 function OptionRow({
@@ -76,6 +122,7 @@ function OptionRow({
                 onChange={(e) => onChange({ ...row, admin_label: e.target.value })}
                 sx={{ flex: 1 }}
             />
+            <TranslateButton translations={row.translations} onChange={(localeId, value) => onChange({ ...row, translations: { ...row.translations, [localeId]: value } })} />
             {swatchType === 'color' && (
                 <TextField
                     size="small"
@@ -133,7 +180,7 @@ export function AttributeOptionsPanel({
     }, [options]);
 
     const [newCode, setNewCode] = useState('');
-    const [newLabel, setNewLabel] = useState('');
+    const [newTranslations, setNewTranslations] = useState<Record<string, string>>({});
     const [newSwatchText, setNewSwatchText] = useState('');
     const [newSwatchImage, setNewSwatchImage] = useState<File | null>(null);
 
@@ -144,7 +191,7 @@ export function AttributeOptionsPanel({
             `/catalog/attributes/${attributeId}/options`,
             {
                 code: newCode,
-                admin_label: newLabel,
+                translations: newTranslations,
                 swatch_value: swatchType === 'color' ? newSwatchText : undefined,
                 swatch_image: newSwatchImage ?? undefined,
             },
@@ -153,7 +200,7 @@ export function AttributeOptionsPanel({
                 forceFormData: true,
                 onSuccess: () => {
                     setNewCode('');
-                    setNewLabel('');
+                    setNewTranslations({});
                     setNewSwatchText('');
                     setNewSwatchImage(null);
                 },
@@ -175,6 +222,7 @@ export function AttributeOptionsPanel({
                     id: row.id,
                     code: row.code,
                     admin_label: row.admin_label,
+                    translations: row.translations,
                     swatch_value: swatchType === 'color' ? row.swatchText : undefined,
                     swatch_image: row.swatchImage ?? undefined,
                 })),
@@ -236,14 +284,7 @@ export function AttributeOptionsPanel({
                         onKeyDown={submitOnEnter}
                         sx={{ width: 140 }}
                     />
-                    <TextField
-                        size="small"
-                        label="Label"
-                        value={newLabel}
-                        onChange={(e) => setNewLabel(e.target.value)}
-                        onKeyDown={submitOnEnter}
-                        sx={{ flex: 1 }}
-                    />
+                    <TranslateButton translations={newTranslations} onChange={(localeId, value) => setNewTranslations((prev) => ({ ...prev, [localeId]: value }))} />
                     {swatchType === 'color' && (
                         <TextField
                             size="small"

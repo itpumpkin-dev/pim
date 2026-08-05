@@ -605,8 +605,10 @@ class ProductController extends Controller
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
                 'enabled' => (bool)$product->enabled,
-                'created_at' => $product->created_at ? $product->created_at->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s'),
-                'updated_at' => $product->updated_at ? $product->updated_at->format('Y-m-d H:i:s') : now()->format('Y-m-d H:i:s'),
+                // ISO 8601 with an explicit UTC offset so the frontend can
+                // localize it, rather than a naive string shown verbatim.
+                'created_at' => ($product->created_at ?? now())->toIso8601String(),
+                'updated_at' => ($product->updated_at ?? now())->toIso8601String(),
             ],
             'families' => $families,
             'assignedGroups' => $groupsData,
