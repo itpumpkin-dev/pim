@@ -22,8 +22,10 @@ class DatabaseSeeder extends Seeder
         $this->call(ChannelSeeder::class);
         $this->call(CategoryTaxonomySeeder::class);
         $this->call(AttributeCatalogSeeder::class);
+        $this->call(AttributeTranslationSeeder::class);
         $this->call(LegacyCategoryAttributeOptionsSeeder::class);
         $this->call(AttributeGroupSeeder::class);
+        $this->call(AttributeGroupTranslationSeeder::class);
         $this->call(AttributeFamilySeeder::class);
         $this->call(ProductCatalogSeeder::class);
 

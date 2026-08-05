@@ -24,7 +24,7 @@ class Channel extends Model
                     return null;
                 }
 
-                $localeId = Locale::where('code', app()->getLocale())->value('id');
+                $localeId = Locale::idForCode(app()->getLocale());
                 if ($localeId) {
                     $translation = $this->translations->firstWhere('locale_id', $localeId);
                     if ($translation && !empty(trim((string) $translation->name))) {

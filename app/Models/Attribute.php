@@ -20,7 +20,7 @@ class Attribute extends Model
         return \Illuminate\Database\Eloquent\Casts\Attribute::make(
             get: function ($value) {
                 if ($this->relationLoaded('translations')) {
-                    $localeId = \App\Models\Locale::where('code', app()->getLocale())->value('id');
+                    $localeId = \App\Models\Locale::idForCode(app()->getLocale());
                     if ($localeId) {
                         $translation = $this->translations->firstWhere('locale_id', $localeId);
                         if ($translation && !empty(trim((string) $translation->label))) {

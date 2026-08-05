@@ -17,7 +17,7 @@ class SetLocale
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $available = Locale::where('enabled', true)->pluck('code')->all();
+        $available = Locale::active()->pluck('code')->all();
 
         $code = $request->user()?->uiLocale?->code
             ?? $request->cookie('locale')
