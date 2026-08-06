@@ -29,17 +29,7 @@ import {
     Typography,
 } from '@mui/material';
 import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'SYSTEM',
-        href: '#',
-    },
-    {
-        title: 'USERS',
-        href: '/system/user',
-    },
-];
+import { useTranslation } from 'react-i18next';
 
 interface UserGroupOption {
     id: number;
@@ -113,7 +103,7 @@ interface EditUserProps {
     };
     groups: UserGroupOption[];
     roles: RoleOption[];
-    locales: LocaleOption[];
+    localeOptions: LocaleOption[];
     timezones: string[];
     departments: DepartmentOption[];
     jobPositions: JobPositionOption[];
@@ -141,12 +131,12 @@ interface UserForm {
     [key: string]: string | boolean | number | number[] | File | null | undefined;
 }
 
-const TABS = ['General properties', 'Groups and Roles', 'Permissions', 'Timeline', 'Password', 'Interfaces'];
-
-function formatDateTime(value: string | null) {
-    if (!value) return 'Never';
-    return new Date(value).toLocaleString('en-US');
-}
+// Stable identifiers for tab state — kept separate from the *displayed*
+// (translated) label, since the label can change out from under an already-
+// selected tab if the user switches UI language while this page is open
+// (see useLocale()'s instant, no-reload language switch).
+const TAB_KEYS = ['general', 'groupsAndRoles', 'permissions', 'timeline', 'password', 'interfaces'] as const;
+type TabKey = (typeof TAB_KEYS)[number];
 
 function humanize(value: string): string {
     return value
@@ -170,9 +160,30 @@ function localeLabel(code: string) {
     }
 }
 
-export default function UserEdit({ user, groups, roles, locales, timezones, departments, jobPositions, canManageAccess, permissions }: EditUserProps) {
-    const tabs = canManageAccess ? TABS : TABS.filter((label) => label !== 'Groups and Roles');
-    const [tab, setTab] = useState(tabs[0]);
+export default function UserEdit({ user, groups, roles, localeOptions, timezones, departments, jobPositions, canManageAccess, permissions }: EditUserProps) {
+    const { t } = useTranslation('system');
+    const { t: tNav } = useTranslation('nav');
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('system'), href: '#' },
+        { title: tNav('users'), href: '/system/user' },
+    ];
+
+    const tabLabels: Record<TabKey, string> = {
+        general: t('tabGeneralProperties'),
+        groupsAndRoles: t('tabGroupsAndRoles'),
+        permissions: t('tabPermissions'),
+        timeline: t('tabTimeline'),
+        password: t('tabPassword'),
+        interfaces: t('tabInterfaces'),
+    };
+    const tabs = canManageAccess ? TAB_KEYS : TAB_KEYS.filter((key) => key !== 'groupsAndRoles');
+    const [tab, setTab] = useState<TabKey>(tabs[0]);
+
+    const formatDateTime = (value: string | null) => {
+        if (!value) return t('never');
+        return new Date(value).toLocaleString('en-US');
+    };
 
     const permissionRows = useMemo(() => {
         const rows = new Map<string, { resource: string; action: string; sources: string[] }>();
@@ -188,18 +199,18 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
         };
 
         permissions.roles.forEach((role) => {
-            role.permissions.forEach((permission) => add(permission, `Role: ${role.label}`));
+            role.permissions.forEach((permission) => add(permission, t('grantedViaRole', { label: role.label })));
         });
         permissions.groups.forEach((group) => {
             group.roles.forEach((role) => {
-                role.permissions.forEach((permission) => add(permission, `Group: ${group.name} → Role: ${role.label}`));
+                role.permissions.forEach((permission) => add(permission, t('grantedViaGroupRole', { group: group.name, role: role.label })));
             });
         });
 
         return Array.from(rows.values()).sort(
             (a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action),
         );
-    }, [permissions]);
+    }, [permissions, t]);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url);
     const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -261,7 +272,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                         color="inherit"
                         sx={{ borderRadius: 8, px: 4, fontWeight: 'bold' }}
                     >
-                        CANCEL
+                        {t('cancel').toUpperCase()}
                     </Button>
                     <Button
                         type="button"
@@ -271,12 +282,12 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                         disabled={processing}
                         sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
                     >
-                        SAVE
+                        {t('save').toUpperCase()}
                     </Button>
                 </>
             }
         >
-            <Head title={`Edit ${user.name}`} />
+            <Head title={t('editUserTitle', { name: user.name })} />
             <Box component="form" id="user-edit-form" onSubmit={submit} sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                     <Box
@@ -325,33 +336,33 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                             {user.name}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Created: {formatDateTime(user.created_at)} Updated: {formatDateTime(user.updated_at)} Last logged in:{' '}
-                            {formatDateTime(user.last_login_at)} Login count: {user.login_count}
+                            {t('createdLabel')}: {formatDateTime(user.created_at)} {t('updatedLabel')}: {formatDateTime(user.updated_at)} {t('lastLoggedInLabel')}:{' '}
+                            {formatDateTime(user.last_login_at)} {t('loginCountLabel')}: {user.login_count}
                         </Typography>
                     </Box>
                 </Box>
 
                 <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
-                    {tabs.map((label) => (
-                        <Tab key={label} label={label} value={label} />
+                    {tabs.map((key) => (
+                        <Tab key={key} label={tabLabels[key]} value={key} />
                     ))}
                 </Tabs>
 
-                {tab === 'General properties' && (
+                {tab === 'general' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         {canManageAccess && (
                             <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                    Status *
+                                    {t('statusRequired')}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 2 }}>
                                     <FormControlLabel
                                         control={<Checkbox checked={data.enabled} onChange={() => update('enabled', true)} />}
-                                        label="Active"
+                                        label={t('active')}
                                     />
                                     <FormControlLabel
                                         control={<Checkbox checked={!data.enabled} onChange={() => update('enabled', false)} />}
-                                        label="Non Active"
+                                        label={t('nonActive')}
                                     />
                                 </Box>
                             </Box>
@@ -373,7 +384,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                First name (required)
+                                {t('firstNameRequired')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -387,7 +398,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Last name (required)
+                                {t('lastNameRequired')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -401,7 +412,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Phone
+                                {t('phone')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -416,7 +427,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Department
+                                {t('department')}
                             </Typography>
                             <Select
                                 fullWidth
@@ -437,7 +448,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Job position
+                                {t('jobPosition')}
                             </Typography>
                             <Select
                                 fullWidth
@@ -472,7 +483,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                         >
                             <ImageIcon sx={{ fontSize: 32, color: 'text.secondary' }} />
                             <Typography variant="body2" color="text.secondary">
-                                Drag and drop to upload or click here
+                                {t('dragDropUpload')}
                             </Typography>
                             <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
                         </Box>
@@ -484,7 +495,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Email *
+                                {t('emailRequired')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -499,11 +510,11 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                     </Box>
                 )}
 
-                {tab === 'Groups and Roles' && canManageAccess && (
+                {tab === 'groupsAndRoles' && canManageAccess && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 500 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                User groups
+                                {t('userGroups')}
                             </Typography>
                             <Autocomplete
                                 multiple
@@ -521,7 +532,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Roles *
+                                {t('rolesRequired')}
                             </Typography>
                             <Autocomplete
                                 multiple
@@ -539,18 +550,18 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                     </Box>
                 )}
 
-                {tab === 'Permissions' && (
+                {tab === 'permissions' && (
                     <Box sx={{ maxWidth: 800 }}>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Effective permissions granted to this user, whether assigned directly via a role or inherited through a group.
+                            {t('permissionsDescription')}
                         </Typography>
                         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
                             <Table size="small">
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>Resource</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Granted via</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{t('resource')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{t('action')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700 }}>{t('grantedVia')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -570,7 +581,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                                     {permissionRows.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                                No permissions assigned.
+                                                {t('noPermissionsAssigned')}
                                             </TableCell>
                                         </TableRow>
                                     )}
@@ -580,17 +591,17 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                     </Box>
                 )}
 
-                {tab === 'Timeline' && (
+                {tab === 'timeline' && (
                     <Box sx={{ maxWidth: 700 }}>
                         <TimelinePanel timelineUrl={route('system.user.history', user.id)} />
                     </Box>
                 )}
 
-                {tab === 'Password' && (
+                {tab === 'password' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                New password
+                                {t('newPassword')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -605,7 +616,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                         </Box>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                New password (repeat)
+                                {t('newPasswordRepeat')}
                             </Typography>
                             <TextField
                                 fullWidth
@@ -619,11 +630,11 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                     </Box>
                 )}
 
-                {tab === 'Interfaces' && (
+                {tab === 'interfaces' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                UI locale
+                                {t('uiLocale')}
                             </Typography>
                             <Select
                                 fullWidth
@@ -632,7 +643,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                                 onChange={(e) => update('ui_locale_id', Number(e.target.value))}
                                 error={Boolean(errors.ui_locale_id)}
                             >
-                                {locales.map((locale) => (
+                                {localeOptions.map((locale) => (
                                     <MenuItem key={locale.id} value={locale.id}>
                                         {localeLabel(locale.code)}
                                     </MenuItem>
@@ -641,7 +652,7 @@ export default function UserEdit({ user, groups, roles, locales, timezones, depa
                         </Box>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                                Timezone (required)
+                                {t('timezoneRequired')}
                             </Typography>
                             <Select fullWidth size="small" value={data.timezone} onChange={(e) => update('timezone', e.target.value)} error={Boolean(errors.timezone)}>
                                 {timezones.map((tz) => (

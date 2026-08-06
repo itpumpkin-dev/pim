@@ -3,5 +3,8 @@
     "toggleSidebar": "サイドバーを切り替え",
     "permissionsChangedLoggingOut": "あなたのアクセス権限が変更されました。少々お待ちください — 次にログインしてください.",
     "packLabel": "{{qty}} {{unit}}/パック",
-    "exportThisProduct": "この商品をエクスポート"
+    "exportThisProduct": "この商品をエクスポート",
+    "settings": "設定",
+    "logout": "ログアウト",
+    "loggingOut": "ログアウト中..."
 }

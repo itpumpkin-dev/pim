@@ -187,7 +187,13 @@ class UserController extends Controller
             ],
             'groups' => UserGroup::orderBy('name')->get(['id', 'name']),
             'roles' => Role::orderBy('label')->get(['id', 'label']),
-            'locales' => Locale::orderBy('code')->get(['id', 'code']),
+            // Named apart from the "locales" prop HandleInertiaRequests shares
+            // globally (the active-only list the header's language switcher
+            // reads) — page props with the same key would silently shadow
+            // the shared one, and this picker intentionally lists every
+            // locale (an admin may want to pre-assign one to a user before
+            // it's switched on for everybody else).
+            'localeOptions' => Locale::orderBy('code')->get(['id', 'code']),
             'timezones' => timezone_identifiers_list(),
             'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),

@@ -3,5 +3,8 @@
     "toggleSidebar": "Toggle sidebar",
     "permissionsChangedLoggingOut": "Your access permissions have changed. You'll be logged out in a moment — please log in again.",
     "packLabel": "{{qty}} {{unit}}/pack",
-    "exportThisProduct": "Export this product"
+    "exportThisProduct": "Export this product",
+    "settings": "ການຕັ້ງຄ່າ",
+    "logout": "ອອກຈາກລະບົບ",
+    "loggingOut": "ກຳລັງອອກຈາກລະບົບ..."
 }

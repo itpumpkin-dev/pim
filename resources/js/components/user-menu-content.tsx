@@ -6,6 +6,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, CircularProgress, Divider, ListItemIcon, MenuItem } from '@mui/material';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface UserMenuContentProps {
     user: User;
@@ -13,6 +14,7 @@ interface UserMenuContentProps {
 }
 
 export function UserMenuContent({ user, onClose }: UserMenuContentProps) {
+    const { t } = useTranslation('common');
     const cleanup = useMobileNavigation();
     const [loggingOut, setLoggingOut] = useState(false);
 
@@ -42,14 +44,14 @@ export function UserMenuContent({ user, onClose }: UserMenuContentProps) {
                 <ListItemIcon>
                     <SettingsIcon fontSize="small" />
                 </ListItemIcon>
-                Settings
+                {t('settings')}
             </MenuItem>
             <Divider />
             <MenuItem onClick={handleLogout} disabled={loggingOut}>
                 <ListItemIcon>
                     {loggingOut ? <CircularProgress size={20} color="inherit" /> : <LogoutIcon fontSize="small" />}
                 </ListItemIcon>
-                {loggingOut ? 'Logging out...' : 'Log out'}
+                {loggingOut ? t('loggingOut') : t('logout')}
             </MenuItem>
         </>
     );

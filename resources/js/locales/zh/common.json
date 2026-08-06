@@ -3,5 +3,8 @@
     "toggleSidebar": "切换侧边栏",
     "permissionsChangedLoggingOut": "您的访问权限已更改 。 请再次登录.",
     "packLabel": "{{qty}} {{unit}}/包",
-    "exportThisProduct": "导出此产品"
+    "exportThisProduct": "导出此产品",
+    "settings": "设置",
+    "logout": "退出登录",
+    "loggingOut": "正在退出登录..."
 }

@@ -13,6 +13,7 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
+use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductAssociation;
 use App\Models\ProductValue;
@@ -86,7 +87,29 @@ class ProductController extends Controller
 
         $allAttributes = Attribute::orderBy('code')->get(['id', 'code', 'name', 'type', 'is_filterable']);
 
+        // Locale-based attributes (pname, spec_*, ...) store one ProductValue
+        // row per locale, and channel-based ones store one per channel. This
+        // grid has no locale/channel picker, so it only ever wants the
+        // globally-scoped value (channel_id IS NULL) in the admin's current
+        // UI locale — restrict to that up front and order the active
+        // locale's row before the locale-less fallback, so the `->first()`
+        // lookups below land on it instead of an arbitrary row whichever
+        // order the DB happened to return them in (which is what silently
+        // ignored the locale switcher before this fix).
+        $activeLocaleId = Locale::where('code', app()->getLocale())->value('id');
+
         $values = ProductValue::whereIn('product_id', $productIds)
+            ->whereNull('channel_id')
+            ->where(function ($query) use ($activeLocaleId) {
+                $query->whereNull('locale_id');
+                if ($activeLocaleId) {
+                    $query->orWhere('locale_id', $activeLocaleId);
+                }
+            })
+            ->when(
+                $activeLocaleId,
+                fn ($query) => $query->orderByRaw('CASE WHEN locale_id = ? THEN 0 ELSE 1 END ASC', [$activeLocaleId]),
+            )
             ->get(['product_id', 'attribute_id', 'value']);
 
         $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus) {

@@ -4,5 +4,8 @@
     "permissionsChangedLoggingOut": "สิทธิ์การใช้งานของคุณมีการเปลี่ยนแปลง ระบบจะออกจากระบบให้ในอีกสักครู่ กรุณาเข้าสู่ระบบใหม่อีกครั้ง",
     "packLabel": "{{qty}} {{unit}}/แพ็ก",
     "exportThisProduct": "ส่งออกสินค้านี้",
-    "popularBadge": "ยอดนิยม"
+    "popularBadge": "ยอดนิยม",
+    "settings": "การตั้งค่า",
+    "logout": "ออกจากระบบ",
+    "loggingOut": "กำลังออกจากระบบ..."
 }

@@ -3,5 +3,8 @@
     "toggleSidebar": "Alternar barra lateral",
     "permissionsChangedLoggingOut": "Sus permisos de acceso han cambiado. Serás deslogueado en un momento — por favor, inicia sesión nuevamente.",
     "packLabel": "{{qty}} {{unit}}/paquete",
-    "exportThisProduct": "Exportar este producto"
+    "exportThisProduct": "Exportar este producto",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión",
+    "loggingOut": "Cerrando sesión..."
 }
