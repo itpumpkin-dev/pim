@@ -33,5 +33,22 @@
     "product": "สินค้า",
     "category": "หมวดหมู่",
     "views": "ยอดเข้าชม",
-    "noViewData": "ยังไม่มีข้อมูลการเข้าชม"
+    "noViewData": "ยังไม่มีข้อมูลการเข้าชม",
+    "filterByCategory": "กรองตามหมวดหมู่",
+    "allCategories": "ทุกหมวดหมู่",
+    "dateFrom": "จากวันที่",
+    "dateTo": "ถึงวันที่",
+    "clearFilters": "ล้างตัวกรอง",
+    "exportActivity": "ส่งออกกิจกรรม",
+    "refresh": "รีเฟรช",
+    "manageUsers": "จัดการผู้ใช้งาน",
+    "manageRoles": "จัดการบทบาท",
+    "failedJobsTooltip": "งาน import/export ที่ล้มเหลว {{count}} งาน",
+    "lowStock": "สินค้าใกล้หมดสต็อก",
+    "lowStockCaption": "ข้อมูลตัวอย่าง",
+    "activityTrendChartTitle": "กิจกรรมย้อนหลัง 30 วัน",
+    "activityCount": "เหตุการณ์",
+    "categoryPieChartTitle": "สินค้าตามหมวดหมู่",
+    "noChartData": "ยังไม่มีข้อมูลเพียงพอ",
+    "viewAll": "ดูทั้งหมด"
 }

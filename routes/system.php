@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\System\ActivityLogController;
 use App\Http\Controllers\System\DepartmentController;
 use App\Http\Controllers\System\JobPositionController;
 use App\Http\Controllers\System\LocaleController;
@@ -11,6 +12,8 @@ use App\Http\Controllers\System\UserGroupController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('system')->name('system.')->group(function () {
+    Route::get('activity-logs', [ActivityLogController::class, 'index'])->name('activityLogs.index')->middleware('permission:dashboards,list_dashboards');
+
     Route::get('user', [UserController::class, 'index'])->name('user.index')->middleware('permission:users,list_users');
     Route::get('user/summary', [UserController::class, 'summary'])->name('user.summary')->middleware('permission:users,list_users');
     Route::get('user/{user}/summary', [UserController::class, 'summaryShow'])->name('user.summary.show')->middleware('permission:users,list_users');

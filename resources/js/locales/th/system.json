@@ -43,5 +43,26 @@
     "isDefaultProvider": "ค่าเริ่มต้น",
     "defaultProvider": "ค่าเริ่มต้น",
     "translationProviderName": "ชื่อ",
-    "translationProviderType": "ประเภท"
+    "translationProviderType": "ประเภท",
+
+    "activityLogsTitle": "{{count}} กิจกรรม",
+    "id": "ไอดี",
+    "user": "ผู้ใช้งาน",
+    "event": "เหตุการณ์",
+    "targetResource": "ทรัพยากรเป้าหมาย",
+    "targetId": "ไอดีเป้าหมาย",
+    "time": "เวลา",
+    "noActivities": "ไม่พบกิจกรรม",
+    "filterByEvent": "ประเภทเหตุการณ์",
+    "filterByUser": "ผู้ใช้งาน",
+    "allEvents": "ทุกเหตุการณ์",
+    "allUsers": "ผู้ใช้งานทั้งหมด",
+    "dateFrom": "จากวันที่",
+    "dateTo": "ถึงวันที่",
+    "clearFilters": "ล้างตัวกรอง",
+    "created": "สร้าง",
+    "updated": "แก้ไข",
+    "deleted": "ลบ",
+    "login": "เข้าสู่ระบบ",
+    "logout": "ออกจากระบบ"
 }

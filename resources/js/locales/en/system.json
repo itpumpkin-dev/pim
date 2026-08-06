@@ -61,5 +61,26 @@
     "isDefaultProvider": "Default",
     "defaultProvider": "Default",
     "translationProviderName": "Name",
-    "translationProviderType": "Type"
+    "translationProviderType": "Type",
+
+    "activityLogsTitle": "{{count}} activities",
+    "id": "ID",
+    "user": "User",
+    "event": "Event",
+    "targetResource": "Target Resource",
+    "targetId": "Target ID",
+    "time": "Time",
+    "noActivities": "No activities found.",
+    "filterByEvent": "Event Type",
+    "filterByUser": "User",
+    "allEvents": "All Events",
+    "allUsers": "All Users",
+    "dateFrom": "From",
+    "dateTo": "To",
+    "clearFilters": "Clear Filters",
+    "created": "Created",
+    "updated": "Updated",
+    "deleted": "Deleted",
+    "login": "Login",
+    "logout": "Logout"
 }

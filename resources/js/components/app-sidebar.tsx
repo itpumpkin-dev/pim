@@ -126,6 +126,11 @@ function useMainNavItems(): NavItem[] {
                     url: '/system/translationProviders',
                     permission: 'translation_providers.list_translation_providers',
                 },
+                {
+                    title: t('activityLogs'),
+                    url: '/system/activity-logs',
+                    permission: 'dashboards.list_dashboards',
+                },
             ],
         },
     ];

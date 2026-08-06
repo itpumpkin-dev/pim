@@ -78,6 +78,7 @@ class AttributeCatalogSeeder extends Seeder
         'bom' => ['textarea', false, false],
         'min_stock' => ['price', false, false],
         'max_stock' => ['price', false, false],
+        'current_stock' => ['price', false, false],
     ];
 
     public function run(): void
