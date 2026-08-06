@@ -4,5 +4,7 @@
     "permissionsChangedLoggingOut": "Your access permissions have changed. You'll be logged out in a moment — please log in again.",
     "packLabel": "{{qty}} {{unit}}/pack",
     "exportThisProduct": "Export this product",
-    "popularBadge": "Popular"
+    "popularBadge": "Popular",
+    "editableLocaleHint": "Showing the field for the language currently selected (top-right). Switch languages to edit the others.",
+    "noActiveLocales": "No active locales configured."
 }
