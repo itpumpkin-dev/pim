@@ -13,7 +13,6 @@ import { useSyncI18nLanguage } from './hooks/use-locale';
 // import { LocaleProvider } from './hooks/use-locale';
 import { getTheme } from './theme';
 import { useTheme } from '@emotion/react';
-import { PALETTE } from '@/theme';
 
 declare global {
     const route: typeof routeFn;
@@ -60,7 +59,8 @@ createInertiaApp({
             </AppearanceProvider>,
         );
     },
-    progress: {
-        color: PALETTE.accent, // Use PALETTE.accent from theme.ts
-    },
+    // The skeleton in RouteLoadingSkeleton (rendered via AppContent) is now
+    // the app's single navigation-loading indicator, replacing Inertia's
+    // default top progress bar.
+    progress: false,
 });
