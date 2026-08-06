@@ -69,7 +69,22 @@
       "Bash(node -e \"console.log\\(require.resolve\\('playwright'\\)\\)\")",
       "Bash(cd /tmp)",
       "Bash(rm -f cookies.txt)",
-      "Bash(curl -s -c cookies.txt -b cookies.txt http://127.0.0.1:8123/ -o home.html -D home_headers.txt)"
+      "Bash(curl -s -c cookies.txt -b cookies.txt http://127.0.0.1:8123/ -o home.html -D home_headers.txt)",
+      "Bash(php -r \"json_decode\\(file_get_contents\\('resources/js/locales/en/dashboard.json'\\), true\\) !== null ? print\\('en OK\\\\n'\\) : print\\('en INVALID\\\\n'\\); json_decode\\(file_get_contents\\('resources/js/locales/th/dashboard.json'\\), true\\) !== null ? print\\('th OK\\\\n'\\) : print\\('th INVALID\\\\n'\\);\")",
+      "Bash(php -l /c/xampp/htdocs/pim/app/Http/Controllers/StorefrontController.php)",
+      "Bash(php -r \"json_decode\\(file_get_contents\\('resources/js/locales/en/home.json'\\), true\\) !== null ? print\\('en OK\\\\n'\\) : print\\('en INVALID\\\\n'\\); json_decode\\(file_get_contents\\('resources/js/locales/th/home.json'\\), true\\) !== null ? print\\('th OK\\\\n'\\) : print\\('th INVALID\\\\n'\\);\")",
+      "Bash(php -r ' *)",
+      "Bash(curl -s -D - http://127.0.0.1:8123/ -H \"X-Inertia: true\" -H \"X-Inertia-Version: 1\" -H \"Accept: application/json\" -o /tmp/inertia_resp.txt)",
+      "Bash(php \"C:\\\\Users\\\\PC628D~1.IT1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-pim\\\\18eb47e8-ceab-4132-ad3c-88b919c47ab2\\\\scratchpad\\\\check_home.php\")",
+      "Bash(npx --yes playwright@latest install chromium --with-deps)",
+      "Bash(node \"C:\\\\Users\\\\PC628D~1.IT1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-pim\\\\18eb47e8-ceab-4132-ad3c-88b919c47ab2\\\\scratchpad\\\\shot.js\")",
+      "Bash(NODE_PATH=\"/c/xampp/htdocs/pim/node_modules\" node \"C:\\\\Users\\\\PC628D~1.IT1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-pim\\\\18eb47e8-ceab-4132-ad3c-88b919c47ab2\\\\scratchpad\\\\shot.js\")",
+      "Bash(php -l /c/xampp/htdocs/pim/app/Http/Controllers/DashboardController.php)",
+      "Bash(ls \"C:/Users/pc.it11/AppData/Local/ms-playwright\" 2>&1)",
+      "Read(//c/Users/pc.it11/AppData/Local/ms-playwright/**)",
+      "Bash(NODE_PATH=\"/c/xampp/htdocs/pim/node_modules\" node \"C:\\\\Users\\\\PC628D~1.IT1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-pim\\\\18eb47e8-ceab-4132-ad3c-88b919c47ab2\\\\scratchpad\\\\shot2.js\")",
+      "Bash(NODE_PATH=\"/c/xampp/htdocs/pim/node_modules\" node \"C:\\\\Users\\\\PC628D~1.IT1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--xampp-htdocs-pim\\\\18eb47e8-ceab-4132-ad3c-88b919c47ab2\\\\scratchpad\\\\shot3.js\")",
+      "Bash(grep -n 'value.*decimal\\\\|value.*string\\\\|$table->' /c/xampp/htdocs/pim/database/migrations/2026_07_21_000010_create_product_values_table.php)"
     ],
     "additionalDirectories": [
       "C:\\Users\\PC628D~1.IT1\\AppData\\Local\\Temp\\claude\\c--xampp-htdocs-pim\\814d6bf4-e1f2-44c6-82ee-e12b83623812\\scratchpad",

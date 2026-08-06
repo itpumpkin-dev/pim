@@ -7,10 +7,11 @@ import { Link } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import { Box, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product, popular = false }: { product: Product; popular?: boolean }) {
     const { t } = useTranslation();
     const Icon = product.icon ?? getCategoryIcon(product.category);
     const [imageFailed, setImageFailed] = useState(false);
@@ -69,6 +70,15 @@ export function ProductCard({ product }: { product: Product }) {
                         color={product.tagColor}
                         size="small"
                         sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 600 }}
+                    />
+                )}
+
+                {popular && (
+                    <Chip
+                        icon={<LocalFireDepartmentIcon fontSize="small" sx={{ color: '#fff !important' }} />}
+                        label={t('popularBadge')}
+                        size="small"
+                        sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1, fontWeight: 600, bgcolor: '#EA580C', color: '#fff' }}
                     />
                 )}
 
@@ -145,7 +155,7 @@ export function ProductCard({ product }: { product: Product }) {
                             onClick={handleExport}
                             sx={{
                                 position: 'absolute',
-                                top: 8,
+                                top: popular ? 44 : 8,
                                 right: 8,
                                 bgcolor: 'background.paper',
                                 border: 1,

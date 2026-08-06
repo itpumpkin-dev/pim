@@ -83,6 +83,7 @@ class AttributeCatalogSeeder extends Seeder
         'min_stock' => ['price', false, false],
         'max_stock' => ['price', false, false],
         'qty' => ['price', false, false],
+        'current_stock' => ['price', false, false],
     ];
 
     public function run(): void

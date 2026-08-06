@@ -31,7 +31,27 @@ class StorefrontController extends Controller
         return Inertia::render('home', [
             'products' => $mapped,
             'categories' => $categories,
+            'topViewedProducts' => $this->topViewedProducts($mapped),
         ]);
+    }
+
+    /**
+     * Top 10 products by storefront click count, restricted to products
+     * still enabled/sellable (same set as $mappedProducts), most-viewed first.
+     */
+    private function topViewedProducts(array $mappedProducts): array
+    {
+        $mappedById = collect($mappedProducts)->keyBy('id');
+
+        $topProductIds = ProductViewEvent::selectRaw('product_id, COUNT(*) as views')
+            ->where('event_type', 'click')
+            ->whereIn('product_id', $mappedById->keys())
+            ->groupBy('product_id')
+            ->orderByDesc('views')
+            ->limit(10)
+            ->pluck('product_id');
+
+        return $topProductIds->map(fn ($id) => $mappedById->get($id))->filter()->values()->all();
     }
 
     public function show(int $id): Response

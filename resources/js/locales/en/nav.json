@@ -17,6 +17,7 @@
     "roles": "Roles",
     "locales": "Locales",
     "translationProviders": "Translation Providers",
+    "activityLogs": "Activity Logs",
     "importExport": "Import / Export",
     "imports": "Imports",
     "exports": "Exports",
