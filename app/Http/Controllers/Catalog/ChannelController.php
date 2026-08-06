@@ -10,6 +10,7 @@ use App\Models\Channel;
 use App\Models\ChannelTranslation;
 use App\Models\Currency;
 use App\Models\Locale;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -62,14 +63,22 @@ class ChannelController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $this->validateChannel($request);
+        $validated = $request->validate([
+            'root_category_id' => ['nullable', 'exists:categories,id'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
+            'locale_ids' => ['required', 'array', 'min:1'],
+            'locale_ids.*' => ['exists:locales,id'],
+            'currency_ids' => ['required', 'array', 'min:1'],
+            'currency_ids.*' => ['exists:currencies,id'],
+        ]);
 
-        $channel = Channel::create([
-            'code' => $validated['code'],
+        $channel = CodeGenerator::createWithRetry('channels', 'channel', fn ($code) => Channel::create([
+            'code' => $code,
             'root_category_id' => $validated['root_category_id'] ?? null,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]), maxLength: 50);
 
         $this->syncTranslations($channel, $validated['translations'] ?? []);
         $newTranslations = $this->currentTranslations($channel);
@@ -109,14 +118,13 @@ class ChannelController extends Controller
 
     public function update(Request $request, Channel $channel): RedirectResponse
     {
-        $validated = $this->validateChannel($request, $channel->id);
+        $validated = $this->validateChannel($request);
 
         $oldTranslations = $this->currentTranslations($channel);
         $oldLocaleIds = $channel->locales()->pluck('locales.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
         $oldCurrencyIds = $channel->currencies()->pluck('currencies.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
         $channel->update([
-            'code' => $validated['code'],
             'root_category_id' => $validated['root_category_id'] ?? null,
             'updated_by' => $request->user()?->id,
         ]);
@@ -150,10 +158,10 @@ class ChannelController extends Controller
         return to_route('catalog.channels.index')->with('success', 'Channel deleted successfully.');
     }
 
-    private function validateChannel(Request $request, ?int $channelId = null): array
+
+    private function validateChannel(Request $request): array
     {
         return $request->validate([
-            'code' => ['required', 'string', 'max:50', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:channels,code' . ($channelId ? ",{$channelId}" : '')],
             'root_category_id' => ['nullable', 'exists:categories,id'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],

@@ -41,7 +41,6 @@ export default function ImportCreate({ types, requiredColumnsByType }: Props) {
     ];
 
     const { data, setData, post, processing, errors, transform } = useForm({
-        code: '',
         type: types[0] ?? 'products',
         file_format: 'csv',
         field_separator: ',',
@@ -106,15 +105,6 @@ export default function ImportCreate({ types, requiredColumnsByType }: Props) {
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{tCatalog('generalTitle')}</Typography>
                         <Stack spacing={3}>
-                            <TextField
-                                label={tCatalog('codeRequired')}
-                                required
-                                fullWidth
-                                value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? tCatalog('codeHelperText')}
-                            />
                             <FormControl fullWidth>
                                 <InputLabel id="import-type-label">{t('typeLabel')}</InputLabel>
                                 <Select

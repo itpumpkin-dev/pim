@@ -10,6 +10,7 @@ use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
+use App\Services\CodeGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -29,15 +30,15 @@ class SalesPlatformController extends Controller
     public function storePlatform(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:sales_platforms,code'],
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        SalesPlatform::create([
+        CodeGenerator::createWithRetry('sales_platforms', 'platform', fn ($code) => SalesPlatform::create([
             ...$validated,
+            'code' => $code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]), maxLength: 50);
 
         return back()->with('success', 'Platform created successfully.');
     }
@@ -45,7 +46,6 @@ class SalesPlatformController extends Controller
     public function updatePlatform(Request $request, SalesPlatform $salesPlatform): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:sales_platforms,code,'.$salesPlatform->id],
             'name' => ['required', 'string', 'max:255'],
         ]);
 
@@ -67,17 +67,22 @@ class SalesPlatformController extends Controller
     public function storeShop(Request $request, SalesPlatform $salesPlatform): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:sales_platform_shops,code,NULL,id,sales_platform_id,'.$salesPlatform->id],
             'name' => ['required', 'string', 'max:255'],
             'lazada_seller_account_id' => ['nullable', 'integer'],
             'is_active' => ['boolean'],
         ]);
 
-        $salesPlatform->shops()->create([
-            ...$validated,
-            'created_by' => $request->user()?->id,
-            'updated_by' => $request->user()?->id,
-        ]);
+        CodeGenerator::createWithRetry(
+            'sales_platform_shops',
+            'shop',
+            fn ($code) => $salesPlatform->shops()->create([
+                ...$validated,
+                'code' => $code,
+                'created_by' => $request->user()?->id,
+                'updated_by' => $request->user()?->id,
+            ]),
+            scope: ['sales_platform_id' => $salesPlatform->id],
+        );
 
         return back()->with('success', 'Shop created successfully.');
     }
@@ -85,7 +90,6 @@ class SalesPlatformController extends Controller
     public function updateShop(Request $request, SalesPlatformShop $shop): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:sales_platform_shops,code,'.$shop->id.',id,sales_platform_id,'.$shop->sales_platform_id],
             'name' => ['required', 'string', 'max:255'],
             'lazada_seller_account_id' => ['nullable', 'integer'],
             'is_active' => ['boolean'],

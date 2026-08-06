@@ -11,6 +11,7 @@ use App\Models\AttributeGroup;
 use App\Models\AuditLog;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,7 +56,6 @@ class AttributeFamilyController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_families,code'],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -65,13 +65,14 @@ class AttributeFamilyController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
+        $name = $this->resolveName($translations, $validated['name'] ?? null);
 
-        $family = AttributeFamily::create([
-            'code' => strtolower($validated['code']),
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
+        $family = CodeGenerator::createWithRetry('attribute_families', 'family', fn ($code) => AttributeFamily::create([
+            'code' => $code,
+            'name' => $name,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]));
 
         $this->syncTranslations($family, $translations);
 
@@ -128,7 +129,6 @@ class AttributeFamilyController extends Controller
     public function update(Request $request, AttributeFamily $attributeFamily): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attribute_families,code,' . $attributeFamily->id],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -142,8 +142,7 @@ class AttributeFamilyController extends Controller
         $oldAssignments = $this->familyAttributesSnapshot($attributeFamily->id);
 
         $attributeFamily->update([
-            'code' => strtolower($validated['code']),
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
+            'name' => $this->resolveName($translations, $validated['name'] ?? null),
             'updated_by' => $request->user()?->id,
         ]);
 
@@ -176,7 +175,7 @@ class AttributeFamilyController extends Controller
         return to_route('catalog.attributeFamilies.index')->with('success', 'Attribute Family updated successfully.');
     }
 
-    private function resolveName(array $translations, ?string $name, string $code): string
+    private function resolveName(array $translations, ?string $name, ?string $code = null): string
     {
         $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
 
@@ -185,8 +184,11 @@ class AttributeFamilyController extends Controller
         }
 
         $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+        if ($firstNonEmpty !== null) {
+            return trim($firstNonEmpty);
+        }
 
-        return $firstNonEmpty !== null ? trim($firstNonEmpty) : ($name ?? ucfirst($code));
+        return $name ?? ($code !== null ? ucfirst($code) : 'Attribute Family');
     }
 
     /**

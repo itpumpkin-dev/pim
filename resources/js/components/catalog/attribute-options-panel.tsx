@@ -45,8 +45,6 @@ interface EditableOption {
     existingSwatchValue: string | null;
 }
 
-const slugify = (value: string) => value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-
 const toEditableOption = (option: AttributeOptionItem, swatchType: string): EditableOption => ({
     id: option.id,
     code: option.code,
@@ -109,18 +107,17 @@ export function AttributeOptionsPanel({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [options]);
 
-    const [newCode, setNewCode] = useState('');
     const [newTranslations, setNewTranslations] = useState<Record<string, string>>({});
     const [newSwatchText, setNewSwatchText] = useState('');
     const [newSwatchImage, setNewSwatchImage] = useState<File | null>(null);
+    const hasNewLabel = Object.values(newTranslations).some((label) => label.trim() !== '');
 
     const addOption = () => {
-        if (!newCode.trim()) return;
+        if (!hasNewLabel) return;
 
         router.post(
             `/catalog/attributes/${attributeId}/options`,
             {
-                code: newCode,
                 translations: newTranslations,
                 swatch_value: swatchType === 'color' ? newSwatchText : undefined,
                 swatch_image: newSwatchImage ?? undefined,
@@ -129,7 +126,6 @@ export function AttributeOptionsPanel({
                 preserveScroll: true,
                 forceFormData: true,
                 onSuccess: () => {
-                    setNewCode('');
                     setNewTranslations({});
                     setNewSwatchText('');
                     setNewSwatchImage(null);
@@ -211,9 +207,8 @@ export function AttributeOptionsPanel({
             </Stack>
 
             {/* Option Errors Alert */}
-            {(errors.code || errors.options || Object.keys(errors).some(k => k.startsWith('options.'))) && (
+            {(errors.options || Object.keys(errors).some(k => k.startsWith('options.'))) && (
                 <Alert severity="error" sx={{ mb: 2 }}>
-                    {errors.code}
                     {errors.options}
                     {Object.entries(errors)
                         .filter(([key]) => key.startsWith('options.'))
@@ -279,16 +274,9 @@ export function AttributeOptionsPanel({
                     <TableBody>
                         <TableRow sx={{ bgcolor: 'action.hover' }}>
                             <TableCell>
-                                <TextField
-                                    size="small"
-                                    placeholder="new_code"
-                                    value={newCode}
-                                    onChange={(e) => setNewCode(slugify(e.target.value))}
-                                    onKeyDown={submitOnEnter}
-                                    error={Boolean(errors.code)}
-                                    helperText={errors.code}
-                                    fullWidth
-                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    Auto
+                                </Typography>
                             </TableCell>
                             {locales.map((locale) => (
                                 <TableCell key={locale.id}>
@@ -323,17 +311,13 @@ export function AttributeOptionsPanel({
                                 </TableCell>
                             )}
                             <TableCell align="right">
-                                <Button size="small" variant="outlined" onClick={addOption} disabled={!newCode.trim()}>
+                                <Button size="small" variant="outlined" onClick={addOption} disabled={!hasNewLabel}>
                                     Add Row
                                 </Button>
                             </TableCell>
                         </TableRow>
 
                         {pagedRows.map((row) => {
-                            const absoluteIndex = rows.findIndex((r) => r.id === row.id);
-                            const rowErrorKey = `options.${absoluteIndex}.code`;
-                            const rowError = errors[rowErrorKey];
-
                             return (
                                 <TableRow key={row.id}>
                                     <TableCell>
@@ -341,9 +325,7 @@ export function AttributeOptionsPanel({
                                             size="small"
                                             fullWidth
                                             value={row.code}
-                                            onChange={(e) => updateRow(row.id, { ...row, code: slugify(e.target.value) })}
-                                            error={Boolean(rowError)}
-                                            helperText={rowError}
+                                            disabled
                                         />
                                     </TableCell>
                                     {locales.map((locale) => (

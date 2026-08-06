@@ -81,6 +81,7 @@
     "parent": "Padre",
     "code": "Código",
     "codeHelperText": "Use minúsculas, números y guiones bajos.",
+    "codeLockedHelperText": "Este código se genera automáticamente y no se puede modificar.",
     "typeLabel": "Tipo",
     "attrTypeText": "Texto",
     "attrTypeTextarea": "Texto en múltiples líneas",

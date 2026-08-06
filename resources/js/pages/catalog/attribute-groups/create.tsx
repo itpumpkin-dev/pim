@@ -6,9 +6,7 @@ import {
     Alert,
     Box,
     Button,
-    Paper,
     Stack,
-    TextField,
     Typography,
 } from '@mui/material';
 import { FormEvent } from 'react';
@@ -25,7 +23,6 @@ export default function AttributeGroupCreate() {
     ];
 
     const { data, setData, post, processing, errors } = useForm({
-        code: '',
         translations: {} as Record<string, string>,
     });
 
@@ -80,32 +77,6 @@ export default function AttributeGroupCreate() {
                 </Stack>
 
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
-                    {/* General Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                            {t('generalTitle')}
-                        </Typography>
-                        <TextField
-                            label={t('codeRequired')}
-                            required
-                            fullWidth
-                            size="small"
-                            placeholder={t('codePlaceholder')}
-                            value={data.code}
-                            onChange={(e) =>
-                                setData(
-                                    'code',
-                                    e.target.value
-                                        .toLowerCase()
-                                        .replace(/\s+/g, '_')
-                                        .replace(/[^a-z0-9_]/g, ''),
-                                )
-                            }
-                            error={Boolean(errors.code)}
-                            helperText={errors.code}
-                        />
-                    </Paper>
-
                     <LocaleLabelFields
                         title={t('labelTitle')}
                         values={data.translations}

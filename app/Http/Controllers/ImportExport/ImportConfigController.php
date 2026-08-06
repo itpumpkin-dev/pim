@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessImportJob;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
+use App\Services\CodeGenerator;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\SampleTemplateBuilder;
 use Illuminate\Http\RedirectResponse;
@@ -45,11 +46,12 @@ class ImportConfigController extends Controller
     {
         $validated = $this->validateConfig($request);
 
-        $config = ImportConfig::create([
+        $config = CodeGenerator::createWithRetry('import_configs', $validated['type'], fn ($code) => ImportConfig::create([
             ...collect($validated)->except('file')->all(),
+            'code' => $code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]));
 
         $this->storeUploadedFile($request, $config);
 
@@ -71,7 +73,7 @@ class ImportConfigController extends Controller
 
     public function update(Request $request, ImportConfig $importConfig): RedirectResponse
     {
-        $validated = $this->validateConfig($request, $importConfig->id);
+        $validated = $this->validateConfig($request);
 
         $importConfig->update([
             ...collect($validated)->except('file')->all(),
@@ -144,10 +146,9 @@ class ImportConfigController extends Controller
             ->all();
     }
 
-    private function validateConfig(Request $request, ?int $configId = null): array
+    private function validateConfig(Request $request): array
     {
         return $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:import_configs,code'.($configId ? ",{$configId}" : '')],
             'type' => ['required', 'in:'.implode(',', ImportExportRegistry::TYPES)],
             'file_format' => ['required', 'in:csv,xls,xlsx'],
             'field_separator' => ['nullable', 'string', 'max:5'],

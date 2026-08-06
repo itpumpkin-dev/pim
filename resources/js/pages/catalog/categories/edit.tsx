@@ -111,21 +111,11 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
                                 helperText={errors.name}
                             />
                             <TextField
-                                label={t('code') + ' *'}
-                                required
+                                label={t('code')}
                                 fullWidth
                                 value={data.code}
-                                onChange={(e) =>
-                                    setData(
-                                        'code',
-                                        e.target.value
-                                            .toLowerCase()
-                                            .replace(/\s+/g, '_')
-                                            .replace(/[^a-z0-9_]/g, ''),
-                                    )
-                                }
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
+                                disabled
+                                helperText={t('codeLockedHelperText')}
                             />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>

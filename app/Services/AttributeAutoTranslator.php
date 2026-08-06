@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Log;
  * Pre-fills empty-locale translation rows for a freshly entered attribute/option
  * label, using the enabled default TranslationProvider. Only touches locales that
  * don't already have a row for this owner — never overwrites a label someone
- * typed by hand or that a prior run already produced. Runs synchronously (a
- * handful of provider calls, one per missing locale) rather than queued, since
- * one attribute/option only ever has a few locales to fill in.
+ * typed by hand or that a prior run already produced. Called from
+ * AutoTranslateLabelsJob (queued), not directly from a request — a handful of
+ * provider calls, one per missing locale, is too slow to make Save wait on.
  */
 class AttributeAutoTranslator
 {

@@ -81,6 +81,7 @@
     "parent": "Parent",
     "code": "Code",
     "codeHelperText": "Use lowercase letters, numbers, and underscores.",
+    "codeLockedHelperText": "ລະຫັດນີ້ຖືກສ້າງຂຶ້ນອັດຕະໂນມັດ ບໍ່ສາມາດແກ້ໄຂໄດ້.",
     "typeLabel": "Type",
     "attrTypeText": "Text",
     "attrTypeTextarea": "Textarea",

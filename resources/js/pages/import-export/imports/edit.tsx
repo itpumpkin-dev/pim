@@ -122,13 +122,11 @@ export default function ImportEdit({ config, types, requiredColumnsByType }: Pro
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{tCatalog('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
-                                label={tCatalog('codeRequired')}
-                                required
+                                label={tCatalog('code')}
                                 fullWidth
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? tCatalog('codeHelperText')}
+                                disabled
+                                helperText={tCatalog('codeLockedHelperText')}
                             />
                             <FormControl fullWidth>
                                 <InputLabel id="import-type-label">{t('typeLabel')}</InputLabel>

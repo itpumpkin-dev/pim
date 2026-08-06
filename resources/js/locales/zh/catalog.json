@@ -81,6 +81,7 @@
     "parent": "家长",
     "code": "代码",
     "codeHelperText": "使用小写字母、数字和下划线.",
+    "codeLockedHelperText": "此代码为自动生成，无法修改。",
     "typeLabel": "类型",
     "attrTypeText": "文本",
     "attrTypeTextarea": "文本区域",

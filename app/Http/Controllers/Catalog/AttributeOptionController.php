@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
-use App\Services\AttributeAutoTranslator;
+use App\Services\CodeGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,10 +29,6 @@ class AttributeOptionController extends Controller
     public function store(Request $request, Attribute $attribute): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => [
-                'required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/',
-                Rule::unique('attribute_options', 'code')->where('attribute_id', $attribute->id),
-            ],
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -41,18 +38,24 @@ class AttributeOptionController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
+        $adminLabel = $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null);
 
         $swatchValue = $validated['swatch_value'] ?? null;
         if ($attribute->swatch_type === 'image' && $request->hasFile('swatch_image')) {
             $swatchValue = $request->file('swatch_image')->store('attribute-options', 'public');
         }
 
-        $option = $attribute->options()->create([
-            'code' => $validated['code'],
-            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
-            'swatch_value' => $swatchValue,
-            'sort_order' => $validated['sort_order'] ?? 0,
-        ]);
+        $option = CodeGenerator::createWithRetry(
+            'attribute_options',
+            'option',
+            fn ($code) => $attribute->options()->create([
+                'code' => $code,
+                'admin_label' => $adminLabel,
+                'swatch_value' => $swatchValue,
+                'sort_order' => $validated['sort_order'] ?? 0,
+            ]),
+            scope: ['attribute_id' => $attribute->id],
+        );
 
         $this->syncTranslations($option, $translations);
         $this->autoTranslate($attribute, $option, $translations);
@@ -65,10 +68,6 @@ class AttributeOptionController extends Controller
     public function update(Request $request, Attribute $attribute, AttributeOption $option): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => [
-                'required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/',
-                Rule::unique('attribute_options', 'code')->where('attribute_id', $attribute->id)->ignore($option->id),
-            ],
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -87,7 +86,6 @@ class AttributeOptionController extends Controller
         $oldFields = $this->optionAuditFields($option);
 
         $option->update([
-            'code' => $validated['code'],
             'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? $option->sort_order,
@@ -124,34 +122,12 @@ class AttributeOptionController extends Controller
                 'required', 'integer',
                 Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
             ],
-            'options.*.code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/'],
             'options.*.admin_label' => ['nullable', 'string', 'max:255'],
             'options.*.translations' => ['nullable', 'array'],
             'options.*.translations.*' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_value' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_image' => ['nullable', 'image', 'max:2048'],
         ]);
-
-        $codes = collect($validated['options'])->pluck('code');
-        if ($codes->count() !== $codes->unique()->count()) {
-            return back()->withErrors(['options' => 'Duplicate option codes are not allowed.']);
-        }
-
-        // Compare against options NOT in this batch, rather than each row
-        // against its own previous code — otherwise swapping/rotating codes
-        // between two rows in the same save (A gets B's code, B gets A's) was
-        // rejected as a false conflict, since neither row's *own* old code had
-        // changed yet when the other row's new code was checked against it.
-        $submittedIds = collect($validated['options'])->pluck('id');
-        $otherExistingCodes = AttributeOption::where('attribute_id', $attribute->id)
-            ->whereNotIn('id', $submittedIds)
-            ->pluck('code');
-
-        foreach ($validated['options'] as $index => $optionData) {
-            if ($otherExistingCodes->contains($optionData['code'])) {
-                return back()->withErrors(["options.{$index}.code" => "Code \"{$optionData['code']}\" is already used by another option."]);
-            }
-        }
 
         $allOldFields = [];
         $allNewFields = [];
@@ -169,7 +145,6 @@ class AttributeOptionController extends Controller
                 $oldFields = $this->optionAuditFields($option);
 
                 $option->update([
-                    'code' => $optionData['code'],
                     'admin_label' => $this->resolveAdminLabel($translations, $optionData['admin_label'] ?? null),
                     'swatch_value' => $swatchValue,
                 ]);
@@ -260,7 +235,7 @@ class AttributeOptionController extends Controller
             return;
         }
 
-        app(AttributeAutoTranslator::class)->fillMissing(
+        AutoTranslateLabelsJob::dispatch(
             AttributeOptionTranslation::class,
             'attribute_option_id',
             $option->id,

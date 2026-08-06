@@ -20,7 +20,6 @@ export default function CategoryFieldCreate() {
     ];
 
     const { data, setData, post, processing, errors } = useForm({
-        code: '',
         type: 'Text',
         labels: {} as Record<string, string>,
         options: [] as string[],
@@ -29,10 +28,6 @@ export default function CategoryFieldCreate() {
         position: 0,
         display_section: 'General',
     });
-
-    const handleCodeChange = (val: string) => {
-        setData('code', val.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''));
-    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -61,16 +56,6 @@ export default function CategoryFieldCreate() {
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>General Config</Typography>
                         <Stack spacing={3}>
-                            <TextField
-                                label="Code *"
-                                required
-                                fullWidth
-                                value={data.code}
-                                onChange={(e) => handleCodeChange(e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? 'lowercase letters and underscores only'}
-                            />
-
                             <FormControl fullWidth required>
                                 <InputLabel id="field-type-label">Field Type</InputLabel>
                                 <Select

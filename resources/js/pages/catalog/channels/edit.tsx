@@ -130,13 +130,11 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
-                                label={t('codeRequired')}
-                                required
+                                label={t('code')}
                                 fullWidth
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
+                                disabled
+                                helperText={t('codeLockedHelperText')}
                             />
                             <FormControl fullWidth>
                                 <InputLabel id="root-category-label">{t('rootCategoryOptional')}</InputLabel>

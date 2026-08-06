@@ -19,7 +19,6 @@ import {
     Paper,
     Select,
     Stack,
-    TextField,
     Typography,
 } from '@mui/material';
 import { FormEvent } from 'react';
@@ -61,7 +60,6 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
     ];
 
     const { data, setData, post, processing, errors, transform } = useForm({
-        code: '',
         translations: {} as Record<string, string>,
         root_category_id: 'none' as string | number,
         locale_ids: [] as number[],
@@ -99,15 +97,6 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
-                            <TextField
-                                label={t('codeRequired')}
-                                required
-                                fullWidth
-                                value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
-                            />
                             <FormControl fullWidth>
                                 <InputLabel id="root-category-label">{t('rootCategoryOptional')}</InputLabel>
                                 <Select

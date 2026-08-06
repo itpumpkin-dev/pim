@@ -81,6 +81,7 @@
     "parent": "Parent",
     "code": "Code",
     "codeHelperText": "Use lowercase letters, numbers, and underscores.",
+    "codeLockedHelperText": "Este código é gerado automaticamente e não pode ser alterado.",
     "typeLabel": "Type",
     "attrTypeText": "Text",
     "attrTypeTextarea": "Textarea",

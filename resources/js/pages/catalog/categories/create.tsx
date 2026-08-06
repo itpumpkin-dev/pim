@@ -28,23 +28,11 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
     ];
 
     const { data, setData, post, processing, errors, transform } = useForm({
-        code: '',
         name: '',
         description: '',
         parent_id: 'root' as string | number,
         additional_data: {} as Record<string, any>,
     });
-
-    const handleNameChange = (nameVal: string) => {
-        setData((prevData) => ({
-            ...prevData,
-            name: nameVal,
-            code: nameVal
-                .toLowerCase()
-                .replace(/\s+/g, '_')
-                .replace(/[^a-z0-9_]/g, ''),
-        }));
-    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -82,18 +70,9 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                 required
                                 fullWidth
                                 value={data.name}
-                                onChange={(e) => handleNameChange(e.target.value)}
+                                onChange={(e) => setData('name', e.target.value)}
                                 error={Boolean(errors.name)}
                                 helperText={errors.name}
-                            />
-                            <TextField
-                                label={t('code') + ' *'}
-                                required
-                                fullWidth
-                                value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
                             />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>

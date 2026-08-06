@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\CategoryField;
 use App\Models\LazadaCategory;
 use App\Models\LazadaSellerAccount;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\JsonResponse;
@@ -82,7 +83,6 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:categories,code'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
@@ -116,8 +116,8 @@ class CategoryController extends Controller
         $validated = $request->validate($rules);
         $validated['additional_data'] = $this->storeUploadedFields($request, $categoryFields, $validated['additional_data'] ?? []);
 
-        Category::create([
-            'code' => $validated['code'],
+        CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
+            'code' => $code,
             'name' => $validated['name'],
             'description' => $validated['description'],
             'parent_id' => $validated['parent_id'],
@@ -125,7 +125,7 @@ class CategoryController extends Controller
             'additional_data' => $validated['additional_data'],
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]));
 
         return to_route('catalog.categories.index')->with('success', 'Category created successfully.');
     }
@@ -214,7 +214,6 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:categories,code,' . $category->id],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
@@ -285,7 +284,6 @@ class CategoryController extends Controller
         }
 
         $category->update([
-            'code' => $validated['code'],
             'name' => $validated['name'],
             'description' => $validated['description'],
             'parent_id' => $validated['parent_id'],

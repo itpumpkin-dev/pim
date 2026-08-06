@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessExportJob;
 use App\Models\ExportConfig;
 use App\Models\JobTracker;
+use App\Services\CodeGenerator;
 use App\Services\ImportExport\ImportExportRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -41,11 +42,12 @@ class ExportConfigController extends Controller
     {
         $validated = $this->validateConfig($request);
 
-        $config = ExportConfig::create([
+        $config = CodeGenerator::createWithRetry('export_configs', $validated['type'], fn ($code) => ExportConfig::create([
             ...$validated,
+            'code' => $code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]));
 
         if ($request->boolean('run')) {
             return $this->dispatchExportJob($request, $config);
@@ -64,7 +66,7 @@ class ExportConfigController extends Controller
 
     public function update(Request $request, ExportConfig $exportConfig): RedirectResponse
     {
-        $validated = $this->validateConfig($request, $exportConfig->id);
+        $validated = $this->validateConfig($request);
 
         $exportConfig->update([
             ...$validated,
@@ -106,10 +108,9 @@ class ExportConfigController extends Controller
         return to_route('importExport.jobs.show', $tracker->id)->with('success', 'Export job queued.');
     }
 
-    private function validateConfig(Request $request, ?int $configId = null): array
+    private function validateConfig(Request $request): array
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:export_configs,code'.($configId ? ",{$configId}" : '')],
             'type' => ['required', 'in:'.implode(',', ImportExportRegistry::TYPES)],
             'file_format' => ['required', 'in:csv,xls,xlsx'],
             'field_separator' => ['nullable', 'string', 'max:5'],

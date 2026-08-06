@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\CategoryField;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -70,7 +71,6 @@ class CategoryFieldController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:category_fields,code'],
             'type' => ['required', 'in:Text,Textarea,Boolean,Select,Multiselect,Datetime,Date,Image,File,Checkbox'],
             'labels' => ['required', 'array'],
             'labels.*' => ['nullable', 'string', 'max:255'],
@@ -82,11 +82,12 @@ class CategoryFieldController extends Controller
             'display_section' => ['nullable', 'string', 'max:100'],
         ]);
 
-        CategoryField::create([
+        CodeGenerator::createWithRetry('category_fields', 'field', fn ($code) => CategoryField::create([
             ...$validated,
+            'code' => $code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]);
+        ]));
 
         return to_route('catalog.categoryFields.index')->with('success', 'Category field created successfully.');
     }
@@ -113,7 +114,6 @@ class CategoryFieldController extends Controller
     public function update(Request $request, CategoryField $categoryField): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:category_fields,code,' . $categoryField->id],
             'type' => ['required', 'in:Text,Textarea,Boolean,Select,Multiselect,Datetime,Date,Image,File,Checkbox'],
             'labels' => ['required', 'array'],
             'labels.*' => ['nullable', 'string', 'max:255'],

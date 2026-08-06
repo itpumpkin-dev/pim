@@ -102,13 +102,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
     const submitPlatform = (e: FormEvent) => {
         e.preventDefault();
-        const payload = { code: platformCode, name: platformName };
         if (editingPlatform) {
-            router.put(`/catalog/sales-platforms/${editingPlatform.id}`, payload, {
+            router.put(`/catalog/sales-platforms/${editingPlatform.id}`, { name: platformName }, {
                 onSuccess: () => setPlatformDialogOpen(false),
             });
         } else {
-            router.post('/catalog/sales-platforms', payload, {
+            router.post('/catalog/sales-platforms', { name: platformName }, {
                 onSuccess: () => setPlatformDialogOpen(false),
             });
         }
@@ -132,13 +131,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
     const submitShop = (e: FormEvent) => {
         e.preventDefault();
-        const payload = { code: shopCode, name: shopName, is_active: shopActive };
         if (editingShop) {
-            router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, payload, {
+            router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, { name: shopName, is_active: shopActive }, {
                 onSuccess: () => setShopDialogPlatformId(null),
             });
         } else if (shopDialogPlatformId) {
-            router.post(`/catalog/sales-platforms/${shopDialogPlatformId}/shops`, payload, {
+            router.post(`/catalog/sales-platforms/${shopDialogPlatformId}/shops`, { name: shopName, is_active: shopActive }, {
                 onSuccess: () => setShopDialogPlatformId(null),
             });
         }
@@ -299,15 +297,16 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogTitle>{editingPlatform ? t('editPlatform') : t('createPlatform')}</DialogTitle>
                     <DialogContent>
                         <Stack spacing={2.5} sx={{ mt: 1 }}>
-                            <TextField
-                                label={t('platformCode')}
-                                required
-                                fullWidth
-                                size="small"
-                                value={platformCode}
-                                onChange={(e) => setPlatformCode(e.target.value)}
-                                helperText="lazada, shopee, ..."
-                            />
+                            {editingPlatform && (
+                                <TextField
+                                    label={t('platformCode')}
+                                    fullWidth
+                                    size="small"
+                                    value={platformCode}
+                                    disabled
+                                    helperText="This code is generated automatically and can't be changed."
+                                />
+                            )}
                             <TextField
                                 label={t('platformName')}
                                 required
@@ -334,14 +333,16 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogTitle>{editingShop ? t('editShop') : t('addShop')}</DialogTitle>
                     <DialogContent>
                         <Stack spacing={2.5} sx={{ mt: 1 }}>
-                            <TextField
-                                label={t('shopCode')}
-                                required
-                                fullWidth
-                                size="small"
-                                value={shopCode}
-                                onChange={(e) => setShopCode(e.target.value)}
-                            />
+                            {editingShop && (
+                                <TextField
+                                    label={t('shopCode')}
+                                    fullWidth
+                                    size="small"
+                                    value={shopCode}
+                                    disabled
+                                    helperText="This code is generated automatically and can't be changed."
+                                />
+                            )}
                             <TextField
                                 label={t('shopName')}
                                 required

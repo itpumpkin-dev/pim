@@ -81,6 +81,7 @@
     "parent": "親",
     "code": "コード",
     "codeHelperText": "小文字、数字、アンダースコアのみを使用してください。",
+    "codeLockedHelperText": "このコードは自動生成されており、変更できません。",
     "typeLabel": "タイプ",
     "attrTypeText": "テキスト",
     "attrTypeTextarea": "テキストエリア",

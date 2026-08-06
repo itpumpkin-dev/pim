@@ -153,20 +153,10 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                         <Stack spacing={2}>
                             <TextField
                                 label={t('code')}
-                                required
                                 fullWidth
                                 value={data.code}
-                                onChange={(event) =>
-                                    setData(
-                                        'code',
-                                        event.target.value
-                                            .toLowerCase()
-                                            .replace(/\s+/g, '_')
-                                            .replace(/[^a-z0-9_]/g, ''),
-                                    )
-                                }
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
+                                disabled
+                                helperText={t('codeLockedHelperText')}
                             />
                             <FormControl fullWidth required error={Boolean(errors.type)}>
                                 <InputLabel id="attribute-type-label">{t('typeLabel')}</InputLabel>

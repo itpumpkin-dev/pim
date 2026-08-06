@@ -113,23 +113,12 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                             General
                         </Typography>
                         <TextField
-                            label="Code *"
-                            required
+                            label="Code"
                             fullWidth
                             size="small"
-                            placeholder="Code"
                             value={data.code}
-                            onChange={(e) =>
-                                setData(
-                                    'code',
-                                    e.target.value
-                                        .toLowerCase()
-                                        .replace(/\s+/g, '_')
-                                        .replace(/[^a-z0-9_]/g, ''),
-                                )
-                            }
-                            error={Boolean(errors.code)}
-                            helperText={errors.code}
+                            disabled
+                            helperText="This code is generated automatically and can't be changed."
                         />
                     </Paper>
 

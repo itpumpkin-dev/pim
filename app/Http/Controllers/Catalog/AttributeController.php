@@ -4,13 +4,14 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
 use App\Models\AttributeTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
-use App\Services\AttributeAutoTranslator;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -122,7 +123,6 @@ class AttributeController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attributes,code'],
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
@@ -137,10 +137,12 @@ class AttributeController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
+        $name = $this->resolveName($translations, $validated['name'] ?? null);
 
-        $attribute = Attribute::create([
+        $attribute = CodeGenerator::createWithRetry('attributes', 'attribute', fn ($code) => Attribute::create([
             ...$validated,
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
+            'code' => $code,
+            'name' => $name,
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -149,7 +151,7 @@ class AttributeController extends Controller
             'is_filterable' => $request->boolean('is_filterable'),
             'created_by' => $request->user()->id,
             'updated_by' => $request->user()->id,
-        ]);
+        ]));
 
         $this->syncTranslations($attribute, $translations);
         $this->autoTranslate($attribute, $translations);
@@ -165,7 +167,6 @@ class AttributeController extends Controller
     public function update(Request $request, Attribute $attribute): RedirectResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'regex:/^[a-z][a-z0-9_]*$/', 'unique:attributes,code,'.$attribute->id],
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
@@ -184,7 +185,7 @@ class AttributeController extends Controller
 
         $attribute->update([
             ...$validated,
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $validated['code']),
+            'name' => $this->resolveName($translations, $validated['name'] ?? null),
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -216,7 +217,7 @@ class AttributeController extends Controller
             ->all();
     }
 
-    private function resolveName(array $translations, ?string $name, string $code): string
+    private function resolveName(array $translations, ?string $name, ?string $code = null): string
     {
         $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
 
@@ -225,16 +226,21 @@ class AttributeController extends Controller
         }
 
         $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+        if ($firstNonEmpty !== null) {
+            return trim($firstNonEmpty);
+        }
 
-        return $firstNonEmpty !== null ? trim($firstNonEmpty) : ($name ?? ucfirst($code));
+        return $name ?? ($code !== null ? ucfirst($code) : 'Attribute');
     }
 
     /**
      * When "AI translate" is enabled and the default locale's label is
-     * filled in, pre-fills every other active locale that doesn't already
-     * have a translation. Skipped entirely if the default locale's own
-     * label is empty, since we'd otherwise have no reliable source text/
-     * language to translate from.
+     * filled in, queues a job to pre-fill every other active locale that
+     * doesn't already have a translation — kept off the request/response
+     * cycle since it's a handful of translation-provider calls, one per
+     * missing locale, which is too slow to make Save wait on. Skipped
+     * entirely if the default locale's own label is empty, since we'd
+     * otherwise have no reliable source text/language to translate from.
      */
     private function autoTranslate(Attribute $attribute, array $translations): void
     {
@@ -249,7 +255,7 @@ class AttributeController extends Controller
             return;
         }
 
-        app(AttributeAutoTranslator::class)->fillMissing(
+        AutoTranslateLabelsJob::dispatch(
             AttributeTranslation::class,
             'attribute_id',
             $attribute->id,

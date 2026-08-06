@@ -92,13 +92,11 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>General Config</Typography>
                         <Stack spacing={3}>
                             <TextField
-                                label="Code *"
-                                required
+                                label="Code"
                                 fullWidth
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''))}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? 'lowercase letters and underscores only'}
+                                disabled
+                                helperText="This code is generated automatically and can't be changed."
                             />
 
                             <FormControl fullWidth required>

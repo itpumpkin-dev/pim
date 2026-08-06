@@ -30,7 +30,6 @@ const swatchTypeKeys: Record<string, string> = {
 };
 
 interface AttributeForm {
-    code: string;
     type: string;
     swatch_type: string;
     is_required: boolean;
@@ -64,13 +63,12 @@ export default function AttributeCreate() {
     }));
 
     const { data, setData, post, processing, errors } = useForm<AttributeForm>({
-        code: '',
         type: 'text',
         swatch_type: '',
         is_required: false,
         is_unique: false,
         is_locale_based: false,
-        is_ai_translate: false,
+        is_ai_translate: true,
         is_channel_based: false,
         is_filterable: false,
         translations: {},
@@ -116,23 +114,6 @@ export default function AttributeCreate() {
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={2}>
-                            <TextField
-                                label={t('code')}
-                                required
-                                fullWidth
-                                value={data.code}
-                                onChange={(event) =>
-                                    setData(
-                                        'code',
-                                        event.target.value
-                                            .toLowerCase()
-                                            .replace(/\s+/g, '_')
-                                            .replace(/[^a-z0-9_]/g, ''),
-                                    )
-                                }
-                                error={Boolean(errors.code)}
-                                helperText={errors.code ?? t('codeHelperText')}
-                            />
                             <FormControl fullWidth required error={Boolean(errors.type)}>
                                 <InputLabel id="attribute-type-label">{t('typeLabel')}</InputLabel>
                                 <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>

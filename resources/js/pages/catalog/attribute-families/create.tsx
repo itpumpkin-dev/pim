@@ -73,7 +73,6 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     ];
 
     const { data, setData, post, processing, errors } = useForm({
-        code: '',
         translations: {} as Record<string, string>,
         group_attributes: [] as { attribute_id: number; attribute_group_id: number }[],
     });
@@ -174,7 +173,6 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
         });
 
         router.post('/catalog/attributeFamilies', {
-            code: data.code,
             translations: data.translations,
             group_attributes: groupAttrsPayload,
         });
@@ -470,32 +468,6 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                     {/* Right Column: General & Label panels */}
                     <Grid item xs={12} md={4}>
                         <Stack spacing={3}>
-                            {/* General Panel */}
-                            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                    {t('generalTitle')}
-                                </Typography>
-                                <TextField
-                                    label={t('codeRequired')}
-                                    required
-                                    fullWidth
-                                    size="small"
-                                    placeholder={t('enterCodePlaceholder')}
-                                    value={data.code}
-                                    onChange={(e) =>
-                                        setData(
-                                            'code',
-                                            e.target.value
-                                                .toLowerCase()
-                                                .replace(/\s+/g, '_')
-                                                .replace(/[^a-z0-9_]/g, ''),
-                                        )
-                                    }
-                                    error={Boolean(errors.code)}
-                                    helperText={errors.code}
-                                />
-                            </Paper>
-
                             <LocaleLabelFields
                                 title={t('labelTitle')}
                                 values={data.translations}
