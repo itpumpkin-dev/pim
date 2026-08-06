@@ -135,6 +135,60 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
         [data.permissions]
     );
 
+    // Read/Edit access for the "Attribute Groups" / "Individual Attributes" tables below.
+    // Edit always implies Read — checking Edit turns Read on too, and unchecking Read
+    // turns Edit back off, so the two resources (view_*/edit_*) never end up inconsistent.
+    const hasAccess = (resource: string, prefix: 'view' | 'edit', code: string) =>
+        (data.permissions[resource] || []).includes(`${prefix}_${code}`);
+
+    const setAccess = (viewResource: string, editResource: string, code: string, level: 'read' | 'edit', checked: boolean) => {
+        const view = new Set(data.permissions[viewResource] || []);
+        const edit = new Set(data.permissions[editResource] || []);
+
+        if (level === 'read') {
+            if (checked) {
+                view.add(`view_${code}`);
+            } else {
+                view.delete(`view_${code}`);
+                edit.delete(`edit_${code}`);
+            }
+        } else {
+            if (checked) {
+                edit.add(`edit_${code}`);
+                view.add(`view_${code}`);
+            } else {
+                edit.delete(`edit_${code}`);
+            }
+        }
+
+        setData('permissions', { ...data.permissions, [viewResource]: Array.from(view), [editResource]: Array.from(edit) });
+    };
+
+    const setAllAccess = (viewResource: string, editResource: string, codes: string[], level: 'read' | 'edit', checked: boolean) => {
+        const view = new Set(data.permissions[viewResource] || []);
+        const edit = new Set(data.permissions[editResource] || []);
+
+        codes.forEach((code) => {
+            if (level === 'read') {
+                if (checked) {
+                    view.add(`view_${code}`);
+                } else {
+                    view.delete(`view_${code}`);
+                    edit.delete(`edit_${code}`);
+                }
+            } else {
+                if (checked) {
+                    edit.add(`edit_${code}`);
+                    view.add(`view_${code}`);
+                } else {
+                    edit.delete(`edit_${code}`);
+                }
+            }
+        });
+
+        setData('permissions', { ...data.permissions, [viewResource]: Array.from(view), [editResource]: Array.from(edit) });
+    };
+
     const cancel = () => router.visit('/system/roles');
 
     const submit: FormEventHandler = (e) => {
@@ -446,8 +500,11 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                     {/* Attribute Access Section - Only show if user has products permission */}
                     {hasProductsPermission ? (
                     <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: '2px solid', borderColor: 'divider', width: '100%' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: 'primary.main' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: 'primary.main' }}>
                             📋 Attribute Access
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                            Read lets this role see the field on a product; Edit lets it change the value (checking Edit turns Read on too).
                         </Typography>
 
                         {/* Attribute Groups */}
@@ -473,49 +530,54 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttrGroups && (
-                                <Box>
-                                    <Box sx={{ pl: 3, mb: 2 }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={attributeGroups.length > 0 && attributeGroups.every((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`))}
-                                                    indeterminate={attributeGroups.some((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`)) && !attributeGroups.every((g) => (data.permissions['view_attribute_groups'] || []).includes(`view_${g.code}`))}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            const allGroupPerms = attributeGroups.map((g) => `view_${g.code}`);
-                                                            setData('permissions', { ...data.permissions, view_attribute_groups: allGroupPerms });
-                                                        } else {
-                                                            setData('permissions', { ...data.permissions, view_attribute_groups: [] });
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label={<Typography variant="caption" sx={{ fontWeight: 700 }}>Select All</Typography>}
-                                        />
-                                    </Box>
-                                    <Box sx={{ pl: 3, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 1 }}>
-                                        {attributeGroups.map((group) => (
-                                            <FormControlLabel
-                                                key={group.id}
-                                                control={
+                                <TableContainer component={Paper} variant="outlined">
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 700 }}>Attribute Group</TableCell>
+                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
                                                     <Checkbox
-                                                        checked={(data.permissions['view_attribute_groups'] || []).includes(`view_${group.code}`)}
-                                                        onChange={(e) => {
-                                                            const current = new Set(data.permissions['view_attribute_groups'] || []);
-                                                            if (e.target.checked) {
-                                                                current.add(`view_${group.code}`);
-                                                            } else {
-                                                                current.delete(`view_${group.code}`);
-                                                            }
-                                                            setData('permissions', { ...data.permissions, view_attribute_groups:Array.from(current) });
-                                                        }}
+                                                        size="small"
+                                                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
+                                                        indeterminate={attributeGroups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) && !attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
+                                                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'read', e.target.checked)}
                                                     />
-                                                }
-                                                label={<Typography variant="body2">{group.name}</Typography>}
-                                            />
-                                        ))}
-                                    </Box>
-                                </Box>
+                                                    Read
+                                                </TableCell>
+                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
+                                                        indeterminate={attributeGroups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) && !attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
+                                                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'edit', e.target.checked)}
+                                                    />
+                                                    Edit
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {attributeGroups.map((group) => (
+                                                <TableRow key={group.id}>
+                                                    <TableCell>{group.name}</TableCell>
+                                                    <TableCell align="center">
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={hasAccess('view_attribute_groups', 'view', group.code)}
+                                                            onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'read', e.target.checked)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={hasAccess('edit_attribute_groups', 'edit', group.code)}
+                                                            onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'edit', e.target.checked)}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
                             )}
                         </Box>
 
@@ -542,57 +604,54 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttributes && (
-                                <Box>
-                                    <Box sx={{ pl: 3, mb: 2 }}>
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    checked={attributes.length > 0 && attributes.every((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`))}
-                                                    indeterminate={attributes.some((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`)) && !attributes.every((a: Attribute) => (data.permissions['view_attributes'] || []).includes(`view_${a.code}`))}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            const allAttrPerms = attributes.map((a: Attribute) => `view_${a.code}`);
-                                                            setData('permissions', { ...data.permissions, view_attributes: allAttrPerms });
-                                                        } else {
-                                                            setData('permissions', { ...data.permissions, view_attributes: [] });
-                                                        }
-                                                    }}
-                                                />
-                                            }
-                                            label={<Typography variant="caption" sx={{ fontWeight: 700 }}>Select All</Typography>}
-                                        />
-                                    </Box>
-                                    <Box sx={{
-                                        pl: 3,
-                                        display: 'grid',
-                                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                                        gap: 1,
-                                        maxHeight: '500px',
-                                        overflowY: 'auto',
-                                        pr: 1,
-                                    }}>
-                                        {attributes.map((attr: Attribute) => (
-                                            <FormControlLabel
-                                                key={attr.id}
-                                                control={
+                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 500, overflowY: 'auto' }}>
+                                    <Table size="small" stickyHeader>
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell sx={{ fontWeight: 700 }}>Attribute</TableCell>
+                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
                                                     <Checkbox
-                                                        checked={(data.permissions['view_attributes'] || []).includes(`view_${attr.code}`)}
-                                                        onChange={(e) => {
-                                                            const current = new Set(data.permissions['view_attributes'] || []);
-                                                            if (e.target.checked) {
-                                                                current.add(`view_${attr.code}`);
-                                                            } else {
-                                                                current.delete(`view_${attr.code}`);
-                                                            }
-                                                            setData('permissions', { ...data.permissions, view_attributes:Array.from(current) });
-                                                        }}
+                                                        size="small"
+                                                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
+                                                        indeterminate={attributes.some((a) => hasAccess('view_attributes', 'view', a.code)) && !attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
+                                                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'read', e.target.checked)}
                                                     />
-                                                }
-                                                label={<Typography variant="body2">{attr.name}</Typography>}
-                                            />
-                                        ))}
-                                    </Box>
-                                </Box>
+                                                    Read
+                                                </TableCell>
+                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
+                                                        indeterminate={attributes.some((a) => hasAccess('edit_attributes', 'edit', a.code)) && !attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
+                                                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
+                                                    />
+                                                    Edit
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {attributes.map((attr: Attribute) => (
+                                                <TableRow key={attr.id}>
+                                                    <TableCell>{attr.name}</TableCell>
+                                                    <TableCell align="center">
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={hasAccess('view_attributes', 'view', attr.code)}
+                                                            onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'read', e.target.checked)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell align="center">
+                                                        <Checkbox
+                                                            size="small"
+                                                            checked={hasAccess('edit_attributes', 'edit', attr.code)}
+                                                            onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'edit', e.target.checked)}
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
                             )}
                         </Box>
                     </Box>

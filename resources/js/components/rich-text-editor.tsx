@@ -6,9 +6,10 @@ interface RichTextEditorProps {
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
+    readOnly?: boolean;
 }
 
-export default function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder, readOnly }: RichTextEditorProps) {
     const [Quill, setQuill] = useState<ComponentType<any> | null>(null);
 
     useEffect(() => {
@@ -40,6 +41,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
+                readOnly={readOnly}
             />
         </Box>
     );

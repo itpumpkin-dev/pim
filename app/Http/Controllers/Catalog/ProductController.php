@@ -523,6 +523,7 @@ class ProductController extends Controller
                     'attributes' => [],
                 ];
             }
+            $attr->editable = $this->canUserEditAttributeGroup($user, $group) && $this->canUserEditAttribute($user, $attr);
             $groupsData[$groupId]['attributes'][] = $attr;
         }
 
@@ -540,6 +541,8 @@ class ProductController extends Controller
             if ($user) {
                 $allAttributes = $allAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
+
+            $allAttributes->each(fn ($attr) => $attr->editable = $this->canUserEditAttribute($user, $attr));
 
             if ($allAttributes->isNotEmpty()) {
                 $groupsData[] = [
@@ -778,8 +781,8 @@ class ProductController extends Controller
                     $attribute = Attribute::find($attributeId);
                     if (!$attribute || !is_array($channelValues)) continue;
 
-                    // Check if user has permission to view/edit this attribute
-                    if ($user && !$this->canUserViewAttribute($user, $attribute)) {
+                    // Check if user has permission to edit this attribute
+                    if ($user && !$this->canUserEditAttribute($user, $attribute)) {
                         continue;
                     }
 
@@ -1016,8 +1019,8 @@ class ProductController extends Controller
             $attribute = Attribute::find($attributeId);
             if (!$attribute) continue;
 
-            // Check if user has permission to view/edit this attribute
-            if ($user && !$this->canUserViewAttribute($user, $attribute)) {
+            // Check if user has permission to edit this attribute
+            if ($user && !$this->canUserEditAttribute($user, $attribute)) {
                 continue;
             }
 
@@ -1252,5 +1255,61 @@ class ProductController extends Controller
         }
 
         return $user->hasPermission('view_attributes', "view_{$attribute->code}");
+    }
+
+    /**
+     * Check if a user has permission to *edit* an attribute group's values —
+     * always a subset of view access. Uses permission format:
+     * 'edit_attribute_groups.edit_{group_code}'.
+     *
+     * Falls back to "editable" only when the role hasn't touched attribute
+     * group access AT ALL (no view_attribute_groups rows either) — backward
+     * compatible with roles that never open the "Attribute Access" section.
+     * Checking `hasAnyPermissionForResource('edit_attribute_groups')` alone
+     * would be wrong: a role given Read-only access (view rows exist, but no
+     * Edit was ever checked) has zero edit_attribute_groups rows too, which
+     * would wrongly fall back to "editable" instead of enforcing read-only.
+     */
+    private function canUserEditAttributeGroup($user, $group): bool
+    {
+        if (!$this->canUserViewAttributeGroup($user, $group)) {
+            return false;
+        }
+
+        if (!$user) {
+            return true;
+        }
+
+        if (!$user->hasAnyPermissionForResource('view_attribute_groups') && !$user->hasAnyPermissionForResource('edit_attribute_groups')) {
+            return true;
+        }
+
+        return $user->hasPermission('edit_attribute_groups', "edit_{$group->code}");
+    }
+
+    /**
+     * Check if a user has permission to *edit* a specific attribute's value —
+     * always a subset of view access. Uses permission format:
+     * 'edit_attributes.edit_{attribute_code}'.
+     *
+     * Same "touched at all" fallback as canUserEditAttributeGroup() above —
+     * see that method's docblock for why checking edit_attributes alone is
+     * wrong for a role that was deliberately given Read-only access.
+     */
+    private function canUserEditAttribute($user, $attribute): bool
+    {
+        if (!$this->canUserViewAttribute($user, $attribute)) {
+            return false;
+        }
+
+        if (!$user) {
+            return true;
+        }
+
+        if (!$user->hasAnyPermissionForResource('view_attributes') && !$user->hasAnyPermissionForResource('edit_attributes')) {
+            return true;
+        }
+
+        return $user->hasPermission('edit_attributes', "edit_{$attribute->code}");
     }
 }

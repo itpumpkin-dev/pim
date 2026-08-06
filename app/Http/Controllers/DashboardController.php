@@ -76,7 +76,7 @@ class DashboardController extends Controller
         if ($canProducts) {
             $productQuery = $productIdsInCategory !== null ? Product::whereIn('id', $productIdsInCategory) : Product::query();
             $productStat = $this->cachedStat('product:' . ($categoryId ?? 'all'), $productQuery);
-            $topViewed = $this->cacheRemember('topViewed:' . ($categoryId ?? 'all'), fn () => $this->topViewedProducts($productIdsInCategory));
+            $topViewed = $this->cacheRemember('topViewed:' . ($categoryId ?? 'all') . ':' . app()->getLocale(), fn () => $this->topViewedProducts($productIdsInCategory));
             $categoryOptions = $this->cacheRemember('categoryOptions', fn () => Category::whereHas('products')->orderBy('name')->get(['id', 'name']));
             $lowStockCount = $this->cacheRemember('lowStock', fn () => $this->lowStockCount());
             $categoryPieChart = $this->cacheRemember('chart:categoryPie', fn () => $this->categoryPieChart());
@@ -247,7 +247,7 @@ class DashboardController extends Controller
         $topViewedCounts = $query->groupBy('product_id')->orderByDesc('views')->limit(10)->get();
 
         $products = Product::whereIn('id', $topViewedCounts->pluck('product_id'))->get();
-        $mappedById = collect(ProductPresenter::mapMany($products))->keyBy('id');
+        $mappedById = collect(ProductPresenter::mapMany($products, app()->getLocale()))->keyBy('id');
 
         return $topViewedCounts
             ->map(function ($row) use ($mappedById) {

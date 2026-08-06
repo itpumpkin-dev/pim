@@ -17,9 +17,9 @@
     "roles": "บทบาท",
     "locales": "ภาษา",
     "translationProviders": "ผู้ให้บริการแปลภาษา",
-    "activityLogs": "บันทึกกิจกรรม",
     "importExport": "นำเข้า / ส่งออก",
     "imports": "นำเข้าข้อมูล",
     "exports": "ส่งออกข้อมูล",
-    "jobTracker": "ตัวติดตามงาน"
+    "jobTracker": "ตัวติดตามงาน",
+    "activityLogs": "บันทึกกิจกรรม"
 }

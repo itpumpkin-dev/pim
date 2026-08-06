@@ -28,7 +28,15 @@ class ProductPresenter
         'how_to_use', 'warnings',
     ];
 
-    public static function mapMany(Collection $products): array
+    /**
+     * @param  string  $localeCode  Which locale's ProductValue rows (pname, spec_*, ...)
+     *                              to prefer. Defaults to 'th' for the public storefront
+     *                              (home, products/show), which is always Thai regardless
+     *                              of the visitor's browser — pass app()->getLocale() for
+     *                              admin-facing callers (e.g. the dashboard) so the result
+     *                              follows whatever language the admin has switched to.
+     */
+    public static function mapMany(Collection $products, string $localeCode = 'th'): array
     {
         if ($products->isEmpty()) {
             return [];
@@ -37,11 +45,11 @@ class ProductPresenter
         $attributesByCode = Attribute::whereIn('code', self::CODES)->get(['id', 'code'])->keyBy('id');
 
         // Locale-based attributes (pname, spec_*, ...) store one ProductValue
-        // row per locale. Only ever display the site's default locale, and
-        // order null-locale (global) rows before it so a locale-specific row
-        // always wins when both exist for the same attribute — otherwise
-        // whichever row the DB happens to return last would win at random.
-        $defaultLocaleId = Locale::where('code', 'th')->value('id');
+        // row per locale. Only ever display $localeCode, and order null-locale
+        // (global) rows before it so a locale-specific row always wins when
+        // both exist for the same attribute — otherwise whichever row the DB
+        // happens to return last would win at random.
+        $defaultLocaleId = Locale::where('code', $localeCode)->value('id');
 
         $values = ProductValue::whereIn('product_id', $products->pluck('id'))
             ->whereIn('attribute_id', $attributesByCode->keys())

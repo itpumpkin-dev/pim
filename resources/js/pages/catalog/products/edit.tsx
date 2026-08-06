@@ -69,6 +69,8 @@ interface AttributeItem {
     is_channel_based?: boolean;
     swatch_type?: string | null;
     options?: AttributeOption[];
+    /** false when the current user's role has Read-only (not Edit) access to this attribute — see "Attribute Access" on the Role form. Absent/true means editable, for backward compatibility. */
+    editable?: boolean;
 }
 
 interface GroupWithAttributes {
@@ -957,6 +959,7 @@ function RenderAttributeInput({
 }) {
     const label = attr.name || attr.code;
     const stringValue = typeof value === 'string' ? value : '';
+    const isReadOnly = attr.editable === false;
     const [addOptionOpen, setAddOptionOpen] = useState(false);
 
     const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -988,6 +991,13 @@ function RenderAttributeInput({
                         sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0', color: 'text.primary', fontWeight: 600 }}
                     />
                 )}
+                {isReadOnly && (
+                    <Chip
+                        label="READ ONLY"
+                        size="small"
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#fee2e2', color: '#b91c1c', fontWeight: 700 }}
+                    />
+                )}
             </>
         );
     };
@@ -1009,6 +1019,7 @@ function RenderAttributeInput({
                     <Autocomplete
                         size="small"
                         fullWidth
+                        disabled={isReadOnly}
                         options={options}
                         value={selectedOption}
                         getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
@@ -1016,7 +1027,7 @@ function RenderAttributeInput({
                         onChange={(_, newValue) => onChange(newValue ? optionValue(newValue) : '')}
                         renderInput={(params) => <TextField {...params} placeholder="Select option" />}
                     />
-                    {canAddOptions && (
+                    {canAddOptions && !isReadOnly && (
                         <IconButton
                             size="small"
                             title={`Add option to "${label}"`}
@@ -1055,6 +1066,7 @@ function RenderAttributeInput({
                     value={stringValue}
                     onChange={onChange}
                     placeholder={`Enter ${label.toLowerCase()}`}
+                    readOnly={isReadOnly}
                 />
             </Box>
         );
@@ -1072,6 +1084,7 @@ function RenderAttributeInput({
                 <TextField
                     size="small"
                     fullWidth
+                    disabled={isReadOnly}
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     InputProps={{
@@ -1091,7 +1104,7 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Switch checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />
+                <Switch disabled={isReadOnly} checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />
             </Box>
         );
     }
@@ -1101,7 +1114,7 @@ function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <FormControlLabel
-                        control={<Checkbox checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />}
+                        control={<Checkbox disabled={isReadOnly} checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />}
                         label={
                             <Typography variant="caption" fontWeight={600} color="#334155">
                                 {label} {attr.is_required && '*'}
@@ -1127,6 +1140,7 @@ function RenderAttributeInput({
                     type={attr.type === 'date' ? 'date' : 'datetime-local'}
                     size="small"
                     fullWidth
+                    disabled={isReadOnly}
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     InputLabelProps={{ shrink: true }}
@@ -1199,6 +1213,7 @@ function RenderAttributeInput({
                         component="label"
                         variant="outlined"
                         size="small"
+                        disabled={isReadOnly}
                         startIcon={<CloudUploadIcon fontSize="small" />}
                         sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
                     >
@@ -1206,6 +1221,7 @@ function RenderAttributeInput({
                         <input
                             type="file"
                             hidden
+                            disabled={isReadOnly}
                             multiple={isGallery}
                             accept={isImage || isGallery ? 'image/*' : undefined}
                             onChange={(e) => {
@@ -1248,6 +1264,7 @@ function RenderAttributeInput({
             <TextField
                 size="small"
                 fullWidth
+                disabled={isReadOnly}
                 value={stringValue}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : `Enter ${label.toLowerCase()}`}

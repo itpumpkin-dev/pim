@@ -28,11 +28,25 @@ interface RoleUserOption {
     last_name: string;
 }
 
+interface AttributeGroup {
+    id: number;
+    code: string;
+    name: string;
+}
+
+interface Attribute {
+    id: number;
+    code: string;
+    name: string;
+}
+
 interface CreateRoleProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
+    attributeGroups: AttributeGroup[];
+    attributes: Attribute[];
 }
 
-export default function RoleCreate({ catalog, users }: CreateRoleProps) {
-    return <RoleFormPage catalog={catalog} users={users} />;
+export default function RoleCreate({ catalog, users, attributeGroups, attributes }: CreateRoleProps) {
+    return <RoleFormPage catalog={catalog} users={users} attributeGroups={attributeGroups} attributes={attributes} />;
 }

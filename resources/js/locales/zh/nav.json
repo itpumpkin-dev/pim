@@ -20,5 +20,6 @@
     "importExport": "导入/导出",
     "imports": "进口",
     "exports": "出口",
-    "jobTracker": "任务跟踪器"
+    "jobTracker": "任务跟踪器",
+    "activityLogs": "活动日志"
 }
