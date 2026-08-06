@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -62,6 +63,12 @@ class User extends Authenticatable
         'name',
         'avatar_url',
     ];
+
+    /**
+     * Per-instance memoized result of getAllPermissions() — see that
+     * method's docblock for why.
+     */
+    private ?array $permissionsCache = null;
 
     /**
      * Get the attributes that should be cast.
@@ -140,76 +147,82 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class, 'user_role');
     }
 
-    public function hasPermission(string $resource, string $action): bool
+    /**
+     * All of this user's "resource.action" permission strings (own roles
+     * plus roles inherited through a group), cached per-user until their
+     * `permissions_version` changes. That version is exactly the signal
+     * EnsureFreshPermissions already uses to force a stale session to log
+     * out the moment a role/group/permission change could affect them — so
+     * keying the cache on it needs no separate invalidation: an old cached
+     * entry can only ever be read back by a session already about to be
+     * kicked out, never by one whose permissions have actually moved on.
+     *
+     * Every permission check in the app (hasPermission(),
+     * hasAnyPermissionForResource()) reads from this single cached list
+     * instead of its own fresh query — previously each one re-queried role/
+     * group/role_permissions from scratch, which added up fast on pages
+     * that check dozens of attributes/groups in a loop (e.g. the product
+     * grid and edit page), and ran unconditionally on every single
+     * navigation via HandleInertiaRequests' shared `auth.permissions` prop.
+     *
+     * Also memoized on the instance itself: `$request->user()` resolves to
+     * the same object for the whole request, so a page checking permissions
+     * dozens of times in a loop hits this in-memory array after the first
+     * call instead of round-tripping to the cache store every time.
+     */
+    public function getAllPermissions(): array
     {
-        $hasDirectRolePermission = $this->roles()
-            ->whereHas('permissions', function ($query) use ($resource, $action) {
-                $query->where('resource', $resource)
-                    ->where('action', $action)
-                    ->where('granted', true);
-            })
-            ->exists();
-
-        if ($hasDirectRolePermission) {
-            return true;
+        if ($this->permissionsCache !== null) {
+            return $this->permissionsCache;
         }
 
-        return $this->groups()
-            ->whereHas('roles.permissions', function ($query) use ($resource, $action) {
-                $query->where('resource', $resource)
-                    ->where('action', $action)
-                    ->where('granted', true);
-            })
-            ->exists();
+        return $this->permissionsCache = Cache::rememberForever(
+            "user:{$this->id}:permissions:v{$this->permissions_version}",
+            function () {
+                $directPermissions = $this->roles()
+                    ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
+                    ->where('role_permissions.granted', true)
+                    ->select('role_permissions.resource', 'role_permissions.action')
+                    ->get()
+                    ->map(function ($item) {
+                        return $item->resource . '.' . $item->action;
+                    });
+
+                $groupPermissions = $this->groups()
+                    ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
+                    ->join('roles', 'role_user_group.role_id', '=', 'roles.id')
+                    ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
+                    ->where('role_permissions.granted', true)
+                    ->select('role_permissions.resource', 'role_permissions.action')
+                    ->get()
+                    ->map(function ($item) {
+                        return $item->resource . '.' . $item->action;
+                    });
+
+                return $directPermissions->concat($groupPermissions)
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+        );
+    }
+
+    public function hasPermission(string $resource, string $action): bool
+    {
+        return in_array("{$resource}.{$action}", $this->getAllPermissions(), true);
     }
 
     public function hasAnyPermissionForResource(string $resource): bool
     {
-        $hasDirectRolePermission = $this->roles()
-            ->whereHas('permissions', function ($query) use ($resource) {
-                $query->where('resource', $resource)
-                    ->where('granted', true);
-            })
-            ->exists();
+        $prefix = "{$resource}.";
 
-        if ($hasDirectRolePermission) {
-            return true;
+        foreach ($this->getAllPermissions() as $permission) {
+            if (str_starts_with($permission, $prefix)) {
+                return true;
+            }
         }
 
-        return $this->groups()
-            ->whereHas('roles.permissions', function ($query) use ($resource) {
-                $query->where('resource', $resource)
-                    ->where('granted', true);
-            })
-            ->exists();
-    }
-
-    public function getAllPermissions(): array
-    {
-        $directPermissions = $this->roles()
-            ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
-            ->where('role_permissions.granted', true)
-            ->select('role_permissions.resource', 'role_permissions.action')
-            ->get()
-            ->map(function ($item) {
-                return $item->resource . '.' . $item->action;
-            });
-
-        $groupPermissions = $this->groups()
-            ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
-            ->join('roles', 'role_user_group.role_id', '=', 'roles.id')
-            ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
-            ->where('role_permissions.granted', true)
-            ->select('role_permissions.resource', 'role_permissions.action')
-            ->get()
-            ->map(function ($item) {
-                return $item->resource . '.' . $item->action;
-            });
-
-        return $directPermissions->concat($groupPermissions)
-            ->unique()
-            ->values()
-            ->toArray();
+        return false;
     }
 
     public function groups(): BelongsToMany

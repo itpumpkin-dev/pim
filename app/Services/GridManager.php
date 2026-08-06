@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,22 +12,31 @@ class GridManager
 {
     protected string $name;
     protected array $config;
-    
+
     public function __construct(string $name)
     {
         $this->name = $name;
         $path = resource_path("grids/{$name}.yml");
-        
+
         if (!File::exists($path)) {
             throw new \Exception("Grid configuration file not found: {$path}");
         }
-        
-        $yaml = Yaml::parseFile($path);
-        
+
+        // Every list page (Users, Roles, Products, Attribute Groups/Families,
+        // ...) instantiates a GridManager on every single request, and this
+        // YAML file never changes at runtime — parsing it fresh each time
+        // was pure repeated work. Keyed on the file's mtime so editing a
+        // grid's YAML during development is picked up automatically, no
+        // manual cache:clear needed.
+        $yaml = Cache::rememberForever(
+            "grid_config:{$name}:" . File::lastModified($path),
+            fn () => Yaml::parseFile($path),
+        );
+
         if (!isset($yaml['datagrid'][$name])) {
             throw new \Exception("Grid definition '{$name}' not found in YAML file.");
         }
-        
+
         $this->config = $yaml['datagrid'][$name];
     }
     
