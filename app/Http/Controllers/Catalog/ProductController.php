@@ -995,6 +995,27 @@ class ProductController extends Controller
 
             $user = $request->user();
 
+            // Group each touched attribute belongs to, for this product's family —
+            // needed so edit permission checks below can enforce the same
+            // "read-only group overrides an individually-editable attribute" rule
+            // that edit() already applies when rendering (see canUserEditAttributeGroup()
+            // docblock). Without this, a request sent directly to this endpoint
+            // (bypassing the UI, which does apply that rule) could still write an
+            // attribute whose parent group is read-only.
+            $attributeGroupsById = FamilyAttribute::with('attributeGroup')
+                ->where('family_id', $product->family_id)
+                ->whereIn('attribute_id', $touchedAttributeIds)
+                ->get()
+                ->keyBy('attribute_id')
+                ->map(fn ($fa) => $fa->attributeGroup);
+
+            $canEditTouchedAttribute = function ($attribute) use ($user, $attributeGroupsById) {
+                if (!$user) return true;
+                $group = $attributeGroupsById->get($attribute->id);
+                if ($group && !$this->canUserEditAttributeGroup($user, $group)) return false;
+                return $this->canUserEditAttribute($user, $attribute);
+            };
+
             // Enforce each attribute's is_required/is_unique flags server-side —
             // previously only rendered as a cosmetic "*" on the frontend, with
             // nothing stopping a blank "required" value or a duplicate "unique"
@@ -1007,7 +1028,7 @@ class ProductController extends Controller
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
                     if (!$attribute || !is_array($channelValues)) continue;
-                    if ($user && !$this->canUserEditAttribute($user, $attribute)) continue;
+                    if (!$canEditTouchedAttribute($attribute)) continue;
 
                     foreach ($channelValues as $channelKey => $localeValues) {
                         $channelId = $channelKey === 'global' ? null : $channelKey;
@@ -1049,8 +1070,9 @@ class ProductController extends Controller
                     $attribute = Attribute::find($attributeId);
                     if (!$attribute || !is_array($channelValues)) continue;
 
-                    // Check if user has permission to edit this attribute
-                    if ($user && !$this->canUserEditAttribute($user, $attribute)) {
+                    // Check if user has permission to edit this attribute (and that
+                    // its attribute group isn't read-only — see $canEditTouchedAttribute above)
+                    if (!$canEditTouchedAttribute($attribute)) {
                         continue;
                     }
 
