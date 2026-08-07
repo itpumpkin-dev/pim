@@ -1,6 +1,7 @@
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
 import { getTheme } from '@/theme';
 import { type NavItem, type SharedData } from '@/types';
@@ -16,10 +17,16 @@ import { Box, Divider, Drawer, ThemeProvider, Toolbar } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
 
-// AdminLTE sidebars are always dark, independent of the app's light/dark
-// mode toggle — so the sidebar gets its own fixed-dark theme instead of
-// inheriting the ambient one.
+// AdminLTE sidebars are always dark-on-text, independent of the app's
+// light/dark mode toggle — so the sidebar gets its own fixed-dark theme
+// for text/icon contrast. Its background color still tracks the app's
+// resolved mode (see SIDEBAR_BG below).
 const sidebarTheme = getTheme('dark');
+
+const SIDEBAR_BG = {
+    light: '#343a40',
+    dark: '#0d1117',
+} as const;
 
 function useMainNavItems(): NavItem[] {
     const { t } = useTranslation('nav');
@@ -139,6 +146,8 @@ function useMainNavItems(): NavItem[] {
 export function AppSidebar() {
     const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
     const { auth } = usePage<SharedData>().props;
+    const { resolved } = useResolvedAppearance();
+    const sidebarBg = SIDEBAR_BG[resolved];
     const collapsed = state === 'collapsed';
     const width = collapsed ? SIDEBAR_WIDTH_ICON : SIDEBAR_WIDTH;
     const mainNavItems = useMainNavItems();
@@ -192,7 +201,7 @@ export function AppSidebar() {
                     open={openMobile}
                     onClose={() => setOpenMobile(false)}
                     ModalProps={{ keepMounted: true }}
-                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH } }}
+                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, backgroundColor: sidebarBg } }}
                 >
                     {content}
                 </Drawer>
@@ -213,6 +222,7 @@ export function AppSidebar() {
                         boxSizing: 'border-box',
                         overflowX: 'hidden',
                         boxShadow: '4px 0 8px rgba(0, 0, 0, 0.15)',
+                        backgroundColor: sidebarBg,
                         transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
                     },
                 }}

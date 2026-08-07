@@ -124,7 +124,6 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                             </Button>
                         ))}
                     </Stack>
-                    </Stack>
                 </Box>
             </Drawer>
         </>

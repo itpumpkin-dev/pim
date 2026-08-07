@@ -2,9 +2,12 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PublishIcon from '@mui/icons-material/Publish';
 import {
@@ -71,6 +74,8 @@ interface AttributeItem {
     options?: AttributeOption[];
     /** false when the current user's role has Read-only (not Edit) access to this attribute — see "Attribute Access" on the Role form. Absent/true means editable, for backward compatibility. */
     editable?: boolean;
+    /** Family ids this attribute is assigned to — used to scope the variant-attribute picker to the product's own family. */
+    family_ids?: number[];
 }
 
 interface GroupWithAttributes {
@@ -105,6 +110,7 @@ interface Product {
     family_code: string;
     type: string;
     enabled: boolean;
+    configurable_attributes?: number[];
     created_at: string;
     updated_at: string;
 }
@@ -114,7 +120,8 @@ interface VariantItem {
     sku: string;
     price: string;
     qty: string;
-    values?: Record<number, string>;
+    /** attribute_id -> option code, defining which combination (e.g. Color: Red, Size: M) this variant is. Empty/absent for a manually added variant that isn't tied to any generated combination. */
+    attributes?: Record<number, string>;
 }
 
 interface Props {
@@ -123,6 +130,7 @@ interface Props {
     assignedGroups: GroupWithAttributes[];
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
+    configurableAttributes?: AttributeItem[];
     channels?: ChannelOption[];
     channelGroups?: ChannelGroup[];
     categoryIds?: number[];
@@ -131,7 +139,7 @@ interface Props {
     canViewHistory?: boolean;
 }
 
-type AttributeValue = string | File | File[];
+type AttributeValue = string | File | (string | File)[];
 
 // values: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value
 interface ProductForm {
@@ -141,6 +149,7 @@ interface ProductForm {
     enabled: boolean;
     values: Record<string | number, Record<string, Record<string | number, AttributeValue>>>;
     variants: VariantItem[];
+    configurable_attributes: number[];
     category_ids: number[];
     published_shop_ids: number[];
     associations: { related: number[]; up_sell: number[]; cross_sell: number[] };
@@ -155,6 +164,10 @@ function formatLocalDateTime(value: string): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function cartesian(sets: any[][]): any[][] {
+    return sets.reduce((acc, set) => acc.flatMap((x) => set.map((y) => [...x, y])), [[]]);
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'CATALOG', href: '#' },
     { title: 'PRODUCTS', href: '/catalog/products' },
@@ -167,6 +180,7 @@ export default function ProductEdit({
     assignedGroups,
     productValues,
     variants = [],
+    configurableAttributes = [],
     channels = [],
     channelGroups = [],
     categoryIds = [],
@@ -237,10 +251,11 @@ export default function ProductEdit({
     const { data, setData, post, transform, processing, errors } = useForm<ProductForm>({
         sku: product.sku || '',
         family_id: product.family_id,
-        type: product.type || 'simple',
+        type: (product.type || 'simple').toLowerCase(),
         enabled: Boolean(product.enabled),
         values: initialValues,
         variants: variants,
+        configurable_attributes: product.configurable_attributes ?? [],
         category_ids: categoryIds,
         published_shop_ids: publishedShopIds,
         associations: {
@@ -256,6 +271,120 @@ export default function ProductEdit({
             'published_shop_ids',
             current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId],
         );
+    };
+
+    // Restrict the variant-attribute picker to attributes actually assigned to
+    // this product's family — same reasoning as the Create page's picker.
+    const familyScopedVariantAttributes = configurableAttributes.filter(
+        (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
+    );
+
+    const optionLabelFor = (attributeId: number, code: string): string => {
+        const attr = configurableAttributes.find((a) => a.id === attributeId);
+        const opt = attr?.options?.find((o) => (o.code || o.admin_label || String(o.id)) === code);
+        return opt?.admin_label || opt?.code || code;
+    };
+
+    // Existing variants only ever carry a real attribute combination if they
+    // were generated through this picker (or the Create page's). A manually
+    // added row, or one from before this feature existed, falls back to
+    // guessing a label from its SKU suffix.
+    const variantLabel = (v: VariantItem): string => {
+        const attrs = v.attributes || {};
+        const keys = Object.keys(attrs);
+        if (keys.length === 0) {
+            const suffix = v.sku.replace(data.sku + '-', '');
+            return suffix || v.sku;
+        }
+        return keys.map((k) => optionLabelFor(Number(k), attrs[Number(k)])).join(' / ');
+    };
+
+    const [variantDialogOpen, setVariantDialogOpen] = useState(false);
+    const [pendingVariantAttrIds, setPendingVariantAttrIds] = useState<number[]>(data.configurable_attributes);
+
+    const openVariantDialog = () => {
+        setPendingVariantAttrIds(data.configurable_attributes);
+        setVariantDialogOpen(true);
+    };
+
+    const selectedVariantAttributeObjects = familyScopedVariantAttributes.filter((attr) =>
+        pendingVariantAttrIds.includes(attr.id),
+    );
+
+    // Regenerating replaces the whole variants table with a fresh cartesian
+    // product of the chosen attributes' options. Any combination that still
+    // exists (matched by its exact set of attribute_id -> option code) keeps
+    // its id/sku/price/qty; everything else becomes a brand-new row, and any
+    // existing variant whose combination is no longer generated is dropped
+    // (Save will then delete it, same as removing a row manually).
+    const applyVariantGeneration = () => {
+        const selectedAttrs = familyScopedVariantAttributes.filter((attr) => pendingVariantAttrIds.includes(attr.id));
+
+        const optionSets = selectedAttrs.map((attr) =>
+            (attr.options || []).map((opt) => ({
+                attribute_id: attr.id,
+                option_code: opt.code || opt.admin_label || String(opt.id),
+            })),
+        );
+
+        if (optionSets.length === 0) {
+            setData((prev) => ({ ...prev, configurable_attributes: [], variants: [] }));
+            setVariantDialogOpen(false);
+            return;
+        }
+
+        const combos = cartesian(optionSets);
+        const generated: VariantItem[] = combos.map((combo) => {
+            const combinationAttrs = combo.reduce((acc: Record<number, string>, c: any) => {
+                acc[c.attribute_id] = c.option_code;
+                return acc;
+            }, {});
+
+            const existing = data.variants.find((v) => {
+                const vAttrs = v.attributes || {};
+                const vKeys = Object.keys(vAttrs);
+                return vKeys.length === combo.length && combo.every((c: any) => vAttrs[c.attribute_id] === c.option_code);
+            });
+
+            const suffix = combo.map((c: any) => String(c.option_code).toUpperCase()).join('-');
+
+            return {
+                id: existing?.id,
+                sku: existing?.sku || (data.sku ? `${data.sku}-${suffix}` : suffix),
+                price: existing?.price ?? '',
+                qty: existing?.qty ?? '',
+                attributes: combinationAttrs,
+            };
+        });
+
+        setData((prev) => ({ ...prev, configurable_attributes: pendingVariantAttrIds, variants: generated }));
+        setVariantDialogOpen(false);
+    };
+
+    const handleAddBlankVariant = () => {
+        setData('variants', [...data.variants, { sku: '', price: '', qty: '', attributes: {} }]);
+    };
+
+    const handleRemoveVariant = (index: number) => {
+        setData('variants', data.variants.filter((_, i) => i !== index));
+    };
+
+    // Switching away from Configurable deletes every variant child on Save
+    // (see ProductController::update()) — confirm first since that's not
+    // reversible from here once saved.
+    const [pendingSimpleConfirm, setPendingSimpleConfirm] = useState(false);
+
+    const handleTypeChange = (newType: string) => {
+        if (data.type.toLowerCase() === 'configurable' && newType.toLowerCase() === 'simple' && data.variants.length > 0) {
+            setPendingSimpleConfirm(true);
+            return;
+        }
+        setData('type', newType);
+    };
+
+    const confirmSwitchToSimple = () => {
+        setData((prev) => ({ ...prev, type: 'simple', variants: [], configurable_attributes: [] }));
+        setPendingSimpleConfirm(false);
     };
 
     // Pushing sends a real, live create/update to Lazada — a confirm step
@@ -470,6 +599,21 @@ export default function ProductEdit({
                     </Stack>
                 </Box>
 
+                {Object.keys(errors).length > 0 && (
+                    <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                        <Alert severity="error">
+                            <Typography variant="body2" fontWeight={700}>
+                                {t('correctErrorsBeforeSaving')}
+                            </Typography>
+                            {Object.values(errors).map((message, index) => (
+                                <Typography key={index} variant="body2">
+                                    {message}
+                                </Typography>
+                            ))}
+                        </Alert>
+                    </Box>
+                )}
+
                 {/* Main 2-Column Layout */}
                 {tabIndex === 0 && (
                 <Box sx={{ px: { xs: 2, md: 4 } }}>
@@ -590,27 +734,42 @@ export default function ProductEdit({
                                     ))}
 
                                 {/* Dynamic Cartesian Variants Table */}
-                                {data.type.toLowerCase() === 'configurable' && data.variants.length > 0 && (
+                                {data.type.toLowerCase() === 'configurable' && (
                                     <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                            ตัวเลือกสินค้าย่อย (Variants List)
-                                        </Typography>
-                                        <TableContainer>
-                                            <Table size="small">
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
-                                                        <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {data.variants.map((v, index) => {
-                                                        const suffix = v.sku.replace(data.sku + '-', '');
-                                                        return (
-                                                            <TableRow key={index}>
-                                                                <TableCell sx={{ fontWeight: 600 }}>{suffix || v.sku}</TableCell>
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
+                                            <Typography variant="h6" fontWeight={700} color="text.primary">
+                                                ตัวเลือกสินค้าย่อย (Variants List)
+                                            </Typography>
+                                            <Stack direction="row" spacing={1}>
+                                                <Button size="small" variant="outlined" startIcon={<AutorenewIcon fontSize="small" />} onClick={openVariantDialog}>
+                                                    {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
+                                                </Button>
+                                                <Button size="small" variant="text" startIcon={<AddIcon fontSize="small" />} onClick={handleAddBlankVariant}>
+                                                    เพิ่มแถวว่าง
+                                                </Button>
+                                            </Stack>
+                                        </Stack>
+
+                                        {data.variants.length === 0 ? (
+                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
+                                            </Typography>
+                                        ) : (
+                                            <TableContainer>
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700 }} align="right">ลบ</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {data.variants.map((v, index) => (
+                                                            <TableRow key={v.id ?? `new-${index}`}>
+                                                                <TableCell sx={{ fontWeight: 600 }}>{variantLabel(v)}</TableCell>
                                                                 <TableCell>
                                                                     <TextField
                                                                         size="small"
@@ -649,12 +808,17 @@ export default function ProductEdit({
                                                                         placeholder="สต๊อก"
                                                                     />
                                                                 </TableCell>
+                                                                <TableCell align="right">
+                                                                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
+                                                                        <DeleteOutlineIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                </TableCell>
                                                             </TableRow>
-                                                        );
-                                                    })}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                        )}
                                     </Paper>
                                 )}
                             </Stack>
@@ -681,20 +845,35 @@ export default function ProductEdit({
                                         </Box>
 
                                         <TextField
+                                            select
                                             label="Family"
-                                            value={product.family_code}
-                                            disabled
+                                            value={data.family_id}
+                                            onChange={(e) => setData('family_id', Number(e.target.value))}
                                             size="small"
                                             fullWidth
-                                        />
+                                            error={Boolean(errors.family_id)}
+                                            helperText={errors.family_id || 'Attribute groups below update the next time you open this product after saving.'}
+                                        >
+                                            {families.map((fam) => (
+                                                <MenuItem key={fam.id} value={fam.id}>
+                                                    {fam.name || fam.code}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
 
                                         <TextField
+                                            select
                                             label="Product Type"
-                                            value={product.type}
-                                            disabled
+                                            value={data.type}
+                                            onChange={(e) => handleTypeChange(e.target.value)}
                                             size="small"
                                             fullWidth
-                                        />
+                                            error={Boolean(errors.type)}
+                                            helperText={errors.type}
+                                        >
+                                            <MenuItem value="simple">Simple</MenuItem>
+                                            <MenuItem value="configurable">Configurable</MenuItem>
+                                        </TextField>
 
                                         <TextField
                                             label="Updated At"
@@ -927,6 +1106,69 @@ export default function ProductEdit({
                 </DialogActions>
             </Dialog>
 
+            <Dialog open={pendingSimpleConfirm} onClose={() => setPendingSimpleConfirm(false)}>
+                <DialogTitle>เปลี่ยนเป็น Simple?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        สินค้านี้มี <strong>{data.variants.length}</strong> variant อยู่ — เปลี่ยน Product Type เป็น Simple แล้วกด Save
+                        จะ<strong>ลบ variant ทั้งหมด</strong>ออกจากระบบ การกระทำนี้ย้อนกลับไม่ได้
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPendingSimpleConfirm(false)} color="inherit">
+                        ยกเลิก
+                    </Button>
+                    <Button onClick={confirmSwitchToSimple} color="error" variant="contained">
+                        ยืนยัน เปลี่ยนเป็น Simple
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={variantDialogOpen} onClose={() => setVariantDialogOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2 } }}>
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={700}>
+                        เลือก Attribute สำหรับสร้าง Variant
+                    </Typography>
+                    <IconButton onClick={() => setVariantDialogOpen(false)} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3 }}>
+                    {data.variants.length > 0 && (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            การสร้างใหม่จะแทนที่ตารางตัวเลือกสินค้าปัจจุบัน — ตัวเลือกที่ยังคงอยู่ (attribute/ค่าเดิม) จะเก็บ SKU/ราคา/สต๊อกเดิมไว้ให้
+                            ส่วนตัวเลือกที่ไม่ได้อยู่ในชุดที่ generate ใหม่จะถูกลบออกเมื่อกด Save
+                        </Alert>
+                    )}
+                    <Autocomplete
+                        multiple
+                        options={familyScopedVariantAttributes}
+                        getOptionLabel={(option) => option.name || option.code}
+                        value={selectedVariantAttributeObjects}
+                        onChange={(_, newValue) => setPendingVariantAttrIds(newValue.map((item) => item.id))}
+                        renderTags={(value, getTagProps) =>
+                            value.map((option, index) => (
+                                <Chip
+                                    label={option.name || option.code}
+                                    {...getTagProps({ index })}
+                                    key={option.id}
+                                    sx={{ bgcolor: '#f0e6ff', color: '#6b21a8', fontWeight: 600 }}
+                                />
+                            ))
+                        }
+                        renderInput={(params) => <TextField {...params} placeholder="เลือก attribute เช่น สี, ไซส์" variant="outlined" />}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
+                    <Button onClick={() => setVariantDialogOpen(false)} sx={{ color: '#7e22ce', fontWeight: 700, textTransform: 'none' }}>
+                        ยกเลิก
+                    </Button>
+                    <Button onClick={applyVariantGeneration} variant="contained" sx={{ textTransform: 'none', fontWeight: 700 }}>
+                        Generate
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             <Snackbar
                 open={pushResult !== null}
                 autoHideDuration={6000}
@@ -938,6 +1180,93 @@ export default function ProductEdit({
                 </Alert>
             </Snackbar>
         </AppLayout>
+    );
+}
+
+// Normalizes a gallery attribute's value — the raw JSON-encoded path array
+// loaded from the backend, or a (string | File)[] once the user has edited
+// it in this session — into a flat list of kept paths / newly picked files.
+function parseGalleryItems(value: AttributeValue): (string | File)[] {
+    if (Array.isArray(value)) {
+        return value;
+    }
+    if (typeof value === 'string' && value) {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.filter((p): p is string => typeof p === 'string' && p !== '');
+            }
+        } catch {
+            // Not JSON — a legacy single-path string; treat it as one existing image.
+            return [value];
+        }
+    }
+    return [];
+}
+
+// Renders one gallery thumbnail — an existing stored path or a locally
+// picked File pending upload — with a remove button. Object URLs for File
+// previews are created/revoked per item so they don't leak across renders.
+function GalleryThumb({
+    item,
+    disabled,
+    onRemove,
+}: {
+    item: string | File;
+    disabled?: boolean;
+    onRemove: () => void;
+}) {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (typeof item === 'string') {
+            setPreviewUrl(null);
+            return undefined;
+        }
+        const url = URL.createObjectURL(item);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [item]);
+
+    const src =
+        typeof item === 'string'
+            ? /^https?:\/\//.test(item) || item.startsWith('/')
+                ? item
+                : `/storage/${item}`
+            : previewUrl;
+
+    return (
+        <Box sx={{ position: 'relative', width: 64, height: 64 }}>
+            {src ? (
+                <Box
+                    component="img"
+                    src={src}
+                    alt=""
+                    sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, border: '1px solid #e2e8f0' }}
+                />
+            ) : (
+                <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
+            )}
+            {!disabled && (
+                <IconButton
+                    size="small"
+                    onClick={onRemove}
+                    aria-label="Remove image"
+                    sx={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        bgcolor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        width: 20,
+                        height: 20,
+                        '&:hover': { bgcolor: '#fee2e2' },
+                    }}
+                >
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+            )}
+        </Box>
     );
 }
 
@@ -1149,35 +1478,82 @@ function RenderAttributeInput({
         );
     }
 
-    if (attr.type === 'image' || attr.type === 'file' || attr.type === 'gallery') {
-        const isGallery = attr.type === 'gallery';
+    if (attr.type === 'gallery') {
+        // Existing images arrive as a JSON-encoded array of paths (the raw
+        // ProductValue string); once the user touches this field it becomes
+        // a real (string | File)[] array mixing kept paths with newly picked
+        // files, which the backend merges back together on save instead of
+        // replacing the whole set (see ProductController::update()).
+        const items = parseGalleryItems(value);
+
+        const removeAt = (index: number) => {
+            onChange(items.filter((_, i) => i !== index));
+        };
+
+        const addFiles = (fileList: FileList) => {
+            onChange([...items, ...Array.from(fileList)]);
+        };
+
+        return (
+            <Box>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
+                {items.length > 0 && (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+                        {items.map((item, index) => (
+                            <GalleryThumb
+                                key={`${index}-${typeof item === 'string' ? item : item.name}`}
+                                item={item}
+                                disabled={isReadOnly}
+                                onRemove={() => removeAt(index)}
+                            />
+                        ))}
+                    </Stack>
+                )}
+                <Button
+                    component="label"
+                    variant="outlined"
+                    size="small"
+                    disabled={isReadOnly}
+                    startIcon={<CloudUploadIcon fontSize="small" />}
+                    sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
+                >
+                    Add images
+                    <input
+                        type="file"
+                        hidden
+                        disabled={isReadOnly}
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => {
+                            const files = e.target.files;
+                            if (!files || files.length === 0) return;
+                            addFiles(files);
+                            e.target.value = '';
+                        }}
+                    />
+                </Button>
+            </Box>
+        );
+    }
+
+    if (attr.type === 'image' || attr.type === 'file') {
         const isImage = attr.type === 'image';
 
-        const selectedNames: string[] = isGallery
-            ? Array.isArray(value)
-                ? value.map((f) => f.name)
-                : []
-            : value instanceof File
-                ? [value.name]
-                : [];
+        const selectedName = value instanceof File ? value.name : '';
 
         let existingLabel = '';
         let existingImageUrl = '';
-        if (selectedNames.length === 0 && stringValue) {
-            if (isGallery) {
-                try {
-                    const parsed = JSON.parse(stringValue);
-                    existingLabel = `${Array.isArray(parsed) ? parsed.length : 1} file(s) uploaded`;
-                } catch {
-                    existingLabel = '1 file uploaded';
-                }
-            } else {
-                existingLabel = stringValue.split('/').pop() || stringValue;
-                if (isImage) {
-                    existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
-                        ? stringValue
-                        : `/storage/${stringValue}`;
-                }
+        if (!selectedName && stringValue) {
+            existingLabel = stringValue.split('/').pop() || stringValue;
+            if (isImage) {
+                existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
+                    ? stringValue
+                    : `/storage/${stringValue}`;
             }
         }
 
@@ -1217,23 +1593,22 @@ function RenderAttributeInput({
                         startIcon={<CloudUploadIcon fontSize="small" />}
                         sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
                     >
-                        {isGallery ? 'Upload images' : 'Choose file'}
+                        Choose file
                         <input
                             type="file"
                             hidden
                             disabled={isReadOnly}
-                            multiple={isGallery}
-                            accept={isImage || isGallery ? 'image/*' : undefined}
+                            accept={isImage ? 'image/*' : undefined}
                             onChange={(e) => {
                                 const files = e.target.files;
                                 if (!files || files.length === 0) return;
-                                onChange(isGallery ? Array.from(files) : files[0]);
+                                onChange(files[0]);
                             }}
                         />
                     </Button>
-                    {selectedNames.length > 0 && (
+                    {selectedName && (
                         <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
-                            {selectedNames.join(', ')}
+                            {selectedName}
                         </Typography>
                     )}
                     {existingLabel && (

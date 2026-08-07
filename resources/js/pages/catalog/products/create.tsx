@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -54,6 +54,7 @@ interface AttributeItem {
     name: string;
     type: string;
     options?: AttributeOption[];
+    family_ids?: number[];
 }
 
 interface Props {
@@ -104,6 +105,15 @@ export default function ProductCreate({ families, attributes }: Props) {
     // Filter dynamic attributes that have options (e.g. Color, Size)
     const selectedAttributeObjects = attributes.filter((attr) =>
         data.configurable_attributes.includes(attr.id)
+    );
+
+    // Restrict the variant-attribute picker to attributes actually assigned to
+    // the selected family — previously any system attribute with options could
+    // be picked here even if it had nothing to do with the chosen family, and
+    // the resulting variant values would then never show up in Edit's
+    // family-scoped attribute groups.
+    const familyScopedAttributeOptions = attributes.filter(
+        (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
     );
 
     const handleGenerateVariants = (selectedAttrIds: number[]) => {
@@ -160,9 +170,10 @@ export default function ProductCreate({ families, attributes }: Props) {
 
     const handleFormSubmit = (e?: FormEvent) => {
         if (e) e.preventDefault();
-        post('/catalog/products', {
-            onSuccess: () => router.visit('/catalog/products', { replace: true }),
-        });
+        // The server redirects straight into Edit (or the list, for a role that
+        // can create but not edit products) — Inertia already follows that
+        // redirect, so there's nothing left to do here on success.
+        post('/catalog/products');
     };
 
     return (
@@ -224,7 +235,17 @@ export default function ProductCreate({ families, attributes }: Props) {
                                     labelId="family-label"
                                     label={t('familyRequired')}
                                     value={data.family_id}
-                                    onChange={(e) => setData('family_id', e.target.value)}
+                                    onChange={(e) =>
+                                        setData((prev) => ({
+                                            ...prev,
+                                            family_id: e.target.value,
+                                            // A variant axis chosen for the previous family may not
+                                            // apply to the new one, so the generated matrix can't
+                                            // carry over either.
+                                            configurable_attributes: [],
+                                            variants: [],
+                                        }))
+                                    }
                                 >
                                     {families.map((fam) => (
                                         <MenuItem key={fam.id} value={fam.id}>
@@ -367,7 +388,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Autocomplete
                         multiple
-                        options={attributes.filter(attr => (attr.options || []).length > 0)}
+                        options={familyScopedAttributeOptions}
                         getOptionLabel={(option) => option.name || option.code}
                         value={selectedAttributeObjects}
                         onChange={(_, newValue) => {

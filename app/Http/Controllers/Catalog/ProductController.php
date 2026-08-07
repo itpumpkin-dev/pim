@@ -28,7 +28,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -406,6 +408,54 @@ class ProductController extends Controller
         return AttributeValueFormatter::format($attribute, $rawValue);
     }
 
+    /**
+     * Deletes whichever public-disk file(s) a value change actually dropped.
+     * Image/file values are a single path string, so any change drops the
+     * old one outright. Gallery values are a JSON-encoded array of paths,
+     * and the frontend now lets users keep most of the set while adding or
+     * removing individual images — so only the paths present in $oldValue
+     * but absent from $newValue get deleted, instead of the whole old set.
+     */
+    private function deleteRemovedAttributeFiles(Attribute $attribute, string $oldValue, ?string $newValue): void
+    {
+        if ($attribute->type === 'gallery') {
+            $oldPaths = json_decode($oldValue, true);
+            $newPaths = $newValue !== null ? json_decode($newValue, true) : [];
+            $removedPaths = array_diff((array) $oldPaths, (array) $newPaths);
+
+            foreach ($removedPaths as $path) {
+                if ($path) {
+                    Storage::disk('public')->delete($path);
+                }
+            }
+
+            return;
+        }
+
+        Storage::disk('public')->delete($oldValue);
+    }
+
+    /**
+     * Attributes eligible to define a configurable product's variant axes
+     * (must have selectable options), each carrying family_ids so the
+     * Create/Edit variant-attribute picker can restrict itself to whichever
+     * attributes are actually assigned to the selected family — otherwise a
+     * choice unrelated to the product's family would silently never surface
+     * in Edit's family-scoped attribute groups.
+     */
+    private function configurableAttributeOptions()
+    {
+        return Attribute::with(['options', 'families:id'])
+            ->has('options')
+            ->select('id', 'code', 'name', 'type')
+            ->get()
+            ->map(function (Attribute $attribute) {
+                $attribute->family_ids = $attribute->families->pluck('id');
+
+                return $attribute;
+            });
+    }
+
     public function create(): Response
     {
         // Ordered most-used family first, so the create form's default
@@ -416,7 +466,8 @@ class ProductController extends Controller
             ->orderByDesc('products_count')
             ->orderBy('name')
             ->get(['id', 'code', 'name']);
-        $attributes = Attribute::with('options')->select('id', 'code', 'name', 'type')->get();
+
+        $attributes = $this->configurableAttributeOptions();
 
         return Inertia::render('catalog/products/create', [
             'families' => $families,
@@ -426,24 +477,67 @@ class ProductController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'sku' => ['required', 'string', 'max:100', 'unique:products,sku'],
             'family_id' => ['required', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable'],
             'enabled' => ['required', 'boolean'],
+            'configurable_attributes' => ['nullable', 'array'],
+            'configurable_attributes.*' => ['integer', 'exists:attributes,id'],
             'variants' => ['nullable', 'array'],
-            'variants.*.sku' => ['required_if:type,configurable', 'string', 'max:100', 'unique:products,sku'],
+            // 'distinct' catches two generated variant rows colliding with each
+            // other, and notIn catches a variant SKU colliding with the parent's
+            // own SKU — both previously slipped past `unique:products,sku` (which
+            // only checks already-persisted rows) and hit the DB's unique
+            // constraint directly inside the loop below, raising a raw
+            // QueryException (500) instead of a clean validation error.
+            'variants.*.sku' => [
+                'required_if:type,configurable',
+                'string',
+                'max:100',
+                'distinct',
+                'unique:products,sku',
+                Rule::notIn([$request->input('sku')]),
+            ],
             'variants.*.price' => ['nullable', 'numeric'],
             'variants.*.qty' => ['nullable', 'integer'],
             'variants.*.attributes' => ['nullable', 'array'],
         ]);
 
-        DB::transaction(function () use ($validated, $request) {
+        // variants.*.attributes is an associative map keyed by attribute id
+        // (`{attributeId: value}`), which Laravel's dot-notation rules can't
+        // validate the *keys* of — a bogus attribute id here previously hit
+        // product_values.attribute_id's FK constraint and raised a raw 500
+        // instead of a validation error.
+        $validator->after(function ($validator) use ($request) {
+            $validAttributeIds = null;
+
+            foreach ((array) $request->input('variants', []) as $index => $variant) {
+                $attributeIds = array_keys((array) ($variant['attributes'] ?? []));
+                if (empty($attributeIds)) {
+                    continue;
+                }
+
+                $validAttributeIds ??= Attribute::pluck('id')->map(fn ($id) => (string) $id)->all();
+                $unknown = array_diff(array_map('strval', $attributeIds), $validAttributeIds);
+
+                foreach ($unknown as $badId) {
+                    $validator->errors()->add("variants.{$index}.attributes", "Unknown attribute id \"{$badId}\".");
+                }
+            }
+        });
+
+        $validated = $validator->validate();
+
+        $parentProduct = null;
+
+        DB::transaction(function () use ($validated, $request, &$parentProduct) {
             $parentProduct = Product::create([
                 'sku' => $validated['sku'],
                 'family_id' => $validated['family_id'],
                 'type' => $validated['type'],
                 'enabled' => $validated['enabled'],
+                'configurable_attributes' => $validated['configurable_attributes'] ?? null,
                 'created_by' => $request->user()?->id,
                 'updated_by' => $request->user()?->id,
             ]);
@@ -503,6 +597,16 @@ class ProductController extends Controller
                 $this->recordProductValueChanges($parentProduct, [], $newVariantValues, 'variant_values_updated');
             }
         });
+
+        // Land the user straight in Edit — the Create form only captures
+        // SKU/family/type/variants, so without this they'd have to manually
+        // find the product they just made in the grid before they could add
+        // any real content (name, images, categories, ...). Falls back to the
+        // index only for a role that can create but can't edit products.
+        $user = $request->user();
+        if ($user && $user->hasPermission('products', 'edit_products')) {
+            return to_route('catalog.products.edit', $parentProduct)->with('success', 'Product created successfully.');
+        }
 
         return to_route('catalog.products.index')->with('success', 'Product created successfully.');
     }
@@ -644,8 +748,13 @@ class ProductController extends Controller
                         $price = $val->value;
                     } elseif ($val->attribute_id == $qtyAttrId) {
                         $qty = $val->value;
+                    } else {
+                        // Only the combination-defining attributes (color, size, ...)
+                        // go here — price/qty are surfaced separately above so the
+                        // frontend can match "does this variant's combination match
+                        // the regenerated one" purely by comparing this map.
+                        $variantValues[$val->attribute_id] = $val->value;
                     }
-                    $variantValues[$val->attribute_id] = $val->value;
                 }
 
                 $variantsData[] = [
@@ -653,7 +762,7 @@ class ProductController extends Controller
                     'sku' => $variant->sku,
                     'price' => $price,
                     'qty' => $qty,
-                    'values' => $variantValues,
+                    'attributes' => $variantValues,
                 ];
             }
         }
@@ -668,6 +777,7 @@ class ProductController extends Controller
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
                 'enabled' => (bool)$product->enabled,
+                'configurable_attributes' => $product->configurable_attributes ?? [],
                 // ISO 8601 with an explicit UTC offset so the frontend can
                 // localize it, rather than a naive string shown verbatim.
                 'created_at' => ($product->created_at ?? now())->toIso8601String(),
@@ -677,6 +787,7 @@ class ProductController extends Controller
             'assignedGroups' => $groupsData,
             'productValues' => $values,
             'variants' => $variantsData,
+            'configurableAttributes' => $this->configurableAttributeOptions(),
             'channels' => $channels,
             'channelGroups' => $channelGroups,
             'categoryIds' => $product->categories()->pluck('categories.id')->all(),
@@ -719,7 +830,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): RedirectResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'sku' => ['required', 'string', 'max:100', 'unique:products,sku,' . $product->id],
             'family_id' => ['required', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
@@ -736,12 +847,38 @@ class ProductController extends Controller
             'associations.cross_sell' => ['nullable', 'array'],
             'associations.cross_sell.*' => ['exists:products,id'],
             'values' => ['nullable', 'array'],
+            'configurable_attributes' => ['nullable', 'array'],
+            'configurable_attributes.*' => ['integer', 'exists:attributes,id'],
             'variants' => ['nullable', 'array'],
             'variants.*.id' => ['nullable', 'integer'],
-            'variants.*.sku' => ['required_if:type,configurable', 'string', 'max:100'],
+            'variants.*.sku' => ['required_if:type,configurable', 'string', 'max:100', 'distinct'],
             'variants.*.price' => ['nullable', 'numeric'],
             'variants.*.qty' => ['nullable', 'integer'],
+            'variants.*.attributes' => ['nullable', 'array'],
         ]);
+
+        // Same "unknown attribute id in variants.*.attributes' keys" guard as
+        // store() — see the comment there. update() previously had no rule at
+        // all for this field, leaving it fully unvalidated.
+        $validator->after(function ($validator) use ($request) {
+            $validAttributeIds = null;
+
+            foreach ((array) $request->input('variants', []) as $index => $variant) {
+                $attributeIds = array_keys((array) ($variant['attributes'] ?? []));
+                if (empty($attributeIds)) {
+                    continue;
+                }
+
+                $validAttributeIds ??= Attribute::pluck('id')->map(fn ($id) => (string) $id)->all();
+                $unknown = array_diff(array_map('strval', $attributeIds), $validAttributeIds);
+
+                foreach ($unknown as $badId) {
+                    $validator->errors()->add("variants.{$index}.attributes", "Unknown attribute id \"{$badId}\".");
+                }
+            }
+        });
+
+        $validated = $validator->validate();
 
         DB::transaction(function () use ($validated, $request, $product) {
             $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -751,6 +888,7 @@ class ProductController extends Controller
                 'family_id' => $validated['family_id'],
                 'type' => strtolower($validated['type']),
                 'enabled' => $validated['enabled'],
+                'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
                 'updated_by' => $request->user()?->id,
             ]);
 
@@ -773,33 +911,140 @@ class ProductController extends Controller
             // sentinel keys back to null for global/default scope.
             $values = $request->input('values', []);
 
+            // Collects "values.{attributeId}" => message. Populated by both the
+            // file-upload pass and the required/unique pass below, then thrown
+            // together as one ValidationException so the whole save is rejected
+            // atomically (the transaction rolls back) instead of partially
+            // applying edits around a bad field.
+            $valueErrors = [];
+
+            $storeAttributeFile = function (Attribute $attribute, $file) use (&$valueErrors) {
+                if (!$file) {
+                    return null;
+                }
+
+                // Mirrors CategoryController's Image/File field rules (4MB images, 10MB
+                // generic files) — this loop previously stored any uploaded file with no
+                // mime-type or size restriction at all.
+                $rules = in_array($attribute->type, ['image', 'gallery'], true)
+                    ? ['image', 'max:4096']
+                    : ['file', 'max:10240'];
+
+                $validator = Validator::make(['file' => $file], ['file' => $rules]);
+
+                if ($validator->fails()) {
+                    $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: " . $validator->errors()->first('file');
+
+                    return null;
+                }
+
+                return $file->store('product-attributes', 'public');
+            };
+
             foreach ($request->file('values', []) as $attributeId => $channelFiles) {
+                $attribute = Attribute::find($attributeId);
+                if (!$attribute) continue;
+
                 if (is_array($channelFiles)) {
                     foreach ($channelFiles as $channelKey => $localeFiles) {
                         if (is_array($localeFiles)) {
                             foreach ($localeFiles as $localeKey => $file) {
                                 if (is_array($file)) {
-                                    $paths = array_map(fn ($f) => $f->store('product-attributes', 'public'), array_filter($file));
-                                    $values[$attributeId][$channelKey][$localeKey] = json_encode($paths);
+                                    // Gallery: the frontend now sends kept existing
+                                    // paths (strings) mixed with newly picked files
+                                    // at the same array indices. Multipart requests
+                                    // keep uploads and plain fields separate even
+                                    // within one array, so the kept strings already
+                                    // survived into $values via the input() read
+                                    // above — merge the new uploads' stored paths
+                                    // back in instead of discarding them (previously
+                                    // any new upload replaced the whole gallery).
+                                    $keptPaths = array_values(array_filter(
+                                        (array) ($values[$attributeId][$channelKey][$localeKey] ?? []),
+                                        fn ($v) => is_string($v) && $v !== ''
+                                    ));
+                                    $newPaths = array_values(array_filter(array_map(
+                                        fn ($f) => $storeAttributeFile($attribute, $f),
+                                        array_filter($file)
+                                    )));
+                                    $values[$attributeId][$channelKey][$localeKey] = json_encode(array_merge($keptPaths, $newPaths));
                                 } elseif ($file) {
-                                    $values[$attributeId][$channelKey][$localeKey] = $file->store('product-attributes', 'public');
+                                    $path = $storeAttributeFile($attribute, $file);
+                                    if ($path) {
+                                        $values[$attributeId][$channelKey][$localeKey] = $path;
+                                    }
                                 }
                             }
                         } elseif ($localeFiles) {
-                            $values[$attributeId][$channelKey]['default'] = $localeFiles->store('product-attributes', 'public');
+                            $path = $storeAttributeFile($attribute, $localeFiles);
+                            if ($path) {
+                                $values[$attributeId][$channelKey]['default'] = $path;
+                            }
                         }
                     }
                 } elseif ($channelFiles) {
-                    $values[$attributeId]['global']['default'] = $channelFiles->store('product-attributes', 'public');
+                    $path = $storeAttributeFile($attribute, $channelFiles);
+                    if ($path) {
+                        $values[$attributeId]['global']['default'] = $path;
+                    }
                 }
             }
 
             $touchedAttributeIds = collect($values)->keys()->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->unique()->values();
             $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
 
-            if (is_array($values)) {
-                $user = $request->user();
+            $user = $request->user();
 
+            // Enforce each attribute's is_required/is_unique flags server-side —
+            // previously only rendered as a cosmetic "*" on the frontend, with
+            // nothing stopping a blank "required" value or a duplicate "unique"
+            // one from being saved. Only checked for scopes actually present in
+            // this submission (channels/locales the user hasn't opened yet were
+            // never loaded into the form, so they can't be validated here) and
+            // skipped for attributes this user has no edit permission for, same
+            // as the persistence loop below silently skips those.
+            if (is_array($values)) {
+                foreach ($values as $attributeId => $channelValues) {
+                    $attribute = Attribute::find($attributeId);
+                    if (!$attribute || !is_array($channelValues)) continue;
+                    if ($user && !$this->canUserEditAttribute($user, $attribute)) continue;
+
+                    foreach ($channelValues as $channelKey => $localeValues) {
+                        $channelId = $channelKey === 'global' ? null : $channelKey;
+                        if (!is_array($localeValues)) continue;
+
+                        foreach ($localeValues as $localeKey => $val) {
+                            $localeId = $localeKey === 'default' ? null : $localeKey;
+                            $isEmpty = $val === null || $val === '' || (is_array($val) && empty($val));
+
+                            if ($attribute->is_required && $isEmpty) {
+                                $valueErrors["values.{$attributeId}"] = "{$attribute->name} is required.";
+                                continue;
+                            }
+
+                            if ($attribute->is_unique && !$isEmpty) {
+                                $stringVal = is_array($val) ? json_encode($val) : (string) $val;
+                                $taken = ProductValue::where('attribute_id', $attributeId)
+                                    ->where('channel_id', $channelId)
+                                    ->where('locale_id', $localeId)
+                                    ->where('value', $stringVal)
+                                    ->where('product_id', '!=', $product->id)
+                                    ->exists();
+
+                                if ($taken) {
+                                    $valueErrors["values.{$attributeId}"] = "{$attribute->name} value \"{$stringVal}\" is already in use.";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!empty($valueErrors)) {
+                throw ValidationException::withMessages($valueErrors);
+            }
+
+            if (is_array($values)) {
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
                     if (!$attribute || !is_array($channelValues)) continue;
@@ -817,7 +1062,27 @@ class ProductController extends Controller
                         foreach ($localeValues as $localeKey => $val) {
                             $localeId = $localeKey === 'default' ? null : $localeKey;
 
-                            if ($val !== null && $val !== '') {
+                            // Uploads previously left the file they replaced on disk forever —
+                            // grab whatever was stored before this write so it can be cleaned
+                            // up below once the new value (or deletion) has been saved.
+                            $isFileAttribute = in_array($attribute->type, ['image', 'gallery', 'file'], true);
+                            $oldStoredValue = $isFileAttribute
+                                ? ProductValue::where('product_id', $product->id)
+                                    ->where('attribute_id', $attributeId)
+                                    ->where('channel_id', $channelId)
+                                    ->where('locale_id', $localeId)
+                                    ->value('value')
+                                : null;
+
+                            // A gallery cleared down to zero images arrives here as `[]`
+                            // (still touched, so still worth diffing/persisting) — treat
+                            // that the same as null/'' instead of storing the literal
+                            // string "[]", consistent with the is_required check above.
+                            $isEmptyVal = $val === null || $val === '' || (is_array($val) && empty($val));
+
+                            if (!$isEmptyVal) {
+                                $newStoredValue = is_array($val) ? json_encode($val) : (string) $val;
+
                                 ProductValue::updateOrCreate(
                                     [
                                         'product_id' => $product->id,
@@ -826,15 +1091,21 @@ class ProductController extends Controller
                                         'locale_id' => $localeId,
                                     ],
                                     [
-                                        'value' => is_array($val) ? json_encode($val) : (string)$val,
+                                        'value' => $newStoredValue,
                                     ]
                                 );
                             } else {
+                                $newStoredValue = null;
+
                                 ProductValue::where('product_id', $product->id)
                                     ->where('attribute_id', $attributeId)
                                     ->where('channel_id', $channelId)
                                     ->where('locale_id', $localeId)
                                     ->delete();
+                            }
+
+                            if ($isFileAttribute && $oldStoredValue && $oldStoredValue !== $newStoredValue) {
+                                $this->deleteRemovedAttributeFiles($attribute, $oldStoredValue, $newStoredValue);
                             }
                         }
                     }
@@ -851,12 +1122,17 @@ class ProductController extends Controller
             // Sync Variants (Cartesian Product Children)
             $oldVariantValues = $this->variantValueSnapshot($product);
 
-            if (strtolower($validated['type']) === 'configurable' && !empty($validated['variants'])) {
+            // $request->has (not !empty) so that clearing every variant in the
+            // Edit UI — submitting `variants: []` after regenerating with no
+            // attributes selected — still deletes the now-orphaned children
+            // below, instead of the empty array being mistaken for "field not
+            // sent, leave variants alone".
+            if (strtolower($validated['type']) === 'configurable' && $request->has('variants')) {
                 $priceAttr = Attribute::where('code', 'price')->first();
                 $qtyAttr = Attribute::where('code', 'qty')->first();
                 $existingVariantIds = [];
 
-                foreach ($validated['variants'] as $variantData) {
+                foreach ($validated['variants'] ?? [] as $variantData) {
                     $childProduct = null;
                     if (!empty($variantData['id'])) {
                         $childProduct = Product::find($variantData['id']);
@@ -953,6 +1229,12 @@ class ProductController extends Controller
                 // bulk query delete) so Eloquent fires the `deleted` event and
                 // Auditable actually records the removal.
                 Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->get()->each->delete();
+            } elseif (strtolower($validated['type']) !== 'configurable') {
+                // Product Type was switched away from Configurable (or already
+                // was Simple) — a Simple product can't have variant children,
+                // so drop any that still exist instead of leaving them orphaned
+                // under a parent that no longer presents itself as configurable.
+                Product::where('parent_id', $product->id)->get()->each->delete();
             }
 
             $product->applySmartDefaults();
@@ -995,7 +1277,7 @@ class ProductController extends Controller
         $channelId = $request->query('channel_id');
         $localeId = $request->query('locale_id');
 
-        $attributes = $this->scopableAttributesFor($product);
+        $attributes = $this->scopableAttributesFor($product, $request->user());
 
         $values = [];
         foreach ($attributes as $attribute) {
@@ -1019,67 +1301,6 @@ class ProductController extends Controller
             });
 
         return response()->json(['values' => $values]);
-    }
-
-    /**
-     * Standalone API to set a batch of attribute values for one channel/locale
-     * combination, applying each attribute's own scoping rule server-side.
-     */
-    public function updateAttributeValue(Request $request, Product $product): JsonResponse
-    {
-        $validated = $request->validate([
-            'channel_id' => ['nullable', 'exists:channels,id'],
-            'locale_id' => ['nullable', 'exists:locales,id'],
-            'values' => ['required', 'array'],
-        ]);
-
-        $touchedAttributeIds = collect($validated['values'])->keys()->map(fn ($id) => (int) $id)->unique()->values();
-        $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
-
-        $user = $request->user();
-
-        foreach ($validated['values'] as $attributeId => $val) {
-            $attribute = Attribute::find($attributeId);
-            if (!$attribute) continue;
-
-            // Check if user has permission to edit this attribute
-            if ($user && !$this->canUserEditAttribute($user, $attribute)) {
-                continue;
-            }
-
-            $channelId = $attribute->is_channel_based ? ($validated['channel_id'] ?? null) : null;
-            $localeId = $attribute->is_locale_based ? ($validated['locale_id'] ?? null) : null;
-
-            if ($val !== null && $val !== '') {
-                ProductValue::updateOrCreate(
-                    [
-                        'product_id' => $product->id,
-                        'attribute_id' => $attributeId,
-                        'channel_id' => $channelId,
-                        'locale_id' => $localeId,
-                    ],
-                    ['value' => is_array($val) ? json_encode($val) : (string) $val]
-                );
-            } else {
-                ProductValue::where('product_id', $product->id)
-                    ->where('attribute_id', $attributeId)
-                    ->where('channel_id', $channelId)
-                    ->where('locale_id', $localeId)
-                    ->delete();
-            }
-        }
-
-        $product->applySmartDefaults();
-
-        $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
-        $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);
-
-        if ($valuesChanged) {
-            event(new ProductDataChanged($product->id, $product->enabled));
-        }
-
-
-        return response()->json(['success' => true]);
     }
 
     /**
@@ -1233,15 +1454,47 @@ class ProductController extends Controller
      * Attributes assigned to the product's family (or all attributes, if the
      * family has none assigned yet) that vary by channel and/or locale.
      */
-    private function scopableAttributesFor(Product $product)
+    /**
+     * Attributes eligible for the channel/locale value refetch, scoped to the
+     * product's family and — mirroring edit()'s group/attribute filtering —
+     * to what $user is allowed to view, so switching the channel/locale
+     * selector can't leak values for attributes the page itself would hide.
+     */
+    private function scopableAttributesFor(Product $product, $user = null)
     {
-        $familyAttributeIds = FamilyAttribute::where('family_id', $product->family_id)->pluck('attribute_id');
+        $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
+            ->where('family_id', $product->family_id)
+            ->get();
 
-        return Attribute::when($familyAttributeIds->isNotEmpty(), fn ($q) => $q->whereIn('id', $familyAttributeIds))
-            ->where(function ($q) {
-                $q->where('is_channel_based', true)->orWhere('is_locale_based', true);
-            })
-            ->get(['id', 'is_channel_based', 'is_locale_based']);
+        if ($familyAttributes->isNotEmpty()) {
+            $attributes = $familyAttributes
+                ->filter(function ($fa) use ($user) {
+                    $group = $fa->attributeGroup;
+                    $attr = $fa->attribute;
+                    if (!$group || !$attr) {
+                        return false;
+                    }
+
+                    if ($user && !$this->canUserViewAttributeGroup($user, $group)) {
+                        return false;
+                    }
+
+                    return !$user || $this->canUserViewAttribute($user, $attr);
+                })
+                ->map(fn ($fa) => $fa->attribute);
+        } else {
+            // No family attributes assigned yet — edit() falls back to showing
+            // every system attribute under "General", so mirror that here too.
+            $attributes = Attribute::all();
+
+            if ($user) {
+                $attributes = $attributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
+            }
+        }
+
+        return $attributes
+            ->filter(fn ($attr) => $attr->is_channel_based || $attr->is_locale_based)
+            ->values();
     }
 
     /**

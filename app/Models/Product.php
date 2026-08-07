@@ -18,6 +18,7 @@ class Product extends Model
         'family_id',
         'type',
         'enabled',
+        'configurable_attributes',
     ];
 
     protected function casts(): array
@@ -25,6 +26,7 @@ class Product extends Model
         return [
             'enabled' => 'boolean',
             'parent_id' => 'integer',
+            'configurable_attributes' => 'array',
         ];
     }
 
@@ -60,11 +62,6 @@ class Product extends Model
     public function platformShops(): BelongsToMany
     {
         return $this->belongsToMany(SalesPlatformShop::class, 'product_platform_shops');
-    }
-
-    public function versions(): HasMany
-    {
-        return $this->hasMany(ProductVersion::class);
     }
 
     public function associations(): HasMany

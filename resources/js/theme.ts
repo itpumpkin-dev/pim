@@ -47,12 +47,12 @@ export function getTheme(mode: PaletteMode) {
                 main: PALETTE.secondary,       // Mid Gray for supporting / muted UI
             },
             background: {
-                default: isDark ? '#0f172a' : PALETTE.background,  // Cool White (light) / dark slate (dark)
-                paper: isDark ? '#1e293b' : '#ffffff',
+                default: isDark ? '#121212' : '#f4f6f9',   // Page background
+                paper: isDark ? '#1e1e1e' : '#ffffff',      // Card surface
             },
             text: {
-                primary: isDark ? '#f1f5f9' : PALETTE.primary,    // Slate Blue text
-                secondary: isDark ? '#94a3b8' : '#64748b',
+                primary: isDark ? '#e1e1e1' : '#212529',
+                secondary: isDark ? '#8b949e' : '#6c757d',
             },
             error: {
                 main: PALETTE.redAlert,       // Signal Orange for destructive / error
@@ -63,7 +63,7 @@ export function getTheme(mode: PaletteMode) {
             info: {
                 main: PALETTE.accent,          // Data Cyan for info
             },
-            divider: isDark ? 'rgba(148,163,184,0.12)' : 'rgba(51,65,85,0.12)',
+            divider: isDark ? '#30363d' : '#dee2e6',
         },
         shape: {
             borderRadius: 10,
@@ -85,7 +85,7 @@ export function getTheme(mode: PaletteMode) {
             MuiAppBar: {
                 styleOverrides: {
                     colorDefault: {
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
                     },
                 },
             },

@@ -272,7 +272,7 @@ export default function Dashboard({
             trend: totalFamiliesTrend,
             icon: <SchemaIcon sx={{ fontSize: 28, color: '#fff' }} />,
             iconBg: PALETTE.accent, // Signal Orange
-            bg: theme.palette.mode === 'dark' ? '#1e293b' : '#fff',
+            bg: theme.palette.background.paper,
             link: '/catalog/attributeFamilies',
             permission: 'attribute_families.list_attribute_families',
         },
@@ -282,7 +282,7 @@ export default function Dashboard({
             trend: totalLocaleTrend,
             icon: <TranslateIcon sx={{ fontSize: 28, color: '#fff' }} />,
             iconBg: PALETTE.highlight, // Data Cyan
-            bg: theme.palette.mode === 'dark' ? '#1e293b' : '#fff',
+            bg: theme.palette.background.paper,
             link: '/system/locales',
             permission: 'locales.list_locales',
         },
@@ -292,7 +292,7 @@ export default function Dashboard({
             trend: totalCurrenciesTrend,
             icon: <PaidIcon sx={{ fontSize: 28, color: '#fff' }} />,
             iconBg: PALETTE.primary, // Slate Blue
-            bg: theme.palette.mode === 'dark' ? '#1e293b' : '#fff',
+            bg: theme.palette.background.paper,
             // No currency management page (or permission) exists yet in this
             // app, so this card intentionally stays non-clickable (no `link`)
             // and visible to anyone who can reach the dashboard.
@@ -303,7 +303,7 @@ export default function Dashboard({
             trend: totalChannelsTrend,
             icon: <SettingsInputAntennaIcon sx={{ fontSize: 28, color: '#fff' }} />,
             iconBg: PALETTE.secondary, // Mid Gray
-            bg: theme.palette.mode === 'dark' ? '#1e293b' : '#fff',
+            bg: theme.palette.background.paper,
             link: '/catalog/channels',
             permission: 'channels.list_channels',
         },
@@ -313,7 +313,7 @@ export default function Dashboard({
             trend: null as number | null,
             icon: <WarningAmberIcon sx={{ fontSize: 28, color: '#fff' }} />,
             iconBg: lowStockCount > 0 ? '#DC2626' : PALETTE.secondary,
-            bg: theme.palette.mode === 'dark' ? '#1e293b' : '#fff',
+            bg: theme.palette.background.paper,
             link: '/catalog/products',
             caption: t('lowStockCaption'),
             permission: 'products.list_products',
