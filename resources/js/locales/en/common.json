@@ -7,5 +7,7 @@
     "popularBadge": "Popular",
     "settings": "Settings",
     "logout": "Log out",
-    "loggingOut": "Logging out..."
+    "loggingOut": "Logging out...",
+    "editableLocaleHint": "Showing the field for the language currently selected (top-right). Switch languages to edit the others.",
+    "noActiveLocales": "No active locales configured."
 }
