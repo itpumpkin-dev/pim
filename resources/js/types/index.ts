@@ -36,6 +36,7 @@ export interface SharedData {
     auth: Auth;
     status?: string | null;
     success?: string | null;
+    created_option_code?: string | null;
     locale: string;
     locales: Locale[];
     [key: string]: unknown;

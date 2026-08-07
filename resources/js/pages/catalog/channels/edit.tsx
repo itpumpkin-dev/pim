@@ -11,6 +11,7 @@ import {
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     FormControl,
     FormHelperText,
     InputLabel,
@@ -119,8 +120,8 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                         <Button component={Link} href="/catalog/channels" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: 'white' }} type="submit" variant="contained" disabled={processing} startIcon={<SaveIcon />}>
-                            {t('save')}
+                        <Button sx={{ color: 'white' }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                            {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
                 </Stack>

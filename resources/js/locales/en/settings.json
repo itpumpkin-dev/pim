@@ -6,6 +6,7 @@
     "lastName": "Last name",
     "emailAddress": "Email address",
     "save": "Save",
+    "saving": "Saving...",
     "saved": "Saved",
     "emailUnverified": "Your email address is unverified.",
     "resendVerification": "Click here to re-send the verification email.",

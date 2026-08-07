@@ -21,6 +21,7 @@ import {
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -204,6 +205,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
     const [quickExportOpen, setQuickExportOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
@@ -704,19 +706,23 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteProductId(null)} color="inherit">
+                    <Button onClick={() => setDeleteProductId(null)} color="inherit" disabled={deleting}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteProductId !== null) {
+                                setDeleting(true);
                                 router.delete(`/catalog/products/${deleteProductId}`, {
                                     onSuccess: () => setDeleteProductId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {t('delete')}
                     </Button>

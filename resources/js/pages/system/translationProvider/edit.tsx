@@ -121,6 +121,7 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
                             type="submit"
                             variant="contained"
                             disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{
                                 bgcolor: 'primary.main',
                                 color: '#fff',
@@ -130,7 +131,7 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Provider
+                            {processing ? 'Saving…' : 'Save Provider'}
                         </Button>
                     </Stack>
                 </Stack>

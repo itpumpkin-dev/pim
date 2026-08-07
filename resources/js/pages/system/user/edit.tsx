@@ -10,6 +10,7 @@ import {
     Button,
     Checkbox,
     Chip,
+    CircularProgress,
     Dialog,
     DialogContent,
     FormControlLabel,
@@ -280,9 +281,10 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         variant="contained"
                         color="primary"
                         disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                         sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
                     >
-                        {t('save').toUpperCase()}
+                        {processing ? t('saving').toUpperCase() : t('save').toUpperCase()}
                     </Button>
                 </>
             }

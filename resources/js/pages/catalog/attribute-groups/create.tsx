@@ -6,6 +6,7 @@ import {
     Alert,
     Box,
     Button,
+    CircularProgress,
     Stack,
     Typography,
 } from '@mui/material';
@@ -62,6 +63,7 @@ export default function AttributeGroupCreate() {
                             type="submit"
                             variant="contained"
                             disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{
                                 bgcolor: 'primary.main',
                                 color: '#fff',
@@ -71,7 +73,7 @@ export default function AttributeGroupCreate() {
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            {t('saveAttributeGroup')}
+                            {processing ? t('saving') : t('saveAttributeGroup')}
                         </Button>
                     </Stack>
                 </Stack>

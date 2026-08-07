@@ -543,7 +543,7 @@ export default function ProductEdit({
                                     alignItems: 'center',
                                     gap: 1,
                                     px: 2,
-                                    py: 0.75,
+                                    py: 0.5,
                                     bgcolor: '#f8fafc',
                                     border: '1px solid #e2e8f0',
                                     borderRadius: 1.5,
@@ -553,12 +553,27 @@ export default function ProductEdit({
                                 <Typography variant="caption" fontWeight={600} color="#64748b">
                                     {t('editingLocale') || 'Editing Language'}:
                                 </Typography>
-                                <Typography variant="body2" fontWeight={700} color="primary.main">
-                                    {(() => {
-                                        const loc = locales.find((l) => l.id === activeLocaleId);
-                                        return loc ? (loc.display_name || loc.code) : '';
-                                    })()}
-                                </Typography>
+                                <Select
+                                    size="small"
+                                    variant="standard"
+                                    disableUnderline
+                                    value={activeLocaleId}
+                                    onChange={(e) => {
+                                        // Changing this also switches the whole app's UI language —
+                                        // this page's "editing language" intentionally follows the
+                                        // same global locale (see useLocale()'s setLocale below), it
+                                        // isn't an independent per-page selector.
+                                        const loc = locales.find((l) => l.id === Number(e.target.value));
+                                        if (loc) setLocale(loc.code);
+                                    }}
+                                    sx={{ fontWeight: 700, color: 'primary.main', '& .MuiSelect-select': { py: 0 } }}
+                                >
+                                    {locales.map((loc) => (
+                                        <MenuItem key={loc.id} value={loc.id}>
+                                            {loc.display_name || loc.code}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
                             </Box>
                             {(loadingValues || isSwitchingScope) && <CircularProgress size={18} thickness={5} />}
                             <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
@@ -584,6 +599,7 @@ export default function ProductEdit({
                                 type="submit"
                                 variant="contained"
                                 disabled={processing}
+                                startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                                 sx={{
                                     bgcolor: 'primary.main',
                                     color: '#fff',
@@ -593,7 +609,7 @@ export default function ProductEdit({
                                     '&:hover': { bgcolor: 'primary.main' },
                                 }}
                             >
-                                Save Product
+                                {processing ? 'Saving…' : 'Save Product'}
                             </Button>
                         </Stack>
                     </Stack>
@@ -1372,6 +1388,7 @@ function RenderAttributeInput({
                         open={addOptionOpen}
                         attributeId={attr.id}
                         attributeLabel={label}
+                        activeLocaleCode={activeLocaleCode}
                         swatchType={attr.swatch_type}
                         existingOptions={options}
                         onClose={() => setAddOptionOpen(false)}

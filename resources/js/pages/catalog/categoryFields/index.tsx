@@ -10,7 +10,7 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Chip } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
@@ -61,6 +61,7 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(fields.per_page ?? 15);
     const [deleteFieldId, setDeleteFieldId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -280,20 +281,24 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteFieldId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeleteFieldId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteFieldId !== null) {
+                                setDeleting(true);
                                 router.delete(`/catalog/categoryFields/${deleteFieldId}`, {
                                     onSuccess: () => setDeleteFieldId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>

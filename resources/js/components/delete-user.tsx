@@ -2,7 +2,7 @@ import { useForm } from '@inertiajs/react';
 import { FormEventHandler, useRef, useState } from 'react';
 
 import InputError from '@/components/input-error';
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Typography } from '@mui/material';
 
 import HeadingSmall from '@/components/heading-small';
 
@@ -76,11 +76,11 @@ export default function DeleteUser() {
                         <InputError message={errors.password} sx={{ mt: 1 }} />
                     </DialogContent>
                     <DialogActions>
-                        <Button variant="outlined" color="inherit" onClick={closeModal}>
+                        <Button variant="outlined" color="inherit" onClick={closeModal} disabled={processing}>
                             Cancel
                         </Button>
-                        <Button type="submit" variant="contained" color="error" disabled={processing}>
-                            Delete account
+                        <Button type="submit" variant="contained" color="error" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                            {processing ? 'Deleting…' : 'Delete account'}
                         </Button>
                     </DialogActions>
                 </Dialog>

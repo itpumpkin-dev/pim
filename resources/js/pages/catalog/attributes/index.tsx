@@ -10,7 +10,7 @@ import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { Box, Button, Chip, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, colors, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
@@ -42,6 +42,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteAttributeId, setDeleteAttributeId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -211,14 +212,16 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setDeleteAttributeId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>{t('cancel')}</Button>
+                <Button onClick={() => setDeleteAttributeId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>{t('cancel')}</Button>
                 <Button onClick={() => {
                     if (deleteAttributeId !== null) {
+                        setDeleting(true);
                         router.delete(`/catalog/attributes/${deleteAttributeId}`, {
                             onSuccess: () => setDeleteAttributeId(null),
+                            onFinish: () => setDeleting(false),
                         });
                     }
-                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }}>
+                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
                     {t('delete')}
                 </Button>
             </DialogActions>

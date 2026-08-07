@@ -62,7 +62,10 @@ class AttributeOptionController extends Controller
 
         AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
-        return back()->with('success', 'Option added successfully.');
+        // Server-generated (see CodeGenerator) — flashed back so the quick-add
+        // dialog on the product edit page can select this option immediately
+        // without asking the caller to guess or supply a code of its own.
+        return back()->with('success', 'Option added successfully.')->with('created_option_code', $option->code);
     }
 
     public function update(Request $request, Attribute $attribute, AttributeOption $option): RedirectResponse
@@ -228,10 +231,9 @@ class AttributeOptionController extends Controller
             return;
         }
 
-        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
-        $sourceLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+        [$sourceLocaleId, $sourceLabel] = $this->resolveAutoTranslateSource($translations);
 
-        if ($defaultLocaleId === null || $sourceLabel === '') {
+        if ($sourceLocaleId === null || $sourceLabel === '') {
             return;
         }
 
@@ -239,9 +241,40 @@ class AttributeOptionController extends Controller
             AttributeOptionTranslation::class,
             'attribute_option_id',
             $option->id,
-            $defaultLocaleId,
+            $sourceLocaleId,
             $sourceLabel,
         );
+    }
+
+    /**
+     * Picks which locale to translate FROM. Prefers the app's default
+     * locale when it was filled in (matching resolveAdminLabel()'s
+     * priority), but falls back to whichever locale actually has a label
+     * otherwise — e.g. the product edit page's quick-add-option dialog only
+     * ever submits the locale currently being edited, which is frequently
+     * not the app default, so requiring the default locale specifically
+     * silently skipped auto-translation for every option added that way.
+     *
+     * @param  array<int|string, mixed>  $translations
+     * @return array{0: int|null, 1: string}
+     */
+    private function resolveAutoTranslateSource(array $translations): array
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+        $defaultLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId !== null && $defaultLabel !== '') {
+            return [$defaultLocaleId, $defaultLabel];
+        }
+
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label !== '') {
+                return [(int) $localeId, $label];
+            }
+        }
+
+        return [null, ''];
     }
 
     private function syncTranslations(AttributeOption $option, array $translations): void

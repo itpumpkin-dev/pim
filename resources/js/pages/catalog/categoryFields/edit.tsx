@@ -6,7 +6,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -81,8 +81,8 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                         <Button component={Link} href="/catalog/categoryFields" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={<SaveIcon />}>
-                            {t('save')}
+                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                            {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
                 </Stack>

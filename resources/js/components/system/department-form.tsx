@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Box, Button, Checkbox, FormControlLabel, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, CircularProgress, FormControlLabel, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -62,9 +62,10 @@ export default function DepartmentFormPage({ department }: DepartmentFormProps) 
                         variant="contained"
                         color="primary"
                         disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                         sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff' }}
                     >
-                        Save
+                        {processing ? 'Saving…' : 'Save'}
                     </Button>
                 </>
             }

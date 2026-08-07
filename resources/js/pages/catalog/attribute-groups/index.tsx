@@ -12,6 +12,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -87,6 +88,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -288,19 +290,23 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteGroupId(null)} color="inherit">
+                    <Button onClick={() => setDeleteGroupId(null)} color="inherit" disabled={deleting}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteGroupId !== null) {
+                                setDeleting(true);
                                 router.delete(`/catalog/attributeGroups/${deleteGroupId}`, {
                                     onSuccess: () => setDeleteGroupId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {t('delete')}
                     </Button>

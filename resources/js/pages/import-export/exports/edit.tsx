@@ -8,6 +8,7 @@ import {
     Alert,
     Box,
     Button,
+    CircularProgress,
     FormControl,
     FormControlLabel,
     InputLabel,
@@ -19,7 +20,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent } from 'react';
+import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface ExportConfigItem {
@@ -61,18 +62,26 @@ export default function ExportEdit({ config, types }: Props) {
         return translated === key ? type : translated;
     };
 
+    const [activeAction, setActiveAction] = useState<'save' | 'run' | null>(null);
+
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        setActiveAction('save');
         put(`/import-export/exports/${config.id}`, {
             onSuccess: () => router.visit('/import-export/exports', { replace: true }),
+            onFinish: () => setActiveAction(null),
         });
     };
 
     const submitAndRun = (e: FormEvent) => {
         e.preventDefault();
+        setActiveAction('run');
         transform((formData) => ({ ...formData, run: true }));
         put(`/import-export/exports/${config.id}`, {
-            onFinish: () => transform((formData) => formData),
+            onFinish: () => {
+                transform((formData) => formData);
+                setActiveAction(null);
+            },
         });
     };
 
@@ -86,14 +95,14 @@ export default function ExportEdit({ config, types }: Props) {
                         <Button component={Link} href="/import-export/exports" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
                             {tCatalog('back')}
                         </Button>
-                        <Button type="submit" variant="outlined" disabled={processing} startIcon={<SaveIcon />}>
-                            {tCatalog('save')}
+                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />}>
+                            {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                         </Button>
                         <Button
                             sx={{ color: 'white' }}
                             variant="contained"
                             disabled={processing}
-                            startIcon={<PlayArrowIcon />}
+                            startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
                             onClick={submitAndRun}
                         >
                             {t('exportNow')}

@@ -8,6 +8,7 @@ import {
     Alert,
     Box,
     Button,
+    CircularProgress,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -71,9 +72,16 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
 const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 /**
- * Options CRUD for select/multiselect attributes, laid out as a grid with one
- * column per active locale — rather than a per-row "Translate" popover — so
- * every language is visible and editable at a glance without an extra click.
+ * Options CRUD for select/multiselect attributes, laid out as a grid with a
+ * single label column for whichever locale is currently active — rather
+ * than one column per locale — so filling in options doesn't mean scrolling
+ * a wide table of every language at once. Follows the same active locale as
+ * this page's own LocaleLabelFields (the site-wide language dropdown in the
+ * header, via useLocale()) rather than having its own separate selector, so
+ * there's one control for "which language am I editing" on this page, not
+ * two that could disagree. Reloading on a language switch is safe here even
+ * with rows mid-edit: the reconciliation effect below keeps any row that
+ * still exists (matched by id) untouched, so in-progress edits survive it.
  * Add/delete are still immediate, independent requests, but edits to existing
  * rows are batched: some of these option lists run into the hundreds
  * (bulk-imported taxonomy data), where a save button per row isn't practical.
@@ -88,13 +96,15 @@ export function AttributeOptionsPanel({
     swatchType: string;
     options: AttributeOptionItem[];
 }) {
-    const { locales } = useLocale();
+    const { locale, locales } = useLocale();
     const { errors } = usePage<any>().props;
     const [rows, setRows] = useState<EditableOption[]>(() => options.map((o) => toEditableOption(o, swatchType)));
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
     const [perPage, setPerPage] = useState(10);
     const [page, setPage] = useState(1);
+    const activeLocale = locales.find((l) => l.code === locale) ?? locales[0];
+    const activeLocaleId = activeLocale?.id;
 
     // Reconciles with fresh server data (after add/delete/save-all) without
     // discarding in-progress edits to rows that are still around — only rows
@@ -110,11 +120,13 @@ export function AttributeOptionsPanel({
     const [newTranslations, setNewTranslations] = useState<Record<string, string>>({});
     const [newSwatchText, setNewSwatchText] = useState('');
     const [newSwatchImage, setNewSwatchImage] = useState<File | null>(null);
-    const hasNewLabel = Object.values(newTranslations).some((label) => label.trim() !== '');
+    const [adding, setAdding] = useState(false);
+    const hasNewLabel = activeLocaleId !== undefined && (newTranslations[String(activeLocaleId)] ?? '').trim() !== '';
 
     const addOption = () => {
         if (!hasNewLabel) return;
 
+        setAdding(true);
         router.post(
             `/catalog/attributes/${attributeId}/options`,
             {
@@ -130,6 +142,7 @@ export function AttributeOptionsPanel({
                     setNewSwatchText('');
                     setNewSwatchImage(null);
                 },
+                onFinish: () => setAdding(false),
             },
         );
     };
@@ -160,8 +173,14 @@ export function AttributeOptionsPanel({
         );
     };
 
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+
     const destroy = (id: number) => {
-        router.delete(`/catalog/attributes/${attributeId}/options/${id}`, { preserveScroll: true });
+        setDeletingId(id);
+        router.delete(`/catalog/attributes/${attributeId}/options/${id}`, {
+            preserveScroll: true,
+            onFinish: () => setDeletingId(null),
+        });
     };
 
     // This panel is always rendered inside the attribute edit page's own
@@ -193,7 +212,7 @@ export function AttributeOptionsPanel({
     const currentPage = Math.min(page, pageCount);
     const pagedRows = filteredRows.slice((currentPage - 1) * perPage, currentPage * perPage);
     const showSwatchColumn = swatchType === 'color' || swatchType === 'image';
-    const columnCount = 2 + locales.length + (showSwatchColumn ? 1 : 0);
+    const columnCount = 2 + 1 + (showSwatchColumn ? 1 : 0);
 
     return (
         <Paper variant="outlined" sx={{ p: 3 }}>
@@ -201,8 +220,15 @@ export function AttributeOptionsPanel({
                 <Typography variant="h6" fontWeight={700}>
                     Options
                 </Typography>
-                <Button type="button" variant="contained" size="small" disabled={saving || rows.length === 0} onClick={saveAll}>
-                    Save all
+                <Button
+                    type="button"
+                    variant="contained"
+                    size="small"
+                    disabled={saving || rows.length === 0}
+                    onClick={saveAll}
+                    startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
+                >
+                    {saving ? 'Saving…' : 'Save all'}
                 </Button>
             </Stack>
 
@@ -262,11 +288,9 @@ export function AttributeOptionsPanel({
                     <TableHead>
                         <TableRow>
                             <TableCell sx={{ fontWeight: 700, width: 160 }}>Code</TableCell>
-                            {locales.map((locale) => (
-                                <TableCell key={locale.id} sx={{ fontWeight: 700 }}>
-                                    {locale.display_name ?? locale.code}
-                                </TableCell>
-                            ))}
+                            <TableCell sx={{ fontWeight: 700 }}>
+                                Label ({activeLocale?.display_name ?? activeLocale?.code})
+                            </TableCell>
                             {showSwatchColumn && <TableCell sx={{ fontWeight: 700 }}>Swatch</TableCell>}
                             <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
                         </TableRow>
@@ -278,17 +302,15 @@ export function AttributeOptionsPanel({
                                     Auto
                                 </Typography>
                             </TableCell>
-                            {locales.map((locale) => (
-                                <TableCell key={locale.id}>
-                                    <TextField
-                                        size="small"
-                                        fullWidth
-                                        value={newTranslations[String(locale.id)] ?? ''}
-                                        onChange={(e) => setNewTranslations((prev) => ({ ...prev, [String(locale.id)]: e.target.value }))}
-                                        onKeyDown={submitOnEnter}
-                                    />
-                                </TableCell>
-                            ))}
+                            <TableCell>
+                                <TextField
+                                    size="small"
+                                    fullWidth
+                                    value={activeLocaleId !== undefined ? (newTranslations[String(activeLocaleId)] ?? '') : ''}
+                                    onChange={(e) => activeLocaleId !== undefined && setNewTranslations((prev) => ({ ...prev, [String(activeLocaleId)]: e.target.value }))}
+                                    onKeyDown={submitOnEnter}
+                                />
+                            </TableCell>
                             {swatchType === 'color' && (
                                 <TableCell>
                                     <TextField
@@ -311,8 +333,14 @@ export function AttributeOptionsPanel({
                                 </TableCell>
                             )}
                             <TableCell align="right">
-                                <Button size="small" variant="outlined" onClick={addOption} disabled={!hasNewLabel}>
-                                    Add Row
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    onClick={addOption}
+                                    disabled={!hasNewLabel || adding}
+                                    startIcon={adding ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                >
+                                    {adding ? 'Adding…' : 'Add Row'}
                                 </Button>
                             </TableCell>
                         </TableRow>
@@ -328,19 +356,17 @@ export function AttributeOptionsPanel({
                                             disabled
                                         />
                                     </TableCell>
-                                    {locales.map((locale) => (
-                                        <TableCell key={locale.id}>
-                                            <TextField
-                                                size="small"
-                                                fullWidth
-                                                value={row.translations[String(locale.id)] ?? ''}
-                                                onChange={(e) => updateRow(row.id, {
-                                                    ...row,
-                                                    translations: { ...row.translations, [String(locale.id)]: e.target.value },
-                                                })}
-                                            />
-                                        </TableCell>
-                                    ))}
+                                    <TableCell>
+                                        <TextField
+                                            size="small"
+                                            fullWidth
+                                            value={activeLocaleId !== undefined ? (row.translations[String(activeLocaleId)] ?? '') : ''}
+                                            onChange={(e) => activeLocaleId !== undefined && updateRow(row.id, {
+                                                ...row,
+                                                translations: { ...row.translations, [String(activeLocaleId)]: e.target.value },
+                                            })}
+                                        />
+                                    </TableCell>
                                     {swatchType === 'color' && (
                                         <TableCell>
                                             <Stack direction="row" spacing={1} alignItems="center">
@@ -369,8 +395,8 @@ export function AttributeOptionsPanel({
                                         </TableCell>
                                     )}
                                     <TableCell align="right">
-                                        <IconButton size="small" onClick={() => destroy(row.id)} title="Delete">
-                                            <DeleteIcon fontSize="small" />
+                                        <IconButton size="small" onClick={() => destroy(row.id)} disabled={deletingId === row.id} title="Delete">
+                                            {deletingId === row.id ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon fontSize="small" />}
                                         </IconButton>
                                     </TableCell>
                                 </TableRow>

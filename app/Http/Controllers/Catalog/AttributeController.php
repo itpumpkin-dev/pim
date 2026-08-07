@@ -248,10 +248,9 @@ class AttributeController extends Controller
             return;
         }
 
-        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
-        $sourceLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+        [$sourceLocaleId, $sourceLabel] = $this->resolveAutoTranslateSource($translations);
 
-        if ($defaultLocaleId === null || $sourceLabel === '') {
+        if ($sourceLocaleId === null || $sourceLabel === '') {
             return;
         }
 
@@ -259,9 +258,39 @@ class AttributeController extends Controller
             AttributeTranslation::class,
             'attribute_id',
             $attribute->id,
-            $defaultLocaleId,
+            $sourceLocaleId,
             $sourceLabel,
         );
+    }
+
+    /**
+     * Picks which locale to translate FROM. Prefers the app's default
+     * locale when it was filled in, but falls back to whichever locale
+     * actually has a label otherwise — a form submitting only a non-default
+     * locale's translation (e.g. an editor working in a locale other than
+     * the app default) would otherwise silently skip auto-translation
+     * entirely, since nothing was ever in the default locale to begin with.
+     *
+     * @param  array<int|string, mixed>  $translations
+     * @return array{0: int|null, 1: string}
+     */
+    private function resolveAutoTranslateSource(array $translations): array
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+        $defaultLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId !== null && $defaultLabel !== '') {
+            return [$defaultLocaleId, $defaultLabel];
+        }
+
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label !== '') {
+                return [(int) $localeId, $label];
+            }
+        }
+
+        return [null, ''];
     }
 
     private function syncTranslations(Attribute $attribute, array $translations): void

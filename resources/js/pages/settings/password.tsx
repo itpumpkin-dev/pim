@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, Fade, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Fade, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler, useRef } from 'react';
 
 import HeadingSmall from '@/components/heading-small';
@@ -96,8 +96,8 @@ export default function Password() {
                             />
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing}>
-                                    Save password
+                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                                    {processing ? 'Saving…' : 'Save password'}
                                 </Button>
 
                                 <Fade in={recentlySuccessful}>

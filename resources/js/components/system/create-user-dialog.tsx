@@ -1,7 +1,7 @@
 import AppLogo from '@/components/app-logo';
 import { useForm } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Button, Dialog, DialogContent, Divider, IconButton, MenuItem, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Dialog, DialogContent, Divider, IconButton, MenuItem, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
 
 interface DepartmentOption {
@@ -168,8 +168,8 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                     <Button variant="contained" color="inherit" onClick={handleClose} sx={{ borderRadius: 8, px: 4 }}>
                         CANCEL
                     </Button>
-                    <Button type="submit" variant="contained" color="primary" disabled={processing} sx={{ borderRadius: 8, px: 4, color: '#fff', }}>
-                        SAVE
+                    <Button type="submit" variant="contained" color="primary" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ borderRadius: 8, px: 4, color: '#fff', }}>
+                        {processing ? 'SAVING…' : 'SAVE'}
                     </Button>
                 </Box>
             </DialogContent>

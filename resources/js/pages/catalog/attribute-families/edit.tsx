@@ -15,6 +15,7 @@ import {
     Alert,
     Box,
     Button,
+    CircularProgress,
     Collapse,
     Dialog,
     DialogActions,
@@ -276,6 +277,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                             type="submit"
                             variant="contained"
                             disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{
                                 bgcolor: 'primary.main',
                                 color: '#fff',
@@ -285,7 +287,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Attribute Family
+                            {processing ? 'Saving…' : 'Save Attribute Family'}
                         </Button>
                     </Stack>
                 </Stack>

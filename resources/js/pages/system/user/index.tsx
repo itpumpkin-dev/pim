@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -70,6 +70,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
     const [search, setSearch] = useState(filters.search || '');
     const [createOpen, setCreateOpen] = useState(false);
     const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const isFirstRender = useRef(true);
 
     const visibleActions = Object.entries(gridConfig.actions ?? {}).filter(([actionKey]) => {
@@ -205,14 +206,16 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>{t('cancel')}</Button>
+                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>{t('cancel')}</Button>
                 <Button onClick={() => {
                     if (deleteUserId !== null) {
+                        setDeleting(true);
                         router.delete(`/system/user/${deleteUserId}`, {
                             onSuccess: () => setDeleteUserId(null),
+                            onFinish: () => setDeleting(false),
                         });
                     }
-                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }}>
+                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
                     {t('delete')}
                 </Button>
             </DialogActions>

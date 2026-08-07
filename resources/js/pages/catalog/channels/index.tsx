@@ -6,7 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -51,6 +51,7 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [deleteChannelId, setDeleteChannelId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -212,20 +213,24 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteChannelId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeleteChannelId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteChannelId !== null) {
+                                setDeleting(true);
                                 router.delete(`/catalog/channels/${deleteChannelId}`, {
                                     onSuccess: () => setDeleteChannelId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>

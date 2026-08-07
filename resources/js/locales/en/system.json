@@ -1,4 +1,5 @@
 {
+    "saving": "Saving...",
     "usersCount": "{{count}} users",
     "createUser": "CREATE USER",
     "searchByUsername": "Search by Username",

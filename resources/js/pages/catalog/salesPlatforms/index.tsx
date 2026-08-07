@@ -13,6 +13,7 @@ import {
     Box,
     Button,
     Chip,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -76,6 +77,8 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [platformCode, setPlatformCode] = useState('');
     const [platformName, setPlatformName] = useState('');
     const [deletePlatformId, setDeletePlatformId] = useState<number | null>(null);
+    const [savingPlatform, setSavingPlatform] = useState(false);
+    const [deletingPlatform, setDeletingPlatform] = useState(false);
 
     const [shopDialogPlatformId, setShopDialogPlatformId] = useState<number | null>(null);
     const [editingShop, setEditingShop] = useState<ShopItem | null>(null);
@@ -83,6 +86,8 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [shopName, setShopName] = useState('');
     const [shopActive, setShopActive] = useState(true);
     const [deleteShopId, setDeleteShopId] = useState<number | null>(null);
+    const [savingShop, setSavingShop] = useState(false);
+    const [deletingShop, setDeletingShop] = useState(false);
 
     const [syncing, setSyncing] = useState(false);
 
@@ -102,13 +107,16 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
     const submitPlatform = (e: FormEvent) => {
         e.preventDefault();
+        setSavingPlatform(true);
         if (editingPlatform) {
             router.put(`/catalog/sales-platforms/${editingPlatform.id}`, { name: platformName }, {
                 onSuccess: () => setPlatformDialogOpen(false),
+                onFinish: () => setSavingPlatform(false),
             });
         } else {
             router.post('/catalog/sales-platforms', { name: platformName }, {
                 onSuccess: () => setPlatformDialogOpen(false),
+                onFinish: () => setSavingPlatform(false),
             });
         }
     };
@@ -131,13 +139,16 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
     const submitShop = (e: FormEvent) => {
         e.preventDefault();
+        setSavingShop(true);
         if (editingShop) {
             router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, { name: shopName, is_active: shopActive }, {
                 onSuccess: () => setShopDialogPlatformId(null),
+                onFinish: () => setSavingShop(false),
             });
         } else if (shopDialogPlatformId) {
             router.post(`/catalog/sales-platforms/${shopDialogPlatformId}/shops`, { name: shopName, is_active: shopActive }, {
                 onSuccess: () => setShopDialogPlatformId(null),
+                onFinish: () => setSavingShop(false),
             });
         }
     };
@@ -318,10 +329,15 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         </Stack>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setPlatformDialogOpen(false)} color="inherit">
+                        <Button onClick={() => setPlatformDialogOpen(false)} color="inherit" disabled={savingPlatform}>
                             {tGrid('cancel')}
                         </Button>
-                        <Button type="submit" variant="contained">
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={savingPlatform}
+                            startIcon={savingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        >
                             {t('save')}
                         </Button>
                     </DialogActions>
@@ -358,10 +374,15 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         </Stack>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setShopDialogPlatformId(null)} color="inherit">
+                        <Button onClick={() => setShopDialogPlatformId(null)} color="inherit" disabled={savingShop}>
                             {tGrid('cancel')}
                         </Button>
-                        <Button type="submit" variant="contained">
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={savingShop}
+                            startIcon={savingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        >
                             {t('save')}
                         </Button>
                     </DialogActions>
@@ -374,20 +395,24 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogContentText>{t('confirmDeletePlatform')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeletePlatformId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeletePlatformId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deletingPlatform}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deletePlatformId !== null) {
+                                setDeletingPlatform(true);
                                 router.delete(`/catalog/sales-platforms/${deletePlatformId}`, {
                                     onSuccess: () => setDeletePlatformId(null),
+                                    onFinish: () => setDeletingPlatform(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deletingPlatform}
+                        startIcon={deletingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>
@@ -400,20 +425,24 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogContentText>{t('confirmDeleteShop')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteShopId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeleteShopId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deletingShop}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteShopId !== null) {
+                                setDeletingShop(true);
                                 router.delete(`/catalog/sales-platforms/shops/${deleteShopId}`, {
                                     onSuccess: () => setDeleteShopId(null),
+                                    onFinish: () => setDeletingShop(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deletingShop}
+                        startIcon={deletingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>

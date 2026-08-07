@@ -5,6 +5,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
     Box,
     Button,
+    CircularProgress,
     InputAdornment,
     Paper,
     Snackbar,
@@ -135,9 +136,10 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                             variant="contained"
                             disabled={dirtyCount === 0 || saving}
                             onClick={save}
+                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{ textTransform: 'none', fontWeight: 700, px: 2.5 }}
                         >
-                            {tSystem('saveTranslations')}
+                            {saving ? 'Saving…' : tSystem('saveTranslations')}
                         </Button>
                     </Stack>
                 </Stack>

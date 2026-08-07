@@ -3,10 +3,12 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import {
     Box,
     Button,
     Checkbox,
+    CircularProgress,
     Divider,
     FormControlLabel,
     IconButton,
@@ -20,6 +22,7 @@ import {
     TableRow,
     Tabs,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { FormEventHandler, useState, useMemo } from 'react';
@@ -331,9 +334,10 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         variant="contained"
                         color="primary"
                         disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                         sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                     >
-                        Save
+                        {processing ? 'Saving…' : 'Save'}
                     </Button>
                 </>
             }
@@ -505,6 +509,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                             Read lets this role see the field on a product; Edit lets it change the value (checking Edit turns Read on too).
+                            An attribute's Edit is overridden by its Attribute Group's setting — if the group is Read-only, the attribute stays read-only on the product even when Edit is checked here.
                         </Typography>
 
                         {/* Attribute Groups */}
@@ -626,6 +631,9 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                         onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
                                                     />
                                                     Edit
+                                                    <Tooltip title="A Read-only Attribute Group overrides this — an attribute stays read-only on the product if its group isn't editable, even when checked here.">
+                                                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: 'text.secondary' }} />
+                                                    </Tooltip>
                                                 </TableCell>
                                             </TableRow>
                                         </TableHead>

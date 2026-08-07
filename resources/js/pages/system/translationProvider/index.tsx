@@ -14,6 +14,7 @@ import {
     Box,
     Button,
     Chip,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -72,6 +73,8 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [testingId, setTestingId] = useState<number | null>(null);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -213,9 +216,16 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
                                                 <IconButton
                                                     size="small"
                                                     sx={{ color: '#64748b' }}
-                                                    onClick={() => router.post(`/system/translationProviders/${row.id}/test`, {}, { preserveScroll: true })}
+                                                    disabled={testingId === row.id}
+                                                    onClick={() => {
+                                                        setTestingId(row.id);
+                                                        router.post(`/system/translationProviders/${row.id}/test`, {}, {
+                                                            preserveScroll: true,
+                                                            onFinish: () => setTestingId(null),
+                                                        });
+                                                    }}
                                                 >
-                                                    <TranslateIcon fontSize="small" />
+                                                    {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon fontSize="small" />}
                                                 </IconButton>
                                             </Tooltip>
                                             {canEdit && (
@@ -254,17 +264,23 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
                     <DialogContentText>{tSystem('confirmDeleteTranslationProviderMessage')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} color="inherit">
+                    <Button onClick={() => setDeleteId(null)} color="inherit" disabled={deleting}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteId !== null) {
-                                router.delete(`/system/translationProviders/${deleteId}`, { onSuccess: () => setDeleteId(null) });
+                                setDeleting(true);
+                                router.delete(`/system/translationProviders/${deleteId}`, {
+                                    onSuccess: () => setDeleteId(null),
+                                    onFinish: () => setDeleting(false),
+                                });
                             }
                         }}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {t('delete')}
                     </Button>

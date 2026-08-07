@@ -4,6 +4,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -222,10 +223,10 @@ export default function UserGroupIndex({ gridConfig, gridData, filters }: UserGr
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)}>
+                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)} disabled={deleting}>
                         {t('cancel')}
                     </Button>
-                    <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+                    <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
                         {t('delete')}
                     </Button>
                 </DialogActions>

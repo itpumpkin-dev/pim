@@ -1,4 +1,5 @@
 {
+    "saving": "กำลังบันทึก...",
     "usersCount": "{{count}} ผู้ใช้งาน",
     "createUser": "สร้างผู้ใช้งาน",
     "searchByUsername": "ค้นหาด้วยชื่อผู้ใช้",

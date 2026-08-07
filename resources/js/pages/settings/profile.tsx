@@ -1,6 +1,6 @@
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { Box, Button, Fade, Link as MuiLink, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, CircularProgress, Fade, Link as MuiLink, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -116,8 +116,8 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             )}
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing}>
-                                    {t('save')}
+                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                                    {processing ? t('saving') : t('save')}
                                 </Button>
 
                                 <Fade in={recentlySuccessful}>

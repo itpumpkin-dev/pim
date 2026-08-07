@@ -15,6 +15,7 @@ import {
     Box,
     Button,
     Chip,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -124,6 +125,7 @@ export default function LocaleIndex({ gridData, filters }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(10);
     const [deleteLocaleId, setDeleteLocaleId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -411,19 +413,23 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteLocaleId(null)} color="inherit">
+                    <Button onClick={() => setDeleteLocaleId(null)} color="inherit" disabled={deleting}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteLocaleId !== null) {
+                                setDeleting(true);
                                 router.delete(`/system/locales/${deleteLocaleId}`, {
                                     onSuccess: () => setDeleteLocaleId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {t('delete')}
                     </Button>

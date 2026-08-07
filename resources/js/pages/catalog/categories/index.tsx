@@ -11,7 +11,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SyncIcon from '@mui/icons-material/Sync';
-import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -61,6 +61,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [search, setSearch] = useState(filters.search ?? '');
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 15);
     const [deleteCategoryId, setDeleteCategoryId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
     const [syncingLazada, setSyncingLazada] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -109,14 +110,14 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         {canEdit && (
                             <Button
                                 variant="outlined"
-                                startIcon={<SyncIcon />}
+                                startIcon={syncingLazada ? <CircularProgress size={16} /> : <SyncIcon />}
                                 disabled={syncingLazada}
                                 onClick={() => {
                                     setSyncingLazada(true);
                                     router.post('/catalog/categories/sync-lazada', {}, { onFinish: () => setSyncingLazada(false) });
                                 }}
                             >
-                                {t('syncLazadaCategories')}
+                                {syncingLazada ? t('syncingLazada') : t('syncLazadaCategories')}
                             </Button>
                         )}
                         {canCreate && (
@@ -296,20 +297,24 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     })()}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteCategoryId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeleteCategoryId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteCategoryId !== null) {
+                                setDeleting(true);
                                 router.delete(`/catalog/categories/${deleteCategoryId}`, {
                                     onSuccess: () => setDeleteCategoryId(null),
+                                    onFinish: () => setDeleting(false),
                                 });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>

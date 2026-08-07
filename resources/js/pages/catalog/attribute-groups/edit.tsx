@@ -7,6 +7,7 @@ import {
     Alert,
     Box,
     Button,
+    CircularProgress,
     Paper,
     Stack,
     Tab,
@@ -92,6 +93,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                             type="submit"
                             variant="contained"
                             disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{
                                 bgcolor: 'primary.main',
                                 color: '#fff',
@@ -101,7 +103,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Attribute Group
+                            {processing ? 'Saving…' : 'Save Attribute Group'}
                         </Button>
                     </Stack>
                 </Stack>

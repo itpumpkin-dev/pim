@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'status' => $request->session()->get('status'),
             'success' => $request->session()->get('success'),
+            'created_option_code' => $request->session()->get('created_option_code'),
             'locale' => app()->getLocale(),
             'locales' => Locale::active(),
         ]);

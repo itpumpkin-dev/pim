@@ -6,7 +6,7 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { Box, Button, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,6 +48,8 @@ export default function ExportIndex({ configs, filters }: Props) {
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [deleteId, setDeleteId] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
+    const [runningId, setRunningId] = useState<number | null>(null);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -130,9 +132,15 @@ export default function ExportIndex({ configs, filters }: Props) {
                                                     size="small"
                                                     color="primary"
                                                     title={t('exportNow')}
-                                                    onClick={() => router.post(`/import-export/exports/${row.id}/run`)}
+                                                    disabled={runningId === row.id}
+                                                    onClick={() => {
+                                                        setRunningId(row.id);
+                                                        router.post(`/import-export/exports/${row.id}/run`, {}, {
+                                                            onFinish: () => setRunningId(null),
+                                                        });
+                                                    }}
                                                 >
-                                                    <PlayArrowIcon fontSize="small" />
+                                                    {runningId === row.id ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
                                                 </IconButton>
                                             )}
                                             {canEdit && (
@@ -171,18 +179,24 @@ export default function ExportIndex({ configs, filters }: Props) {
                     <DialogContentText>{t('confirmDeleteExport')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} color="inherit" sx={{ fontWeight: 'bold' }}>
+                    <Button onClick={() => setDeleteId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={() => {
                             if (deleteId !== null) {
-                                router.delete(`/import-export/exports/${deleteId}`, { onSuccess: () => setDeleteId(null) });
+                                setDeleting(true);
+                                router.delete(`/import-export/exports/${deleteId}`, {
+                                    onSuccess: () => setDeleteId(null),
+                                    onFinish: () => setDeleting(false),
+                                });
                             }
                         }}
                         color="error"
                         variant="contained"
                         sx={{ fontWeight: 'bold' }}
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
                         {tGrid('delete')}
                     </Button>

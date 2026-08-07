@@ -7,6 +7,7 @@ import {
     Box,
     Button,
     Checkbox,
+    CircularProgress,
     FormControlLabel,
     Paper,
     Stack,
@@ -73,6 +74,7 @@ export default function LocaleCreate() {
                             type="submit"
                             variant="contained"
                             disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={{
                                 bgcolor: 'primary.main',
                                 color: '#fff',
@@ -82,7 +84,7 @@ export default function LocaleCreate() {
                                 '&:hover': { bgcolor: 'primary.dark' },
                             }}
                         >
-                            Save Locale
+                            {processing ? 'Saving…' : 'Save Locale'}
                         </Button>
                     </Stack>
                 </Stack>

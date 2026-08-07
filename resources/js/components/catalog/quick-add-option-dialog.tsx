@@ -1,6 +1,7 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     Button,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -17,8 +18,7 @@ import {
 } from '@mui/material';
 import { KeyboardEvent, useState } from 'react';
 import { useLocale } from '@/hooks/use-locale';
-
-const slugify = (value: string) => value.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+import { type SharedData } from '@/types';
 
 export interface ExistingOption {
     id: number;
@@ -32,14 +32,19 @@ export interface ExistingOption {
  * product edit page. Posts to the same endpoint as the full options CRUD
  * panel on the attribute edit page (attribute-options-panel.tsx), so
  * permissions and validation stay identical; this is just a narrower,
- * single-option entry point into it. Collects a label per active locale
- * (same `translations` shape the attribute/group/family label forms use),
- * not just one flat label.
+ * single-option entry point into it.
+ *
+ * Only collects a label for the locale currently being edited on the
+ * product page (not every locale at once) — other locales can still be
+ * filled in later from the full options panel. `code` isn't collected at
+ * all: the backend always generates it (see CodeGenerator), ignoring
+ * anything a caller sends, so asking for one here was a dead field.
  */
 export function QuickAddOptionDialog({
     open,
     attributeId,
     attributeLabel,
+    activeLocaleCode,
     swatchType,
     existingOptions = [],
     onClose,
@@ -48,22 +53,23 @@ export function QuickAddOptionDialog({
     open: boolean;
     attributeId: number;
     attributeLabel: string;
+    activeLocaleCode?: string;
     swatchType?: string | null;
     existingOptions?: ExistingOption[];
     onClose: () => void;
     onCreated: (code: string) => void;
 }) {
     const { locales } = useLocale();
-    const [code, setCode] = useState('');
-    const [translations, setTranslations] = useState<Record<string, string>>({});
+    const { props } = usePage<SharedData>();
+    const activeLocale = locales.find((l) => l.code === activeLocaleCode) ?? locales[0];
+    const [label, setLabel] = useState('');
     const [swatchText, setSwatchText] = useState('');
     const [swatchImage, setSwatchImage] = useState<File | null>(null);
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const reset = () => {
-        setCode('');
-        setTranslations({});
+        setLabel('');
         setSwatchText('');
         setSwatchImage(null);
         setError(null);
@@ -76,8 +82,8 @@ export function QuickAddOptionDialog({
     };
 
     const submit = () => {
-        if (!code.trim()) {
-            setError('Code is required.');
+        if (!label.trim()) {
+            setError('Label is required.');
             return;
         }
 
@@ -87,8 +93,7 @@ export function QuickAddOptionDialog({
         router.post(
             `/catalog/attributes/${attributeId}/options`,
             {
-                code,
-                translations,
+                translations: activeLocale ? { [String(activeLocale.id)]: label } : {},
                 swatch_value: swatchType === 'color' ? swatchText : undefined,
                 swatch_image: swatchImage ?? undefined,
             },
@@ -96,8 +101,9 @@ export function QuickAddOptionDialog({
                 preserveScroll: true,
                 preserveState: true,
                 forceFormData: true,
-                onSuccess: () => {
-                    onCreated(code);
+                onSuccess: (page) => {
+                    const newCode = (page.props as { created_option_code?: string | null }).created_option_code ?? props.created_option_code;
+                    if (newCode) onCreated(newCode);
                     reset();
                     onClose();
                 },
@@ -117,7 +123,7 @@ export function QuickAddOptionDialog({
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+        <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
             <DialogTitle>Add option — {attributeLabel}</DialogTitle>
             <DialogContent>
                 {existingOptions.length > 0 && (
@@ -151,25 +157,14 @@ export function QuickAddOptionDialog({
                 </Typography>
                 <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                     <TextField
-                        label="Code"
+                        label={`Label (${activeLocale?.display_name ?? activeLocale?.code ?? 'default'})`}
                         size="small"
-                        value={code}
-                        onChange={(e) => setCode(slugify(e.target.value))}
+                        value={label}
+                        onChange={(e) => setLabel(e.target.value)}
                         onKeyDown={submitOnEnter}
                         autoFocus
-                        sx={{ width: 160 }}
+                        sx={{ minWidth: 220, flex: 1 }}
                     />
-                    {locales.map((locale) => (
-                        <TextField
-                            key={locale.id}
-                            label={locale.display_name ?? locale.code}
-                            size="small"
-                            value={translations[String(locale.id)] ?? ''}
-                            onChange={(e) => setTranslations((prev) => ({ ...prev, [String(locale.id)]: e.target.value }))}
-                            onKeyDown={submitOnEnter}
-                            sx={{ minWidth: 160, flex: 1 }}
-                        />
-                    ))}
                     {swatchType === 'color' && (
                         <TextField
                             label="Color (hex)"
@@ -200,8 +195,13 @@ export function QuickAddOptionDialog({
                 <Button onClick={handleClose} disabled={processing}>
                     Cancel
                 </Button>
-                <Button variant="contained" onClick={submit} disabled={processing}>
-                    Add
+                <Button
+                    variant="contained"
+                    onClick={submit}
+                    disabled={processing || !label.trim()}
+                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                    {processing ? 'Adding…' : 'Add'}
                 </Button>
             </DialogActions>
         </Dialog>

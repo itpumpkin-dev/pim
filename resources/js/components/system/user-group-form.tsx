@@ -6,6 +6,7 @@ import {
     Box,
     Button,
     Checkbox,
+    CircularProgress,
     Divider,
     Paper,
     Table,
@@ -103,9 +104,10 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                         variant="contained"
                         color="primary"
                         disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                         sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
                     >
-                        Save
+                        {processing ? 'Saving…' : 'Save'}
                     </Button>
                 </>
             }
