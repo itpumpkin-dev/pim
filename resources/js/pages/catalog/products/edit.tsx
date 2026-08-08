@@ -54,6 +54,7 @@ import { HistoryPanel } from '@/components/history-panel';
 import { CategoryTreePicker } from '@/components/category-tree-picker';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
+import { localizedLabel, type Translation } from '@/lib/localized-label';
 
 interface AttributeOption {
     id: number;
@@ -76,12 +77,15 @@ interface AttributeItem {
     editable?: boolean;
     /** Family ids this attribute is assigned to — used to scope the variant-attribute picker to the product's own family. */
     family_ids?: number[];
+    /** Every locale's label — lets the displayed name switch instantly on locale change instead of waiting for a server round-trip to re-resolve `name`. */
+    translations?: Translation[];
 }
 
 interface GroupWithAttributes {
     id: number;
     code: string;
     name: string;
+    translations?: Translation[];
     attributes: AttributeItem[];
 }
 
@@ -89,7 +93,9 @@ interface AttributeFamily {
     id: number;
     code: string;
     name?: string;
+    translations?: Translation[];
 }
+
 
 interface ChannelOption {
     id: number;
@@ -134,7 +140,7 @@ interface Props {
     channels?: ChannelOption[];
     channelGroups?: ChannelGroup[];
     categoryIds?: number[];
-    selectedCategories?: { id: number; name: string }[];
+    selectedCategories?: { id: number; name: string; translations?: Translation[] }[];
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
@@ -455,6 +461,16 @@ export default function ProductEdit({
     const visitedCombosRef = useRef<Set<string>>(new Set(locales.map((l) => `${defaultChannelId ?? 'none'}:${l.id}`)));
     const [loadingValues, setLoadingValues] = useState(false);
 
+    // True while any part of the field area is showing stale data: values
+    // being re-fetched for a channel/locale combo (loadingValues), or the
+    // local re-render that triggers (isSwitchingScope). Attribute/group/
+    // family/category labels no longer depend on useLocale()'s background
+    // reload (switchingLocale) at all — they're resolved instantly from each
+    // entity's preloaded `translations`, so there's nothing left to wait for
+    // on a pure language switch; switchingLocale is intentionally not
+    // included here anymore.
+    const isFieldAreaBusy = loadingValues || isSwitchingScope;
+
     useEffect(() => {
         const comboKey = `${activeChannelId ?? 'none'}:${activeLocaleId}`;
         if (visitedCombosRef.current.has(comboKey)) {
@@ -577,7 +593,7 @@ export default function ProductEdit({
                                     ))}
                                 </Select>
                             </Box>
-                            {(loadingValues || isSwitchingScope) && <CircularProgress size={18} thickness={5} />}
+                            {isFieldAreaBusy && <CircularProgress size={18} thickness={5} />}
                             <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
                                 More
                             </Button>
@@ -638,7 +654,7 @@ export default function ProductEdit({
                     <Grid container spacing={3}>
                         {/* Left Main Area: Real Attribute Groups from Database */}
                         <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
-                            {(loadingValues || isSwitchingScope) && (
+                            {isFieldAreaBusy && (
                                 <Box
                                     sx={{
                                         position: 'absolute',
@@ -658,8 +674,8 @@ export default function ProductEdit({
                             <Stack
                                 spacing={3}
                                 sx={{
-                                    opacity: loadingValues || isSwitchingScope ? 0.5 : 1,
-                                    pointerEvents: loadingValues || isSwitchingScope ? 'none' : 'auto',
+                                    opacity: isFieldAreaBusy ? 0.5 : 1,
+                                    pointerEvents: isFieldAreaBusy ? 'none' : 'auto',
                                     transition: 'opacity 0.15s',
                                 }}
                             >
@@ -701,6 +717,7 @@ export default function ProductEdit({
                                                         value={val}
                                                         onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                         activeLocaleCode={activeLocaleCode}
+                                                        activeLocaleId={activeLocaleId}
                                                         canAddOptions={canAddAttributeOptions}
                                                         sku={data.sku}
                                                     />
@@ -715,7 +732,7 @@ export default function ProductEdit({
                                     .map((group) => (
                                         <Paper key={group.id} variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
                                             <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
-                                                {group.name}
+                                                {localizedLabel(group, activeLocaleId)}
                                             </Typography>
                                             <Stack spacing={2.5}>
                                                 {group.attributes.length === 0 ? (
@@ -741,6 +758,7 @@ export default function ProductEdit({
                                                                     value={val}
                                                                     onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
                                                                     activeLocaleCode={activeLocaleCode}
+                                                                    activeLocaleId={activeLocaleId}
                                                                     canAddOptions={canAddAttributeOptions}
                                                                     sku={data.sku}
                                                                 />
@@ -874,7 +892,7 @@ export default function ProductEdit({
                                         >
                                             {families.map((fam) => (
                                                 <MenuItem key={fam.id} value={fam.id}>
-                                                    {fam.name || fam.code}
+                                                    {localizedLabel(fam, activeLocaleId)}
                                                 </MenuItem>
                                             ))}
                                         </TextField>
@@ -926,6 +944,7 @@ export default function ProductEdit({
                                         value={data.category_ids}
                                         onChange={(ids) => setData('category_ids', ids)}
                                         initialSelected={selectedCategories}
+                                        activeLocaleId={activeLocaleId}
                                     />
                                 </Paper>
 
@@ -1298,6 +1317,7 @@ function RenderAttributeInput({
     value,
     onChange,
     activeLocaleCode,
+    activeLocaleId,
     canAddOptions,
     sku,
 }: {
@@ -1305,10 +1325,11 @@ function RenderAttributeInput({
     value: AttributeValue;
     onChange: (val: AttributeValue) => void;
     activeLocaleCode?: string;
+    activeLocaleId: number;
     canAddOptions?: boolean;
     sku: string;
 }) {
-    const label = attr.name || attr.code;
+    const label = localizedLabel(attr, activeLocaleId);
     const stringValue = typeof value === 'string' ? value : '';
     const isReadOnly = attr.editable === false;
     const [addOptionOpen, setAddOptionOpen] = useState(false);

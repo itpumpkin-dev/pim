@@ -558,6 +558,8 @@ export default function ProductShow({ product, related }: { product: Product | n
 
     if (product.canViewPricing !== false) {
         cells.push({ w: 3, h: 3, weight: 4, data: { key: 'price', type: 'stat', render: priceRender } });
+    }
+    if (product.canViewPackaging !== false) {
         cells.push({ w: 3, h: 3, weight: 4, data: { key: 'packaging', type: 'stat', render: packagingRender } });
     }
     cells.push({

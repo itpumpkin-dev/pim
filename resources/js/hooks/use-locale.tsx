@@ -18,6 +18,14 @@ let latestRequestedLocale: string | null = null;
 export function useLocale() {
     const { locale: serverLocale, locales } = usePage<SharedData>().props;
     const [locale, setLocaleState] = useState(serverLocale);
+    // True from the moment setLocale() is called until the background
+    // router.reload() below (or an earlier bail-out) settles. Server-resolved
+    // labels baked into the current page's props (e.g. an attribute/category
+    // name via app()->getLocale()) don't update until that reload lands, so
+    // callers needing to show a loading state during that gap (e.g. Edit
+    // Product's field area) can key off this instead of building their own
+    // tracking for a switch this hook already owns.
+    const [switchingLocale, setSwitchingLocale] = useState(false);
 
     // Stay in sync with the server-resolved locale after a real page visit
     // (e.g. a normal link click, or the very first load), in case it was
@@ -40,6 +48,7 @@ export function useLocale() {
         setLocaleState(code);
         i18n.changeLanguage(code);
         latestRequestedLocale = code;
+        setSwitchingLocale(true);
 
         fetch('/locale', {
             method: 'PUT',
@@ -60,6 +69,7 @@ export function useLocale() {
                 // language data and the sync effect below would silently
                 // flip the whole app's displayed language back.
                 if (!response.ok) {
+                    setSwitchingLocale(false);
                     return;
                 }
 
@@ -85,16 +95,17 @@ export function useLocale() {
                 // preference is guaranteed to be in place before it runs.
                 // reload() always preserves scroll/state (that's what makes
                 // it a "reload" rather than a "visit") — no options needed.
-                router.reload();
+                router.reload({ onFinish: () => setSwitchingLocale(false) });
             })
             .catch(() => {
                 // Best-effort: worst case the preference doesn't stick server-side
                 // this session, and the next full page load falls back to
                 // whatever cookie/user default was already there — harmless.
+                setSwitchingLocale(false);
             });
     };
 
-    return { locale, locales, setLocale } as const;
+    return { locale, locales, setLocale, switchingLocale } as const;
 }
 
 // Keeps i18next's active language in lockstep with the server-resolved

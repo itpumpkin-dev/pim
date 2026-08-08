@@ -19,7 +19,8 @@ class AttributeGroupTranslationSeeder extends Seeder
      */
     private const LABELS = [
         'general' => ['en' => 'General Information', 'th' => 'ข้อมูลทั่วไป', 'zh' => '基本信息'],
-        'pricing_packaging' => ['en' => 'Pricing & Packaging', 'th' => 'ราคาและบรรจุภัณฑ์', 'zh' => '价格与包装'],
+        'pricing_packaging' => ['en' => 'Pricing', 'th' => 'ราคา', 'zh' => '价格'],
+        'packaging' => ['en' => 'Packaging', 'th' => 'บรรจุภัณฑ์', 'zh' => '包装'],
         'specifications' => ['en' => 'Specifications', 'th' => 'ข้อมูลจำเพาะ', 'zh' => '规格参数'],
         'warranty_usage' => ['en' => 'Warranty & Usage', 'th' => 'การรับประกันและการใช้งาน', 'zh' => '保修与使用'],
     ];

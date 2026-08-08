@@ -18,17 +18,19 @@ class AttributeFamilySeeder extends Seeder
         'producttype' => 'general', 'eol' => 'general', 'pgroupname' => 'general', 'pimage' => 'general',
         'unitinfo' => 'general', 'pointtype' => 'general', 'search' => 'general', 'sales_channel' => 'general',
 
-        // pricing_packaging
-        'barcode_pcs' => 'pricing_packaging', 'width_pcs' => 'pricing_packaging', 'length_pcs' => 'pricing_packaging',
-        'height_pcs' => 'pricing_packaging', 'packaging_pcs' => 'pricing_packaging', 'weight_pcs' => 'pricing_packaging',
-        'barcode_box' => 'pricing_packaging', 'width_box' => 'pricing_packaging', 'length_box' => 'pricing_packaging',
-        'height_box' => 'pricing_packaging', 'packaging_box' => 'pricing_packaging', 'weight_box' => 'pricing_packaging',
-        'barcode_ctn' => 'pricing_packaging', 'width_ctn' => 'pricing_packaging', 'length_ctn' => 'pricing_packaging',
-        'height_ctn' => 'pricing_packaging', 'packaging_ctn' => 'pricing_packaging', 'weight_ctn' => 'pricing_packaging',
-        'price_std' => 'pricing_packaging', 'price_recommend' => 'pricing_packaging', 'shelflife' => 'pricing_packaging',
-        'cover_month' => 'pricing_packaging', 'leadtime' => 'pricing_packaging', 'moq' => 'pricing_packaging',
-        'bom' => 'pricing_packaging', 'min_stock' => 'pricing_packaging', 'max_stock' => 'pricing_packaging',
-        'qty' => 'pricing_packaging',
+        // pricing_packaging (now "Pricing" — money only) and packaging
+        // (physical/logistics — dimensions, weight, barcodes, shelf life,
+        // lead time, stock levels, ...), split from the original combined group.
+        'price_std' => 'pricing_packaging', 'price_recommend' => 'pricing_packaging',
+
+        'barcode_pcs' => 'packaging', 'width_pcs' => 'packaging', 'length_pcs' => 'packaging',
+        'height_pcs' => 'packaging', 'packaging_pcs' => 'packaging', 'weight_pcs' => 'packaging',
+        'barcode_box' => 'packaging', 'width_box' => 'packaging', 'length_box' => 'packaging',
+        'height_box' => 'packaging', 'packaging_box' => 'packaging', 'weight_box' => 'packaging',
+        'barcode_ctn' => 'packaging', 'width_ctn' => 'packaging', 'length_ctn' => 'packaging',
+        'height_ctn' => 'packaging', 'packaging_ctn' => 'packaging', 'weight_ctn' => 'packaging',
+        'shelflife' => 'packaging', 'cover_month' => 'packaging', 'leadtime' => 'packaging', 'moq' => 'packaging',
+        'bom' => 'packaging', 'min_stock' => 'packaging', 'max_stock' => 'packaging', 'qty' => 'packaging',
 
         // specifications
         'spec_specifications' => 'specifications', 'spec_features' => 'specifications', 'spec_accessories' => 'specifications',

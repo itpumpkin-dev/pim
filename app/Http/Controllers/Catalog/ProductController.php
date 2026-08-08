@@ -773,6 +773,11 @@ class ProductController extends Controller
                     'id' => $group->id,
                     'code' => $group->code,
                     'name' => $group->name ?: ucfirst($group->code),
+                    // Every locale's label, so the frontend can switch the
+                    // displayed language instantly (picking from this) instead
+                    // of waiting on a server round-trip to re-resolve `name`
+                    // above for the new locale.
+                    'translations' => $group->translations,
                     'attributes' => [],
                 ];
             }
@@ -901,7 +906,11 @@ class ProductController extends Controller
         // blocking this page. The tree itself only loads if/when the user
         // opens the picker to change the selection.
         $selectedCategories = $product->categories()->get(['categories.id', 'categories.name'])
-            ->map(fn (Category $category) => ['id' => $category->id, 'name' => $category->name]);
+            ->map(fn (Category $category) => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'translations' => $category->translations,
+            ]);
 
         return Inertia::render('catalog/products/edit', [
             'product' => [

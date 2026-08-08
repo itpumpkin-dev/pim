@@ -232,11 +232,13 @@ class ProductPresenter
             'description' => self::plainText($get('product_details_features')) ?? '-',
             'highlights' => self::toLines($get('spec_features')),
             'specs' => $specs,
-            // price_std/packaging_box both live in the pricing_packaging Attribute
-            // Group, so either both are allowed or both are blanked above — this
-            // just tells the frontend whether to render the price/packaging tiles
-            // at all, rather than showing the placeholder 0/1 fallback values.
+            // price_std and packaging_box now live in separate Attribute Groups
+            // (Pricing vs Packaging, split from the original combined group) and
+            // can be restricted independently — each flag tells the frontend
+            // whether to render that tile at all, rather than showing the
+            // placeholder 0/1 fallback values.
             'canViewPricing' => in_array('price_std', $allowedCodes, true),
+            'canViewPackaging' => in_array('packaging_box', $allowedCodes, true),
         ];
 
         if ($imagePath = $get('pimage')) {

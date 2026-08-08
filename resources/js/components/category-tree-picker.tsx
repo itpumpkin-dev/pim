@@ -4,6 +4,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import { Box, Button, Chip, Checkbox, Collapse, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import { localizedLabel, type Translation } from '@/lib/localized-label';
 
 interface CategoryNode {
     id: number;
@@ -15,6 +16,8 @@ interface CategoryNode {
 interface SelectedCategory {
     id: number;
     name: string;
+    /** Every locale's label — lets the closed-state chips switch language instantly instead of waiting on a page reload. */
+    translations?: Translation[];
 }
 
 function findAncestorIds(nodes: CategoryNode[], targetId: number, path: number[] = []): number[] | null {
@@ -78,10 +81,13 @@ export function CategoryTreePicker({
     value,
     onChange,
     initialSelected = [],
+    activeLocaleId,
 }: {
     value: number[];
     onChange: (ids: number[]) => void;
     initialSelected?: SelectedCategory[];
+    /** Resolves `initialSelected`'s chip labels for this locale instantly — omit to just use each category's already-resolved `name`. */
+    activeLocaleId?: number;
 }) {
     const [open, setOpen] = useState(false);
     const [tree, setTree] = useState<CategoryNode[]>([]);
@@ -89,7 +95,10 @@ export function CategoryTreePicker({
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
 
-    const namesById = useMemo(() => new Map(initialSelected.map((c) => [c.id, c.name])), [initialSelected]);
+    const namesById = useMemo(
+        () => new Map(initialSelected.map((c) => [c.id, activeLocaleId ? localizedLabel(c, activeLocaleId) : c.name])),
+        [initialSelected, activeLocaleId],
+    );
 
     useEffect(() => {
         if (!open || tree.length > 0) return;

@@ -139,15 +139,19 @@ export function ProductCard({ product, popular = false }: { product: Product; po
                         {product.size}
                     </Typography>
  
-                    {product.canViewPricing !== false && (
+                    {(product.canViewPricing !== false || product.canViewPackaging !== false) && (
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                                {currency(product.price)}
-                            </Typography>
-                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
-                                <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                                <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
-                            </Stack>
+                            {product.canViewPricing !== false && (
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                                    {currency(product.price)}
+                                </Typography>
+                            )}
+                            {product.canViewPackaging !== false && (
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
+                                    <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
+                                    <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
+                                </Stack>
+                            )}
                         </Stack>
                     )}
 
