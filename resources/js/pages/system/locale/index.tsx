@@ -367,7 +367,7 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                                     </TableCell>
                                     <TableCell align="right">
                                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                            {canEdit && row.code !== 'en' && (
+                                            {canEdit && (
                                                 <Tooltip title={tSystem('editTranslations')}>
                                                     <IconButton
                                                         size="small"

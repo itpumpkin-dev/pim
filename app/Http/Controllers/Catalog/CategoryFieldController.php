@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoTranslateJsonLabelsJob;
 use App\Models\CategoryField;
+use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
@@ -77,17 +79,20 @@ class CategoryFieldController extends Controller
             'options' => ['nullable', 'array', 'required_if:type,Select,Multiselect'],
             'options.*' => ['string', 'max:255'],
             'is_required' => ['required', 'boolean'],
+            'is_ai_translate' => ['nullable', 'boolean'],
             'status' => ['required', 'boolean'],
             'position' => ['required', 'integer'],
             'display_section' => ['nullable', 'string', 'max:100'],
         ]);
 
-        CodeGenerator::createWithRetry('category_fields', 'field', fn ($code) => CategoryField::create([
+        $field = CodeGenerator::createWithRetry('category_fields', 'field', fn ($code) => CategoryField::create([
             ...$validated,
             'code' => $code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
         ]));
+
+        $this->autoTranslate($field, $validated['labels']);
 
         return to_route('catalog.categoryFields.index')->with('success', 'Category field created successfully.');
     }
@@ -120,6 +125,7 @@ class CategoryFieldController extends Controller
             'options' => ['nullable', 'array', 'required_if:type,Select,Multiselect'],
             'options.*' => ['string', 'max:255'],
             'is_required' => ['required', 'boolean'],
+            'is_ai_translate' => ['nullable', 'boolean'],
             'status' => ['required', 'boolean'],
             'position' => ['required', 'integer'],
             'display_section' => ['nullable', 'string', 'max:100'],
@@ -130,7 +136,66 @@ class CategoryFieldController extends Controller
             'updated_by' => $request->user()?->id,
         ]);
 
+        $this->autoTranslate($categoryField, $validated['labels']);
+
         return to_route('catalog.categoryFields.index')->with('success', 'Category field updated successfully.');
+    }
+
+    /**
+     * When "AI translate" is enabled, queues a job to pre-fill every other
+     * active locale's label that doesn't already have one — same pattern as
+     * AttributeController/AttributeOptionController, but writing into the
+     * `labels` JSON column instead of a related translations table (see
+     * AttributeAutoTranslator::fillMissingJsonColumn()).
+     */
+    private function autoTranslate(CategoryField $field, array $labels): void
+    {
+        if (!$field->is_ai_translate) {
+            return;
+        }
+
+        [$sourceLocaleId, $sourceLabel] = $this->resolveAutoTranslateSource($labels);
+
+        if ($sourceLocaleId === null || $sourceLabel === '') {
+            return;
+        }
+
+        AutoTranslateJsonLabelsJob::dispatch(
+            CategoryField::class,
+            $field->id,
+            'labels',
+            $sourceLocaleId,
+            $sourceLabel,
+        );
+    }
+
+    /**
+     * Picks which locale to translate FROM. Prefers the app's default locale
+     * when it was filled in, but falls back to whichever locale actually has
+     * a label otherwise — see AttributeController::resolveAutoTranslateSource()
+     * for why requiring the default locale specifically silently skips
+     * auto-translation for a field filled in only in another language.
+     *
+     * @param  array<int|string, mixed>  $labels
+     * @return array{0: int|null, 1: string}
+     */
+    private function resolveAutoTranslateSource(array $labels): array
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+        $defaultLabel = trim((string) ($labels[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId !== null && $defaultLabel !== '') {
+            return [$defaultLocaleId, $defaultLabel];
+        }
+
+        foreach ($labels as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label !== '') {
+                return [(int) $localeId, $label];
+            }
+        }
+
+        return [null, ''];
     }
 
     /**

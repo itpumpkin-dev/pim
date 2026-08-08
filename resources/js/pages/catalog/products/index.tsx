@@ -81,6 +81,7 @@ interface ProductRow {
     family?: { id: number; code: string };
     name?: string | null;
     image_url?: string | null;
+    completeness?: number | null;
     attribute_values?: Record<string, unknown>;
     [key: string]: unknown;
 }
@@ -282,13 +283,26 @@ export default function ProductIndex({ gridData, filters, attributes, families }
             {
                 key: 'complete',
                 label: t('complete'),
-                render: () => (
-                    <Chip
-                        label={t('notApplicable')}
-                        size="small"
-                        sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                    />
-                ),
+                render: (row) => {
+                    const completeness = row.completeness;
+                    if (completeness === null || completeness === undefined) {
+                        return (
+                            <Chip
+                                label={t('notApplicable')}
+                                size="small"
+                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            />
+                        );
+                    }
+                    const color = completeness >= 80 ? '#22c55e' : completeness >= 50 ? '#f59e0b' : '#ef4444';
+                    return (
+                        <Chip
+                            label={`${completeness}%`}
+                            size="small"
+                            sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                        />
+                    );
+                },
             },
             { key: 'created_at', label: t('createdAt'), render: (row) => formatDateTime(row.created_at) },
             { key: 'updated_at', label: t('updatedAt'), render: (row) => formatDateTime(row.updated_at) },

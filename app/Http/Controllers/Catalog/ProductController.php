@@ -80,6 +80,17 @@ class ProductController extends Controller
             ->where('attributes.type', 'image')
             ->pluck('attributes.id', 'family_attributes.family_id');
 
+        // Completeness = share of every attribute assigned to a product's
+        // family (not just the required ones) that already has a value.
+        // Grouped by family up front so every product on the page reuses the
+        // same lookup instead of re-querying per row.
+        $familyIds = $gridData->getCollection()->pluck('family_id')->filter()->unique();
+        $familyAttributeIdsByFamily = FamilyAttribute::query()
+            ->whereIn('family_id', $familyIds)
+            ->get(['family_id', 'attribute_id'])
+            ->groupBy('family_id')
+            ->map(fn ($rows) => $rows->pluck('attribute_id'));
+
         $productIds = $gridData->getCollection()->pluck('id');
         $parentIds = $gridData->getCollection()->pluck('parent_id')->filter()->unique();
 
@@ -114,8 +125,22 @@ class ProductController extends Controller
             )
             ->get(['product_id', 'attribute_id', 'value']);
 
-        $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus) {
+        $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
+
+            $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
+            if ($familyAttributeIds->isEmpty()) {
+                // Family has no attributes assigned at all — nothing to
+                // measure completeness against, so "N/A" rather than a
+                // misleading 100%.
+                $product->completeness = null;
+            } else {
+                $filledCount = $familyAttributeIds->filter(function ($attributeId) use ($product, $values) {
+                    $raw = optional($values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $attributeId))->value;
+                    return $raw !== null && trim((string) $raw) !== '';
+                })->count();
+                $product->completeness = (int) round($filledCount / $familyAttributeIds->count() * 100);
+            }
 
             $product->name = $nameAttributeId
                 ? optional($values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $nameAttributeId))->value

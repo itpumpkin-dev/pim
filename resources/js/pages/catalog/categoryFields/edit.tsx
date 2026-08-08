@@ -17,6 +17,7 @@ interface CategoryFieldItem {
     labels: Record<string, string>;
     options: string[] | null;
     is_required: boolean;
+    is_ai_translate: boolean;
     status: boolean;
     position: number;
     display_section: string | null;
@@ -44,6 +45,7 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
         labels: field.labels || {},
         options: field.options || ([] as string[]),
         is_required: Boolean(field.is_required),
+        is_ai_translate: Boolean(field.is_ai_translate),
         status: Boolean(field.status),
         position: field.position || 0,
         display_section: field.display_section || 'General',
@@ -152,6 +154,10 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                                 <FormControlLabel
                                     control={<Checkbox checked={data.is_required} onChange={(e) => setData('is_required', e.target.checked)} />}
                                     label="Required field"
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                    label={t('aiTranslate')}
                                 />
                                 <FormControlLabel
                                     control={<Checkbox checked={data.status} onChange={(e) => setData('status', e.target.checked)} />}

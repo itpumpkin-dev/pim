@@ -11,6 +11,7 @@
         "unique": "Unique",
         "localeBased": "Locale Based",
         "channelBased": "Channel Based",
+        "aiTranslate": "AI Translate",
         "employeeId": "Employee ID",
         "username": "Username",
         "firstName": "First name",

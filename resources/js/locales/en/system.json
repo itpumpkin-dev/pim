@@ -53,6 +53,7 @@
     "noTranslationEntriesFound": "No matching strings.",
     "saveTranslations": "Save Changes",
     "unsavedTranslationsCount": "{{count}} unsaved",
+    "contentTranslationsTab": "Content",
 
     "translationProvidersTitle": "Translation Providers",
     "createTranslationProvider": "Add Provider",

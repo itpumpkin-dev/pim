@@ -4,11 +4,12 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, CircularProgress, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/catalog/lazada-category-picker';
@@ -18,6 +19,7 @@ interface CategoryItem {
     code: string;
     name: string;
     description: string | null;
+    is_ai_translate: boolean;
     parent_id: number | null;
     additional_data: Record<string, any> | null;
     lazada_category_id: number | null;
@@ -26,11 +28,12 @@ interface CategoryItem {
 
 interface Props {
     category: CategoryItem;
+    translations: Record<string, string>;
     categoryFields: CategoryFieldItem[];
     canViewHistory?: boolean;
 }
 
-export default function CategoryEdit({ category, categoryFields = [], canViewHistory = false }: Props) {
+export default function CategoryEdit({ category, translations, categoryFields = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -47,7 +50,8 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
 
     const { data, setData, post, transform, processing, errors } = useForm({
         code: category.code || '',
-        name: category.name || '',
+        translations: translations || ({} as Record<string, string>),
+        is_ai_translate: Boolean(category.is_ai_translate),
         description: category.description || '',
         parent_id: (category.parent_id !== null ? category.parent_id : '') as string | number,
         lazada_category_id: category.lazada_category_id,
@@ -102,15 +106,6 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
-                                label={t('name') + ' *'}
-                                required
-                                fullWidth
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                error={Boolean(errors.name)}
-                                helperText={errors.name}
-                            />
-                            <TextField
                                 label={t('code')}
                                 fullWidth
                                 value={data.code}
@@ -153,8 +148,18 @@ export default function CategoryEdit({ category, categoryFields = [], canViewHis
                                 error={Boolean(errors.description)}
                                 helperText={errors.description}
                             />
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                label={t('aiTranslate')}
+                            />
                         </Stack>
                     </Paper>
+
+                    <LocaleLabelFields
+                        title={t('name')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
 
                     {categoryFields.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 3 }}>

@@ -24,6 +24,7 @@ export default function CategoryFieldCreate() {
         labels: {} as Record<string, string>,
         options: [] as string[],
         is_required: false,
+        is_ai_translate: false,
         status: true,
         position: 0,
         display_section: 'General',
@@ -109,6 +110,10 @@ export default function CategoryFieldCreate() {
                                 <FormControlLabel
                                     control={<Checkbox checked={data.is_required} onChange={(e) => setData('is_required', e.target.checked)} />}
                                     label="Required field"
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                    label={t('aiTranslate')}
                                 />
                                 <FormControlLabel
                                     control={<Checkbox checked={data.status} onChange={(e) => setData('status', e.target.checked)} />}

@@ -18,6 +18,7 @@ class CategoryField extends Model
         'options',
         'is_required',
         'value_per_locale',
+        'is_ai_translate',
         'status',
         'position',
         'display_section',
@@ -30,6 +31,7 @@ class CategoryField extends Model
         return [
             'is_required' => 'boolean',
             'value_per_locale' => 'boolean',
+            'is_ai_translate' => 'boolean',
             'status' => 'boolean',
             'position' => 'integer',
             'labels' => 'array',

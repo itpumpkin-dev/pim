@@ -12,11 +12,14 @@ class Category extends Model
 {
     use Auditable;
 
+    protected $with = ['translations'];
+
     protected $fillable = [
         'code',
         'name',
         'description',
         'additional_data',
+        'is_ai_translate',
         'parent_id',
         'lazada_category_id',
         'created_by',
@@ -27,7 +30,38 @@ class Category extends Model
     {
         return [
             'additional_data' => 'array',
+            'is_ai_translate' => 'boolean',
         ];
+    }
+
+    /**
+     * Resolves to the current locale's translated name when one exists,
+     * falling back to the raw `name` column otherwise — same pattern as
+     * Attribute::name. Writes still go straight to the raw column (no `set`
+     * closure), so every existing caller (Lazada sync, imports, tree
+     * builders that write $category->name directly) is unaffected.
+     */
+    protected function name(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function ($value) {
+                if ($this->relationLoaded('translations')) {
+                    $localeId = Locale::idForCode(app()->getLocale());
+                    if ($localeId) {
+                        $translation = $this->translations->firstWhere('locale_id', $localeId);
+                        if ($translation && !empty(trim((string) $translation->label))) {
+                            return $translation->label;
+                        }
+                    }
+                }
+                return $value;
+            }
+        );
+    }
+
+    public function translations(): HasMany
+    {
+        return $this->hasMany(CategoryTranslation::class);
     }
 
     public function getAdditionalData(string $code, $default = null)

@@ -23,6 +23,9 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
+
+const CONTENT_NAMESPACE = 'content';
 
 interface LocaleModel {
     id: number;
@@ -41,9 +44,10 @@ interface Props {
     namespaces: string[];
     activeNamespace: string | null;
     entries: TranslationEntry[];
+    contentGroups: ContentGroup[] | null;
 }
 
-export default function LocaleTranslations({ localeModel, namespaces, activeNamespace, entries }: Props) {
+export default function LocaleTranslations({ localeModel, namespaces, activeNamespace, entries, contentGroups }: Props) {
     const { t: tSystem } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
     const { t } = useTranslation('grid');
@@ -110,6 +114,8 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
         );
     };
 
+    const isContentTab = activeNamespace === CONTENT_NAMESPACE;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${tSystem('translationsTitle')}: ${localeModel.code}`} />
@@ -119,7 +125,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                         {tSystem('translationsTitle')}: {localeModel.display_name || localeModel.code}
                     </Typography>
                     <Stack direction="row" spacing={1.5} alignItems="center">
-                        {dirtyCount > 0 && (
+                        {!isContentTab && dirtyCount > 0 && (
                             <Typography variant="body2" color="text.secondary">
                                 {tSystem('unsavedTranslationsCount', { count: dirtyCount })}
                             </Typography>
@@ -132,15 +138,17 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                         >
                             {t('cancel')}
                         </Button>
-                        <Button
-                            variant="contained"
-                            disabled={dirtyCount === 0 || saving}
-                            onClick={save}
-                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{ textTransform: 'none', fontWeight: 700, px: 2.5 }}
-                        >
-                            {saving ? 'Saving…' : tSystem('saveTranslations')}
-                        </Button>
+                        {!isContentTab && (
+                            <Button
+                                variant="contained"
+                                disabled={dirtyCount === 0 || saving}
+                                onClick={save}
+                                startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
+                                sx={{ textTransform: 'none', fontWeight: 700, px: 2.5 }}
+                            >
+                                {saving ? 'Saving…' : tSystem('saveTranslations')}
+                            </Button>
+                        )}
                     </Stack>
                 </Stack>
 
@@ -155,67 +163,79 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                         {namespaces.map((namespace) => (
                             <Tab key={namespace} value={namespace} label={namespace} sx={{ textTransform: 'none' }} />
                         ))}
+                        <Tab
+                            key={CONTENT_NAMESPACE}
+                            value={CONTENT_NAMESPACE}
+                            label={tSystem('contentTranslationsTab')}
+                            sx={{ textTransform: 'none', fontWeight: 700 }}
+                        />
                     </Tabs>
                 </Paper>
 
-                <TextField
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder={tSystem('searchTranslations')}
-                    size="small"
-                    sx={{ mb: 2, minWidth: 320, bgcolor: '#fff' }}
-                    InputProps={{
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <SearchIcon sx={{ color: 'text.secondary' }} />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                {isContentTab ? (
+                    contentGroups && <ContentTranslationCoverage localeId={localeModel.id} groups={contentGroups} />
+                ) : (
+                    <>
+                        <TextField
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder={tSystem('searchTranslations')}
+                            size="small"
+                            sx={{ mb: 2, minWidth: 320, bgcolor: '#fff' }}
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <SearchIcon sx={{ color: 'text.secondary' }} />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
 
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-                    <Table size="small">
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, width: '25%' }}>{tSystem('translationKey')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, width: '35%' }}>{tSystem('translationSource')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, width: '40%' }}>{tSystem('translationValue')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredEntries.map((entry) => (
-                                <TableRow key={entry.path} hover>
-                                    <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#64748b', verticalAlign: 'top', pt: 1.5 }}>
-                                        {entry.path}
-                                    </TableCell>
-                                    <TableCell sx={{ color: 'text.secondary', verticalAlign: 'top', pt: 1.5 }}>{entry.source}</TableCell>
-                                    <TableCell sx={{ verticalAlign: 'top' }}>
-                                        <TextField
-                                            fullWidth
-                                            multiline
-                                            size="small"
-                                            value={values[entry.path] ?? ''}
-                                            onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
-                                            sx={{
-                                                bgcolor: '#fff',
-                                                ...(dirty[entry.path] !== undefined && {
-                                                    '& .MuiOutlinedInput-root': { borderColor: 'warning.main' },
-                                                }),
-                                            }}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {filteredEntries.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        {tSystem('noTranslationEntriesFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                            <Table size="small">
+                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                    <TableRow>
+                                        <TableCell sx={{ fontWeight: 700, width: '25%' }}>{tSystem('translationKey')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '35%' }}>{tSystem('translationSource')}</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, width: '40%' }}>{tSystem('translationValue')}</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {filteredEntries.map((entry) => (
+                                        <TableRow key={entry.path} hover>
+                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#64748b', verticalAlign: 'top', pt: 1.5 }}>
+                                                {entry.path}
+                                            </TableCell>
+                                            <TableCell sx={{ color: 'text.secondary', verticalAlign: 'top', pt: 1.5 }}>{entry.source}</TableCell>
+                                            <TableCell sx={{ verticalAlign: 'top' }}>
+                                                <TextField
+                                                    fullWidth
+                                                    multiline
+                                                    size="small"
+                                                    value={values[entry.path] ?? ''}
+                                                    onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
+                                                    sx={{
+                                                        bgcolor: '#fff',
+                                                        ...(dirty[entry.path] !== undefined && {
+                                                            '& .MuiOutlinedInput-root': { borderColor: 'warning.main' },
+                                                        }),
+                                                    }}
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                    {filteredEntries.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                                {tSystem('noTranslationEntriesFound')}
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </>
+                )}
             </Box>
 
             <Snackbar

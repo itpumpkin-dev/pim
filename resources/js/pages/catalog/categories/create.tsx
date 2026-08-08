@@ -3,11 +3,12 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, Stack, TextField, Typography } from '@mui/material';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 
@@ -28,7 +29,8 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
     ];
 
     const { data, setData, post, processing, errors, transform } = useForm({
-        name: '',
+        translations: {} as Record<string, string>,
+        is_ai_translate: false,
         description: '',
         parent_id: 'root' as string | number,
         additional_data: {} as Record<string, any>,
@@ -65,15 +67,6 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
-                            <TextField
-                                label={t('name') + ' *'}
-                                required
-                                fullWidth
-                                value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                error={Boolean(errors.name)}
-                                helperText={errors.name}
-                            />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                                     {t('parentCategory')}
@@ -94,8 +87,18 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                 error={Boolean(errors.description)}
                                 helperText={errors.description}
                             />
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                label={t('aiTranslate')}
+                            />
                         </Stack>
                     </Paper>
+
+                    <LocaleLabelFields
+                        title={t('name')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
 
                     {categoryFields.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 3 }}>

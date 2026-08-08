@@ -11,6 +11,7 @@
         "unique": "ไม่ซ้ำ",
         "localeBased": "แยกตามภาษา",
         "channelBased": "แยกตามช่องทาง",
+        "aiTranslate": "แปลด้วย AI",
         "employeeId": "รหัสพนักงาน",
         "username": "ชื่อผู้ใช้",
         "firstName": "ชื่อจริง",

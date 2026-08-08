@@ -39,6 +39,11 @@ datagrid:
         type: boolean
         sortable: true
         filterable: true
+      is_ai_translate:
+        label: fields.aiTranslate
+        type: boolean
+        sortable: true
+        filterable: true
       created_at:
         label: fields.createdAt
         type: datetime

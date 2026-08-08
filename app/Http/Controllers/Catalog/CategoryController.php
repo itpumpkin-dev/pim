@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoTranslateLabelsJob;
+use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\CategoryField;
+use App\Models\CategoryTranslation;
 use App\Models\LazadaCategory;
 use App\Models\LazadaSellerAccount;
+use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\Lazada\LazadaClient;
@@ -83,7 +87,10 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
+            'is_ai_translate' => ['boolean'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
@@ -116,16 +123,27 @@ class CategoryController extends Controller
         $validated = $request->validate($rules);
         $validated['additional_data'] = $this->storeUploadedFields($request, $categoryFields, $validated['additional_data'] ?? []);
 
-        CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
+        $translations = $validated['translations'] ?? [];
+
+        $category = CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
             'code' => $code,
-            'name' => $validated['name'],
+            'name' => $this->resolveName($translations, $validated['name'] ?? null, $code),
             'description' => $validated['description'],
+            'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
             'lazada_category_id' => $validated['lazada_category_id'] ?? null,
             'additional_data' => $validated['additional_data'],
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
         ]));
+
+        $this->syncTranslations($category, $translations);
+        $this->autoTranslate($category, $translations);
+
+        $newTranslations = $this->currentTranslations($category);
+        if (!empty($newTranslations)) {
+            AuditLog::record('labels_set', $category, null, $newTranslations);
+        }
 
         return to_route('catalog.categories.index')->with('success', 'Category created successfully.');
     }
@@ -168,6 +186,7 @@ class CategoryController extends Controller
 
         return Inertia::render('catalog/categories/edit', [
             'category' => $category->load('lazadaCategory:id,name,parent_id'),
+            'translations' => $this->currentTranslations($category),
             'categoryFields' => $categoryFields,
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
@@ -214,7 +233,10 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
+            'is_ai_translate' => ['boolean'],
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
@@ -283,16 +305,130 @@ class CategoryController extends Controller
             }
         }
 
+        $translations = $validated['translations'] ?? [];
+        $oldTranslations = $this->currentTranslations($category);
+
         $category->update([
-            'name' => $validated['name'],
+            'name' => $this->resolveName($translations, $validated['name'] ?? null, $category->code),
             'description' => $validated['description'],
+            'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
             'lazada_category_id' => $validated['lazada_category_id'] ?? null,
             'additional_data' => $validated['additional_data'] ?? [],
             'updated_by' => $request->user()?->id,
         ]);
 
+        $this->syncTranslations($category, $translations);
+        $this->autoTranslate($category, $translations);
+
+        $newTranslations = $this->currentTranslations($category);
+        if ($oldTranslations !== $newTranslations) {
+            AuditLog::record('labels_updated', $category, $oldTranslations, $newTranslations);
+        }
+
         return to_route('catalog.categories.index')->with('success', 'Category updated successfully.');
+    }
+
+    /**
+     * Fresh (uncached) locale_id => label map for the category's current
+     * translations — used to snapshot before/after state for audit diffs.
+     */
+    private function currentTranslations(Category $category): array
+    {
+        return $category->translations()->get()
+            ->mapWithKeys(fn (CategoryTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+    }
+
+    private function resolveName(array $translations, ?string $name, ?string $code = null): string
+    {
+        $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
+
+        if ($defaultLocaleId !== null && !empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
+            return trim($translations[$defaultLocaleId]);
+        }
+
+        $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+        if ($firstNonEmpty !== null) {
+            return trim($firstNonEmpty);
+        }
+
+        return $name ?? ($code !== null ? ucfirst($code) : 'Category');
+    }
+
+    /**
+     * When "AI translate" is enabled, queues a job to pre-fill every other
+     * active locale that doesn't already have a translation — same pattern
+     * as AttributeController::autoTranslate().
+     */
+    private function autoTranslate(Category $category, array $translations): void
+    {
+        if (!$category->is_ai_translate) {
+            return;
+        }
+
+        [$sourceLocaleId, $sourceLabel] = $this->resolveAutoTranslateSource($translations);
+
+        if ($sourceLocaleId === null || $sourceLabel === '') {
+            return;
+        }
+
+        AutoTranslateLabelsJob::dispatch(
+            CategoryTranslation::class,
+            'category_id',
+            $category->id,
+            $sourceLocaleId,
+            $sourceLabel,
+        );
+    }
+
+    /**
+     * Picks which locale to translate FROM. Prefers the app's default locale
+     * when it was filled in, but falls back to whichever locale actually has
+     * a label otherwise — see AttributeController::resolveAutoTranslateSource()
+     * for why requiring the default locale specifically silently skips
+     * auto-translation for a category named only in another language.
+     *
+     * @param  array<int|string, mixed>  $translations
+     * @return array{0: int|null, 1: string}
+     */
+    private function resolveAutoTranslateSource(array $translations): array
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+        $defaultLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId !== null && $defaultLabel !== '') {
+            return [$defaultLocaleId, $defaultLabel];
+        }
+
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label !== '') {
+                return [(int) $localeId, $label];
+            }
+        }
+
+        return [null, ''];
+    }
+
+    private function syncTranslations(Category $category, array $translations): void
+    {
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+
+            if ($label === '') {
+                CategoryTranslation::where('category_id', $category->id)
+                    ->where('locale_id', $localeId)
+                    ->delete();
+
+                continue;
+            }
+
+            CategoryTranslation::updateOrCreate(
+                ['category_id' => $category->id, 'locale_id' => $localeId],
+                ['label' => $label]
+            );
+        }
     }
 
     /**
