@@ -2,15 +2,20 @@
 
 namespace App\Services\ImportExport;
 
+use App\Models\User;
+
 class SampleTemplateBuilder
 {
     /**
      * A header row plus one example row, as CSV text — regardless of the
      * config's chosen file_format, since this is just a schema reference.
+     * $user, when given, drops columns for 'products' attributes that
+     * user's role can't edit (see AttributeAccessPolicy) — no point handing
+     * out a template column they'd never be allowed to fill in anyway.
      */
-    public static function build(string $type): string
+    public static function build(string $type, ?User $user = null): string
     {
-        $columns = ImportExportRegistry::importer($type)->columns();
+        $columns = ImportExportRegistry::importer($type, $user)->columns();
         $example = self::exampleRow($type);
 
         $handle = fopen('php://temp', 'r+');

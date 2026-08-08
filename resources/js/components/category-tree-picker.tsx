@@ -1,7 +1,8 @@
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
-import { Box, Checkbox, Collapse, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Chip, Checkbox, Collapse, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
 interface CategoryNode {
@@ -9,6 +10,11 @@ interface CategoryNode {
     code: string;
     name: string;
     children: CategoryNode[];
+}
+
+interface SelectedCategory {
+    id: number;
+    name: string;
 }
 
 function findAncestorIds(nodes: CategoryNode[], targetId: number, path: number[] = []): number[] | null {
@@ -61,17 +67,34 @@ function highlightMatch(name: string, query: string) {
 }
 
 /**
- * Multi-select category tree: tick any node at any depth. Fetches the whole
- * tree once (catalog.categories.tree, ~1,086 rows) and renders it collapsed
- * except for the ancestors of whatever's already selected.
+ * Multi-select category tree: tick any node at any depth. The full tree
+ * (catalog.categories.tree, ~1,086 rows) is only fetched once the user
+ * actually opens the picker — before that, already-assigned categories are
+ * shown as plain chips from `initialSelected` (passed down from the Edit
+ * Product page's own load, a handful of rows) so the page never has to wait
+ * on the tree just to render what's already selected.
  */
-export function CategoryTreePicker({ value, onChange }: { value: number[]; onChange: (ids: number[]) => void }) {
+export function CategoryTreePicker({
+    value,
+    onChange,
+    initialSelected = [],
+}: {
+    value: number[];
+    onChange: (ids: number[]) => void;
+    initialSelected?: SelectedCategory[];
+}) {
+    const [open, setOpen] = useState(false);
     const [tree, setTree] = useState<CategoryNode[]>([]);
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
 
+    const namesById = useMemo(() => new Map(initialSelected.map((c) => [c.id, c.name])), [initialSelected]);
+
     useEffect(() => {
+        if (!open || tree.length > 0) return;
+
+        setLoading(true);
         fetch('/catalog/categories/tree', { headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : []))
             .then((data: CategoryNode[]) => {
@@ -86,7 +109,7 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
             })
             .finally(() => setLoading(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [open]);
 
     const query = search.trim().toLowerCase();
     const visibleIds = useMemo(() => (query ? collectVisible(tree, query) : null), [tree, query]);
@@ -145,6 +168,35 @@ export function CategoryTreePicker({ value, onChange }: { value: number[]; onCha
             </Box>
         );
     };
+
+    const removeSelected = (id: number) => onChange(value.filter((v) => v !== id));
+
+    if (!open) {
+        return (
+            <Stack spacing={1.5}>
+                {value.length > 0 ? (
+                    <Stack direction="row" flexWrap="wrap" sx={{ gap: 1 }}>
+                        {value.map((id) => (
+                            <Chip key={id} label={namesById.get(id) ?? `#${id}`} size="small" onDelete={() => removeSelected(id)} />
+                        ))}
+                    </Stack>
+                ) : (
+                    <Typography variant="body2" color="text.secondary">
+                        ยังไม่ได้กำหนดหมวดหมู่
+                    </Typography>
+                )}
+                <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<EditOutlinedIcon fontSize="small" />}
+                    onClick={() => setOpen(true)}
+                    sx={{ alignSelf: 'flex-start' }}
+                >
+                    {value.length > 0 ? 'แก้ไขหมวดหมู่' : 'เลือกหมวดหมู่'}
+                </Button>
+            </Stack>
+        );
+    }
 
     if (loading) {
         return (

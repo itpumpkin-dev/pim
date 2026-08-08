@@ -556,8 +556,10 @@ export default function ProductShow({ product, related }: { product: Product | n
         cells.push({ w: 4, h: 4, weight: 4, data: { key: 'video', type: 'video', render: videoRender } });
     }
 
-    cells.push({ w: 3, h: 3, weight: 4, data: { key: 'price', type: 'stat', render: priceRender } });
-    cells.push({ w: 3, h: 3, weight: 4, data: { key: 'packaging', type: 'stat', render: packagingRender } });
+    if (product.canViewPricing !== false) {
+        cells.push({ w: 3, h: 3, weight: 4, data: { key: 'price', type: 'stat', render: priceRender } });
+        cells.push({ w: 3, h: 3, weight: 4, data: { key: 'packaging', type: 'stat', render: packagingRender } });
+    }
     cells.push({
         w: 2,
         h: 2,

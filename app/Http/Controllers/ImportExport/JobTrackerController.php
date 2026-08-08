@@ -33,6 +33,8 @@ class JobTrackerController extends Controller
 
     public function show(JobTracker $jobTracker): Response
     {
+        $this->assertCanViewJobData($jobTracker);
+
         $jobTracker->load('user:id,username,first_name,last_name');
 
         return Inertia::render('import-export/jobs/show', [
@@ -42,6 +44,8 @@ class JobTrackerController extends Controller
 
     public function status(JobTracker $jobTracker): JsonResponse
     {
+        $this->assertCanViewJobData($jobTracker);
+
         return response()->json([
             'status' => $jobTracker->status,
             'total_records_created' => $jobTracker->total_records_created,
@@ -58,11 +62,35 @@ class JobTrackerController extends Controller
 
     public function download(JobTracker $jobTracker): StreamedResponse
     {
+        $this->assertCanViewJobData($jobTracker);
+
         abort_unless(
             $jobTracker->job_type === 'export' && $jobTracker->status === 'completed' && $jobTracker->result_file_path,
             404
         );
 
         return Storage::disk('local')->download($jobTracker->result_file_path);
+    }
+
+    /**
+     * A job's `entity_type` is the only granularity we have — a 'products'
+     * import/export always spans every non-locale/non-channel attribute
+     * across every attribute group at once (see ProductRowImporter::columns()),
+     * there's no per-job record of which specific groups/attributes it
+     * touched. So this can't reuse ProductController's per-group check
+     * (canUserViewAttributeGroup) — it can only ask the coarser question
+     * "has this role been scoped to specific attribute groups at all", and
+     * if so, hide every 'products' job's details rather than guess which
+     * ones are actually safe to show.
+     */
+    private function assertCanViewJobData(JobTracker $jobTracker): void
+    {
+        $user = auth()->user();
+
+        abort_if(
+            $jobTracker->entity_type === 'products' && $user && $user->hasAttributeGroupRestrictions(),
+            403,
+            'Your role\'s Attribute Access restrictions prevent viewing product import/export job details.'
+        );
     }
 }

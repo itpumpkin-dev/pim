@@ -8,14 +8,15 @@ use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
  * Maps EAV-backed Product/ProductValue rows to the plain shape the public
- * storefront pages (home, products/show) expect, matching the `Product`
- * interface in resources/js/data/products.ts.
+ * home page and the internal staff products/show preview expect, matching
+ * the `Product` interface in resources/js/data/products.ts.
  */
 class ProductPresenter
 {
@@ -28,6 +29,9 @@ class ProductPresenter
         'how_to_use', 'warnings',
     ];
 
+    /** Select-type codes among CODES whose stored value is an AttributeOption code, not a display label — see resolveSelectOptionLabels(). */
+    private const SELECT_CODES_TO_RESOLVE = ['pcatname', 'pbaseunit', 'pbrand'];
+
     /**
      * @param  string  $localeCode  Which locale's ProductValue rows (pname, spec_*, ...)
      *                              to prefer. Defaults to 'th' for the public storefront
@@ -35,14 +39,26 @@ class ProductPresenter
      *                              of the visitor's browser — pass app()->getLocale() for
      *                              admin-facing callers (e.g. the dashboard) so the result
      *                              follows whatever language the admin has switched to.
+     * @param  ?User  $viewer  When given, fields whose attribute belongs to an Attribute
+     *                         Group the viewer's role can't view (Attribute Access
+     *                         permissions) are blanked out — same rule as the product
+     *                         edit page and export/import. Null (the default, used by
+     *                         the public home() page) means no restriction.
      */
-    public static function mapMany(Collection $products, string $localeCode = 'th'): array
+    public static function mapMany(Collection $products, string $localeCode = 'th', ?User $viewer = null): array
     {
         if ($products->isEmpty()) {
             return [];
         }
 
-        $attributesByCode = Attribute::whereIn('code', self::CODES)->get(['id', 'code'])->keyBy('id');
+        $attributesByCode = Attribute::whereIn('code', self::CODES)->get(['id', 'code', 'name'])->keyBy('id');
+        $allowedCodes = app(AttributeAccessPolicy::class)->filterAttributeCodes($viewer, self::CODES, 'view');
+
+        // Attribute::name resolves through its translations relation to
+        // whatever label an admin actually configured (Attribute management),
+        // in the current app locale — used so the specs table shows real,
+        // admin-editable headings instead of text hardcoded here.
+        $labelsByCode = $attributesByCode->values()->pluck('name', 'code');
 
         // Locale-based attributes (pname, spec_*, ...) store one ProductValue
         // row per locale. Only ever display $localeCode, and order null-locale
@@ -69,7 +85,7 @@ class ProductPresenter
             )
         );
 
-        $valuesByProduct = self::resolvePcatnameLabels($valuesByProduct, $attributesByCode);
+        $valuesByProduct = self::resolveSelectOptionLabels($valuesByProduct, $attributesByCode);
 
         $categoryNamesByProduct = self::rootCategoryNames($products);
 
@@ -77,36 +93,47 @@ class ProductPresenter
             fn (Product $product) => self::mapOne(
                 $product,
                 $valuesByProduct->get($product->id, collect()),
-                $categoryNamesByProduct->get($product->id)
+                $categoryNamesByProduct->get($product->id),
+                $allowedCodes,
+                $labelsByCode
             )
         )->values()->all();
     }
 
     /**
-     * `pcatname` is now a select field backed by AttributeOption, whose
-     * stored value is the option's `code` (not its label — codes have to be
-     * unique per attribute, and several category names collide, so the
-     * label can't be the code). Resolve it back to the Thai name here so
-     * every consumer of the mapped product still sees a real name instead
-     * of a bare code like "a". Values from before this field became a
-     * dropdown (plain free-typed text) won't match any option code and pass
-     * through unchanged.
+     * pcatname/pbaseunit/pbrand are select fields backed by AttributeOption,
+     * whose stored value is the option's `code` (not its label — codes have
+     * to be unique per attribute, and several labels collide across
+     * attributes, so the label can't double as the code). Resolve each back
+     * to its real admin_label here so every consumer of the mapped product
+     * sees "พัมคิน"/"ชิ้น" instead of a bare code like "option_1". Values
+     * from before a field became a dropdown (plain free-typed text) won't
+     * match any option code and pass through unchanged.
      *
      * @return Collection<int, Collection<string, string>>
      */
-    private static function resolvePcatnameLabels(Collection $valuesByProduct, Collection $attributesByCode): Collection
+    private static function resolveSelectOptionLabels(Collection $valuesByProduct, Collection $attributesByCode): Collection
     {
-        $pcatnameAttributeId = $attributesByCode->search(fn ($attr) => $attr->code === 'pcatname');
-        if ($pcatnameAttributeId === false) {
+        $attributeIdsByCode = collect(self::SELECT_CODES_TO_RESOLVE)
+            ->mapWithKeys(fn (string $code) => [$code => $attributesByCode->search(fn ($attr) => $attr->code === $code)])
+            ->filter(fn ($id) => $id !== false);
+
+        if ($attributeIdsByCode->isEmpty()) {
             return $valuesByProduct;
         }
 
-        $labelsByCode = AttributeOption::where('attribute_id', $pcatnameAttributeId)->pluck('admin_label', 'code');
+        $labelsByAttributeId = AttributeOption::whereIn('attribute_id', $attributeIdsByCode->values())
+            ->get(['attribute_id', 'code', 'admin_label'])
+            ->groupBy('attribute_id')
+            ->map(fn (Collection $options) => $options->pluck('admin_label', 'code'));
 
-        return $valuesByProduct->map(function (Collection $values) use ($labelsByCode) {
-            if ($values->has('pcatname')) {
-                $raw = $values->get('pcatname');
-                $values = $values->put('pcatname', $labelsByCode->get($raw, $raw));
+        return $valuesByProduct->map(function (Collection $values) use ($attributeIdsByCode, $labelsByAttributeId) {
+            foreach ($attributeIdsByCode as $code => $attributeId) {
+                if ($values->has($code)) {
+                    $raw = $values->get($code);
+                    $labels = $labelsByAttributeId->get($attributeId, collect());
+                    $values = $values->put($code, $labels->get($raw, $raw));
+                }
             }
 
             return $values;
@@ -148,19 +175,48 @@ class ProductPresenter
         })->filter();
     }
 
-    private static function mapOne(Product $product, Collection $values, ?string $categoryName): array
+    /**
+     * Falls back to the original hardcoded Thai text only if the attribute
+     * itself (or its name) is somehow missing — the real label always comes
+     * from $labelsByCode (Attribute::name, i.e. Attribute management) below.
+     */
+    private const SPEC_LABEL_FALLBACKS = [
+        'spec_specifications' => 'ข้อมูลจำเพาะ',
+        'spec_packaging' => 'บรรจุภัณฑ์',
+        'spec_accessories' => 'อุปกรณ์เสริม',
+        'how_to_use' => 'วิธีใช้งาน',
+        'warnings' => 'คำเตือน',
+        'warranty_period' => 'การรับประกัน',
+    ];
+
+    /**
+     * @param  array<int, string>  $allowedCodes  Codes from self::CODES the viewer is
+     *                                             permitted to see (see mapMany()'s
+     *                                             $viewer doc). Values for any other
+     *                                             code are blanked out below, so the
+     *                                             restricted data never reaches the
+     *                                             mapped result at all — not just hidden
+     *                                             client-side.
+     * @param  Collection<string, string>  $labelsByCode  code => Attribute::name, used for
+     *                                                     the specs table's row labels so
+     *                                                     they reflect whatever an admin
+     *                                                     actually configured, not text
+     *                                                     baked into this class.
+     */
+    private static function mapOne(Product $product, Collection $values, ?string $categoryName, array $allowedCodes, Collection $labelsByCode): array
     {
-        $get = fn (string $code) => $values->get($code) ?: null;
+        $get = fn (string $code) => in_array($code, $allowedCodes, true) ? ($values->get($code) ?: null) : null;
+        $specLabel = fn (string $code) => $labelsByCode->get($code) ?: self::SPEC_LABEL_FALLBACKS[$code];
 
         $price = (float) ($get('price_std') ?? $get('price_recommend') ?? 0);
 
         $specs = array_filter([
-            'ข้อมูลจำเพาะ' => self::plainText($get('spec_specifications')),
-            'บรรจุภัณฑ์' => self::plainText($get('spec_packaging')),
-            'อุปกรณ์เสริม' => self::plainText($get('spec_accessories')),
-            'วิธีใช้งาน' => self::plainText($get('how_to_use')),
-            'คำเตือน' => self::plainText($get('warnings')),
-            'การรับประกัน' => $get('warranty_period') ? $get('warranty_period').' เดือน' : null,
+            $specLabel('spec_specifications') => self::plainText($get('spec_specifications')),
+            $specLabel('spec_packaging') => self::plainText($get('spec_packaging')),
+            $specLabel('spec_accessories') => self::plainText($get('spec_accessories')),
+            $specLabel('how_to_use') => self::plainText($get('how_to_use')),
+            $specLabel('warnings') => self::plainText($get('warnings')),
+            $specLabel('warranty_period') => $get('warranty_period') ? $get('warranty_period').' เดือน' : null,
         ]);
 
         $result = [
@@ -176,6 +232,11 @@ class ProductPresenter
             'description' => self::plainText($get('product_details_features')) ?? '-',
             'highlights' => self::toLines($get('spec_features')),
             'specs' => $specs,
+            // price_std/packaging_box both live in the pricing_packaging Attribute
+            // Group, so either both are allowed or both are blanked above — this
+            // just tells the frontend whether to render the price/packaging tiles
+            // at all, rather than showing the placeholder 0/1 fallback values.
+            'canViewPricing' => in_array('price_std', $allowedCodes, true),
         ];
 
         if ($imagePath = $get('pimage')) {

@@ -134,6 +134,7 @@ interface Props {
     channels?: ChannelOption[];
     channelGroups?: ChannelGroup[];
     categoryIds?: number[];
+    selectedCategories?: { id: number; name: string }[];
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
@@ -184,6 +185,7 @@ export default function ProductEdit({
     channels = [],
     channelGroups = [],
     categoryIds = [],
+    selectedCategories = [],
     publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
@@ -920,7 +922,11 @@ export default function ProductEdit({
                                     <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
                                         Categories
                                     </Typography>
-                                    <CategoryTreePicker value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
+                                    <CategoryTreePicker
+                                        value={data.category_ids}
+                                        onChange={(ids) => setData('category_ids', ids)}
+                                        initialSelected={selectedCategories}
+                                    />
                                 </Paper>
 
                                 {/* Associations Panel */}

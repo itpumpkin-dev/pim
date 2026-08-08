@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Category;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Services\ImportExport\ImportExportRegistry;
@@ -44,7 +45,7 @@ class ProcessImportJob implements ShouldQueue
 
         $tracker->update(['status' => 'processing', 'started_at' => now()]);
 
-        $importer = ImportExportRegistry::importer($config->type);
+        $importer = ImportExportRegistry::importer($config->type, $tracker->user);
 
         $rowNumber = 1; // header is row 1, data starts at row 2
         $created = 0;
@@ -79,6 +80,13 @@ class ProcessImportJob implements ShouldQueue
         $tracker->total_records_skipped = $skipped;
         $tracker->total_rows_processed = $processed;
         $tracker->save();
+
+        // One bump for the whole batch (not per-row — CategoryRowImporter can
+        // touch hundreds of rows) so the cached tree the product edit page's
+        // picker uses doesn't miss an imported/renamed/reparented category.
+        if ($config->type === 'categories' && $created > 0) {
+            Category::bumpTreeCacheVersion();
+        }
     }
 
     public function failed(\Throwable $exception): void

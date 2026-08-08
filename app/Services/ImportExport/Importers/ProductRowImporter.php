@@ -7,12 +7,40 @@ use App\Models\AttributeFamily;
 use App\Models\ImportConfig;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Models\User;
+use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\ImportExport\RowImportException;
 
 class ProductRowImporter implements RowImporterInterface
 {
-    private const FIXED_COLUMNS = ['sku', 'family_code', 'type', 'enabled'];
+    public const FIXED_COLUMNS = ['sku', 'family_code', 'type', 'enabled'];
+
+    private ?array $allowedAttributeCodesCache = null;
+
+    /**
+     * $user, when given, restricts columns()/importRow() to attributes this
+     * user's role can *edit* (per AttributeAccessPolicy — both the
+     * attribute itself and its Attribute Group, in every family it belongs
+     * to) — null (the default) keeps every existing caller that doesn't
+     * pass one unfiltered, matching the prior behavior.
+     */
+    public function __construct(private readonly ?User $user = null)
+    {
+    }
+
+    /**
+     * Every non-locale/non-channel attribute the given user is allowed to
+     * edit (all of them, if no user was given).
+     */
+    public static function baseAttributeCodes(): array
+    {
+        return Attribute::where('is_locale_based', false)
+            ->where('is_channel_based', false)
+            ->orderBy('code')
+            ->pluck('code')
+            ->all();
+    }
 
     /**
      * Only non-locale/non-channel attributes are supported for v1 — imported
@@ -20,13 +48,13 @@ class ProductRowImporter implements RowImporterInterface
      */
     public function columns(): array
     {
-        $attributeCodes = Attribute::where('is_locale_based', false)
-            ->where('is_channel_based', false)
-            ->orderBy('code')
-            ->pluck('code')
-            ->all();
+        return array_merge(self::FIXED_COLUMNS, $this->allowedAttributeCodes());
+    }
 
-        return array_merge(self::FIXED_COLUMNS, $attributeCodes);
+    private function allowedAttributeCodes(): array
+    {
+        return $this->allowedAttributeCodesCache ??= app(AttributeAccessPolicy::class)
+            ->filterAttributeCodes($this->user, self::baseAttributeCodes(), 'edit');
     }
 
     public function requiredColumns(): array
@@ -78,6 +106,18 @@ class ProductRowImporter implements RowImporterInterface
         );
 
         $unknownColumns = [];
+        $restrictedColumns = [];
+        $allowedAttributeCodes = $this->allowedAttributeCodes();
+        // The permission check below only makes sense for attributes this
+        // importer actually supports at all (non-locale/non-channel — see
+        // baseAttributeCodes()/the v1-limitation note on columns()).
+        // $allowedAttributeCodes never contains a locale/channel-based code
+        // regardless of permissions, so checking a column like `pname`
+        // against it would always fail and wrongly blame "no edit access"
+        // instead of the real (pre-existing, unrelated) v1 limitation —
+        // this keeps such columns landing in the global scope same as
+        // before that permission check existed.
+        $baseAttributeCodes = self::baseAttributeCodes();
 
         foreach ($row as $key => $value) {
             if (in_array($key, self::FIXED_COLUMNS, true) || $value === null || $value === '') {
@@ -87,6 +127,15 @@ class ProductRowImporter implements RowImporterInterface
             $attribute = Attribute::where('code', $key)->first();
             if (!$attribute) {
                 $unknownColumns[] = $key;
+                continue;
+            }
+
+            // Present in the file but outside what this import's user is
+            // allowed to edit (see AttributeAccessPolicy) — skipped exactly
+            // like an unknown column, just with a distinct warning so it
+            // doesn't read as a typo.
+            if ($this->user && in_array($key, $baseAttributeCodes, true) && !in_array($key, $allowedAttributeCodes, true)) {
+                $restrictedColumns[] = $key;
                 continue;
             }
 
@@ -104,11 +153,16 @@ class ProductRowImporter implements RowImporterInterface
 
         $product->applySmartDefaults();
 
-        if (empty($unknownColumns)) {
-            return [];
+        $warnings = [];
+
+        if (!empty($unknownColumns)) {
+            $warnings[] = "Column(s) ignored, no matching attribute found: ".implode(', ', $unknownColumns);
         }
 
+        if (!empty($restrictedColumns)) {
+            $warnings[] = "Column(s) skipped, your role doesn't have edit access to: ".implode(', ', $restrictedColumns);
+        }
 
-        return ["Column(s) ignored, no matching attribute found: ".implode(', ', $unknownColumns)];
+        return $warnings;
     }
 }

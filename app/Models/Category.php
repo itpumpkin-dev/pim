@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Category extends Model
 {
@@ -148,5 +149,30 @@ class Category extends Model
     public function products(): BelongsToMany
     {
         return $this->belongsToMany(Product::class, 'product_category');
+    }
+
+    private const TREE_CACHE_VERSION_KEY = 'category-tree:version';
+
+    /**
+     * Cache key suffix for CategoryController::tree()'s cached payload —
+     * bumping this (see bumpTreeCacheVersion()) makes every previously
+     * cached tree unreachable without having to know every locale's exact
+     * key or touch a driver-specific cache-tagging feature (the app's
+     * default `file` cache store doesn't support tags).
+     */
+    public static function treeCacheVersion(): int
+    {
+        return (int) Cache::get(self::TREE_CACHE_VERSION_KEY, 1);
+    }
+
+    /**
+     * Call after any change that affects the tree's shape or labels
+     * (create/update/delete, parent_id change, name/translation change,
+     * bulk import) — see CategoryController::store()/update()/destroy() and
+     * ProcessImportJob.
+     */
+    public static function bumpTreeCacheVersion(): void
+    {
+        Cache::forever(self::TREE_CACHE_VERSION_KEY, self::treeCacheVersion() + 1);
     }
 }

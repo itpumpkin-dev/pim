@@ -18,6 +18,7 @@ use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,6 +146,8 @@ class CategoryController extends Controller
             AuditLog::record('labels_set', $category, null, $newTranslations);
         }
 
+        Category::bumpTreeCacheVersion();
+
         return to_route('catalog.categories.index')->with('success', 'Category created successfully.');
     }
 
@@ -202,27 +205,58 @@ class CategoryController extends Controller
      * multi-select tree picker and the category create/edit page's parent
      * picker. `exclude` (optional) drops that category and its whole
      * subtree, so a category being edited can't be chosen as its own parent.
+     *
+     * Building this from scratch (recursive eager load + per-node `name`
+     * resolution across ~1,100 categories) measured ~365ms and a 164KB
+     * payload, and the tree picker re-fetches it on every Edit Product page
+     * load — so the *unfiltered* tree is cached per locale, keyed by a
+     * version bumped in store()/update()/destroy() (see
+     * Category::bumpTreeCacheVersion()) whenever the tree's shape or labels
+     * could have changed. `exclude` is applied to the cached array
+     * afterwards instead of being part of the cache key, since baking it in
+     * would fragment the cache into one entry per category ever edited.
      */
     public function tree(Request $request): JsonResponse
     {
         $excludeId = $request->integer('exclude') ?: null;
+        $cacheKey = 'category-tree:'.Category::treeCacheVersion().':'.app()->getLocale();
 
-        $roots = Category::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
+        $tree = Cache::remember($cacheKey, now()->addHours(6), function () {
+            $roots = Category::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
 
-        $map = function (Category $category) use (&$map, $excludeId) {
-            if ($excludeId && $category->id === $excludeId) {
-                return null;
-            }
+            $map = function (Category $category) use (&$map) {
+                return [
+                    'id' => $category->id,
+                    'code' => $category->code,
+                    'name' => $category->name,
+                    'children' => $category->recursiveChildren->map($map)->filter()->values(),
+                ];
+            };
 
-            return [
-                'id' => $category->id,
-                'code' => $category->code,
-                'name' => $category->name,
-                'children' => $category->recursiveChildren->map($map)->filter()->values(),
-            ];
-        };
+            return $roots->map($map)->filter()->values();
+        });
 
-        return response()->json($roots->map($map)->filter()->values());
+        if ($excludeId) {
+            $tree = $this->excludeFromTree($tree, $excludeId);
+        }
+
+        return response()->json($tree);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $nodes
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function excludeFromTree(\Illuminate\Support\Collection $nodes, int $excludeId): \Illuminate\Support\Collection
+    {
+        return $nodes
+            ->reject(fn (array $node) => $node['id'] === $excludeId)
+            ->map(function (array $node) use ($excludeId) {
+                $node['children'] = $this->excludeFromTree($node['children'], $excludeId);
+
+                return $node;
+            })
+            ->values();
     }
 
     /**
@@ -325,6 +359,8 @@ class CategoryController extends Controller
         if ($oldTranslations !== $newTranslations) {
             AuditLog::record('labels_updated', $category, $oldTranslations, $newTranslations);
         }
+
+        Category::bumpTreeCacheVersion();
 
         return to_route('catalog.categories.index')->with('success', 'Category updated successfully.');
     }
@@ -438,6 +474,8 @@ class CategoryController extends Controller
     {
         // Deleting category will automatically null parent_id on children due to DB constraints
         $category->delete();
+
+        Category::bumpTreeCacheVersion();
 
         return to_route('catalog.categories.index')->with('success', 'Category deleted successfully.');
     }

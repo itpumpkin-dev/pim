@@ -44,6 +44,8 @@ export interface Product {
     icon?: IconType;
     image?: string;
     videoUrl?: string;
+    /** false when the viewer's role can't see the Pricing & Packaging attribute group — price/packQty are then placeholders, not real data. Absent (static mock data) means unrestricted. */
+    canViewPricing?: boolean;
 }
 
 export const products: Product[] = [

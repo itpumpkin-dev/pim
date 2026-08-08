@@ -6,13 +6,31 @@ use App\Models\Attribute;
 use App\Models\ExportConfig;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Models\User;
+use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 
 class ProductRowExporter implements RowExporterInterface, HasMediaFiles
 {
+    private ?array $columnsCache = null;
+
+    /**
+     * $user, when given, restricts columns()/rows() to attributes this
+     * user's role can *view* (per AttributeAccessPolicy — both the
+     * attribute itself and its Attribute Group, in every family it belongs
+     * to) — null (the default) keeps every existing caller that doesn't
+     * pass one unfiltered, matching the prior behavior.
+     */
+    public function __construct(private readonly ?User $user = null)
+    {
+    }
+
     public function columns(): array
     {
-        return (new ProductRowImporter())->columns();
+        return $this->columnsCache ??= array_merge(
+            ProductRowImporter::FIXED_COLUMNS,
+            app(AttributeAccessPolicy::class)->filterAttributeCodes($this->user, ProductRowImporter::baseAttributeCodes(), 'view'),
+        );
     }
 
     public function rows(ExportConfig $config): \Generator

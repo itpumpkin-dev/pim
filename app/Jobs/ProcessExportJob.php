@@ -40,7 +40,7 @@ class ProcessExportJob implements ShouldQueue
 
         $tracker->update(['status' => 'processing', 'started_at' => now()]);
 
-        $exporter = ImportExportRegistry::exporter($config->type);
+        $exporter = ImportExportRegistry::exporter($config->type, $tracker->user);
         $columns = $exporter->columns();
 
         $dir = "exports/{$tracker->id}";

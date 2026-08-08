@@ -207,6 +207,27 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
+    // A Set, not a single id — clicking Copy on one row while another row's
+    // request is still in flight previously overwrote a single id, wrongly
+    // clearing the first row's disabled/spinner state (and the guard against
+    // double-firing that request) while it was still pending.
+    const [duplicatingIds, setDuplicatingIds] = useState<Set<number>>(new Set());
+
+    const duplicateProduct = (productId: number) => {
+        setDuplicatingIds((prev) => new Set(prev).add(productId));
+        router.post(
+            `/catalog/products/${productId}/duplicate`,
+            {},
+            {
+                onFinish: () =>
+                    setDuplicatingIds((prev) => {
+                        const next = new Set(prev);
+                        next.delete(productId);
+                        return next;
+                    }),
+            },
+        );
+    };
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
     const [quickExportOpen, setQuickExportOpen] = useState(false);
     const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
@@ -647,9 +668,20 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 )}
-                                                <IconButton size="small" sx={{ color: '#64748b' }}>
-                                                    <ContentCopyIcon fontSize="small" />
-                                                </IconButton>
+                                                {canCreate && (
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={{ color: '#64748b' }}
+                                                        disabled={duplicatingIds.has(row.id)}
+                                                        onClick={() => duplicateProduct(row.id)}
+                                                    >
+                                                        {duplicatingIds.has(row.id) ? (
+                                                            <CircularProgress size={16} color="inherit" />
+                                                        ) : (
+                                                            <ContentCopyIcon fontSize="small" />
+                                                        )}
+                                                    </IconButton>
+                                                )}
                                                 {canDelete && (
                                                     <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteProductId(row.id)}>
                                                         <DeleteIcon fontSize="small" />

@@ -18,9 +18,11 @@ use App\Models\Product;
 use App\Models\ProductAssociation;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
+use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\CodeGenerator;
 use App\Services\GridManager;
-use App\Services\ImportExport\Importers\ProductRowImporter;
+use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +41,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class ProductController extends Controller
 {
     use HasVersionHistory;
+
+    public function __construct(private readonly AttributeAccessPolicy $attributeAccess)
+    {
+    }
 
 
     public function index(Request $request): Response
@@ -376,7 +382,7 @@ class ProductController extends Controller
         $format = $validated['format'];
         $ids = $validated['ids'] ?? [];
 
-        $columns = (new ProductRowImporter())->columns();
+        $columns = (new ProductRowExporter($request->user()))->columns();
         $attributeCodes = array_slice($columns, 4);
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
@@ -636,6 +642,101 @@ class ProductController extends Controller
         return to_route('catalog.products.index')->with('success', 'Product created successfully.');
     }
 
+    /**
+     * Seeds a new product from an existing one: same family/type/attribute
+     * values/categories, under a fresh, auto-generated SKU. Starts disabled
+     * (regardless of the source's status) so a not-yet-reviewed duplicate
+     * never accidentally goes live under a second SKU — the user is expected
+     * to review/adjust it on the Edit page (where they land next) and enable
+     * it themselves. Configurable products bring their variants along too,
+     * each duplicated the same way and re-parented to the new product.
+     */
+    public function duplicate(Request $request, Product $product): RedirectResponse
+    {
+        $duplicate = DB::transaction(function () use ($product, $request) {
+            $newProduct = CodeGenerator::createWithRetry(
+                'products',
+                $product->sku.'-copy',
+                fn ($sku) => Product::create([
+                    'sku' => $sku,
+                    'family_id' => $product->family_id,
+                    'type' => $product->type,
+                    'enabled' => false,
+                    'configurable_attributes' => $product->configurable_attributes,
+                    'created_by' => $request->user()?->id,
+                    'updated_by' => $request->user()?->id,
+                ]),
+                column: 'sku',
+            );
+
+            $this->copyProductData($product, $newProduct);
+
+            if (strtolower($product->type) === 'configurable') {
+                foreach (Product::where('parent_id', $product->id)->get() as $variant) {
+                    $newVariant = CodeGenerator::createWithRetry(
+                        'products',
+                        $variant->sku.'-copy',
+                        fn ($sku) => Product::create([
+                            'sku' => $sku,
+                            'parent_id' => $newProduct->id,
+                            'family_id' => $variant->family_id,
+                            'type' => 'simple',
+                            'enabled' => false,
+                            'created_by' => $request->user()?->id,
+                            'updated_by' => $request->user()?->id,
+                        ]),
+                        column: 'sku',
+                    );
+
+                    $this->copyProductData($variant, $newVariant);
+                }
+            }
+
+            return $newProduct;
+        });
+
+        AuditLog::record('duplicated', $duplicate, null, [
+            'duplicated_from_id' => $product->id,
+            'duplicated_from_sku' => $product->sku,
+        ]);
+
+        return to_route('catalog.products.edit', $duplicate)
+            ->with('success', "Duplicated as \"{$duplicate->sku}\" (disabled). Review and update before enabling.");
+    }
+
+    /**
+     * Copies $source's attribute values and category assignments onto
+     * $target. `is_unique`-flagged attributes (barcode_*, `pid`, ...) are
+     * deliberately skipped — copying them verbatim would give the duplicate
+     * the exact same "unique" value as the original, which is either
+     * meaningless (two products sharing one barcode) or actively wrong.
+     * `pid` self-heals via applySmartDefaults() (called first, so the
+     * subsequent copy of non-unique values like `pname` can still overwrite
+     * its bootstrap "= SKU" default with the source's real name).
+     */
+    private function copyProductData(Product $source, Product $target): void
+    {
+        $target->applySmartDefaults();
+
+        ProductValue::where('product_id', $source->id)
+            ->whereHas('attribute', fn ($q) => $q->where('is_unique', false))
+            ->get(['attribute_id', 'channel_id', 'locale_id', 'value'])
+            ->each(fn (ProductValue $value) => ProductValue::updateOrCreate(
+                [
+                    'product_id' => $target->id,
+                    'attribute_id' => $value->attribute_id,
+                    'channel_id' => $value->channel_id,
+                    'locale_id' => $value->locale_id,
+                ],
+                ['value' => $value->value]
+            ));
+
+        $categoryIds = $source->categories()->pluck('categories.id');
+        if ($categoryIds->isNotEmpty()) {
+            $target->categories()->sync($categoryIds);
+        }
+    }
+
     public function edit(Product $product): Response
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
@@ -794,6 +895,14 @@ class ProductController extends Controller
 
         $family = $product->family;
 
+        // Cheap (a handful of rows, not the ~1,086-node full tree) — lets the
+        // Categories panel show what's already assigned immediately, without
+        // the picker's full tree fetch (see CategoryController::tree()) ever
+        // blocking this page. The tree itself only loads if/when the user
+        // opens the picker to change the selection.
+        $selectedCategories = $product->categories()->get(['categories.id', 'categories.name'])
+            ->map(fn (Category $category) => ['id' => $category->id, 'name' => $category->name]);
+
         return Inertia::render('catalog/products/edit', [
             'product' => [
                 'id' => $product->id,
@@ -815,7 +924,8 @@ class ProductController extends Controller
             'configurableAttributes' => $this->configurableAttributeOptions(),
             'channels' => $channels,
             'channelGroups' => $channelGroups,
-            'categoryIds' => $product->categories()->pluck('categories.id')->all(),
+            'categoryIds' => $selectedCategories->pluck('id')->all(),
+            'selectedCategories' => $selectedCategories->values(),
             'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
@@ -1545,94 +1655,40 @@ class ProductController extends Controller
     }
 
     /**
-     * Check if a user has permission to view an attribute group.
-     * Uses permission format: 'attribute_groups.view_{group_code}'
-     * If no such permission exists, grants access by default (backward compatibility).
+     * Check if a user has permission to view an attribute group. Thin
+     * wrapper kept so every existing call site in this controller doesn't
+     * need to change — the actual rule now lives in AttributeAccessPolicy
+     * (shared with bulk product import/export column filtering).
      */
     private function canUserViewAttributeGroup($user, $group): bool
     {
-        if (!$user) {
-            return true;
-        }
-
-        if (!$user->hasAnyPermissionForResource('view_attribute_groups')) {
-            return true;
-        }
-
-        return $user->hasPermission('view_attribute_groups', "view_{$group->code}");
+        return $this->attributeAccess->canViewGroup($user, $group);
     }
 
     /**
-     * Check if a user has permission to view a specific attribute.
-     * Uses permission format: 'attributes.view_{attribute_code}'
-     * If no such permission exists, grants access by default (backward compatibility).
+     * Check if a user has permission to view a specific attribute. See
+     * canUserViewAttributeGroup()'s docblock.
      */
     private function canUserViewAttribute($user, $attribute): bool
     {
-        if (!$user) {
-            return true;
-        }
-
-        if (!$user->hasAnyPermissionForResource('view_attributes')) {
-            return true;
-        }
-
-        return $user->hasPermission('view_attributes', "view_{$attribute->code}");
+        return $this->attributeAccess->canViewAttribute($user, $attribute);
     }
 
     /**
-     * Check if a user has permission to *edit* an attribute group's values —
-     * always a subset of view access. Uses permission format:
-     * 'edit_attribute_groups.edit_{group_code}'.
-     *
-     * Falls back to "editable" only when the role hasn't touched attribute
-     * group access AT ALL (no view_attribute_groups rows either) — backward
-     * compatible with roles that never open the "Attribute Access" section.
-     * Checking `hasAnyPermissionForResource('edit_attribute_groups')` alone
-     * would be wrong: a role given Read-only access (view rows exist, but no
-     * Edit was ever checked) has zero edit_attribute_groups rows too, which
-     * would wrongly fall back to "editable" instead of enforcing read-only.
+     * Check if a user has permission to *edit* an attribute group's values.
+     * See canUserViewAttributeGroup()'s docblock.
      */
     private function canUserEditAttributeGroup($user, $group): bool
     {
-        if (!$this->canUserViewAttributeGroup($user, $group)) {
-            return false;
-        }
-
-        if (!$user) {
-            return true;
-        }
-
-        if (!$user->hasAnyPermissionForResource('view_attribute_groups') && !$user->hasAnyPermissionForResource('edit_attribute_groups')) {
-            return true;
-        }
-
-        return $user->hasPermission('edit_attribute_groups', "edit_{$group->code}");
+        return $this->attributeAccess->canEditGroup($user, $group);
     }
 
     /**
-     * Check if a user has permission to *edit* a specific attribute's value —
-     * always a subset of view access. Uses permission format:
-     * 'edit_attributes.edit_{attribute_code}'.
-     *
-     * Same "touched at all" fallback as canUserEditAttributeGroup() above —
-     * see that method's docblock for why checking edit_attributes alone is
-     * wrong for a role that was deliberately given Read-only access.
+     * Check if a user has permission to *edit* a specific attribute's value.
+     * See canUserViewAttributeGroup()'s docblock.
      */
     private function canUserEditAttribute($user, $attribute): bool
     {
-        if (!$this->canUserViewAttribute($user, $attribute)) {
-            return false;
-        }
-
-        if (!$user) {
-            return true;
-        }
-
-        if (!$user->hasAnyPermissionForResource('view_attributes') && !$user->hasAnyPermissionForResource('edit_attributes')) {
-            return true;
-        }
-
-        return $user->hasPermission('edit_attributes', "edit_{$attribute->code}");
+        return $this->attributeAccess->canEditAttribute($user, $attribute);
     }
 }

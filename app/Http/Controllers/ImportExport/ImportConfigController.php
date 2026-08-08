@@ -128,7 +128,7 @@ class ImportConfigController extends Controller
     {
         abort_unless(in_array($type, ImportExportRegistry::TYPES, true), 404);
 
-        $csv = SampleTemplateBuilder::build($type);
+        $csv = SampleTemplateBuilder::build($type, auth()->user());
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',

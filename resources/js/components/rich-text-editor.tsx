@@ -39,7 +39,21 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly 
             <Quill
                 theme="snow"
                 value={value}
-                onChange={onChange}
+                // Quill fires onChange for ANY content change, including its own
+                // internal re-normalization of the `value` prop into its canonical
+                // HTML shape (e.g. plain text with literal \n, as raw-imported or
+                // seeded data has, gets rewritten into <p> tags on mount). Passing
+                // that straight to a controlled `onChange` feeds the "normalized"
+                // HTML back in as the new `value`, which can normalize again on the
+                // next render — an infinite React "Maximum update depth exceeded"
+                // loop that freezes the whole page. `source` distinguishes real
+                // typing ('user') from Quill's own programmatic changes ('api'/
+                // 'silent') — only the former should ever reach the parent.
+                onChange={(content: string, _delta: unknown, source: string) => {
+                    if (source === 'user') {
+                        onChange(content);
+                    }
+                }}
                 placeholder={placeholder}
                 readOnly={readOnly}
             />

@@ -225,6 +225,23 @@ class User extends Authenticatable
         return false;
     }
 
+    /**
+     * True once a role's "Attribute Access" section (see role-form.tsx) has
+     * been touched at all — i.e. it has at least one `view_attribute_groups`
+     * row, meaning it was deliberately scoped to specific groups rather than
+     * left at the backward-compatible "no rows = everything visible"
+     * default (see ProductController::canUserViewAttributeGroup()). Used
+     * anywhere that needs a coarse "does this role have ANY Attribute Group
+     * restriction configured" signal without checking one specific group —
+     * e.g. gating access to import/export job details, which can't be
+     * checked against one particular group since a product job's data spans
+     * every attribute group at once.
+     */
+    public function hasAttributeGroupRestrictions(): bool
+    {
+        return $this->hasAnyPermissionForResource('view_attribute_groups');
+    }
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(UserGroup::class, 'user_group_user', 'user_id', 'group_id');

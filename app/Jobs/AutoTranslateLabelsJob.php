@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Category;
+use App\Models\CategoryTranslation;
 use App\Services\AttributeAutoTranslator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -44,5 +46,14 @@ class AutoTranslateLabelsJob implements ShouldQueue
             $this->sourceLocaleId,
             $this->sourceLabel,
         );
+
+        // The controller already bumps the cached category tree (see
+        // Category::bumpTreeCacheVersion()) when the save happens, but this
+        // job fills in the *other* locales asynchronously after that — bump
+        // again once it's done, or those labels stay stale in the cached
+        // tree until the 6h TTL expires.
+        if ($this->translationModel === CategoryTranslation::class) {
+            Category::bumpTreeCacheVersion();
+        }
     }
 }

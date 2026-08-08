@@ -14,9 +14,16 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Public-facing product pages (home, product detail). Unlike Catalog\ProductController,
- * these routes carry no auth/permission middleware, so only enabled, sellable
- * (type=simple) products are ever queried or exposed here.
+ * Public-facing product pages (home, product detail). Unlike
+ * Catalog\ProductController, these routes carry no auth/permission
+ * middleware, so only enabled, sellable (type=simple) products are ever
+ * queried or exposed here.
+ *
+ * show() still honours Attribute Access permissions when a viewer happens to
+ * be logged in (e.g. staff browsing while signed in): Attribute Groups they
+ * can't see (e.g. Pricing & Packaging) are blanked out of the mapped product
+ * via ProductPresenter. Anonymous visitors are always unrestricted, same as
+ * home().
  */
 class StorefrontController extends Controller
 {
@@ -54,7 +61,7 @@ class StorefrontController extends Controller
         return $topProductIds->map(fn ($id) => $mappedById->get($id))->filter()->values()->all();
     }
 
-    public function show(int $id): Response
+    public function show(int $id, Request $request): Response
     {
         $product = Product::where('id', $id)->where('enabled', true)->where('type', 'simple')->first();
 
@@ -66,13 +73,14 @@ class StorefrontController extends Controller
             ]);
         }
 
-        $mapped = ProductPresenter::mapMany(collect([$product]))[0];
+        $viewer = $request->user();
+        $mapped = ProductPresenter::mapMany(collect([$product]), 'th', $viewer)[0];
 
         $categoryAttributeId = Attribute::where('code', 'pcatname')->value('id');
 
         // pcatname is a select field storing an AttributeOption code, not the
         // label — $mapped['category'] is already the resolved label (see
-        // ProductPresenter::resolvePcatnameLabels), so match products whose
+        // ProductPresenter::resolveSelectOptionLabels), so match products whose
         // raw value is either that same code, or (for values predating the
         // dropdown) the literal free-typed label text.
         $matchingCodes = $categoryAttributeId
@@ -100,7 +108,7 @@ class StorefrontController extends Controller
         return Inertia::render('products/show', [
             'id' => $id,
             'product' => $mapped,
-            'related' => ProductPresenter::mapMany($related),
+            'related' => ProductPresenter::mapMany($related, 'th', $viewer),
         ]);
     }
 

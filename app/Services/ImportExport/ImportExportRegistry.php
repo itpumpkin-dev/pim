@@ -14,15 +14,20 @@ use App\Services\ImportExport\Importers\AttributeRowImporter;
 use App\Services\ImportExport\Importers\CategoryRowImporter;
 use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\ImportExport\Importers\RowImporterInterface;
+use App\Models\User;
 
 class ImportExportRegistry
 {
     public const TYPES = ['products', 'categories', 'attributes', 'attribute_families', 'attribute_options'];
 
-    public static function importer(string $type): RowImporterInterface
+    /**
+     * $user is only meaningful for 'products' — the other entity types
+     * aren't gated by Attribute Access, so it's silently ignored for them.
+     */
+    public static function importer(string $type, ?User $user = null): RowImporterInterface
     {
         return match ($type) {
-            'products' => new ProductRowImporter(),
+            'products' => new ProductRowImporter($user),
             'categories' => new CategoryRowImporter(),
             'attributes' => new AttributeRowImporter(),
             'attribute_families' => new AttributeFamilyRowImporter(),
@@ -31,10 +36,13 @@ class ImportExportRegistry
         };
     }
 
-    public static function exporter(string $type): RowExporterInterface
+    /**
+     * $user is only meaningful for 'products' — see importer().
+     */
+    public static function exporter(string $type, ?User $user = null): RowExporterInterface
     {
         return match ($type) {
-            'products' => new ProductRowExporter(),
+            'products' => new ProductRowExporter($user),
             'categories' => new CategoryRowExporter(),
             'attributes' => new AttributeRowExporter(),
             'attribute_families' => new AttributeFamilyRowExporter(),
