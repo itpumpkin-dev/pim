@@ -8,6 +8,10 @@ datagrid:
         label: fields.label
         type: string
         sortable: true
+      is_guest:
+        label: fields.isGuest
+        type: boolean
+        sortable: true
     filters:
       global:
         type: string

@@ -26,6 +26,7 @@ class UpdateRoleRequest extends FormRequest
 
         return [
             'label' => ['required', 'string', 'max:100', Rule::unique('roles', 'label')->ignore($role->id)],
+            'is_guest' => ['boolean'],
 
             'permissions' => ['array'],
             'permissions.*' => ['array'],

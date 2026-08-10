@@ -46,6 +46,7 @@ interface EditRoleProps {
     role: {
         id: number;
         label: string;
+        is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
     };

@@ -17,7 +17,8 @@
         "firstName": "ชื่อจริง",
         "lastName": "นามสกุล",
         "displayName": "ชื่อที่แสดง",
-        "sku": "SKU"
+        "sku": "SKU",
+        "isGuest": "Role สำหรับผู้ไม่ Login"
     },
     "rowActions": {
         "edit": "แก้ไข",

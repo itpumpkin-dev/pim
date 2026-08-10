@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\Models\Attribute;
 use App\Models\AttributeGroup;
 use App\Models\FamilyAttribute;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -14,10 +15,23 @@ use Illuminate\Support\Collection;
  * ProductController (still the canonical place these rules were designed
  * for — the product edit page) so the same rules can gate other surfaces
  * that expose attribute values outside that page, e.g. bulk product
- * import/export columns.
+ * import/export columns, and the public (no-login) product preview page.
  */
 class AttributeAccessPolicy
 {
+    /**
+     * Which role's permissions actually govern this check: the given user's
+     * own, or — when there's no user at all (an anonymous visitor) — the
+     * designated `is_guest` role's, if one has been configured (see
+     * Role::guest()). Null means "fully unrestricted", preserving the
+     * original behavior for anonymous visitors on an install that hasn't
+     * set up a guest role.
+     */
+    private function actorFor(?User $user): User|Role|null
+    {
+        return $user ?? Role::guest();
+    }
+
     /**
      * Uses permission format: 'view_attribute_groups.view_{group_code}'.
      * If a role has never touched the "Attribute Access" section at all (no
@@ -26,15 +40,16 @@ class AttributeAccessPolicy
      */
     public function canViewGroup(?User $user, AttributeGroup $group): bool
     {
-        if (!$user) {
+        $actor = $this->actorFor($user);
+        if (!$actor) {
             return true;
         }
 
-        if (!$user->hasAnyPermissionForResource('view_attribute_groups')) {
+        if (!$actor->hasAnyPermissionForResource('view_attribute_groups')) {
             return true;
         }
 
-        return $user->hasPermission('view_attribute_groups', "view_{$group->code}");
+        return $actor->hasPermission('view_attribute_groups', "view_{$group->code}");
     }
 
     /**
@@ -43,15 +58,16 @@ class AttributeAccessPolicy
      */
     public function canViewAttribute(?User $user, Attribute $attribute): bool
     {
-        if (!$user) {
+        $actor = $this->actorFor($user);
+        if (!$actor) {
             return true;
         }
 
-        if (!$user->hasAnyPermissionForResource('view_attributes')) {
+        if (!$actor->hasAnyPermissionForResource('view_attributes')) {
             return true;
         }
 
-        return $user->hasPermission('view_attributes', "view_{$attribute->code}");
+        return $actor->hasPermission('view_attributes', "view_{$attribute->code}");
     }
 
     /**
@@ -67,15 +83,16 @@ class AttributeAccessPolicy
             return false;
         }
 
-        if (!$user) {
+        $actor = $this->actorFor($user);
+        if (!$actor) {
             return true;
         }
 
-        if (!$user->hasAnyPermissionForResource('view_attribute_groups') && !$user->hasAnyPermissionForResource('edit_attribute_groups')) {
+        if (!$actor->hasAnyPermissionForResource('view_attribute_groups') && !$actor->hasAnyPermissionForResource('edit_attribute_groups')) {
             return true;
         }
 
-        return $user->hasPermission('edit_attribute_groups', "edit_{$group->code}");
+        return $actor->hasPermission('edit_attribute_groups', "edit_{$group->code}");
     }
 
     /**
@@ -87,15 +104,16 @@ class AttributeAccessPolicy
             return false;
         }
 
-        if (!$user) {
+        $actor = $this->actorFor($user);
+        if (!$actor) {
             return true;
         }
 
-        if (!$user->hasAnyPermissionForResource('view_attributes') && !$user->hasAnyPermissionForResource('edit_attributes')) {
+        if (!$actor->hasAnyPermissionForResource('view_attributes') && !$actor->hasAnyPermissionForResource('edit_attributes')) {
             return true;
         }
 
-        return $user->hasPermission('edit_attributes', "edit_{$attribute->code}");
+        return $actor->hasPermission('edit_attributes', "edit_{$attribute->code}");
     }
 
     /**
@@ -118,7 +136,7 @@ class AttributeAccessPolicy
             return false;
         }
 
-        if (!$user) {
+        if (!$this->actorFor($user)) {
             return true;
         }
 
@@ -152,7 +170,7 @@ class AttributeAccessPolicy
      */
     public function filterAttributes(?User $user, Collection $attributes, string $mode = 'view'): Collection
     {
-        if (!$user || $attributes->isEmpty()) {
+        if ($attributes->isEmpty() || !$this->actorFor($user)) {
             return $attributes;
         }
 
@@ -191,7 +209,7 @@ class AttributeAccessPolicy
      */
     public function filterAttributeCodes(?User $user, array $codes, string $mode = 'view'): array
     {
-        if (!$user || empty($codes)) {
+        if (empty($codes) || !$this->actorFor($user)) {
             return $codes;
         }
 

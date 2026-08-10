@@ -17,7 +17,8 @@
         "firstName": "First name",
         "lastName": "Last name",
         "displayName": "Display Name",
-        "sku": "SKU"
+        "sku": "SKU",
+        "isGuest": "Guest Role"
     },
     "rowActions": {
         "edit": "Edit",

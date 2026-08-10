@@ -84,6 +84,7 @@ interface RoleFormProps {
     role?: {
         id: number;
         label: string;
+        is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
     };
@@ -93,9 +94,10 @@ interface RoleFormProps {
 
 interface RoleForm {
     label: string;
+    is_guest: boolean;
     permissions: Record<string, string[]>;
     users: number[];
-    [key: string]: string | number[] | Record<string, string[]>;
+    [key: string]: string | boolean | number[] | Record<string, string[]>;
 }
 
 const TABS = ['General', 'Permissions', 'Users'];
@@ -126,6 +128,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
     const { data, setData, post, put, processing, errors, clearErrors } = useForm<RoleForm>({
         label: role?.label ?? '',
+        is_guest: role?.is_guest ?? false,
         permissions: role?.permissions ?? {},
         users: role?.user_ids ?? [],
     });
@@ -370,6 +373,18 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             error={Boolean(errors.label)}
                             helperText={errors.label}
                         />
+
+                        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_guest} onChange={(e) => setData('is_guest', e.target.checked)} />}
+                                label="Guest role (applies to visitors who aren't logged in)"
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 4, mt: -0.5 }}>
+                                This role's Attribute Access restrictions (Permissions tab) govern what anonymous visitors see on the public
+                                product pages. Only one role can be marked as the guest role — checking this here will uncheck it on whichever
+                                role currently has it.
+                            </Typography>
+                        </Box>
                     </Box>
                 )}
 

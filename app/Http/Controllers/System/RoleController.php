@@ -44,8 +44,13 @@ class RoleController extends Controller
 
     public function store(StoreRoleRequest $request): RedirectResponse
     {
+        if ($request->boolean('is_guest')) {
+            $this->clearOtherGuestRoles();
+        }
+
         $role = Role::create([
             'label' => $request->label,
+            'is_guest' => $request->boolean('is_guest'),
         ]);
 
         $permissions = $request->input('permissions', []);
@@ -74,6 +79,7 @@ class RoleController extends Controller
             'role' => [
                 'id' => $role->id,
                 'label' => $role->label,
+                'is_guest' => $role->is_guest,
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
             ],
@@ -99,7 +105,11 @@ class RoleController extends Controller
         // any of the changes below are applied.
         $previouslyAffectedUserIds = SessionInvalidator::roleUserIds($role);
 
-        $role->update(['label' => $request->label]);
+        if ($request->boolean('is_guest') && !$role->is_guest) {
+            $this->clearOtherGuestRoles($role->id);
+        }
+
+        $role->update(['label' => $request->label, 'is_guest' => $request->boolean('is_guest')]);
 
         $oldPermissions = $this->groupedPermissions($role);
         $newPermissions = $request->input('permissions', []);
@@ -130,6 +140,18 @@ class RoleController extends Controller
         }
 
         return to_route('system.roles.index')->with('success', 'Role updated successfully.');
+    }
+
+    /**
+     * At most one role can be the guest role (see the `is_guest` migration's
+     * partial unique index) — clear it off every other role first so
+     * assigning it to this one doesn't trip that constraint.
+     */
+    private function clearOtherGuestRoles(?int $exceptRoleId = null): void
+    {
+        Role::where('is_guest', true)
+            ->when($exceptRoleId, fn ($q) => $q->where('id', '!=', $exceptRoleId))
+            ->update(['is_guest' => false]);
     }
 
     private function userOptions()

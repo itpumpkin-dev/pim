@@ -23,6 +23,7 @@ class StoreRoleRequest extends FormRequest
     {
         return [
             'label' => ['required', 'string', 'max:100', 'unique:roles,label'],
+            'is_guest' => ['boolean'],
 
             'permissions' => ['array'],
             'permissions.*' => ['array'],
