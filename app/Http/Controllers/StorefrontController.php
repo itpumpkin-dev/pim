@@ -74,7 +74,12 @@ class StorefrontController extends Controller
         }
 
         $viewer = $request->user();
-        $mapped = ProductPresenter::mapMany(collect([$product]), 'th', $viewer)[0];
+        // Unlike home() (deliberately fixed to Thai), this page follows
+        // whatever locale the visitor has switched to — see the
+        // LocaleDropdown on products/show.tsx and SetLocale middleware,
+        // which resolves this from a cookie for anonymous visitors too.
+        $localeCode = app()->getLocale();
+        $mapped = ProductPresenter::mapMany(collect([$product]), $localeCode, $viewer)[0];
 
         $categoryAttributeId = Attribute::where('code', 'pcatname')->value('id');
 
@@ -108,7 +113,7 @@ class StorefrontController extends Controller
         return Inertia::render('products/show', [
             'id' => $id,
             'product' => $mapped,
-            'related' => ProductPresenter::mapMany($related, 'th', $viewer),
+            'related' => ProductPresenter::mapMany($related, $localeCode, $viewer),
         ]);
     }
 

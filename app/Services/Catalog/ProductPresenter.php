@@ -34,11 +34,12 @@ class ProductPresenter
 
     /**
      * @param  string  $localeCode  Which locale's ProductValue rows (pname, spec_*, ...)
-     *                              to prefer. Defaults to 'th' for the public storefront
-     *                              (home, products/show), which is always Thai regardless
-     *                              of the visitor's browser — pass app()->getLocale() for
-     *                              admin-facing callers (e.g. the dashboard) so the result
-     *                              follows whatever language the admin has switched to.
+     *                              to prefer. Defaults to 'th' — still fixed for home()
+     *                              (the public storefront listing), but
+     *                              StorefrontController::show() and admin-facing callers
+     *                              (e.g. the dashboard) explicitly pass app()->getLocale()
+     *                              instead, so the result follows whatever locale the
+     *                              visitor/admin has switched to.
      * @param  ?User  $viewer  When given, fields whose attribute belongs to an Attribute
      *                         Group the viewer's role can't view (Attribute Access
      *                         permissions) are blanked out — same rule as the product

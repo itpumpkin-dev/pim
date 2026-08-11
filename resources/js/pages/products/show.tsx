@@ -1,6 +1,8 @@
 import AppLogoIcon from '@/components/app-logo-icon';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
+import LocaleDropdown from '@/components/locale-dropdown';
 import { ProductCard } from '@/components/product-card';
+import { RouteLoadingSkeleton } from '@/components/route-loading-skeleton';
 import { currency, productImageUrl, type IconType, type Product } from '@/data/products';
 import { useElementWidth } from '@/hooks/use-element-width';
 import { useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
@@ -164,7 +166,7 @@ export default function ProductShow({ product, related }: { product: Product | n
 
     if (!product) {
         return (
-            <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+            <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', position: 'relative' }}>
                 <Head title="ไม่พบสินค้า" />
                 <AppBar position="sticky" color="inherit" elevation={1}>
                     <Toolbar sx={{ justifyContent: 'space-between' }}>
@@ -184,6 +186,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                             </Typography>
                         </Box>
                         <Stack direction="row" spacing={1} alignItems="center">
+                            <LocaleDropdown />
                             <AppearanceToggleDropdown />
                             {actions}
                         </Stack>
@@ -196,6 +199,8 @@ export default function ProductShow({ product, related }: { product: Product | n
                         กลับหน้า Home
                     </Button>
                 </Stack>
+
+                <RouteLoadingSkeleton />
             </Box>
         );
     }
@@ -614,7 +619,7 @@ export default function ProductShow({ product, related }: { product: Product | n
               ];
 
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', position: 'relative' }}>
             <Head title={product.name} />
             <AppBar position="sticky" color="inherit" elevation={1}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
@@ -630,6 +635,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                         </Typography>
                     </Box>
                     <Stack direction="row" spacing={1} alignItems="center">
+                        <LocaleDropdown />
                         <AppearanceToggleDropdown />
                         {actions}
                     </Stack>
@@ -682,6 +688,8 @@ export default function ProductShow({ product, related }: { product: Product | n
                     </Box>
                 )}
             </Box>
+
+            <RouteLoadingSkeleton />
         </Box>
     );
 }
