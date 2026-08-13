@@ -131,7 +131,23 @@ class ProductController extends Controller
             )
             ->get(['product_id', 'attribute_id', 'value']);
 
-        $items = $gridData->getCollection()->map(function ($product) use ($values, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily) {
+        // Indexed by "product_id-attribute_id" so each row below is an O(1)
+        // lookup instead of a fresh linear scan of $values per product per
+        // attribute (that scan was O(products × attributes) and dominated
+        // this action's time on any catalog of meaningful size). Rows are
+        // already ordered active-locale-first (see orderByRaw above), and
+        // this only keeps the first value seen per key, so the active
+        // locale's row still wins over the locale-less fallback exactly as
+        // ->first() did.
+        $valueByKey = [];
+        foreach ($values as $value) {
+            $key = $value->product_id.'-'.$value->attribute_id;
+            if (!array_key_exists($key, $valueByKey)) {
+                $valueByKey[$key] = $value->value;
+            }
+        }
+
+        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
@@ -141,29 +157,27 @@ class ProductController extends Controller
                 // misleading 100%.
                 $product->completeness = null;
             } else {
-                $filledCount = $familyAttributeIds->filter(function ($attributeId) use ($product, $values) {
-                    $raw = optional($values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $attributeId))->value;
+                $filledCount = $familyAttributeIds->filter(function ($attributeId) use ($product, $valueByKey) {
+                    $raw = $valueByKey[$product->id.'-'.$attributeId] ?? null;
                     return $raw !== null && trim((string) $raw) !== '';
                 })->count();
                 $product->completeness = (int) round($filledCount / $familyAttributeIds->count() * 100);
             }
 
             $product->name = $nameAttributeId
-                ? optional($values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $nameAttributeId))->value
+                ? ($valueByKey[$product->id.'-'.$nameAttributeId] ?? null)
                 : null;
 
             $imageAttributeId = $imageAttributeIdByFamily->get($product->family_id);
             $imagePath = $imageAttributeId
-                ? optional($values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $imageAttributeId))->value
+                ? ($valueByKey[$product->id.'-'.$imageAttributeId] ?? null)
                 : null;
-            $product->image_url = $imagePath ? Storage::url($imagePath) : null;
+            $product->image_url = $imagePath ? Storage::disk('public')->url($imagePath) : null;
 
             $product->parent_sku = $product->parent_id ? ($parentSkus->get($product->parent_id) ?? null) : null;
 
-            $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $values) {
-                $rawValue = optional(
-                    $values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $attribute->id)
-                )->value;
+            $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey) {
+                $rawValue = $valueByKey[$product->id.'-'.$attribute->id] ?? null;
 
                 return [$attribute->id => $this->formatAttributeValue($attribute, $rawValue)];
             });
@@ -868,8 +882,15 @@ class ProductController extends Controller
             $qtyAttrId = Attribute::where('code', 'qty')->value('id');
 
             $variants = Product::where('parent_id', $product->id)->get();
+            // Batched into one query keyed by product_id instead of a
+            // ProductValue::where('product_id', ...) query per variant
+            // inside the loop below — that was N+1 queries for an N-variant
+            // configurable product.
+            $variantValuesByProduct = ProductValue::whereIn('product_id', $variants->pluck('id'))
+                ->get()
+                ->groupBy('product_id');
             foreach ($variants as $variant) {
-                $rawVals = ProductValue::where('product_id', $variant->id)->get();
+                $rawVals = $variantValuesByProduct->get($variant->id, collect());
                 $variantValues = [];
                 $price = '';
                 $qty = '';

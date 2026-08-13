@@ -1,23 +1,43 @@
 import i18n from '@/lib/i18n';
 import { type SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 
 function readCookie(name: string): string | null {
     const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.$?*|{}()[\]\\/+^]/g, '\\$&') + '=([^;]*)'));
     return match ? decodeURIComponent(match[1]) : null;
 }
 
-// Module-level (not per-component-instance) so it coordinates across every
-// useLocale() call site — the dropdown's own instance and the separate one
-// inside useSyncI18nLanguage() are otherwise unaware of each other. Tracks
-// which locale switch is the most recent, so an older switch's in-flight
-// request can't clobber a newer one that already resolved (see setLocale()).
+// Shared across every useLocale() call site (the header dropdown, Edit
+// Product, category editors, ...) instead of each holding its own
+// useState. Those call sites used to be independent React state: clicking
+// a language in the dropdown only updated *that* component's own state
+// instantly, while every other useLocale() consumer kept showing the old
+// language until router.reload() below landed and its own sync effect
+// caught up — visible as a flash back to the old language everywhere except
+// the dropdown itself. Routing every instance through this one store makes
+// the optimistic switch land everywhere at once.
+let sharedLocale: string | null = null;
+let sharedSwitching = false;
+const listeners = new Set<() => void>();
+
+function emitChange() {
+    listeners.forEach((listener) => listener());
+}
+
+function subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+// Tracks which locale switch is the most recent, so an older switch's
+// in-flight request can't clobber a newer one that already resolved (see
+// setLocale()).
 let latestRequestedLocale: string | null = null;
 
 export function useLocale() {
     const { locale: serverLocale, locales } = usePage<SharedData>().props;
-    const [locale, setLocaleState] = useState(serverLocale);
+    const locale = useSyncExternalStore(subscribe, () => sharedLocale ?? serverLocale);
     // True from the moment setLocale() is called until the background
     // router.reload() below (or an earlier bail-out) settles. Server-resolved
     // labels baked into the current page's props (e.g. an attribute/category
@@ -25,15 +45,16 @@ export function useLocale() {
     // callers needing to show a loading state during that gap (e.g. Edit
     // Product's field area) can key off this instead of building their own
     // tracking for a switch this hook already owns.
-    const [switchingLocale, setSwitchingLocale] = useState(false);
+    const switchingLocale = useSyncExternalStore(subscribe, () => sharedSwitching);
 
     // Stay in sync with the server-resolved locale after a real page visit
     // (e.g. a normal link click, or the very first load), in case it was
     // set some other way than setLocale() below (a fresh session's cookie,
     // for instance).
     useEffect(() => {
-        if (serverLocale && serverLocale !== locale) {
-            setLocaleState(serverLocale);
+        if (serverLocale && serverLocale !== sharedLocale) {
+            sharedLocale = serverLocale;
+            emitChange();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [serverLocale]);
@@ -45,10 +66,11 @@ export function useLocale() {
         // force a full reload of the current page just to re-render it in
         // the new language, which made every switch feel like a full
         // navigation for no real reason.
-        setLocaleState(code);
+        sharedLocale = code;
+        sharedSwitching = true;
+        emitChange();
         i18n.changeLanguage(code);
         latestRequestedLocale = code;
-        setSwitchingLocale(true);
 
         fetch('/locale', {
             method: 'PUT',
@@ -69,7 +91,8 @@ export function useLocale() {
                 // language data and the sync effect below would silently
                 // flip the whole app's displayed language back.
                 if (!response.ok) {
-                    setSwitchingLocale(false);
+                    sharedSwitching = false;
+                    emitChange();
                     return;
                 }
 
@@ -95,13 +118,19 @@ export function useLocale() {
                 // preference is guaranteed to be in place before it runs.
                 // reload() always preserves scroll/state (that's what makes
                 // it a "reload" rather than a "visit") — no options needed.
-                router.reload({ onFinish: () => setSwitchingLocale(false) });
+                router.reload({
+                    onFinish: () => {
+                        sharedSwitching = false;
+                        emitChange();
+                    },
+                });
             })
             .catch(() => {
                 // Best-effort: worst case the preference doesn't stick server-side
                 // this session, and the next full page load falls back to
                 // whatever cookie/user default was already there — harmless.
-                setSwitchingLocale(false);
+                sharedSwitching = false;
+                emitChange();
             });
     };
 

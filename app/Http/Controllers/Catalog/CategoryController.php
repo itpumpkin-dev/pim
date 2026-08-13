@@ -14,6 +14,7 @@ use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
+use App\Services\Lazada\LazadaCategoryMatcher;
 use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -547,5 +548,204 @@ class CategoryController extends Controller
             ->get(['id', 'name', 'parent_id']);
 
         return response()->json(['data' => $categories]);
+    }
+
+    /**
+     * Bulk review UI for mapping local leaf categories to a Lazada leaf
+     * category — the prerequisite LazadaProductSyncService::buildPayload()
+     * enforces before any product in that category can be pushed. Suggestions
+     * are a ranking aid only (see LazadaCategoryMatcher); nothing is
+     * persisted here until bulkMapLazada() is called with explicit picks.
+     */
+    public function lazadaMapping(Request $request): Response
+    {
+        $status = $request->input('status', 'unmapped');
+        if (!in_array($status, ['unmapped', 'mapped', 'all'], true)) {
+            $status = 'unmapped';
+        }
+
+        $search = trim((string) $request->input('search', ''));
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (!in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        // Load the whole local tree once (~1,100 rows) so each row's
+        // ancestor chain can be resolved in memory regardless of depth,
+        // instead of firing one query per row per level.
+        $allCategories = Category::query()->without('translations')
+            ->get(['id', 'parent_id', 'name', 'additional_data', 'lazada_category_id'])
+            ->keyBy('id');
+
+        $childParentIds = $allCategories->pluck('parent_id')->filter()->unique();
+        $leafIds = $allCategories->reject(fn (Category $c) => $childParentIds->contains($c->id))->pluck('id');
+
+        $nameEngOf = fn (Category $category) => trim((string) ($category->additional_data['name_eng'] ?? '')) ?: $category->name;
+
+        $ancestorNameEngTokens = function (int $id) use ($allCategories, $nameEngOf): array {
+            $tokens = [];
+            $currentParentId = $allCategories->get($id)?->parent_id;
+            while ($currentParentId && $allCategories->has($currentParentId)) {
+                $tokens = [...$tokens, ...LazadaCategoryMatcher::tokenize($nameEngOf($allCategories->get($currentParentId)))];
+                $currentParentId = $allCategories->get($currentParentId)->parent_id;
+            }
+
+            return $tokens;
+        };
+
+        $pathOf = function (int $id) use ($allCategories): string {
+            $names = [];
+            $node = $allCategories->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allCategories->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $query = Category::query()->without('translations')
+            ->whereIn('id', $leafIds)
+            ->with('lazadaCategory:id,name,parent_id');
+
+        if ($status === 'unmapped') {
+            $query->whereNull('lazada_category_id');
+        } elseif ($status === 'mapped') {
+            $query->whereNotNull('lazada_category_id');
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhereRaw("additional_data->>'name_eng' ILIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
+
+        // Lazada leaf candidates + their token sets, precomputed once and
+        // reused for every row scored on this page.
+        $allLazada = LazadaCategory::query()->get(['id', 'parent_id', 'name', 'is_leaf'])->keyBy('id');
+
+        $lazadaAncestorTokens = function (int $id) use ($allLazada): array {
+            $tokens = [];
+            $currentParentId = $allLazada->get($id)?->parent_id;
+            while ($currentParentId && $allLazada->has($currentParentId)) {
+                $tokens = [...$tokens, ...LazadaCategoryMatcher::tokenize($allLazada->get($currentParentId)->name)];
+                $currentParentId = $allLazada->get($currentParentId)->parent_id;
+            }
+
+            return $tokens;
+        };
+
+        $lazadaPathOf = function (int $id) use ($allLazada): string {
+            $names = [];
+            $node = $allLazada->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allLazada->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $candidates = $allLazada->filter(fn (LazadaCategory $c) => $c->is_leaf)
+            ->map(fn (LazadaCategory $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'path' => $lazadaPathOf($c->id),
+                'tokens' => LazadaCategoryMatcher::tokenize($c->name),
+                'parentTokens' => $lazadaAncestorTokens($c->id),
+            ])
+            ->values()
+            ->all();
+
+        $rows = $paginated->getCollection()->map(function (Category $category) use ($nameEngOf, $ancestorNameEngTokens, $pathOf, $candidates) {
+            $leafTokens = LazadaCategoryMatcher::tokenize($nameEngOf($category));
+            $parentTokens = $ancestorNameEngTokens($category->id);
+
+            return [
+                'id' => $category->id,
+                'code' => $category->code,
+                'name' => $category->name,
+                'name_eng' => $category->additional_data['name_eng'] ?? null,
+                'path' => $pathOf($category->id),
+                'current' => $category->lazadaCategory ? [
+                    'id' => $category->lazadaCategory->id,
+                    'name' => $category->lazadaCategory->name,
+                ] : null,
+                'suggestions' => LazadaCategoryMatcher::suggest($leafTokens, $parentTokens, $candidates),
+            ];
+        });
+
+        $paginated->setCollection($rows);
+
+        return Inertia::render('catalog/categories/lazada-mapping', [
+            'categories' => $paginated,
+            'stats' => [
+                'total' => $leafIds->count(),
+                'mapped' => $allCategories->whereIn('id', $leafIds)->whereNotNull('lazada_category_id')->count(),
+            ],
+            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage],
+        ]);
+    }
+
+    /**
+     * Persists explicit picks made on the mapping review page. Each entry is
+     * either a chosen leaf Lazada category or an explicit `null` (clear).
+     * Rows the user never touched aren't included in the payload at all —
+     * see resources/js/pages/catalog/categories/lazada-mapping.tsx.
+     */
+    public function bulkMapLazada(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'mappings' => ['required', 'array'],
+            'mappings.*.category_id' => ['required', 'integer', 'exists:categories,id'],
+            'mappings.*.lazada_category_id' => ['nullable', 'integer', 'exists:lazada_categories,id'],
+        ]);
+
+        $categories = Category::whereIn('id', collect($validated['mappings'])->pluck('category_id'))
+            ->get()
+            ->keyBy('id');
+
+        $requestedLazadaIds = collect($validated['mappings'])->pluck('lazada_category_id')->filter()->values();
+        $leafLazadaIds = LazadaCategory::whereIn('id', $requestedLazadaIds)->where('is_leaf', true)->pluck('id');
+
+        $updated = 0;
+
+        foreach ($validated['mappings'] as $mapping) {
+            $category = $categories->get($mapping['category_id']);
+            if (!$category) {
+                continue;
+            }
+
+            $newId = $mapping['lazada_category_id'] ?? null;
+
+            // A non-null pick must resolve to an actual leaf category —
+            // silently drop anything else. The UI only ever offers leaves,
+            // but this guards direct API calls too.
+            if ($newId !== null && !$leafLazadaIds->contains($newId)) {
+                continue;
+            }
+
+            if ($newId === $category->lazada_category_id) {
+                continue;
+            }
+
+            $oldId = $category->lazada_category_id;
+            $category->update(['lazada_category_id' => $newId]);
+
+            AuditLog::record(
+                'lazada_category_mapped',
+                $category,
+                ['lazada_category_id' => $oldId],
+                ['lazada_category_id' => $newId],
+            );
+
+            $updated++;
+        }
+
+        return back()->with('success', "Updated {$updated} category mapping(s).");
     }
 }

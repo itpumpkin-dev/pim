@@ -1,6 +1,7 @@
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import LocaleDropdown from '@/components/locale-dropdown';
+import { NavUser } from '@/components/nav-user';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -37,7 +38,9 @@ export function AppSidebarHeader({ breadcrumbs = [], actions }: AppSidebarHeader
                 {actions}
                 <LocaleDropdown />
                 <AppearanceToggleDropdown />
+                <NavUser />
             </Box>
         </Toolbar>
     );
 }
+

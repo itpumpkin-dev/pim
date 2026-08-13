@@ -11,6 +11,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SyncIcon from '@mui/icons-material/Sync';
+import LinkIcon from '@mui/icons-material/Link';
 import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -118,6 +119,15 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                 }}
                             >
                                 {syncingLazada ? t('syncingLazada') : t('syncLazadaCategories')}
+                            </Button>
+                        )}
+                        {canEdit && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<LinkIcon />}
+                                onClick={() => router.visit('/catalog/categories/lazada-mapping')}
+                            >
+                                {t('mapToLazada')}
                             </Button>
                         )}
                         {canCreate && (

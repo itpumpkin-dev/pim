@@ -1,6 +1,6 @@
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
+
 import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
 import { getTheme } from '@/theme';
@@ -186,10 +186,7 @@ export function AppSidebar() {
             <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
                 <NavMain items={filteredMainNavItems} collapsed={collapsed} />
             </Box>
-            <Box sx={{ mt: 'auto' }}>
-                <Divider />
-                <NavUser collapsed={collapsed} />
-            </Box>
+
         </Box>
     );
 

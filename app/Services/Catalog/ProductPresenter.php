@@ -243,7 +243,7 @@ class ProductPresenter
         ];
 
         if ($imagePath = $get('pimage')) {
-            $result['image'] = Storage::url($imagePath);
+            $result['image'] = Storage::disk('public')->url($imagePath);
         }
 
         if ($get('eol') === '1') {

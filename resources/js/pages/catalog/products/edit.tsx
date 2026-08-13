@@ -46,7 +46,7 @@ import {
     TableHead,
     TableRow,
 } from '@mui/material';
-import { FormEvent, useEffect, useRef, useState, useTransition } from 'react';
+import { FormEvent, memo, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
@@ -441,20 +441,37 @@ export default function ProductEdit({
         localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
     });
 
-    const handleAttributeChange = (attributeId: number, val: AttributeValue, attr: AttributeItem) => {
-        const { channelKey, localeKey } = getValueKeys(attr);
-        const attrValues = data.values[attributeId] || {};
-        setData('values', {
-            ...data.values,
-            [attributeId]: {
-                ...attrValues,
-                [channelKey]: {
-                    ...(attrValues[channelKey] || {}),
-                    [localeKey]: val,
+    // useForm() doesn't document setData as identity-stable across renders,
+    // so it's captured in a ref rather than a useCallback dep — that keeps
+    // setAttributeValue's own identity permanently stable (empty deps)
+    // regardless of whether setData's is. That stability is the point:
+    // passing it down to a memoized field's onChange shouldn't by itself
+    // force that field to re-render — e.g. on a pure locale switch, where
+    // most fields' channelKey/localeKey/value don't change even though the
+    // surrounding form re-renders. Takes the resolved channelKey/localeKey
+    // rather than re-deriving them via getValueKeys(), so it doesn't need
+    // attr (and isn't invalidated by it) either.
+    const setDataRef = useRef(setData);
+    setDataRef.current = setData;
+    const setAttributeValue = useCallback((attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
+        setDataRef.current((prev) => {
+            const attrValues = prev.values[attributeId] || {};
+            return {
+                ...prev,
+                values: {
+                    ...prev.values,
+                    [attributeId]: {
+                        ...attrValues,
+                        [channelKey]: {
+                            ...(attrValues[channelKey] || {}),
+                            [localeKey]: val,
+                        },
+                    },
                 },
-            },
+            };
         });
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Only channel/locale-based fields are re-fetched on switch; non-scopable
     // fields always live under the constant 'global'/'default' keys and never change.
@@ -715,9 +732,11 @@ export default function ProductEdit({
                                                         key={attr.id}
                                                         attr={attr}
                                                         value={val}
-                                                        onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
+                                                        channelKey={channelKey}
+                                                        localeKey={localeKey}
+                                                        onValueChange={setAttributeValue}
+                                                        label={localizedLabel(attr, activeLocaleId)}
                                                         activeLocaleCode={activeLocaleCode}
-                                                        activeLocaleId={activeLocaleId}
                                                         canAddOptions={canAddAttributeOptions}
                                                         sku={data.sku}
                                                     />
@@ -756,9 +775,11 @@ export default function ProductEdit({
                                                                     key={attr.id}
                                                                     attr={attr}
                                                                     value={val}
-                                                                    onChange={(newVal) => handleAttributeChange(attr.id, newVal, attr)}
+                                                                    channelKey={channelKey}
+                                                                    localeKey={localeKey}
+                                                                    onValueChange={setAttributeValue}
+                                                                    label={localizedLabel(attr, activeLocaleId)}
                                                                     activeLocaleCode={activeLocaleCode}
-                                                                    activeLocaleId={activeLocaleId}
                                                                     canAddOptions={canAddAttributeOptions}
                                                                     sku={data.sku}
                                                                 />
@@ -1312,24 +1333,109 @@ function GalleryThumb({
 }
 
 // Component to dynamically render appropriate form control based on real system attribute definition
+// Pure and stateless, so it's hoisted out of RenderAttributeInput instead
+// of redefined every render — SelectControl below needs it to hold a
+// stable identity to stay memoizable.
+function optionValue(opt: AttributeOption) {
+    return opt.code || opt.admin_label || String(opt.id);
+}
+
+type FieldControlProps = {
+    attributeId: number;
+    channelKey: string;
+    localeKey: string;
+    onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
+};
+
+// Autocomplete (options popper, virtualization, filtering) is one of the
+// heaviest controls in this form, and most attributes aren't locale-scoped
+// — their value/options don't change on a pure language switch even though
+// every field's *label* does (attribute names are translated). Splitting
+// it out from the label/chip chrome around it and memoizing on props that
+// only change when the value/options genuinely do lets it skip that
+// re-render instead of rebuilding on every switch.
+const SelectControl = memo(function SelectControl({
+    attributeId,
+    channelKey,
+    localeKey,
+    options,
+    value,
+    disabled,
+    onValueChange,
+}: FieldControlProps & {
+    options: AttributeOption[];
+    value: string;
+    disabled: boolean;
+}) {
+    const selectedOption = options.find((opt) => optionValue(opt) === value) ?? null;
+    return (
+        <Autocomplete
+            size="small"
+            fullWidth
+            disabled={disabled}
+            options={options}
+            value={selectedOption}
+            getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
+            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+            onChange={(_, newValue) => onValueChange(attributeId, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
+            renderInput={(params) => <TextField {...params} placeholder="Select option" />}
+        />
+    );
+});
+
+// Same rationale as SelectControl: a rich-text editor is expensive to
+// re-render, and most attributes' values don't change on a pure locale
+// switch — only their (separately rendered) label does.
+const RichTextControl = memo(function RichTextControl({
+    attributeId,
+    channelKey,
+    localeKey,
+    value,
+    placeholder,
+    readOnly,
+    onValueChange,
+}: FieldControlProps & {
+    value: string;
+    placeholder: string;
+    readOnly: boolean;
+}) {
+    return (
+        <RichTextEditor
+            value={value}
+            onChange={(val) => onValueChange(attributeId, channelKey, localeKey, val)}
+            placeholder={placeholder}
+            readOnly={readOnly}
+        />
+    );
+});
+
 function RenderAttributeInput({
     attr,
     value,
-    onChange,
+    channelKey,
+    localeKey,
+    onValueChange,
+    label,
     activeLocaleCode,
-    activeLocaleId,
     canAddOptions,
     sku,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
-    onChange: (val: AttributeValue) => void;
+    channelKey: string;
+    localeKey: string;
+    onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
+    label: string;
     activeLocaleCode?: string;
-    activeLocaleId: number;
     canAddOptions?: boolean;
     sku: string;
 }) {
-    const label = localizedLabel(attr, activeLocaleId);
+    // Used by every field type below except the memoized SelectControl /
+    // RichTextControl (they call onValueChange directly with the resolved
+    // attributeId/channelKey/localeKey instead) — those two are the fields
+    // expensive enough that a fresh closure identity here would defeat
+    // their memoization on every parent re-render (e.g. a locale switch).
+    const onChange = (val: AttributeValue) => onValueChange(attr.id, channelKey, localeKey, val);
     const stringValue = typeof value === 'string' ? value : '';
     const isReadOnly = attr.editable === false;
     const [addOptionOpen, setAddOptionOpen] = useState(false);
@@ -1376,8 +1482,6 @@ function RenderAttributeInput({
 
     if (attr.type === 'select' || attr.type === 'multiselect') {
         const options = attr.options ?? [];
-        const optionValue = (opt: AttributeOption) => opt.code || opt.admin_label || String(opt.id);
-        const selectedOption = options.find((opt) => optionValue(opt) === stringValue) ?? null;
 
         return (
             <FormControl fullWidth size="small">
@@ -1388,16 +1492,14 @@ function RenderAttributeInput({
                     {renderChips()}
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
-                    <Autocomplete
-                        size="small"
-                        fullWidth
-                        disabled={isReadOnly}
+                    <SelectControl
+                        attributeId={attr.id}
+                        channelKey={channelKey}
+                        localeKey={localeKey}
                         options={options}
-                        value={selectedOption}
-                        getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
-                        isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                        onChange={(_, newValue) => onChange(newValue ? optionValue(newValue) : '')}
-                        renderInput={(params) => <TextField {...params} placeholder="Select option" />}
+                        value={stringValue}
+                        disabled={isReadOnly}
+                        onValueChange={onValueChange}
                     />
                     {canAddOptions && !isReadOnly && (
                         <IconButton
@@ -1435,11 +1537,14 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <RichTextEditor
+                <RichTextControl
+                    attributeId={attr.id}
+                    channelKey={channelKey}
+                    localeKey={localeKey}
                     value={stringValue}
-                    onChange={onChange}
                     placeholder={`Enter ${label.toLowerCase()}`}
                     readOnly={isReadOnly}
+                    onValueChange={onValueChange}
                 />
             </Box>
         );

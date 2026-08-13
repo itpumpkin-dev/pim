@@ -1,47 +1,62 @@
-import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
-import { useSidebar } from '@/hooks/use-sidebar';
+import { useInitials } from '@/hooks/use-initials';
 import { type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
-import ExpandMoreIcon from '@mui/icons-material/UnfoldMore';
-import { Box, ButtonBase, Menu } from '@mui/material';
+import { Avatar, Badge, Box, ButtonBase, Menu } from '@mui/material';
 import { useState } from 'react';
 
-export function NavUser({ collapsed = false }: { collapsed?: boolean }) {
+export function NavUser() {
     const { auth } = usePage<SharedData>().props;
-    const { isMobile } = useSidebar();
     
     if (!auth.user) return null;
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
+    const getInitials = useInitials();
 
     const handleOpen = (event: React.MouseEvent<HTMLElement>) => setAnchorEl(event.currentTarget);
     const handleClose = () => setAnchorEl(null);
 
     return (
-        <Box sx={{ px: 1, py: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <ButtonBase
                 onClick={handleOpen}
                 sx={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
-                    borderRadius: 1,
-                    p: 1,
+                    borderRadius: '50%',
+                    p: 0.5,
                     '&:hover': { bgcolor: 'action.hover' },
                 }}
             >
-                <UserInfo user={auth.user} withStatusDot />
-                {!collapsed && <ExpandMoreIcon fontSize="small" sx={{ ml: 'auto' }} />}
+                <Badge
+                    overlap="circular"
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    variant="dot"
+                    sx={{
+                        '& .MuiBadge-dot': {
+                            bgcolor: '#22c55e',
+                            border: '2px solid',
+                            borderColor: 'background.paper',
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                        },
+                    }}
+                >
+                    <Avatar 
+                        src={auth.user.avatar_url} 
+                        alt={auth.user.name} 
+                        sx={{ width: 32, height: 32, fontSize: 14 }}
+                    >
+                        {getInitials(auth.user.name)}
+                    </Avatar>
+                </Badge>
             </ButtonBase>
             <Menu
                 anchorEl={anchorEl}
                 open={open}
                 onClose={handleClose}
-                anchorOrigin={{ vertical: isMobile ? 'bottom' : 'top', horizontal: 'right' }}
-                transformOrigin={{ vertical: isMobile ? 'top' : 'bottom', horizontal: 'left' }}
-                slotProps={{ paper: { sx: { minWidth: 240 } } }}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                slotProps={{ paper: { sx: { minWidth: 240, mt: 1 } } }}
             >
                 <UserMenuContent user={auth.user} onClose={handleClose} />
             </Menu>
