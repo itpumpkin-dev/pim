@@ -43,6 +43,15 @@ interface Props {
     filterColumns: Record<string, GridColumn>;
 }
 
+// One button + platform picker instead of one dedicated button per platform
+// (which doesn't scale — was literally "Sync Lazada Categories" hardcoded).
+// Only Lazada actually has a working category sync today; adding the next
+// platform's is just one more entry here plus its own backend route, not a
+// new button/layout change on this page.
+const CATEGORY_SYNC_PLATFORMS = [
+    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada' },
+] as const;
+
 export default function CategoryIndex({ categories, filters, filterColumns }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tGrid } = useTranslation('grid');
@@ -64,6 +73,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [deleteCategoryId, setDeleteCategoryId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [syncingLazada, setSyncingLazada] = useState(false);
+    const [syncPlatform, setSyncPlatform] = useState<string>(CATEGORY_SYNC_PLATFORMS[0].value);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -109,17 +119,32 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     </Box>
                     <Stack direction="row" spacing={1.5}>
                         {canEdit && (
-                            <Button
-                                variant="outlined"
-                                startIcon={syncingLazada ? <CircularProgress size={16} /> : <SyncIcon />}
-                                disabled={syncingLazada}
-                                onClick={() => {
-                                    setSyncingLazada(true);
-                                    router.post('/catalog/categories/sync-lazada', {}, { onFinish: () => setSyncingLazada(false) });
-                                }}
-                            >
-                                {syncingLazada ? t('syncingLazada') : t('syncLazadaCategories')}
-                            </Button>
+                            <Stack direction="row" spacing={0.5} alignItems="center">
+                                <Select
+                                    value={syncPlatform}
+                                    onChange={(e) => setSyncPlatform(e.target.value)}
+                                    size="small"
+                                    disabled={syncingLazada}
+                                    sx={{ minWidth: 120 }}
+                                >
+                                    {CATEGORY_SYNC_PLATFORMS.map((p) => (
+                                        <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+                                    ))}
+                                </Select>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={syncingLazada ? <CircularProgress size={16} /> : <SyncIcon />}
+                                    disabled={syncingLazada}
+                                    onClick={() => {
+                                        const platform = CATEGORY_SYNC_PLATFORMS.find((p) => p.value === syncPlatform);
+                                        if (!platform) return;
+                                        setSyncingLazada(true);
+                                        router.post(platform.route, {}, { onFinish: () => setSyncingLazada(false) });
+                                    }}
+                                >
+                                    {syncingLazada ? t('syncingLazada') : t('syncCategories')}
+                                </Button>
+                            </Stack>
                         )}
                         {canEdit && (
                             <Button

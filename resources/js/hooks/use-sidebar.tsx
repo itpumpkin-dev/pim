@@ -1,8 +1,8 @@
 import { useMediaQuery, useTheme } from '@mui/material';
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
-export const SIDEBAR_WIDTH = 260;
-export const SIDEBAR_WIDTH_ICON = 68;
+export const SIDEBAR_WIDTH = 270;
+export const SIDEBAR_WIDTH_ICON = 70;
 
 interface SidebarContextValue {
     isMobile: boolean;

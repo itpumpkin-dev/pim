@@ -250,13 +250,13 @@ export default function Home({
                 px: 3,
                 py: 1,
                 borderWidth: 2,
-                color: '#06B6D4',
-                borderColor: '#06B6D4',
+                color: '',
+                borderColor: '',
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
                     borderWidth: 2,
-                    borderColor: '#0891B2',
-                    bgcolor: alpha('#06B6D4', 0.08),
+                    borderColor: '',
+                    // bgcolor: alpha('', 0.08),
                     transform: 'translateY(-2px)',
                 },
             }}

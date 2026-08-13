@@ -164,6 +164,38 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         );
     };
 
+    const [syncingLiveStatus, setSyncingLiveStatus] = useState(false);
+    const syncLiveStatus = () => {
+        setSyncingLiveStatus(true);
+        router.post(
+            '/catalog/sales-platforms/sync-live-status',
+            {},
+            {
+                onFinish: () => setSyncingLiveStatus(false),
+            },
+        );
+    };
+
+    // Per-shop sync — a Set (not a single id) since more than one shop's
+    // sync could be in flight at once, same reasoning as products/index.tsx's
+    // duplicatingIds.
+    const [syncingShopIds, setSyncingShopIds] = useState<Set<number>>(new Set());
+    const syncShopLiveStatus = (shopId: number) => {
+        setSyncingShopIds((prev) => new Set(prev).add(shopId));
+        router.post(
+            `/catalog/sales-platforms/shops/${shopId}/sync-live-status`,
+            {},
+            {
+                onFinish: () =>
+                    setSyncingShopIds((prev) => {
+                        const next = new Set(prev);
+                        next.delete(shopId);
+                        return next;
+                    }),
+            },
+        );
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
@@ -184,6 +216,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <Stack direction="row" spacing={1.5}>
                         <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLazada} disabled={syncing}>
                             {syncing ? t('syncingLazada') : t('syncFromLazada')}
+                        </Button>
+                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLiveStatus} disabled={syncingLiveStatus}>
+                            {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
                         </Button>
                         {canCreate && (
                             <Button sx={{ color: 'white' }} variant="contained" startIcon={<AddIcon />} onClick={openCreatePlatform}>
@@ -265,6 +300,20 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                                     {(canEdit || canDelete) && (
                                                         <TableCell align="right">
                                                             <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                                {canEdit && shop.lazada_seller_account_id && (
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        title={t('syncLiveStatus')}
+                                                                        disabled={syncingShopIds.has(shop.id)}
+                                                                        onClick={() => syncShopLiveStatus(shop.id)}
+                                                                    >
+                                                                        {syncingShopIds.has(shop.id) ? (
+                                                                            <CircularProgress size={16} />
+                                                                        ) : (
+                                                                            <SyncIcon fontSize="small" />
+                                                                        )}
+                                                                    </IconButton>
+                                                                )}
                                                                 {canEdit && (
                                                                     <IconButton size="small" onClick={() => openEditShop(platform.id, shop)}>
                                                                         <EditIcon fontSize="small" />

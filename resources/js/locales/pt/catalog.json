@@ -95,6 +95,7 @@
     "attrTypeGallery": "Gallery",
     "attrTypeFile": "File",
     "attrTypeCheckbox": "Checkbox",
+    "attrTypeVideo": "Vídeo",
     "swatchTypeLabel": "Tipo de Amostra",
     "swatchTypeText": "Amostra de Texto",
     "swatchTypeColor": "Amostra de Cor",

@@ -10,6 +10,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PublishIcon from '@mui/icons-material/Publish';
+import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import {
     Alert,
     Autocomplete,
@@ -102,6 +103,8 @@ interface ChannelOption {
     code: string;
     name: string | null;
     shop_id?: number | null;
+    is_live?: boolean;
+    live_synced_at?: string | null;
 }
 
 interface ChannelGroup {
@@ -401,6 +404,32 @@ export default function ProductEdit({
     const [pushing, setPushing] = useState(false);
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
 
+    // Fired the moment Push/Deactivate's confirm dialog opens — checks
+    // Lazada directly (not the cached "Live" badge, which is only as fresh
+    // as the last sync and may never have run for this product) so the
+    // dialog reflects the real current state right before committing to a
+    // live write. Shared by both dialogs since only one is ever open at once.
+    const [statusCheck, setStatusCheck] = useState<{
+        shopId: number;
+        loading: boolean;
+        is_live?: boolean;
+        never_pushed?: boolean;
+        status?: string | null;
+        error?: string;
+    } | null>(null);
+
+    const checkLazadaStatus = (shopId: number) => {
+        setStatusCheck({ shopId, loading: true });
+        fetch(`/catalog/products/${product.id}/lazada-status/${shopId}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                setStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
+            })
+            .catch(() => setStatusCheck({ shopId, loading: false, error: 'Network error while checking Lazada status.' }));
+    };
+
     const confirmPushToLazada = () => {
         if (!pushConfirmShop) return;
         const shopId = pushConfirmShop.id;
@@ -433,6 +462,49 @@ export default function ProductEdit({
                 setPushConfirmShop(null);
             });
     };
+
+    // Same real-write reasoning as push above — explicit confirm, never
+    // automatic. Reuses pushResult for the result snackbar (the response
+    // message itself distinguishes "Pushed" vs "Deactivated").
+    const [deactivateConfirmShop, setDeactivateConfirmShop] = useState<{ id: number; name: string } | null>(null);
+    const [deactivating, setDeactivating] = useState(false);
+
+    const confirmDeactivateLazada = () => {
+        if (!deactivateConfirmShop) return;
+        const shopId = deactivateConfirmShop.id;
+        setDeactivating(true);
+
+        const xsrfToken = decodeURIComponent(
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1] ?? '',
+        );
+
+        fetch(`/catalog/products/${product.id}/deactivate-lazada/${shopId}`, {
+            method: 'POST',
+            headers: {
+                'X-XSRF-TOKEN': xsrfToken,
+                Accept: 'application/json',
+            },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
+            })
+            .catch(() => setPushResult({ severity: 'error', message: 'Network error while deactivating on Lazada.' }))
+            .finally(() => {
+                setDeactivating(false);
+                setDeactivateConfirmShop(null);
+            });
+    };
+
+    // Narrowed views of statusCheck for each dialog — plain `statusCheck &&`
+    // (rather than the optional-chained comparison used to compute this)
+    // is what lets TypeScript actually narrow away the `null` case at every
+    // read site below.
+    const pushStatusCheck = statusCheck && pushConfirmShop && statusCheck.shopId === pushConfirmShop.id ? statusCheck : null;
+    const deactivateStatusCheck = statusCheck && deactivateConfirmShop && statusCheck.shopId === deactivateConfirmShop.id ? statusCheck : null;
 
     // Resolves which nested keys a given attribute's value lives under for the
     // currently selected channel/locale, based on its own scoping flags.
@@ -727,6 +799,7 @@ export default function ProductEdit({
                                                 const { channelKey, localeKey } = getValueKeys(attr);
                                                 const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
                                                 const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
                                                 return (
                                                     <RenderAttributeInput
                                                         key={attr.id}
@@ -737,6 +810,7 @@ export default function ProductEdit({
                                                         onValueChange={setAttributeValue}
                                                         label={localizedLabel(attr, activeLocaleId)}
                                                         activeLocaleCode={activeLocaleCode}
+                                                        activeChannelName={activeChannelName}
                                                         canAddOptions={canAddAttributeOptions}
                                                         sku={data.sku}
                                                     />
@@ -770,6 +844,7 @@ export default function ProductEdit({
                                                             const { channelKey, localeKey } = getValueKeys(attr);
                                                             const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
                                                             const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                            const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
                                                             return (
                                                                 <RenderAttributeInput
                                                                     key={attr.id}
@@ -780,6 +855,7 @@ export default function ProductEdit({
                                                                     onValueChange={setAttributeValue}
                                                                     label={localizedLabel(attr, activeLocaleId)}
                                                                     activeLocaleCode={activeLocaleCode}
+                                                                    activeChannelName={activeChannelName}
                                                                     canAddOptions={canAddAttributeOptions}
                                                                     sku={data.sku}
                                                                 />
@@ -1081,6 +1157,21 @@ export default function ProductEdit({
                                                                 const active = activeChannelId === ch.id;
                                                                 const isShop = ch.shop_id != null;
                                                                 const published = isShop && data.published_shop_ids.includes(ch.shop_id as number);
+                                                                // Push/Deactivate hit the backend's *saved* published_shop_ids
+                                                                // (product->platformShops(), only updated on Save Product) —
+                                                                // but `published` above reflects unsaved local checkbox state.
+                                                                // Showing the action button as soon as the box is ticked, before
+                                                                // saving, let a user check a shop and immediately click Push,
+                                                                // which the backend then rejects with "not marked as published"
+                                                                // since nothing was persisted yet. Only offer the action once
+                                                                // the checkbox state actually matches what's saved.
+                                                                const savedPublished = isShop && publishedShopIds.includes(ch.shop_id as number);
+                                                                const canPushOrDeactivate = published && savedPublished;
+                                                                // Only the "checked but not saved yet" direction is worth a
+                                                                // hint — that's the one where a push/deactivate button would
+                                                                // otherwise look available but isn't yet. The reverse
+                                                                // (unchecking) has no action being blocked, just a pending save.
+                                                                const hasUnsavedPublishChange = published && !savedPublished;
                                                                 return (
                                                                     <Box
                                                                         key={ch.id}
@@ -1113,17 +1204,60 @@ export default function ProductEdit({
                                                                         <Typography variant="body2" sx={{ flex: 1 }}>
                                                                             {ch.name || ch.code}
                                                                         </Typography>
-                                                                        {published && (
+                                                                        {ch.is_live && (
+                                                                            <Chip
+                                                                                label="Live"
+                                                                                size="small"
+                                                                                title={
+                                                                                    ch.live_synced_at
+                                                                                        ? `Confirmed live as of ${new Date(ch.live_synced_at).toLocaleString()}`
+                                                                                        : 'Confirmed live on last sync'
+                                                                                }
+                                                                                sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 700, height: 20, fontSize: '0.65rem', mr: 1 }}
+                                                                            />
+                                                                        )}
+                                                                        {hasUnsavedPublishChange && (
+                                                                            <Typography
+                                                                                variant="caption"
+                                                                                sx={{ color: active ? 'rgba(255,255,255,0.8)' : 'text.secondary', fontStyle: 'italic', whiteSpace: 'nowrap' }}
+                                                                            >
+                                                                                Save first
+                                                                            </Typography>
+                                                                        )}
+                                                                        {canPushOrDeactivate && (
                                                                             <IconButton
                                                                                 size="small"
                                                                                 title="Push to Lazada"
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code });
+                                                                                    checkLazadaStatus(ch.shop_id as number);
                                                                                 }}
                                                                                 sx={{ color: active ? '#fff' : 'primary.main' }}
                                                                             >
                                                                                 <PublishIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
+                                                                        {/* Unlike Push (safe to offer any time — it creates or
+                                                                            updates), Deactivate only makes sense once there's
+                                                                            actually something live to take down. Without the
+                                                                            ch.is_live check this showed up purely from "marked
+                                                                            to publish", so clicking it on a shop that was
+                                                                            marked but never actually pushed successfully hit
+                                                                            the backend's "never been pushed — nothing to
+                                                                            deactivate" error instead of just not being there. */}
+                                                                        {canPushOrDeactivate && ch.is_live && (
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                title="Deactivate on Lazada"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setDeactivateConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code });
+                                                                                    checkLazadaStatus(ch.shop_id as number);
+                                                                                }}
+                                                                                sx={{ color: active ? '#fff' : 'text.secondary' }}
+                                                                            >
+                                                                                <UnpublishedIcon fontSize="small" />
                                                                             </IconButton>
                                                                         )}
                                                                     </Box>
@@ -1157,6 +1291,24 @@ export default function ProductEdit({
                         This creates or updates a <strong>real, live listing</strong> on Lazada for <strong>{pushConfirmShop?.name}</strong>,
                         visible to real customers. This action can&apos;t be undone from here.
                     </DialogContentText>
+                    {pushStatusCheck && (
+                        <Box sx={{ mt: 2 }}>
+                            {pushStatusCheck.loading ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <CircularProgress size={14} />
+                                    <Typography variant="body2" color="text.secondary">Checking current status on Lazada...</Typography>
+                                </Stack>
+                            ) : pushStatusCheck.error ? (
+                                <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {pushStatusCheck.error}</Alert>
+                            ) : pushStatusCheck.never_pushed ? (
+                                <Alert severity="info" sx={{ py: 0 }}>Not pushed before — this will create a new listing.</Alert>
+                            ) : pushStatusCheck.is_live ? (
+                                <Alert severity="success" sx={{ py: 0 }}>Currently live on Lazada — this will update the existing listing.</Alert>
+                            ) : (
+                                <Alert severity="info" sx={{ py: 0 }}>Exists on Lazada but not currently active (status: {pushStatusCheck.status ?? 'unknown'}) — this will update it.</Alert>
+                            )}
+                        </Box>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setPushConfirmShop(null)} color="inherit" disabled={pushing}>
@@ -1164,6 +1316,53 @@ export default function ProductEdit({
                     </Button>
                     <Button onClick={confirmPushToLazada} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>
                         {pushing ? 'Pushing...' : 'Push'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={deactivateConfirmShop !== null} onClose={() => setDeactivateConfirmShop(null)}>
+                <DialogTitle>Deactivate on Lazada?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This hides the <strong>real, live listing</strong> on Lazada for <strong>{deactivateConfirmShop?.name}</strong> from
+                        customers. It stays deactivated until pushed again. This action can&apos;t be undone from here.
+                    </DialogContentText>
+                    {deactivateStatusCheck && (
+                        <Box sx={{ mt: 2 }}>
+                            {deactivateStatusCheck.loading ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <CircularProgress size={14} />
+                                    <Typography variant="body2" color="text.secondary">Checking current status on Lazada...</Typography>
+                                </Stack>
+                            ) : deactivateStatusCheck.error ? (
+                                <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {deactivateStatusCheck.error}</Alert>
+                            ) : deactivateStatusCheck.never_pushed ? (
+                                <Alert severity="error" sx={{ py: 0 }}>This product has never been pushed to this shop — there&apos;s nothing to deactivate.</Alert>
+                            ) : !deactivateStatusCheck.is_live ? (
+                                <Alert severity="error" sx={{ py: 0 }}>Already not active on Lazada (status: {deactivateStatusCheck.status ?? 'unknown'}) — nothing to deactivate.</Alert>
+                            ) : (
+                                <Alert severity="success" sx={{ py: 0 }}>Confirmed currently live on Lazada.</Alert>
+                            )}
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeactivateConfirmShop(null)} color="inherit" disabled={deactivating}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={confirmDeactivateLazada}
+                        color="error"
+                        variant="contained"
+                        disabled={
+                            deactivating ||
+                            !deactivateStatusCheck ||
+                            deactivateStatusCheck.loading ||
+                            (!deactivateStatusCheck.error && (deactivateStatusCheck.never_pushed || !deactivateStatusCheck.is_live))
+                        }
+                        startIcon={deactivating ? <CircularProgress size={16} /> : <UnpublishedIcon />}
+                    >
+                        {deactivating ? 'Deactivating...' : 'Deactivate'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1417,6 +1616,7 @@ function RenderAttributeInput({
     onValueChange,
     label,
     activeLocaleCode,
+    activeChannelName,
     canAddOptions,
     sku,
 }: {
@@ -1427,6 +1627,7 @@ function RenderAttributeInput({
     onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
     label: string;
     activeLocaleCode?: string;
+    activeChannelName?: string;
     canAddOptions?: boolean;
     sku: string;
 }) {
@@ -1442,9 +1643,10 @@ function RenderAttributeInput({
 
     const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
     const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [videoError, setVideoError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (attr.type === 'image' && value instanceof File) {
+        if ((attr.type === 'image' || attr.type === 'video') && value instanceof File) {
             const url = URL.createObjectURL(value);
             setFilePreviewUrl(url);
             return () => URL.revokeObjectURL(url);
@@ -1461,6 +1663,19 @@ function RenderAttributeInput({
                         label={activeLocaleCode ? activeLocaleCode.toUpperCase() : 'LOCALE'}
                         size="small"
                         sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#c084fc', color: '#fff', fontWeight: 700 }}
+                    />
+                ) : attr.is_channel_based ? (
+                    // Previously always showed "DEFAULT" here regardless of
+                    // which channel was actually active — a channel-based
+                    // field (e.g. price_std) gave zero visual confirmation of
+                    // which shop you were editing, so switching the active
+                    // channel and typing a value looked identical to typing
+                    // it for the wrong (or no) channel. Show the real channel
+                    // name so that's no longer silently ambiguous.
+                    <Chip
+                        label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
+                        size="small"
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#60a5fa', color: '#fff', fontWeight: 700 }}
                     />
                 ) : (
                     <Chip
@@ -1686,6 +1901,123 @@ function RenderAttributeInput({
                         }}
                     />
                 </Button>
+            </Box>
+        );
+    }
+
+    if (attr.type === 'video') {
+        const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+
+        const selectedName = value instanceof File ? value.name : '';
+
+        let existingLabel = '';
+        let existingVideoUrl = '';
+        if (!selectedName && stringValue) {
+            existingLabel = stringValue.split('/').pop() || stringValue;
+            existingVideoUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
+                ? stringValue
+                : `/storage/${stringValue}`;
+        }
+
+        const previewSrc = filePreviewUrl || existingVideoUrl;
+
+        // Mirrors the server-side getID3 check in ProductController
+        // (validateVideoConstraints()) — this is the fast, no-round-trip
+        // path that catches most bad files before a 100MB upload even
+        // starts; the server check is what a request made directly against
+        // the endpoint (bypassing this UI) can't get past.
+        const handleVideoSelect = (file: File) => {
+            setVideoError(null);
+
+            if (file.type !== 'video/mp4') {
+                setVideoError('Only MP4 videos are supported.');
+                return;
+            }
+            if (file.size > MAX_VIDEO_BYTES) {
+                setVideoError('Video must be 100MB or smaller.');
+                return;
+            }
+
+            const probeUrl = URL.createObjectURL(file);
+            const probe = document.createElement('video');
+            probe.preload = 'metadata';
+            probe.onloadedmetadata = () => {
+                URL.revokeObjectURL(probeUrl);
+                if (probe.duration > 60) {
+                    setVideoError('Video must be 60 seconds or shorter.');
+                    return;
+                }
+                if (probe.videoWidth < 480 || probe.videoHeight < 480) {
+                    setVideoError('Video must be at least 480x480px.');
+                    return;
+                }
+                onChange(file);
+            };
+            probe.onerror = () => {
+                URL.revokeObjectURL(probeUrl);
+                setVideoError('Could not read this video file.');
+            };
+            probe.src = probeUrl;
+        };
+
+        return (
+            <Box>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
+                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                    {previewSrc && (
+                        <Box
+                            component="video"
+                            src={previewSrc}
+                            controls
+                            sx={{ width: 160, maxHeight: 100, borderRadius: 1, border: '1px solid #e2e8f0' }}
+                        />
+                    )}
+                    <Button
+                        component="label"
+                        variant="outlined"
+                        size="small"
+                        disabled={isReadOnly}
+                        startIcon={<CloudUploadIcon fontSize="small" />}
+                        sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
+                    >
+                        Choose file
+                        <input
+                            type="file"
+                            hidden
+                            disabled={isReadOnly}
+                            accept="video/mp4"
+                            onChange={(e) => {
+                                const files = e.target.files;
+                                if (!files || files.length === 0) return;
+                                handleVideoSelect(files[0]);
+                                // Reset so re-selecting the same (rejected) file still
+                                // fires this handler again — browsers skip the change
+                                // event otherwise since the input's value didn't change.
+                                e.target.value = '';
+                            }}
+                        />
+                    </Button>
+                    {selectedName && (
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
+                            {selectedName}
+                        </Typography>
+                    )}
+                    {existingLabel && (
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
+                            Current: {existingLabel}
+                        </Typography>
+                    )}
+                </Stack>
+                {videoError && (
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                        {videoError}
+                    </Typography>
+                )}
             </Box>
         );
     }

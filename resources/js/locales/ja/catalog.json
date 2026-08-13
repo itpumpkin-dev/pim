@@ -95,6 +95,7 @@
     "attrTypeGallery": "画廊",
     "attrTypeFile": "文件",
     "attrTypeCheckbox": "复选框",
+    "attrTypeVideo": "動画",
     "swatchTypeLabel": "スウォッチタイプ",
     "swatchTypeText": "テキストスウォッチ",
     "swatchTypeColor": "カラースウォッチ",

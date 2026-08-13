@@ -9,9 +9,9 @@ class AttributeValueFormatter
 {
     /**
      * Converts a raw stored attribute value into its public-facing form —
-     * image/file/gallery values are stored as paths relative to the 'public'
-     * disk (see ProductController's upload handling) and need a URL built
-     * against that specific disk to become fetchable.
+     * image/file/video/gallery values are stored as paths relative to the
+     * 'public' disk (see ProductController's upload handling) and need a URL
+     * built against that specific disk to become fetchable.
      *
      * Deliberately not `Storage::url()` (the default-disk facade): that
      * resolves against whatever FILESYSTEM_DISK happens to be configured
@@ -33,7 +33,7 @@ class AttributeValueFormatter
             return array_map(fn ($path) => Storage::disk('public')->url($path), $paths);
         }
 
-        if (in_array($attribute->type, ['image', 'file'], true)) {
+        if (in_array($attribute->type, ['image', 'file', 'video'], true)) {
             return Storage::disk('public')->url($rawValue);
         }
 

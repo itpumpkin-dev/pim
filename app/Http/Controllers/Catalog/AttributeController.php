@@ -124,7 +124,7 @@ class AttributeController extends Controller
     {
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
+            'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
@@ -168,7 +168,7 @@ class AttributeController extends Controller
     {
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox'],
+            'type' => ['required', 'in:text,textarea,price,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],

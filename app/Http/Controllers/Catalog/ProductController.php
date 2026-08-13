@@ -147,7 +147,25 @@ class ProductController extends Controller
             }
         }
 
-        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily) {
+        // "Sales Channels" column data — confirmed-live status only
+        // (product_platform_shops.status = 'live', populated by
+        // LazadaProductSyncService::syncLiveStatus(); a row existing without
+        // status='live' just means "marked to publish", not actually
+        // pushed). Grouped by platform name, not hardcoded to Lazada, so a
+        // future platform's sync needs no change here.
+        $salesChannelRows = DB::table('product_platform_shops')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->whereIn('product_platform_shops.product_id', $productIds)
+            ->where('product_platform_shops.status', 'live')
+            ->get(['product_platform_shops.product_id', 'sales_platforms.name as platform_name']);
+
+        $salesChannelsByProduct = $salesChannelRows->groupBy('product_id')->map(fn ($rows) => [
+            'total' => $rows->count(),
+            'platforms' => $rows->groupBy('platform_name')->map->count(),
+        ]);
+
+        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
@@ -175,6 +193,12 @@ class ProductController extends Controller
             $product->image_url = $imagePath ? Storage::disk('public')->url($imagePath) : null;
 
             $product->parent_sku = $product->parent_id ? ($parentSkus->get($product->parent_id) ?? null) : null;
+
+            $channels = $salesChannelsByProduct->get($product->id);
+            $product->sales_channels = [
+                'total' => $channels['total'] ?? 0,
+                'platforms' => $channels ? $channels['platforms']->toArray() : [],
+            ];
 
             $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey) {
                 $rawValue = $valueByKey[$product->id.'-'.$attribute->id] ?? null;
@@ -478,6 +502,37 @@ class ProductController extends Controller
         }
 
         Storage::disk('public')->delete($oldValue);
+    }
+
+    /**
+     * Duration (≤60s) and dimension (≥480×480px) checks for the `video`
+     * attribute type — Laravel's validator has no built-in rule for either,
+     * and reading them requires actually parsing the MP4's metadata, which
+     * getID3 (james-heinrich/getid3, pure PHP, no ffmpeg binary needed) does
+     * directly from the file on disk. Returns a user-facing message for the
+     * first constraint violated, or null if the file is within bounds.
+     *
+     * Mirrors the equivalent client-side check in edit.tsx (browser
+     * <video> metadata) — that one is enforced first and catches most bad
+     * uploads before they're even sent, but this is what a request made
+     * directly against the endpoint (bypassing the UI) can't get past.
+     */
+    private function validateVideoConstraints(\Illuminate\Http\UploadedFile $file): ?string
+    {
+        $info = (new \getID3())->analyze($file->getRealPath());
+
+        $duration = $info['playtime_seconds'] ?? null;
+        if ($duration !== null && $duration > 60) {
+            return 'Video must be 60 seconds or shorter.';
+        }
+
+        $width = $info['video']['resolution_x'] ?? null;
+        $height = $info['video']['resolution_y'] ?? null;
+        if ($width !== null && $height !== null && ($width < 480 || $height < 480)) {
+            return 'Video must be at least 480x480px.';
+        }
+
+        return null;
     }
 
     /**
@@ -844,9 +899,21 @@ class ProductController extends Controller
             ->get()
             ->keyBy('channel_id');
 
+        // Confirmed-live status for this product's own shops (see
+        // LazadaProductSyncService::syncLiveStatus()) — separate from
+        // publishedShopIds below, which only means "marked to publish".
+        // Answers "did I already push this?" so the Push button isn't the
+        // only way to find out — see the Sales Channels panel's live badge.
+        $liveStatusByShopId = DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->where('status', 'live')
+            ->get(['sales_platform_shop_id', 'last_synced_at'])
+            ->keyBy('sales_platform_shop_id');
+
         $channelGroups = $channels
-            ->map(function ($channel) use ($shopByChannelId) {
+            ->map(function ($channel) use ($shopByChannelId, $liveStatusByShopId) {
                 $shop = $shopByChannelId->get($channel['id']);
+                $liveStatus = $shop ? $liveStatusByShopId->get($shop->id) : null;
 
                 return [
                     'id' => $channel['id'],
@@ -854,6 +921,8 @@ class ProductController extends Controller
                     'name' => $channel['name'],
                     'shop_id' => $shop?->id,
                     'platform' => $shop?->platform?->name ?? 'Website',
+                    'is_live' => $liveStatus !== null,
+                    'live_synced_at' => $liveStatus?->last_synced_at,
                 ];
             })
             ->groupBy('platform')
@@ -968,6 +1037,24 @@ class ProductController extends Controller
     }
 
     /**
+     * Read-only, real-time check of whether this product actually is live
+     * on Lazada for this shop right now — called by the Edit Product page
+     * when opening the Push/Deactivate confirm dialog, so it reflects
+     * Lazada's current state rather than product_platform_shops' cached
+     * status (which is only ever as fresh as the last bulk sync, or could
+     * simply have never been run for this product). See
+     * LazadaProductSyncService::checkLiveStatus().
+     */
+    public function checkLazadaStatus(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        try {
+            return response()->json(LazadaProductSyncService::forShop($shop)->checkLiveStatus($product, $shop));
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
      * FIRES A REAL, LIVE WRITE TO LAZADA — creates or updates an actual
      * listing on the seller's storefront. Only reachable for a shop the
      * product is explicitly marked "published" for (see platformShops()),
@@ -988,6 +1075,32 @@ class ProductController extends Controller
             AuditLog::record('pushed_to_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
 
             return response()->json(['message' => "Pushed to '{$shop->name}' successfully.", 'result' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO LAZADA — hides an actual listing from the
+     * storefront. Same "published" guard as pushToLazada(); the service
+     * layer additionally guards that the product has actually been pushed
+     * before (nothing to deactivate otherwise).
+     */
+    public function deactivateLazada(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
+        if (!$isPublished) {
+            return response()->json([
+                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
+            ], 422);
+        }
+
+        try {
+            $result = LazadaProductSyncService::forShop($shop)->deactivate($product, $shop);
+
+            AuditLog::record('deactivated_on_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
+
+            return response()->json(['message' => "Deactivated on '{$shop->name}' successfully.", 'result' => $result]);
         } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
@@ -1090,10 +1203,15 @@ class ProductController extends Controller
 
                 // Mirrors CategoryController's Image/File field rules (4MB images, 10MB
                 // generic files) — this loop previously stored any uploaded file with no
-                // mime-type or size restriction at all.
-                $rules = in_array($attribute->type, ['image', 'gallery'], true)
-                    ? ['image', 'max:4096']
-                    : ['file', 'max:10240'];
+                // mime-type or size restriction at all. Video gets its own branch: MP4
+                // only, 100MB — matching Lazada's own video-upload requirements, since
+                // this attribute exists to feed Lazada's optional "video" (Video URL)
+                // product field.
+                $rules = match (true) {
+                    in_array($attribute->type, ['image', 'gallery'], true) => ['image', 'max:4096'],
+                    $attribute->type === 'video' => ['file', 'mimes:mp4', 'max:102400'],
+                    default => ['file', 'max:10240'],
+                };
 
                 $validator = Validator::make(['file' => $file], ['file' => $rules]);
 
@@ -1101,6 +1219,19 @@ class ProductController extends Controller
                     $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: " . $validator->errors()->first('file');
 
                     return null;
+                }
+
+                // Duration/dimension aren't things Laravel's validator can check —
+                // done as a second pass, only once mime/size already passed, so a
+                // wrong-format file gets the cheaper, more specific error above
+                // instead of getID3 trying (and likely failing) to parse it.
+                if ($attribute->type === 'video') {
+                    $videoError = $this->validateVideoConstraints($file);
+                    if ($videoError !== null) {
+                        $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: {$videoError}";
+
+                        return null;
+                    }
                 }
 
                 return $file->store('product-attributes', 'public');
@@ -1252,7 +1383,7 @@ class ProductController extends Controller
                             // Uploads previously left the file they replaced on disk forever —
                             // grab whatever was stored before this write so it can be cleaned
                             // up below once the new value (or deletion) has been saved.
-                            $isFileAttribute = in_array($attribute->type, ['image', 'gallery', 'file'], true);
+                            $isFileAttribute = in_array($attribute->type, ['image', 'gallery', 'file', 'video'], true);
                             $oldStoredValue = $isFileAttribute
                                 ? ProductValue::where('product_id', $product->id)
                                     ->where('attribute_id', $attributeId)

@@ -11,8 +11,10 @@ use App\Models\Locale;
 use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
 use App\Services\CodeGenerator;
+use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,6 +147,87 @@ class SalesPlatformController extends Controller
         }
 
         return back()->with('success', "Synced {$synced} Lazada shop(s).");
+    }
+
+    /**
+     * Refreshes real live-listing status (product_platform_shops.status/
+     * platform_item_id/last_synced_at) for every active Lazada-linked shop —
+     * powers the Products list's "Sales Channels" column. Reads from Lazada
+     * (LazadaProductSyncService::syncLiveStatus()), writes only to our own
+     * DB — same risk class as syncLazadaShops()/CategoryController::
+     * syncLazadaCategories() above, safe to re-run any time.
+     *
+     * Runs synchronously rather than as a queued job — confirmed live,
+     * 2026-08-13: this environment has 225 jobs stuck in the `jobs` table
+     * from 5 days earlier (all clustered within one ~20-minute window, none
+     * since), meaning a queue worker isn't reliably running here. Queuing
+     * this would trade a visible timeout for a silent no-op (dispatched,
+     * "success" shown, nothing ever actually runs) — worse. Instead:
+     * set_time_limit() covers 8 shops × several paginated Lazada calls each
+     * (confirmed to exceed PHP's default 60s ceiling live), and a short
+     * pause between shops spreads out requests to reduce (not guarantee
+     * against — Lazada's own limit is opaque) hitting Lazada's "901: too
+     * frequent" rate limit, which one shop did mid-run before this fix.
+     */
+    public function syncLiveStatus(): RedirectResponse
+    {
+        set_time_limit(300);
+
+        $shops = SalesPlatformShop::whereNotNull('lazada_seller_account_id')->get();
+
+        $totalMatched = 0;
+        $failed = 0;
+        foreach ($shops as $shop) {
+            try {
+                $result = LazadaProductSyncService::forShop($shop)->syncLiveStatus($shop);
+                $totalMatched += $result['matched'];
+            } catch (\Throwable $e) {
+                $failed++;
+                Log::error('Lazada live-status sync failed for shop', [
+                    'shop_id' => $shop->id,
+                    'shop_name' => $shop->name,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            usleep(300_000);
+        }
+
+        $message = "Synced live status for ".($shops->count() - $failed)." of {$shops->count()} shop(s), {$totalMatched} product(s) matched live.";
+        if ($failed > 0) {
+            $message .= " {$failed} shop(s) failed — check storage/logs/laravel.log.";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Same sync as syncLiveStatus() above, but for exactly one shop —
+     * finishes well within PHP's default time limit (one shop's own
+     * pagination loop, not eight shops' worth back to back) and only spends
+     * this shop's share of Lazada's rate limit, so a shop that failed in the
+     * bulk sync (or just needs a quicker check) can be retried on its own
+     * without waiting on — or re-hitting the limit via — every other shop.
+     */
+    public function syncShopLiveStatus(SalesPlatformShop $shop): RedirectResponse
+    {
+        if (!$shop->lazada_seller_account_id) {
+            return back()->with('error', "'{$shop->name}' has no linked Lazada account to sync from.");
+        }
+
+        try {
+            $result = LazadaProductSyncService::forShop($shop)->syncLiveStatus($shop);
+
+            return back()->with('success', "Synced '{$shop->name}': {$result['matched']} product(s) matched live (of {$result['total_live']} live on Lazada).");
+        } catch (\Throwable $e) {
+            Log::error('Lazada live-status sync failed for shop', [
+                'shop_id' => $shop->id,
+                'shop_name' => $shop->name,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', "Failed to sync '{$shop->name}': ".$e->getMessage());
+        }
     }
 
     /**

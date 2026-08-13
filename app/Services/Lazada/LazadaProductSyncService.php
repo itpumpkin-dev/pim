@@ -4,11 +4,11 @@ namespace App\Services\Lazada;
 
 use App\Models\Attribute;
 use App\Models\Locale;
-use App\Models\LazadaProductMapping;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Catalog\AttributeValueFormatter;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -63,7 +63,6 @@ class LazadaProductSyncService
         $price = $this->attributeValue($product, 'price_std', $shop->channel_id);
         $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
         $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
-        $brand = $this->attributeValue($product, 'pbrand', $shop->channel_id);
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to Lazada.");
@@ -84,8 +83,24 @@ class LazadaProductSyncService
             'attributes' => array_filter([
                 'name' => $name,
                 'short_description' => $name,
-                'brand' => $brand,
+                // Confirmed live, 2026-08-13: Lazada's `brand` field must
+                // match its own controlled brand catalog exactly
+                // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — our local pbrand
+                // select-option value (e.g. "option_1"/"พัมคิน") was never
+                // going to match that. The catalog has 153,482 entries via
+                // /category/brands/query with no confirmed name-search
+                // parameter (tried name/keyword/brand_name/search — none
+                // filtered), so matching our brand to a real Lazada brand_id
+                // isn't currently feasible. "No Brand" is Lazada's own
+                // documented universal fallback (present in their official
+                // /product/create example payload) for exactly this case.
+                'brand' => 'No Brand',
             ]),
+            // Confirmed via a real official /product/create example: Product
+            // carries its own main-image list separate from each Sku's own
+            // Images (which the same $imageUrl also feeds into via
+            // $skuFields['images'] above) — both exist in the real payload.
+            'images' => $imageUrl ? [$imageUrl] : [],
             'skus' => [
                 array_filter($skuFields, fn ($v) => $v !== null && $v !== ''),
             ],
@@ -97,8 +112,16 @@ class LazadaProductSyncService
     }
 
     /**
-     * Decides create vs. update from n8n's lazada_product_mapping (does this
-     * SKU already have a live item_id under this shop?), then pushes.
+     * Decides create vs. update by asking Lazada directly (findProductMatch()
+     * below) whether this SellerSku already exists under this shop.
+     *
+     * Previously checked n8n's lazada_product_mapping instead — found live,
+     * 2026-08-13: that table can lag behind a just-completed push (n8n syncs
+     * on its own separate schedule we don't control), so pushing again
+     * shortly after a first successful push could still see "no mapping yet"
+     * and call createProduct() a second time instead of updateProduct() —
+     * risking a duplicate listing or Lazada's own SellerSku-repeat rejection.
+     * Asking Lazada directly has no such lag.
      *
      * FIRES A REAL, LIVE WRITE TO LAZADA — creates or edits an actual
      * listing on the seller's storefront, visible to real customers. Only
@@ -108,14 +131,223 @@ class LazadaProductSyncService
     public function push(Product $product, SalesPlatformShop $shop): array
     {
         $payload = $this->buildPayload($product, $shop);
+        $payload = $this->uploadImagesToLazada($payload);
 
-        $existing = LazadaProductMapping::where('seller_sku', $product->sku)
-            ->where('shop_name', $shop->name)
-            ->first();
+        $existing = $this->findProductMatch($product->sku);
 
-        return $existing
-            ? $this->client->updateProduct($payload)
-            : $this->client->createProduct($payload);
+        if ($existing) {
+            // Confirmed live, 2026-08-13: /product/update rejects the
+            // payload outright ("skuId is a mandatory field and must be
+            // filled in") without this — unlike /product/create, which
+            // assigns item_id/SkuId itself, an update has to say exactly
+            // which existing item/sku it's targeting. findProductMatch()
+            // (called above to decide create-vs-update in the first place)
+            // already has both, so no extra Lazada call is needed to get them.
+            $payload['item_id'] = $existing['item_id'];
+            $payload['skus'][0]['SkuId'] = $existing['sku']['SkuId'] ?? null;
+
+            return $this->client->updateProduct($payload);
+        }
+
+        return $this->client->createProduct($payload);
+    }
+
+    /**
+     * Lazada rejects any product/SKU image URL that isn't already hosted on
+     * their own domain (confirmed live, 2026-08-13:
+     * BIZ_CHECK_EXIST_OUTER_MAIN_IMAGE) — buildPayload() only knows our own
+     * storage URLs, so every one of them needs to go through
+     * LazadaClient::uploadImage() and get swapped for the URL that comes
+     * back before this payload can actually be submitted. Kept out of
+     * buildPayload() itself so that method stays side-effect-free/safe to
+     * call anytime for inspection — this step is a real write (uploads to
+     * Lazada's CDN) and only belongs on the push() path.
+     */
+    private function uploadImagesToLazada(array $payload): array
+    {
+        $uploaded = [];
+        $uploadOnce = function (string $localUrl) use (&$uploaded): string {
+            return $uploaded[$localUrl] ??= $this->client->uploadImage($localUrl);
+        };
+
+        if (!empty($payload['images'])) {
+            $payload['images'] = array_map($uploadOnce, $payload['images']);
+        }
+
+        foreach ($payload['skus'] as &$sku) {
+            if (!empty($sku['images'])) {
+                $sku['images'] = array_map($uploadOnce, $sku['images']);
+            }
+        }
+        unset($sku);
+
+        return $payload;
+    }
+
+    /**
+     * Hides this product's listing for this shop from the storefront —
+     * requires it to actually exist on Lazada right now (findProductMatch()
+     * below asks Lazada directly, not n8n's lazada_product_mapping — see
+     * push()'s docblock for why that table can't be trusted for a check this
+     * time-sensitive; it's exactly what produced the confusing case of
+     * checkLiveStatus() confirming "live" while this method's old
+     * mapping-based lookup still said "never pushed").
+     *
+     * FIRES A REAL, LIVE WRITE TO LAZADA — takes down an actual listing
+     * visible to real customers. Same explicit-go-ahead rule as push().
+     */
+    public function deactivate(Product $product, SalesPlatformShop $shop): array
+    {
+        $match = $this->findProductMatch($product->sku);
+
+        if (!$match) {
+            throw new RuntimeException("Product '{$product->sku}' has never been pushed to '{$shop->name}' — nothing to deactivate.");
+        }
+
+        return $this->client->deactivateProduct([
+            'item_id' => $match['item_id'],
+            'sku_id' => $match['sku']['SkuId'] ?? null,
+            'seller_sku' => $product->sku,
+        ]);
+    }
+
+    /**
+     * Real-time single-item status check — see findProductMatch() below for
+     * why this asks Lazada directly rather than trusting n8n's
+     * lazada_product_mapping. Meant to be called right before offering/
+     * confirming Push or Deactivate, so a shop that was never actually
+     * pushed (or was pushed but later deactivated outside this app) doesn't
+     * look "maybe live" purely because a cache somewhere hasn't caught up.
+     *
+     * Also refreshes product_platform_shops' status/platform_item_id/
+     * last_synced_at for this row with what it just found, so the result
+     * and the cached "Live" badge stay consistent without waiting for the
+     * next bulk sync.
+     *
+     * Read-only against Lazada; the only write is to our own cache.
+     *
+     * @return array{is_live: bool, never_pushed: bool, status: string|null}
+     */
+    public function checkLiveStatus(Product $product, SalesPlatformShop $shop): array
+    {
+        $match = $this->findProductMatch($product->sku);
+
+        if ($match === null) {
+            DB::table('product_platform_shops')
+                ->where('product_id', $product->id)
+                ->where('sales_platform_shop_id', $shop->id)
+                ->update(['status' => null, 'last_synced_at' => now()]);
+
+            return ['is_live' => false, 'never_pushed' => true, 'status' => null];
+        }
+
+        $status = $match['sku']['Status'] ?? null;
+        $isLive = strtolower((string) $status) === 'active';
+
+        DB::table('product_platform_shops')->updateOrInsert(
+            ['product_id' => $product->id, 'sales_platform_shop_id' => $shop->id],
+            ['status' => $isLive ? 'live' : null, 'platform_item_id' => (string) $match['item_id'], 'last_synced_at' => now(), 'updated_at' => now()]
+        );
+
+        return ['is_live' => $isLive, 'never_pushed' => false, 'status' => $status];
+    }
+
+    /**
+     * Shared lookup for push()/deactivate()/checkLiveStatus() — one direct
+     * call to Lazada by our own SellerSku (LazadaClient::findProductBySku()),
+     * returning the matching {item_id, sku: [...]} or null if this SKU
+     * doesn't exist on Lazada under this shop's account at all.
+     *
+     * Deliberately not LazadaProductMapping (n8n's separate, independently-
+     * timed sync of the same data): confirmed live, 2026-08-13, that it can
+     * lag behind Lazada's actual current state enough to matter — a
+     * checkLiveStatus() call (using this method) correctly reported a
+     * product as live while deactivate()'s old mapping-based lookup still
+     * said "never pushed", because n8n simply hadn't synced that mapping row
+     * yet even though the listing had existed on Lazada for a while.
+     */
+    private function findProductMatch(string $sellerSku): ?array
+    {
+        $response = $this->client->findProductBySku($sellerSku);
+
+        foreach ($response['data']['products'] ?? [] as $lazadaProduct) {
+            foreach ($lazadaProduct['skus'] ?? [] as $sku) {
+                if (($sku['SellerSku'] ?? null) === $sellerSku) {
+                    return ['item_id' => $lazadaProduct['item_id'] ?? null, 'sku' => $sku];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Refreshes product_platform_shops.status/platform_item_id/last_synced_at
+     * for this shop from Lazada's own live-listing API — the only real
+     * source of truth for whether a push actually succeeded (the row's mere
+     * existence only ever meant "marked to publish", see
+     * ProductController::update()'s published_shop_ids handling). Paging
+     * through every live listing on every Products-list page load isn't
+     * feasible (one shop alone had 265 live products in testing), so this
+     * populates a local cache instead — see LazadaClient::getLiveProducts().
+     *
+     * FIRES A REAL WRITE, but only to our own database — reads from Lazada,
+     * writes to us. No risk to Lazada's data; safe to re-run any time.
+     *
+     * @return array{matched: int, total_live: int}
+     */
+    public function syncLiveStatus(SalesPlatformShop $shop): array
+    {
+        $liveItemIdBySku = [];
+        $offset = 0;
+        $limit = 50;
+
+        do {
+            $response = $this->client->getLiveProducts($offset, $limit);
+            $products = $response['data']['products'] ?? [];
+
+            foreach ($products as $liveProduct) {
+                foreach ($liveProduct['skus'] ?? [] as $sku) {
+                    $sellerSku = $sku['SellerSku'] ?? null;
+                    if ($sellerSku !== null && $sellerSku !== '') {
+                        $liveItemIdBySku[$sellerSku] = $liveProduct['item_id'] ?? null;
+                    }
+                }
+            }
+
+            $total = (int) ($response['data']['total_products'] ?? 0);
+            $offset += $limit;
+
+            // Paced to reduce hitting Lazada's opaque per-account rate limit
+            // ("901: too frequent") — a single shop can need several of
+            // these calls back to back (265 live products / 50 per page = 6
+            // pages), which is what actually triggered it live, 2026-08-13.
+            if ($offset < $total) {
+                usleep(300_000);
+            }
+        } while ($offset < $total);
+
+        $productIdBySku = Product::whereIn('sku', array_keys($liveItemIdBySku))->pluck('id', 'sku');
+
+        $now = now();
+        foreach ($productIdBySku as $sku => $productId) {
+            DB::table('product_platform_shops')->updateOrInsert(
+                ['product_id' => $productId, 'sales_platform_shop_id' => $shop->id],
+                ['status' => 'live', 'platform_item_id' => (string) $liveItemIdBySku[$sku], 'last_synced_at' => $now, 'updated_at' => $now]
+            );
+        }
+
+        // Anything previously marked live for this shop but not seen in this
+        // sync is no longer live (delisted/deactivated Lazada-side) — reset
+        // rather than delete, since the row's existence alone still carries
+        // the separate "marked to publish" meaning.
+        DB::table('product_platform_shops')
+            ->where('sales_platform_shop_id', $shop->id)
+            ->where('status', 'live')
+            ->whereNotIn('product_id', $productIdBySku->values())
+            ->update(['status' => null, 'last_synced_at' => $now]);
+
+        return ['matched' => $productIdBySku->count(), 'total_live' => count($liveItemIdBySku)];
     }
 
     /**
@@ -134,7 +366,15 @@ class LazadaProductSyncService
             }
 
             $providedIn = $field['attribute_type'] === 'sku' ? $skuFields : $payload['attributes'];
-            $value = $providedIn[$field['name']] ?? null;
+            // Confirmed via a live (read-only) getCategoryAttributes() call:
+            // Lazada's schema names the SKU image slot "__images__", but our
+            // own payload builds it under the plain "images" key (matching
+            // the "Images" JSON key LazadaClient::buildProductPayload()
+            // emits) — translate here so a category that actually requires
+            // it doesn't get a false "missing" (or worse, a false pass) from
+            // a literal key mismatch.
+            $fieldName = $field['name'] === '__images__' ? 'images' : $field['name'];
+            $value = $providedIn[$fieldName] ?? null;
 
             if ($value === null || $value === '' || $value === []) {
                 $missing[] = ($field['label'] ?? $field['name']).' ('.$field['name'].')';

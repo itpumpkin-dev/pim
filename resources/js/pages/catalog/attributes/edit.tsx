@@ -76,6 +76,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         { value: 'gallery', label: t('attrTypeGallery') },
         { value: 'file', label: t('attrTypeFile') },
         { value: 'checkbox', label: t('attrTypeCheckbox') },
+        { value: 'video', label: t('attrTypeVideo') },
     ];
 
     const swatchTypes = Object.entries(swatchTypeKeys).map(([value, key]) => ({

@@ -21,6 +21,7 @@ const attributeTypeKeys: Record<string, string> = {
     gallery: 'attrTypeGallery',
     file: 'attrTypeFile',
     checkbox: 'attrTypeCheckbox',
+    video: 'attrTypeVideo',
 };
 
 const swatchTypeKeys: Record<string, string> = {

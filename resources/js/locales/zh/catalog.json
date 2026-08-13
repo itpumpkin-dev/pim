@@ -95,6 +95,7 @@
     "attrTypeGallery": "图片库",
     "attrTypeFile": "文件",
     "attrTypeCheckbox": "复选框",
+    "attrTypeVideo": "视频",
     "swatchTypeLabel": "样本类型",
     "swatchTypeText": "文字样本",
     "swatchTypeColor": "颜色样本",

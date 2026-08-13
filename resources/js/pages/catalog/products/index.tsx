@@ -83,6 +83,7 @@ interface ProductRow {
     image_url?: string | null;
     completeness?: number | null;
     attribute_values?: Record<string, unknown>;
+    sales_channels?: { total: number; platforms: Record<string, number> };
     [key: string]: unknown;
 }
 interface GridData {
@@ -321,6 +322,34 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             label={`${completeness}%`}
                             size="small"
                             sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                        />
+                    );
+                },
+            },
+            {
+                key: 'sales_channels',
+                label: t('salesChannels'),
+                render: (row) => {
+                    const total = row.sales_channels?.total ?? 0;
+                    if (total === 0) {
+                        return (
+                            <Chip
+                                label={t('notLive')}
+                                size="small"
+                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            />
+                        );
+                    }
+                    const platforms = row.sales_channels?.platforms ?? {};
+                    const tooltip = Object.entries(platforms)
+                        .map(([platform, count]) => `${platform}: ${count}`)
+                        .join(', ');
+                    return (
+                        <Chip
+                            label={t('liveOnCount', { count: total })}
+                            title={tooltip}
+                            size="small"
+                            sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
                         />
                     );
                 },

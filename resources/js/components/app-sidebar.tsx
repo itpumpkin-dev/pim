@@ -1,19 +1,16 @@
-import { NavFooter } from '@/components/nav-footer';
-import { NavMain } from '@/components/nav-main';
-
+import { NavPrimary } from '@/components/nav-primary';
+import { NavSecondary } from '@/components/nav-secondary';
 import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
 import { getTheme } from '@/theme';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import FolderIcon from '@mui/icons-material/Folder';
-import GroupIcon from '@mui/icons-material/Group';
-import HomeIcon from '@mui/icons-material/Home';
-import ImportExportIcon from '@mui/icons-material/ImportExport';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
+import ImportExportIcon from '@mui/icons-material/ImportExport';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { Box, Divider, Drawer, ThemeProvider, Toolbar } from '@mui/material';
+import { Box, Divider, Drawer, ThemeProvider, Toolbar, Typography } from '@mui/material';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
 
@@ -31,7 +28,15 @@ const SIDEBAR_BG = {
 function useMainNavItems(): NavItem[] {
     const { t } = useTranslation('nav');
 
-    return [
+    // Must be stable across renders that don't actually change translations:
+    // filteredMainNavItems (useMemo below) depends on this array's identity,
+    // and a second effect depends on filteredMainNavItems and unconditionally
+    // calls setSelectedGroup — an unmemoized array here (a fresh literal every
+    // render) makes that chain recompute and re-set state on every single
+    // render, which is an unbounded render loop (surfaced as React's "Maximum
+    // update depth exceeded", most visibly under the product edit page's
+    // useTransition-driven re-render churn, but not actually specific to it).
+    return useMemo(() => [
         {
             title: t('dashboard'),
             url: '/dashboard',
@@ -140,53 +145,173 @@ function useMainNavItems(): NavItem[] {
                 },
             ],
         },
-    ];
+    ], [t]);
+}
+
+// Nav items only list each section's top-level URL (e.g. /catalog/products)
+// — an exact-equality match against the page URL would never match a nested
+// detail page (/catalog/products/33/edit, /catalog/products/create, ?query
+// strings, ...). Match by path prefix instead (with a '/' boundary so
+// /catalog/products doesn't also match an unrelated /catalog/productsX).
+function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
+    const currentPath = pageUrl.split('?')[0];
+    const matchesCurrentPath = (url?: string) =>
+        !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
+
+    return (
+        items.find(
+            (item) =>
+                matchesCurrentPath(item.url) ||
+                (item.items && item.items.some((sub) => matchesCurrentPath(sub.url)))
+        ) || items[0] || null
+    );
 }
 
 export function AppSidebar() {
-    const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
+    const { isMobile, openMobile, setOpenMobile, state, setOpen } = useSidebar();
+    const page = usePage();
     const { auth } = usePage<SharedData>().props;
     const { resolved } = useResolvedAppearance();
     const sidebarBg = SIDEBAR_BG[resolved];
     const collapsed = state === 'collapsed';
-    const width = collapsed ? SIDEBAR_WIDTH_ICON : SIDEBAR_WIDTH;
     const mainNavItems = useMainNavItems();
 
-    const filterNavItems = (items: NavItem[]): NavItem[] => {
-        return items
-            .filter((item) => !item.permission || auth.permissions.includes(item.permission))
-            .map((item) => ({
-                ...item,
-                items: item.items ? filterNavItems(item.items) : undefined,
-            }))
-            .filter((item) => !item.items || item.items.length > 0);
-    };
+    // Memoize filtered items to avoid unnecessary recalculations and keep stable references
+    const filteredMainNavItems = useMemo(() => {
+        const filterNavItems = (items: NavItem[]): NavItem[] => {
+            return items
+                .filter((item) => !item.permission || auth.permissions.includes(item.permission))
+                .map((item) => ({
+                    ...item,
+                    items: item.items ? filterNavItems(item.items) : undefined,
+                }))
+                .filter((item) => !item.items || item.items.length > 0);
+        };
+        return filterNavItems(mainNavItems);
+    }, [mainNavItems, auth.permissions]);
 
-    const filteredMainNavItems = filterNavItems(mainNavItems);
+    // Lazy-initialized (not useState(null) + an effect) so the very first
+    // paint after AppSidebar mounts — which is every navigation, since each
+    // page wraps itself in <AppLayout> rather than Inertia persisting a
+    // shared layout instance — already has the right group selected. With
+    // useState(null), that first paint always rendered with hasSubmenus
+    // false (secondary sidebar collapsed to width 0/opacity 0), then the
+    // post-mount effect set the real group and the secondary sidebar
+    // animated open — a visible flash on every page load.
+    const [selectedGroup, setSelectedGroup] = useState<NavItem | null>(() => findActiveGroup(filteredMainNavItems, page.url));
+
+    // Still needed for a page.url change without a remount (e.g. if a future
+    // refactor moves to Inertia's persistent-layout pattern) — harmless
+    // no-op re-render on first mount since it recomputes the same group the
+    // lazy initializer above already set.
+    useEffect(() => {
+        const activeGroup = findActiveGroup(filteredMainNavItems, page.url);
+        if (activeGroup) {
+            setSelectedGroup(activeGroup);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page.url]);
+
+    // Keep selectedGroup in sync with new translated items when language changes
+    useEffect(() => {
+        if (selectedGroup) {
+            const updatedGroup = filteredMainNavItems.find(item => item.icon === selectedGroup.icon);
+            if (updatedGroup) {
+                setSelectedGroup(updatedGroup);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredMainNavItems]);
+
+    const hasSubmenus = selectedGroup && selectedGroup.items && selectedGroup.items.length > 0;
+    const width = collapsed ? SIDEBAR_WIDTH_ICON : (hasSubmenus ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON);
 
     const content = (
-        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Toolbar
+        <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+            {/* Primary Sidebar (Narrow Left Column) */}
+            <Box
                 sx={{
-                    px: collapsed ? 1 : 2,
-                    minHeight: '57px !important',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    width: SIDEBAR_WIDTH_ICON,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    borderRight: '1px solid',
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
                 }}
             >
-                <Box
-                    component={Link}
-                    href="/dashboard"
-                    prefetch
-                    sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit', overflow: 'hidden' }}
+                <Toolbar
+                    sx={{
+                        px: 1,
+                        minHeight: '57px !important',
+                        justifyContent: 'center',
+                    }}
                 >
-                    <AppLogo collapsed={collapsed} />
+                    <Box
+                        component={Link}
+                        href="/dashboard"
+                        prefetch
+                        sx={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: 'inherit' }}
+                    >
+                        <AppLogo collapsed={true} />
+                    </Box>
+                </Toolbar>
+                <Divider sx={{ alignSelf: 'stretch', borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', alignSelf: 'stretch' }}>
+                    <NavPrimary
+                        items={filteredMainNavItems}
+                        activeTitle={selectedGroup?.title ?? null}
+                        onSelect={(item) => {
+                            if (collapsed) {
+                                setOpen(true);
+                            }
+                            setSelectedGroup(item);
+                        }}
+                    />
                 </Box>
-            </Toolbar>
-            <Divider />
-            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', py: 1 }}>
-                <NavMain items={filteredMainNavItems} collapsed={collapsed} />
             </Box>
 
+            {/* Secondary Sidebar (Wider Right Column) */}
+            <Box
+                sx={{
+                    flex: 1,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: (theme) => theme.transitions.create(['width', 'opacity'], { duration: theme.transitions.duration.shortest }),
+                    width: hasSubmenus && !collapsed ? SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON : 0,
+                    opacity: hasSubmenus && !collapsed ? 1 : 0,
+                    overflow: 'hidden',
+                    bgcolor: 'rgba(0, 0, 0, 0.12)',
+                }}
+            >
+                <Toolbar
+                    sx={{
+                        px: 3,
+                        minHeight: '57px !important',
+                        justifyContent: 'flex-start',
+                    }}
+                >
+                    <Typography
+                        variant="h6"
+                        noWrap
+                        sx={{
+                            fontWeight: 700,
+                            fontSize: '1.1rem',
+                            color: '#fff',
+                            letterSpacing: '0.02em',
+                        }}
+                    >
+                        PIM PK
+                    </Typography>
+                </Toolbar>
+                <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+                    {selectedGroup && (
+                        <NavSecondary title={selectedGroup.title} items={selectedGroup.items ?? []} />
+                    )}
+                </Box>
+            </Box>
         </Box>
     );
 
@@ -229,3 +354,4 @@ export function AppSidebar() {
         </ThemeProvider>
     );
 }
+
