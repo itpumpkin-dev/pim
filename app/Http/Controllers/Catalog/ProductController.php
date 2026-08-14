@@ -25,6 +25,7 @@ use App\Services\GridManager;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
+use App\Services\Shopee\ShopeeProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1099,6 +1100,70 @@ class ProductController extends Controller
             $result = LazadaProductSyncService::forShop($shop)->deactivate($product, $shop);
 
             AuditLog::record('deactivated_on_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
+
+            return response()->json(['message' => "Deactivated on '{$shop->name}' successfully.", 'result' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * Same role as checkLazadaStatus() above, for Shopee — see
+     * ShopeeProductSyncService::checkLiveStatus() for how "live" is
+     * determined there (against our own cached platform_item_id, not a
+     * Shopee-side SKU search).
+     */
+    public function checkShopeeStatus(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        try {
+            return response()->json(ShopeeProductSyncService::forShop($shop)->checkLiveStatus($product, $shop));
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO SHOPEE — creates or updates an actual
+     * listing on the seller's storefront. Same "published" guard as
+     * pushToLazada().
+     */
+    public function pushToShopee(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
+        if (!$isPublished) {
+            return response()->json([
+                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
+            ], 422);
+        }
+
+        try {
+            $result = ShopeeProductSyncService::forShop($shop)->push($product, $shop);
+
+            AuditLog::record('pushed_to_shopee', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
+
+            return response()->json(['message' => "Pushed to '{$shop->name}' successfully.", 'result' => $result]);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO SHOPEE — hides an actual listing from the
+     * storefront. Same "published" guard as deactivateLazada().
+     */
+    public function deactivateShopee(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
+        if (!$isPublished) {
+            return response()->json([
+                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
+            ], 422);
+        }
+
+        try {
+            $result = ShopeeProductSyncService::forShop($shop)->deactivate($product, $shop);
+
+            AuditLog::record('deactivated_on_shopee', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
 
             return response()->json(['message' => "Deactivated on '{$shop->name}' successfully.", 'result' => $result]);
         } catch (\Throwable $e) {

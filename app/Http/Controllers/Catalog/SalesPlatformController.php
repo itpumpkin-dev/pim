@@ -10,6 +10,7 @@ use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
+use App\Models\ShopeeSellerAccount;
 use App\Services\CodeGenerator;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\RedirectResponse;
@@ -141,12 +142,51 @@ class SalesPlatformController extends Controller
             $shop->updated_by = $request->user()?->id;
             $shop->save();
 
-            $this->ensureChannelFor($shop, $request);
+            $this->ensureChannelFor($shop, $platform, $request);
 
             $synced++;
         }
 
         return back()->with('success', "Synced {$synced} Lazada shop(s).");
+    }
+
+    /**
+     * Same bootstrap as syncLazadaShops() above, but mirrors n8n's
+     * shopee_tokens into sales_platform_shops under the 'shopee' platform,
+     * matched by shop_id. See ShopeeSellerAccount for why this reads
+     * ::all() rather than an ::active() scope — shopee_tokens has no
+     * is_active column to filter on.
+     */
+    public function syncShopeeShops(Request $request): RedirectResponse
+    {
+        $platform = SalesPlatform::firstOrCreate(
+            ['code' => 'shopee'],
+            ['name' => 'Shopee', 'created_by' => $request->user()?->id, 'updated_by' => $request->user()?->id]
+        );
+
+        $synced = 0;
+        foreach (ShopeeSellerAccount::all() as $account) {
+            $shop = SalesPlatformShop::firstOrNew([
+                'sales_platform_id' => $platform->id,
+                'shopee_seller_account_id' => $account->shop_id,
+            ]);
+
+            if (!$shop->exists) {
+                $shop->code = 'shop_'.$account->shop_id;
+                $shop->created_by = $request->user()?->id;
+            }
+
+            $shop->name = trim($account->shop_name ?: $account->shop_id);
+            $shop->is_active = true;
+            $shop->updated_by = $request->user()?->id;
+            $shop->save();
+
+            $this->ensureChannelFor($shop, $platform, $request);
+
+            $synced++;
+        }
+
+        return back()->with('success', "Synced {$synced} Shopee shop(s).");
     }
 
     /**
@@ -236,7 +276,7 @@ class SalesPlatformController extends Controller
      * that shop — see the "sales platforms vs channels" design discussion.
      * Only ever creates once per shop; never touches an already-linked one.
      */
-    private function ensureChannelFor(SalesPlatformShop $shop, Request $request): void
+    private function ensureChannelFor(SalesPlatformShop $shop, SalesPlatform $platform, Request $request): void
     {
         if ($shop->channel_id) {
             return;
@@ -250,7 +290,7 @@ class SalesPlatformController extends Controller
         }
 
         $channel = Channel::create([
-            'code' => 'lazada_'.$shop->code,
+            'code' => $platform->code.'_'.$shop->code,
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
         ]);

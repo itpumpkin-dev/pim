@@ -10,6 +10,7 @@ export interface GridColumn {
 }
 
 export interface DateRangeValue {
+    [key: string]: string | undefined;
     from?: string;
     to?: string;
 }

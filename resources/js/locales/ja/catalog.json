@@ -167,8 +167,9 @@
     "shopCode": "店舗コード",
     "shopName": "店舗名",
     "shopActive": "有効",
-    "linkedLazadaAccount": "連携済みLazadaアカウント",
-    "noLazadaAccount": "未連携",
+    "linkedPlatformAccount": "連携済みアカウント",
+    "noLinkedAccount": "未連携",
+    "syncFromShopee": "Shopeeから同期",
     "noShopsYet": "まだ店舗がありません。",
     "confirmDeleteShop": "この店舗を削除してもよろしいですか？"
 }

@@ -16,6 +16,7 @@ class SalesPlatformShop extends Model
         'code',
         'name',
         'lazada_seller_account_id',
+        'shopee_seller_account_id',
         'is_active',
         'created_by',
         'updated_by',
@@ -66,5 +67,19 @@ class SalesPlatformShop extends Model
         }
 
         return LazadaSellerAccount::find($this->lazada_seller_account_id);
+    }
+
+    /**
+     * shopee_seller_account_id points at a row in n8n's separate database
+     * (see ShopeeSellerAccount), same cross-database situation as
+     * lazadaAccount() above — resolved with a lookup instead of a relation.
+     */
+    public function shopeeAccount(): ?ShopeeSellerAccount
+    {
+        if (!$this->shopee_seller_account_id) {
+            return null;
+        }
+
+        return ShopeeSellerAccount::find($this->shopee_seller_account_id);
     }
 }

@@ -12,10 +12,13 @@ use App\Models\CategoryTranslation;
 use App\Models\LazadaCategory;
 use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
+use App\Models\ShopeeCategory;
+use App\Models\ShopeeSellerAccount;
+use App\Services\CategoryMatcher;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
-use App\Services\Lazada\LazadaCategoryMatcher;
 use App\Services\Lazada\LazadaClient;
+use App\Services\Shopee\ShopeeClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -493,10 +496,13 @@ class CategoryController extends Controller
         // timezone marker attached. Parse it in the app timezone (UTC)
         // explicitly before serializing, otherwise the frontend's Date
         // parser misreads the naive string as local time.
-        $lastSyncedAt = LazadaCategory::max('updated_at');
+        $toIso = fn (?string $value) => $value ? \Carbon\Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/marketplace-sync', [
-            'lastSyncedAt' => $lastSyncedAt ? \Carbon\Carbon::parse($lastSyncedAt, 'UTC')->toISOString() : null,
+            'lastSyncedAt' => [
+                'lazada' => $toIso(LazadaCategory::max('updated_at')),
+                'shopee' => $toIso(ShopeeCategory::max('updated_at')),
+            ],
         ]);
     }
 
@@ -552,6 +558,65 @@ class CategoryController extends Controller
     }
 
     /**
+     * Refreshes the local shopee_categories cache from Shopee's live
+     * category tree (v2.product.get_category) — same purpose as
+     * syncLazadaCategories() above. Unlike Lazada, category-tree access on
+     * Shopee still requires shop_id + access_token (see ShopeeClient), and
+     * shopee_tokens has no is_active column to filter an account by, so any
+     * linked shop can authenticate this.
+     */
+    public function syncShopeeCategories(Request $request): RedirectResponse
+    {
+        $account = ShopeeSellerAccount::first();
+        if (!$account) {
+            return back()->with('error', 'No Shopee seller account found to authenticate the sync.');
+        }
+
+        $tree = (new ShopeeClient($account))->getCategoryTree();
+
+        $rows = collect($tree['response']['category_list'] ?? [])->map(function (array $node) {
+            $parentId = (int) ($node['parent_category_id'] ?? 0);
+
+            return [
+                'id' => $node['category_id'],
+                'parent_id' => $parentId > 0 ? $parentId : null,
+                'name' => $node['display_category_name'] ?? $node['original_category_name'],
+                'is_leaf' => !($node['has_children'] ?? false),
+            ];
+        })->all();
+
+        // Shopee returns category_list flat (not nested like Lazada's tree),
+        // with no guarantee parents are listed before their children — but
+        // shopee_categories.parent_id is a real self-referencing FK, checked
+        // per row within each upsert chunk below, so rows must be reordered
+        // depth-first first (same requirement as flattenLazadaCategoryNodes()).
+        $byParent = [];
+        foreach ($rows as $row) {
+            $byParent[$row['parent_id'] ?? 0][] = $row;
+        }
+
+        $ordered = [];
+        $walk = function (int $parentId) use (&$walk, &$byParent, &$ordered) {
+            foreach ($byParent[$parentId] ?? [] as $row) {
+                $ordered[] = $row;
+                $walk($row['id']);
+            }
+        };
+        $walk(0);
+
+        $now = now();
+        foreach (array_chunk($ordered, 500) as $chunk) {
+            ShopeeCategory::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['id'],
+                ['parent_id', 'name', 'is_leaf', 'updated_at']
+            );
+        }
+
+        return back()->with('success', 'Synced '.count($ordered).' Shopee categories.');
+    }
+
+    /**
      * Search endpoint backing the Lazada category Autocomplete on the
      * category edit form — only leaf categories are selectable, since
      * Lazada requires products to be assigned to a leaf, not a parent node.
@@ -570,13 +635,43 @@ class CategoryController extends Controller
     }
 
     /**
-     * Bulk review UI for mapping local leaf categories to a Lazada leaf
-     * category — the prerequisite LazadaProductSyncService::buildPayload()
-     * enforces before any product in that category can be pushed. Suggestions
-     * are a ranking aid only (see LazadaCategoryMatcher); nothing is
-     * persisted here until bulkMapLazada() is called with explicit picks.
+     * Search endpoint backing the Shopee category Autocomplete on the
+     * mapping review page — mirrors searchLazadaCategories() above.
      */
-    public function lazadaMapping(Request $request): Response
+    public function searchShopeeCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = ShopeeCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
+    }
+
+    /**
+     * Lightweight product list for one category — powers the Lazada/Shopee
+     * mapping review pages' "which products does this affect" expander, so a
+     * still-unmapped category with real products attached (blocking every
+     * one of them from being pushed to that platform) can be prioritized
+     * over one with none. Not platform-specific — same endpoint for both.
+     */
+    public function categoryProducts(Category $category): JsonResponse
+    {
+        $products = $category->products()
+            ->orderBy('sku')
+            ->get(['products.id', 'products.sku'])
+            ->map(fn ($p) => ['id' => $p->id, 'sku' => $p->sku]);
+
+        return response()->json(['data' => $products]);
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: int, 3: bool}
+     */
+    private function parseMappingFilters(Request $request): array
     {
         $status = $request->input('status', 'unmapped');
         if (!in_array($status, ['unmapped', 'mapped', 'all'], true)) {
@@ -590,11 +685,29 @@ class CategoryController extends Controller
             $perPage = 25;
         }
 
+        $onlyWithProducts = $request->boolean('only_with_products');
+
+        return [$status, $search, $perPage, $onlyWithProducts];
+    }
+
+    /**
+     * Shared query/scoring logic behind lazadaMapping() and shopeeMapping()
+     * — only the marketplace side (which model, FK column, relation) differs
+     * between the two; the local-category half (ancestor chains, name
+     * resolution, pagination) is identical either way. Suggestions are a
+     * ranking aid only (see CategoryMatcher); nothing is persisted here
+     * until bulkMapMarketplaceCategory() is called with explicit picks.
+     *
+     * @param  class-string<LazadaCategory>|class-string<ShopeeCategory>  $marketplaceModel
+     * @return array{categories: mixed, stats: array{total: int, mapped: int}}
+     */
+    private function buildCategoryMappingData(string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $relation, string $marketplaceModel): array
+    {
         // Load the whole local tree once (~1,100 rows) so each row's
         // ancestor chain can be resolved in memory regardless of depth,
         // instead of firing one query per row per level.
         $allCategories = Category::query()->without('translations')
-            ->get(['id', 'parent_id', 'name', 'additional_data', 'lazada_category_id'])
+            ->get(['id', 'parent_id', 'name', 'additional_data', $fkColumn])
             ->keyBy('id');
 
         $childParentIds = $allCategories->pluck('parent_id')->filter()->unique();
@@ -606,7 +719,7 @@ class CategoryController extends Controller
             $tokens = [];
             $currentParentId = $allCategories->get($id)?->parent_id;
             while ($currentParentId && $allCategories->has($currentParentId)) {
-                $tokens = [...$tokens, ...LazadaCategoryMatcher::tokenize($nameEngOf($allCategories->get($currentParentId)))];
+                $tokens = [...$tokens, ...CategoryMatcher::tokenize($nameEngOf($allCategories->get($currentParentId)))];
                 $currentParentId = $allCategories->get($currentParentId)->parent_id;
             }
 
@@ -626,12 +739,17 @@ class CategoryController extends Controller
 
         $query = Category::query()->without('translations')
             ->whereIn('id', $leafIds)
-            ->with('lazadaCategory:id,name,parent_id');
+            ->withCount('products')
+            ->with("{$relation}:id,name,parent_id");
 
         if ($status === 'unmapped') {
-            $query->whereNull('lazada_category_id');
+            $query->whereNull($fkColumn);
         } elseif ($status === 'mapped') {
-            $query->whereNotNull('lazada_category_id');
+            $query->whereNotNull($fkColumn);
+        }
+
+        if ($onlyWithProducts) {
+            $query->whereHas('products');
         }
 
         if ($search !== '') {
@@ -643,45 +761,45 @@ class CategoryController extends Controller
 
         $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
 
-        // Lazada leaf candidates + their token sets, precomputed once and
-        // reused for every row scored on this page.
-        $allLazada = LazadaCategory::query()->get(['id', 'parent_id', 'name', 'is_leaf'])->keyBy('id');
+        // Marketplace leaf candidates + their token sets, precomputed once
+        // and reused for every row scored on this page.
+        $allMarketplace = $marketplaceModel::query()->get(['id', 'parent_id', 'name', 'is_leaf'])->keyBy('id');
 
-        $lazadaAncestorTokens = function (int $id) use ($allLazada): array {
+        $marketplaceAncestorTokens = function (int $id) use ($allMarketplace): array {
             $tokens = [];
-            $currentParentId = $allLazada->get($id)?->parent_id;
-            while ($currentParentId && $allLazada->has($currentParentId)) {
-                $tokens = [...$tokens, ...LazadaCategoryMatcher::tokenize($allLazada->get($currentParentId)->name)];
-                $currentParentId = $allLazada->get($currentParentId)->parent_id;
+            $currentParentId = $allMarketplace->get($id)?->parent_id;
+            while ($currentParentId && $allMarketplace->has($currentParentId)) {
+                $tokens = [...$tokens, ...CategoryMatcher::tokenize($allMarketplace->get($currentParentId)->name)];
+                $currentParentId = $allMarketplace->get($currentParentId)->parent_id;
             }
 
             return $tokens;
         };
 
-        $lazadaPathOf = function (int $id) use ($allLazada): string {
+        $marketplacePathOf = function (int $id) use ($allMarketplace): string {
             $names = [];
-            $node = $allLazada->get($id);
+            $node = $allMarketplace->get($id);
             while ($node) {
                 array_unshift($names, $node->name);
-                $node = $node->parent_id ? $allLazada->get($node->parent_id) : null;
+                $node = $node->parent_id ? $allMarketplace->get($node->parent_id) : null;
             }
 
             return implode(' > ', $names);
         };
 
-        $candidates = $allLazada->filter(fn (LazadaCategory $c) => $c->is_leaf)
-            ->map(fn (LazadaCategory $c) => [
+        $candidates = $allMarketplace->filter(fn ($c) => $c->is_leaf)
+            ->map(fn ($c) => [
                 'id' => $c->id,
                 'name' => $c->name,
-                'path' => $lazadaPathOf($c->id),
-                'tokens' => LazadaCategoryMatcher::tokenize($c->name),
-                'parentTokens' => $lazadaAncestorTokens($c->id),
+                'path' => $marketplacePathOf($c->id),
+                'tokens' => CategoryMatcher::tokenize($c->name),
+                'parentTokens' => $marketplaceAncestorTokens($c->id),
             ])
             ->values()
             ->all();
 
-        $rows = $paginated->getCollection()->map(function (Category $category) use ($nameEngOf, $ancestorNameEngTokens, $pathOf, $candidates) {
-            $leafTokens = LazadaCategoryMatcher::tokenize($nameEngOf($category));
+        $rows = $paginated->getCollection()->map(function (Category $category) use ($nameEngOf, $ancestorNameEngTokens, $pathOf, $candidates, $relation) {
+            $leafTokens = CategoryMatcher::tokenize($nameEngOf($category));
             $parentTokens = $ancestorNameEngTokens($category->id);
 
             return [
@@ -690,24 +808,113 @@ class CategoryController extends Controller
                 'name' => $category->name,
                 'name_eng' => $category->additional_data['name_eng'] ?? null,
                 'path' => $pathOf($category->id),
-                'current' => $category->lazadaCategory ? [
-                    'id' => $category->lazadaCategory->id,
-                    'name' => $category->lazadaCategory->name,
+                'current' => $category->{$relation} ? [
+                    'id' => $category->{$relation}->id,
+                    'name' => $category->{$relation}->name,
                 ] : null,
-                'suggestions' => LazadaCategoryMatcher::suggest($leafTokens, $parentTokens, $candidates),
+                'products_count' => $category->products_count,
+                'suggestions' => CategoryMatcher::suggest($leafTokens, $parentTokens, $candidates),
             ];
         });
 
         $paginated->setCollection($rows);
 
-        return Inertia::render('catalog/categories/lazada-mapping', [
+        return [
             'categories' => $paginated,
             'stats' => [
                 'total' => $leafIds->count(),
-                'mapped' => $allCategories->whereIn('id', $leafIds)->whereNotNull('lazada_category_id')->count(),
+                'mapped' => $allCategories->whereIn('id', $leafIds)->whereNotNull($fkColumn)->count(),
             ],
-            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage],
+        ];
+    }
+
+    /**
+     * Bulk review UI for mapping local leaf categories to a Lazada leaf
+     * category — the prerequisite LazadaProductSyncService::buildPayload()
+     * enforces before any product in that category can be pushed.
+     */
+    public function lazadaMapping(Request $request): Response
+    {
+        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+
+        return Inertia::render('catalog/categories/lazada-mapping', [
+            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'lazada_category_id', 'lazadaCategory', LazadaCategory::class),
+            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
         ]);
+    }
+
+    /**
+     * Same bulk review UI as lazadaMapping() above, but against Shopee's
+     * category tree — see buildCategoryMappingData().
+     */
+    public function shopeeMapping(Request $request): Response
+    {
+        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+
+        return Inertia::render('catalog/categories/shopee-mapping', [
+            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'shopee_category_id', 'shopeeCategory', ShopeeCategory::class),
+            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+        ]);
+    }
+
+    /**
+     * Shared persistence logic behind bulkMapLazada() and bulkMapShopee() —
+     * validates each pick resolves to an actual leaf marketplace category,
+     * updates only rows that actually changed, and records an audit entry
+     * per change.
+     *
+     * @param  class-string<LazadaCategory>|class-string<ShopeeCategory>  $marketplaceModel
+     */
+    private function bulkMapMarketplaceCategory(Request $request, string $fkColumn, string $marketplaceTable, string $marketplaceModel, string $auditEvent): RedirectResponse
+    {
+        $validated = $request->validate([
+            'mappings' => ['required', 'array'],
+            'mappings.*.category_id' => ['required', 'integer', 'exists:categories,id'],
+            "mappings.*.{$fkColumn}" => ['nullable', 'integer', "exists:{$marketplaceTable},id"],
+        ]);
+
+        $categories = Category::whereIn('id', collect($validated['mappings'])->pluck('category_id'))
+            ->get()
+            ->keyBy('id');
+
+        $requestedIds = collect($validated['mappings'])->pluck($fkColumn)->filter()->values();
+        $leafIds = $marketplaceModel::whereIn('id', $requestedIds)->where('is_leaf', true)->pluck('id');
+
+        $updated = 0;
+
+        foreach ($validated['mappings'] as $mapping) {
+            $category = $categories->get($mapping['category_id']);
+            if (!$category) {
+                continue;
+            }
+
+            $newId = $mapping[$fkColumn] ?? null;
+
+            // A non-null pick must resolve to an actual leaf category —
+            // silently drop anything else. The UI only ever offers leaves,
+            // but this guards direct API calls too.
+            if ($newId !== null && !$leafIds->contains($newId)) {
+                continue;
+            }
+
+            if ($newId === $category->{$fkColumn}) {
+                continue;
+            }
+
+            $oldId = $category->{$fkColumn};
+            $category->update([$fkColumn => $newId]);
+
+            AuditLog::record(
+                $auditEvent,
+                $category,
+                [$fkColumn => $oldId],
+                [$fkColumn => $newId],
+            );
+
+            $updated++;
+        }
+
+        return back()->with('success', "Updated {$updated} category mapping(s).");
     }
 
     /**
@@ -718,53 +925,14 @@ class CategoryController extends Controller
      */
     public function bulkMapLazada(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'mappings' => ['required', 'array'],
-            'mappings.*.category_id' => ['required', 'integer', 'exists:categories,id'],
-            'mappings.*.lazada_category_id' => ['nullable', 'integer', 'exists:lazada_categories,id'],
-        ]);
+        return $this->bulkMapMarketplaceCategory($request, 'lazada_category_id', 'lazada_categories', LazadaCategory::class, 'lazada_category_mapped');
+    }
 
-        $categories = Category::whereIn('id', collect($validated['mappings'])->pluck('category_id'))
-            ->get()
-            ->keyBy('id');
-
-        $requestedLazadaIds = collect($validated['mappings'])->pluck('lazada_category_id')->filter()->values();
-        $leafLazadaIds = LazadaCategory::whereIn('id', $requestedLazadaIds)->where('is_leaf', true)->pluck('id');
-
-        $updated = 0;
-
-        foreach ($validated['mappings'] as $mapping) {
-            $category = $categories->get($mapping['category_id']);
-            if (!$category) {
-                continue;
-            }
-
-            $newId = $mapping['lazada_category_id'] ?? null;
-
-            // A non-null pick must resolve to an actual leaf category —
-            // silently drop anything else. The UI only ever offers leaves,
-            // but this guards direct API calls too.
-            if ($newId !== null && !$leafLazadaIds->contains($newId)) {
-                continue;
-            }
-
-            if ($newId === $category->lazada_category_id) {
-                continue;
-            }
-
-            $oldId = $category->lazada_category_id;
-            $category->update(['lazada_category_id' => $newId]);
-
-            AuditLog::record(
-                'lazada_category_mapped',
-                $category,
-                ['lazada_category_id' => $oldId],
-                ['lazada_category_id' => $newId],
-            );
-
-            $updated++;
-        }
-
-        return back()->with('success', "Updated {$updated} category mapping(s).");
+    /**
+     * Same as bulkMapLazada() above, but for Shopee's category tree.
+     */
+    public function bulkMapShopee(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceCategory($request, 'shopee_category_id', 'shopee_categories', ShopeeCategory::class, 'shopee_category_mapped');
     }
 }

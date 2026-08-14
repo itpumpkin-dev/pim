@@ -2,12 +2,9 @@
 
 namespace App\Services\Lazada;
 
-use App\Models\Attribute;
-use App\Models\Locale;
 use App\Models\Product;
-use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
-use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -19,6 +16,8 @@ use RuntimeException;
  */
 class LazadaProductSyncService
 {
+    use ResolvesProductAttributeValues;
+
     /**
      * Our attribute code for each Lazada SKU-level field this category
      * might require — anything mandatory but not in this map (e.g. a
@@ -386,30 +385,5 @@ class LazadaProductSyncService
                 'Missing mandatory Lazada field(s) for this category: '.implode(', ', $missing)
             );
         }
-    }
-
-    private function attributeValue(Product $product, string $attributeCode, ?int $channelId, ?string $localeCode = null): ?string
-    {
-        $attribute = Attribute::where('code', $attributeCode)->first();
-        if (!$attribute) {
-            return null;
-        }
-
-        $query = ProductValue::where('product_id', $product->id)
-            ->where('attribute_id', $attribute->id)
-            ->where('channel_id', $attribute->is_channel_based ? $channelId : null);
-
-        if ($attribute->is_locale_based) {
-            $localeId = $localeCode ? Locale::where('code', $localeCode)->value('id') : null;
-            $query->where('locale_id', $localeId);
-        } else {
-            $query->whereNull('locale_id');
-        }
-
-        $raw = $query->value('value');
-
-        $formatted = AttributeValueFormatter::format($attribute, $raw);
-
-        return is_array($formatted) ? ($formatted[0] ?? null) : $formatted;
     }
 }

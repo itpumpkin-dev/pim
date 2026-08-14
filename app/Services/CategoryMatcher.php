@@ -1,16 +1,18 @@
 <?php
 
-namespace App\Services\Lazada;
+namespace App\Services;
 
 /**
- * Heuristic ranking aid for the bulk category-mapping review tool
- * (CategoryController::lazadaMapping) — scores how likely a local category
- * is to correspond to a given Lazada leaf category, based on English-name
- * token overlap. This is NOT an auto-mapper: scores only drive suggestion
- * ordering in the UI, and nothing is persisted until a human clicks one.
- * Stateless/pure so it can be unit-tested without a DB connection.
+ * Heuristic ranking aid for the bulk category-mapping review tools
+ * (CategoryController::lazadaMapping/shopeeMapping) — scores how likely a
+ * local category is to correspond to a given marketplace leaf category,
+ * based on English-name token overlap. This is NOT an auto-mapper: scores
+ * only drive suggestion ordering in the UI, and nothing is persisted until a
+ * human clicks one. Stateless/pure so it can be unit-tested without a DB
+ * connection, and platform-agnostic — it never references Lazada or Shopee
+ * directly, so both mapping flows share this one implementation.
  */
-class LazadaCategoryMatcher
+class CategoryMatcher
 {
     private const STOPWORDS = ['and', 'or', 'the', 'a', 'of', 'for', 'with', 'to', 'in'];
 
@@ -58,7 +60,8 @@ class LazadaCategoryMatcher
 
     /**
      * Scores one local category (already tokenized) against every candidate
-     * Lazada leaf category and returns the top N above a small noise floor.
+     * marketplace leaf category and returns the top N above a small noise
+     * floor.
      *
      * @param  list<string>  $leafTokens  tokens of the local category's own name_eng
      * @param  list<string>  $parentTokens  tokens of the local category's ancestor name_eng chain

@@ -167,8 +167,9 @@
     "shopCode": "店铺代码",
     "shopName": "店铺名称",
     "shopActive": "启用",
-    "linkedLazadaAccount": "已关联的 Lazada 账号",
-    "noLazadaAccount": "未关联",
+    "linkedPlatformAccount": "已关联账号",
+    "noLinkedAccount": "未关联",
+    "syncFromShopee": "从 Shopee 同步",
     "noShopsYet": "暂无店铺。",
     "confirmDeleteShop": "确定要删除此店铺吗？"
 }

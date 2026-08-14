@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/catalog/lazada-category-picker';
+import { ShopeeCategoryPicker, type ShopeeCategoryOption } from '@/components/catalog/shopee-category-picker';
 import { CategoryProductsExpander } from '@/components/catalog/category-products-expander';
 
 interface Suggestion {
@@ -67,7 +67,7 @@ function scoreColor(score: number): string {
     return '#94a3b8';
 }
 
-export default function LazadaCategoryMapping({ categories, stats, filters }: Props) {
+export default function ShopeeCategoryMapping({ categories, stats, filters }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
@@ -76,14 +76,14 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
         { title: tNav('catalog'), href: '#' },
         { title: tNav('categories'), href: '/catalog/categories' },
         { title: t('marketplaceSyncTab'), href: '/catalog/categories/marketplace-sync' },
-        { title: t('lazadaMappingTitle'), href: '#' },
+        { title: t('shopeeMappingTitle'), href: '#' },
     ];
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? 'unmapped');
     const [onlyWithProducts, setOnlyWithProducts] = useState(filters.only_with_products ?? false);
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 25);
-    const [pending, setPending] = useState<Record<number, LazadaCategoryOption | null>>({});
+    const [pending, setPending] = useState<Record<number, ShopeeCategoryOption | null>>({});
     const [manualSearchFor, setManualSearchFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const firstRender = useRef(true);
@@ -105,7 +105,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categories/lazada-mapping', { search, status, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true, replace: true });
+            router.get('/catalog/categories/shopee-mapping', { search, status, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -114,21 +114,21 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
 
     const applyStatus = (value: 'unmapped' | 'mapped' | 'all') => {
         setStatus(value);
-        router.get('/catalog/categories/lazada-mapping', { search, status: value, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/categories/shopee-mapping', { search, status: value, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const applyOnlyWithProducts = (value: boolean) => {
         setOnlyWithProducts(value);
-        router.get('/catalog/categories/lazada-mapping', { search, status, per_page: perPage, only_with_products: value }, { preserveState: true });
+        router.get('/catalog/categories/shopee-mapping', { search, status, per_page: perPage, only_with_products: value }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/categories/lazada-mapping', { search, status, per_page: value, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/categories/shopee-mapping', { search, status, per_page: value, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const goToPage = (page: number) => {
-        router.get('/catalog/categories/lazada-mapping', { search, status, per_page: perPage, page, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/categories/shopee-mapping', { search, status, per_page: perPage, page, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const currentPage = categories.current_page ?? 1;
@@ -163,7 +163,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
     const saveChanges = () => {
         const mappings = Object.entries(pending).map(([categoryId, option]) => ({
             category_id: Number(categoryId),
-            lazada_category_id: option ? option.id : null,
+            shopee_category_id: option ? option.id : null,
         }));
 
         if (mappings.length === 0) {
@@ -172,7 +172,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
 
         setSaving(true);
         router.post(
-            '/catalog/categories/lazada-mapping',
+            '/catalog/categories/shopee-mapping',
             { mappings },
             { preserveScroll: true, onFinish: () => setSaving(false) },
         );
@@ -180,7 +180,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('lazadaMappingTitle')} />
+            <Head title={t('shopeeMappingTitle')} />
             <Box sx={{ p: 4 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
                     <Box>
@@ -192,7 +192,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
                         >
                             {t('marketplaceSyncTab')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('lazadaMappingTitle')}</Typography>
+                        <Typography variant="h4" fontWeight={700}>{t('shopeeMappingTitle')}</Typography>
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.total })}
                         </Typography>
@@ -345,7 +345,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
 
                                         {manualSearchFor === row.id ? (
                                             <Box sx={{ maxWidth: 360 }}>
-                                                <LazadaCategoryPicker
+                                                <ShopeeCategoryPicker
                                                     value={rowPending ?? null}
                                                     onChange={(val) => setPending((prev) => ({ ...prev, [row.id]: val }))}
                                                     placeholder={t('searchManually')}

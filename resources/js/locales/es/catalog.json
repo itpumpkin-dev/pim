@@ -167,8 +167,9 @@
     "shopCode": "Código de Tienda",
     "shopName": "Nombre de Tienda",
     "shopActive": "Activa",
-    "linkedLazadaAccount": "Cuenta de Lazada Vinculada",
-    "noLazadaAccount": "No vinculada",
+    "linkedPlatformAccount": "Cuenta Vinculada",
+    "noLinkedAccount": "No vinculada",
+    "syncFromShopee": "Sincronizar desde Shopee",
     "noShopsYet": "Aún no hay tiendas.",
     "confirmDeleteShop": "¿Estás seguro de que deseas eliminar esta tienda?"
 }

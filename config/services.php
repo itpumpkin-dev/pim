@@ -43,4 +43,8 @@ return [
         'base_url' => env('LAZADA_API_BASE_URL', 'https://api.lazada.co.th/rest'),
     ],
 
+    'shopee' => [
+        'base_url' => env('SHOPEE_API_BASE_URL', 'https://partner.shopeemobile.com'),
+    ],
+
 ];

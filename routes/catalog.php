@@ -28,6 +28,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:products,edit_products');
     Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:products,edit_products');
+    Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
@@ -68,9 +71,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/{category}/history', [CategoryController::class, 'history'])->name('categories.history')->middleware('permission:categories,view_history');
     Route::get('categories/marketplace-sync', [CategoryController::class, 'marketplaceSync'])->name('categories.marketplaceSync')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
+    Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:categories,edit_categories');
     Route::get('categories/search-lazada', [CategoryController::class, 'searchLazadaCategories'])->name('categories.searchLazada')->middleware('permission:categories,edit_categories');
+    Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
     Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:categories,edit_categories');
+    Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
+    Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
+    Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
 
     Route::get('categoryFields', [CategoryFieldController::class, 'index'])->name('categoryFields.index')->middleware('permission:category_fields,list_category_fields');
     Route::get('categoryFields/create', [CategoryFieldController::class, 'create'])->name('categoryFields.create')->middleware('permission:category_fields,create_category_fields');
@@ -93,6 +101,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'updatePlatform'])->name('salesPlatforms.update')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::delete('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'destroyPlatform'])->name('salesPlatforms.destroy')->middleware('permission:sales_platforms,delete_sales_platforms');
     Route::post('sales-platforms/sync-lazada', [SalesPlatformController::class, 'syncLazadaShops'])->name('salesPlatforms.syncLazada')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::post('sales-platforms/sync-shopee', [SalesPlatformController::class, 'syncShopeeShops'])->name('salesPlatforms.syncShopee')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/sync-live-status', [SalesPlatformController::class, 'syncLiveStatus'])->name('salesPlatforms.syncLiveStatus')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/shops/{shop}/sync-live-status', [SalesPlatformController::class, 'syncShopLiveStatus'])->name('salesPlatforms.syncShopLiveStatus')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/{salesPlatform}/shops', [SalesPlatformController::class, 'storeShop'])->name('salesPlatforms.shops.store')->middleware('permission:sales_platforms,edit_sales_platforms');

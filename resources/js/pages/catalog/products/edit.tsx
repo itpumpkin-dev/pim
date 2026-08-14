@@ -398,15 +398,22 @@ export default function ProductEdit({
         setPendingSimpleConfirm(false);
     };
 
-    // Pushing sends a real, live create/update to Lazada — a confirm step
-    // and explicit trigger (never automatic) are deliberate given that.
-    const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string } | null>(null);
+    // Pushing sends a real, live create/update to the marketplace — a
+    // confirm step and explicit trigger (never automatic) are deliberate
+    // given that. Platform-generic (Lazada, Shopee, ...) — each shop's group
+    // carries its own platform name (group.platform), which picks the route.
+    const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string }> = {
+        lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
+        shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status' },
+    };
+
+    const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
     const [pushing, setPushing] = useState(false);
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
 
-    // Fired the moment Push/Deactivate's confirm dialog opens — checks
-    // Lazada directly (not the cached "Live" badge, which is only as fresh
-    // as the last sync and may never have run for this product) so the
+    // Fired the moment Push/Deactivate's confirm dialog opens — checks the
+    // marketplace directly (not the cached "Live" badge, which is only as
+    // fresh as the last sync and may never have run for this product) so the
     // dialog reflects the real current state right before committing to a
     // live write. Shared by both dialogs since only one is ever open at once.
     const [statusCheck, setStatusCheck] = useState<{
@@ -418,21 +425,29 @@ export default function ProductEdit({
         error?: string;
     } | null>(null);
 
-    const checkLazadaStatus = (shopId: number) => {
+    const checkPlatformStatus = (shopId: number, platform: string) => {
         setStatusCheck({ shopId, loading: true });
-        fetch(`/catalog/products/${product.id}/lazada-status/${shopId}`, {
+        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
+        if (!routes) {
+            setStatusCheck({ shopId, loading: false, error: `Unsupported platform: ${platform}` });
+            return;
+        }
+
+        fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, {
             headers: { Accept: 'application/json' },
         })
             .then(async (res) => {
                 const body = await res.json();
                 setStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
             })
-            .catch(() => setStatusCheck({ shopId, loading: false, error: 'Network error while checking Lazada status.' }));
+            .catch(() => setStatusCheck({ shopId, loading: false, error: `Network error while checking ${platform} status.` }));
     };
 
-    const confirmPushToLazada = () => {
+    const confirmPush = () => {
         if (!pushConfirmShop) return;
-        const shopId = pushConfirmShop.id;
+        const { id: shopId, platform } = pushConfirmShop;
+        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
+        if (!routes) return;
         setPushing(true);
 
         // This app has no <meta name="csrf-token">; Laravel's VerifyCsrfToken
@@ -445,7 +460,7 @@ export default function ProductEdit({
                 ?.split('=')[1] ?? '',
         );
 
-        fetch(`/catalog/products/${product.id}/push-lazada/${shopId}`, {
+        fetch(`/catalog/products/${product.id}/${routes.push}/${shopId}`, {
             method: 'POST',
             headers: {
                 'X-XSRF-TOKEN': xsrfToken,
@@ -456,7 +471,7 @@ export default function ProductEdit({
                 const body = await res.json();
                 setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
             })
-            .catch(() => setPushResult({ severity: 'error', message: 'Network error while pushing to Lazada.' }))
+            .catch(() => setPushResult({ severity: 'error', message: `Network error while pushing to ${platform}.` }))
             .finally(() => {
                 setPushing(false);
                 setPushConfirmShop(null);
@@ -466,12 +481,14 @@ export default function ProductEdit({
     // Same real-write reasoning as push above — explicit confirm, never
     // automatic. Reuses pushResult for the result snackbar (the response
     // message itself distinguishes "Pushed" vs "Deactivated").
-    const [deactivateConfirmShop, setDeactivateConfirmShop] = useState<{ id: number; name: string } | null>(null);
+    const [deactivateConfirmShop, setDeactivateConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
     const [deactivating, setDeactivating] = useState(false);
 
-    const confirmDeactivateLazada = () => {
+    const confirmDeactivate = () => {
         if (!deactivateConfirmShop) return;
-        const shopId = deactivateConfirmShop.id;
+        const { id: shopId, platform } = deactivateConfirmShop;
+        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
+        if (!routes) return;
         setDeactivating(true);
 
         const xsrfToken = decodeURIComponent(
@@ -481,7 +498,7 @@ export default function ProductEdit({
                 ?.split('=')[1] ?? '',
         );
 
-        fetch(`/catalog/products/${product.id}/deactivate-lazada/${shopId}`, {
+        fetch(`/catalog/products/${product.id}/${routes.deactivate}/${shopId}`, {
             method: 'POST',
             headers: {
                 'X-XSRF-TOKEN': xsrfToken,
@@ -492,7 +509,7 @@ export default function ProductEdit({
                 const body = await res.json();
                 setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
             })
-            .catch(() => setPushResult({ severity: 'error', message: 'Network error while deactivating on Lazada.' }))
+            .catch(() => setPushResult({ severity: 'error', message: `Network error while deactivating on ${platform}.` }))
             .finally(() => {
                 setDeactivating(false);
                 setDeactivateConfirmShop(null);
@@ -1166,7 +1183,11 @@ export default function ProductEdit({
                                                                 // since nothing was persisted yet. Only offer the action once
                                                                 // the checkbox state actually matches what's saved.
                                                                 const savedPublished = isShop && publishedShopIds.includes(ch.shop_id as number);
-                                                                const canPushOrDeactivate = published && savedPublished;
+                                                                // Only platforms with an actual integration (PLATFORM_ROUTES)
+                                                                // get Push/Deactivate — a shop on some future/unintegrated
+                                                                // platform can still be "published" (checkbox-only) without
+                                                                // a live API to push to.
+                                                                const canPushOrDeactivate = published && savedPublished && group.platform.toLowerCase() in PLATFORM_ROUTES;
                                                                 // Only the "checked but not saved yet" direction is worth a
                                                                 // hint — that's the one where a push/deactivate button would
                                                                 // otherwise look available but isn't yet. The reverse
@@ -1227,11 +1248,11 @@ export default function ProductEdit({
                                                                         {canPushOrDeactivate && (
                                                                             <IconButton
                                                                                 size="small"
-                                                                                title="Push to Lazada"
+                                                                                title={`Push to ${group.platform}`}
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code });
-                                                                                    checkLazadaStatus(ch.shop_id as number);
+                                                                                    setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
+                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
                                                                                 }}
                                                                                 sx={{ color: active ? '#fff' : 'primary.main' }}
                                                                             >
@@ -1249,11 +1270,11 @@ export default function ProductEdit({
                                                                         {canPushOrDeactivate && ch.is_live && (
                                                                             <IconButton
                                                                                 size="small"
-                                                                                title="Deactivate on Lazada"
+                                                                                title={`Deactivate on ${group.platform}`}
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    setDeactivateConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code });
-                                                                                    checkLazadaStatus(ch.shop_id as number);
+                                                                                    setDeactivateConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
+                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
                                                                                 }}
                                                                                 sx={{ color: active ? '#fff' : 'text.secondary' }}
                                                                             >
@@ -1285,10 +1306,10 @@ export default function ProductEdit({
             </Box>
 
             <Dialog open={pushConfirmShop !== null} onClose={() => setPushConfirmShop(null)}>
-                <DialogTitle>Push to Lazada?</DialogTitle>
+                <DialogTitle>Push to {pushConfirmShop?.platform}?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        This creates or updates a <strong>real, live listing</strong> on Lazada for <strong>{pushConfirmShop?.name}</strong>,
+                        This creates or updates a <strong>real, live listing</strong> on {pushConfirmShop?.platform} for <strong>{pushConfirmShop?.name}</strong>,
                         visible to real customers. This action can&apos;t be undone from here.
                     </DialogContentText>
                     {pushStatusCheck && (
@@ -1296,16 +1317,16 @@ export default function ProductEdit({
                             {pushStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">Checking current status on Lazada...</Typography>
+                                    <Typography variant="body2" color="text.secondary">Checking current status on {pushConfirmShop?.platform}...</Typography>
                                 </Stack>
                             ) : pushStatusCheck.error ? (
                                 <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {pushStatusCheck.error}</Alert>
                             ) : pushStatusCheck.never_pushed ? (
                                 <Alert severity="info" sx={{ py: 0 }}>Not pushed before — this will create a new listing.</Alert>
                             ) : pushStatusCheck.is_live ? (
-                                <Alert severity="success" sx={{ py: 0 }}>Currently live on Lazada — this will update the existing listing.</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>Currently live on {pushConfirmShop?.platform} — this will update the existing listing.</Alert>
                             ) : (
-                                <Alert severity="info" sx={{ py: 0 }}>Exists on Lazada but not currently active (status: {pushStatusCheck.status ?? 'unknown'}) — this will update it.</Alert>
+                                <Alert severity="info" sx={{ py: 0 }}>Exists on {pushConfirmShop?.platform} but not currently active (status: {pushStatusCheck.status ?? 'unknown'}) — this will update it.</Alert>
                             )}
                         </Box>
                     )}
@@ -1314,17 +1335,17 @@ export default function ProductEdit({
                     <Button onClick={() => setPushConfirmShop(null)} color="inherit" disabled={pushing}>
                         Cancel
                     </Button>
-                    <Button onClick={confirmPushToLazada} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>
+                    <Button onClick={confirmPush} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>
                         {pushing ? 'Pushing...' : 'Push'}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             <Dialog open={deactivateConfirmShop !== null} onClose={() => setDeactivateConfirmShop(null)}>
-                <DialogTitle>Deactivate on Lazada?</DialogTitle>
+                <DialogTitle>Deactivate on {deactivateConfirmShop?.platform}?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        This hides the <strong>real, live listing</strong> on Lazada for <strong>{deactivateConfirmShop?.name}</strong> from
+                        This hides the <strong>real, live listing</strong> on {deactivateConfirmShop?.platform} for <strong>{deactivateConfirmShop?.name}</strong> from
                         customers. It stays deactivated until pushed again. This action can&apos;t be undone from here.
                     </DialogContentText>
                     {deactivateStatusCheck && (
@@ -1332,16 +1353,16 @@ export default function ProductEdit({
                             {deactivateStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">Checking current status on Lazada...</Typography>
+                                    <Typography variant="body2" color="text.secondary">Checking current status on {deactivateConfirmShop?.platform}...</Typography>
                                 </Stack>
                             ) : deactivateStatusCheck.error ? (
                                 <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {deactivateStatusCheck.error}</Alert>
                             ) : deactivateStatusCheck.never_pushed ? (
                                 <Alert severity="error" sx={{ py: 0 }}>This product has never been pushed to this shop — there&apos;s nothing to deactivate.</Alert>
                             ) : !deactivateStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>Already not active on Lazada (status: {deactivateStatusCheck.status ?? 'unknown'}) — nothing to deactivate.</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>Already not active on {deactivateConfirmShop?.platform} (status: {deactivateStatusCheck.status ?? 'unknown'}) — nothing to deactivate.</Alert>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>Confirmed currently live on Lazada.</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>Confirmed currently live on {deactivateConfirmShop?.platform}.</Alert>
                             )}
                         </Box>
                     )}
@@ -1351,7 +1372,7 @@ export default function ProductEdit({
                         Cancel
                     </Button>
                     <Button
-                        onClick={confirmDeactivateLazada}
+                        onClick={confirmDeactivate}
                         color="error"
                         variant="contained"
                         disabled={

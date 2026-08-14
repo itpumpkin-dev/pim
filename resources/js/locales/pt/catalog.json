@@ -167,8 +167,9 @@
     "shopCode": "Shop Code",
     "shopName": "Shop Name",
     "shopActive": "Active",
-    "linkedLazadaAccount": "Linked Lazada Account",
-    "noLazadaAccount": "Not linked",
+    "linkedPlatformAccount": "Linked Account",
+    "noLinkedAccount": "Not linked",
+    "syncFromShopee": "Sync from Shopee",
     "noShopsYet": "No shops yet.",
     "confirmDeleteShop": "Are you sure you want to delete this shop?"
 }

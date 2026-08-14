@@ -43,6 +43,7 @@ interface ShopItem {
     code: string;
     name: string;
     lazada_seller_account_id: number | null;
+    shopee_seller_account_id: string | null;
     is_active: boolean;
 }
 
@@ -164,6 +165,18 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         );
     };
 
+    const [syncingShopee, setSyncingShopee] = useState(false);
+    const syncShopee = () => {
+        setSyncingShopee(true);
+        router.post(
+            '/catalog/sales-platforms/sync-shopee',
+            {},
+            {
+                onFinish: () => setSyncingShopee(false),
+            },
+        );
+    };
+
     const [syncingLiveStatus, setSyncingLiveStatus] = useState(false);
     const syncLiveStatus = () => {
         setSyncingLiveStatus(true);
@@ -217,6 +230,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLazada} disabled={syncing}>
                             {syncing ? t('syncingLazada') : t('syncFromLazada')}
                         </Button>
+                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncShopee} disabled={syncingShopee}>
+                            {syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
+                        </Button>
                         <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLiveStatus} disabled={syncingLiveStatus}>
                             {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
                         </Button>
@@ -267,7 +283,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                             <TableRow>
                                                 <TableCell sx={{ fontWeight: 700 }}>{t('shopCode')}</TableCell>
                                                 <TableCell sx={{ fontWeight: 700 }}>{t('shopName')}</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{t('linkedLazadaAccount')}</TableCell>
+                                                <TableCell sx={{ fontWeight: 700 }}>{t('linkedPlatformAccount')}</TableCell>
                                                 <TableCell sx={{ fontWeight: 700 }}>{t('shopActive')}</TableCell>
                                                 {(canEdit || canDelete) && (
                                                     <TableCell sx={{ fontWeight: 700 }} align="right">
@@ -283,10 +299,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                                     <TableCell sx={{ fontWeight: 600 }}>{shop.name}</TableCell>
                                                     <TableCell>
                                                         {shop.lazada_seller_account_id ? (
-                                                            <Chip label={`#${shop.lazada_seller_account_id}`} size="small" color="success" variant="outlined" />
+                                                            <Chip label={`Lazada #${shop.lazada_seller_account_id}`} size="small" color="success" variant="outlined" />
+                                                        ) : shop.shopee_seller_account_id ? (
+                                                            <Chip label={`Shopee #${shop.shopee_seller_account_id}`} size="small" color="success" variant="outlined" />
                                                         ) : (
                                                             <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                                {t('noLazadaAccount')}
+                                                                {t('noLinkedAccount')}
                                                             </Typography>
                                                         )}
                                                     </TableCell>

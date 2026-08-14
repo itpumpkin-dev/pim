@@ -9,10 +9,11 @@ import { useTranslation } from 'react-i18next';
 
 // One button + platform picker instead of one dedicated button per platform
 // (which doesn't scale — was literally "Sync Lazada Categories" hardcoded).
-// Only Lazada actually has a working category sync today; adding the next
-// platform's is just one more entry here plus its own backend route.
+// Adding another platform's category sync is just one more entry here plus
+// its own backend route.
 const CATEGORY_SYNC_PLATFORMS = [
-    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada' },
+    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada', mappingRoute: '/catalog/categories/lazada-mapping' },
+    { value: 'shopee', label: 'Shopee', route: '/catalog/categories/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -22,7 +23,7 @@ function formatLocalDateTime(value: string | null): string {
 }
 
 interface Props {
-    lastSyncedAt: string | null;
+    lastSyncedAt: Record<string, string | null>;
 }
 
 export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
@@ -35,7 +36,7 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
         { title: t('marketplaceSyncTab'), href: '#' },
     ];
 
-    const [syncingLazada, setSyncingLazada] = useState(false);
+    const [syncing, setSyncing] = useState(false);
     const [syncPlatform, setSyncPlatform] = useState<string>(CATEGORY_SYNC_PLATFORMS[0].value);
 
     return (
@@ -63,7 +64,7 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                                 value={syncPlatform}
                                 onChange={(e) => setSyncPlatform(e.target.value)}
                                 size="small"
-                                disabled={syncingLazada}
+                                disabled={syncing}
                                 sx={{ minWidth: 140 }}
                             >
                                 {CATEGORY_SYNC_PLATFORMS.map((p) => (
@@ -72,31 +73,38 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                             </Select>
                             <Button
                                 variant="outlined"
-                                startIcon={syncingLazada ? <CircularProgress size={16} /> : <SyncIcon />}
-                                disabled={syncingLazada}
+                                startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                                disabled={syncing}
                                 onClick={() => {
                                     const platform = CATEGORY_SYNC_PLATFORMS.find((p) => p.value === syncPlatform);
                                     if (!platform) return;
-                                    setSyncingLazada(true);
-                                    router.post(platform.route, {}, { onFinish: () => setSyncingLazada(false) });
+                                    setSyncing(true);
+                                    router.post(platform.route, {}, { onFinish: () => setSyncing(false) });
                                 }}
                             >
-                                {syncingLazada ? t('syncingLazada') : t('syncCategories')}
+                                {syncing ? t('syncingLazada') : t('syncCategories')}
                             </Button>
                         </Stack>
 
                         <Typography variant="body2" color="text.secondary">
-                            {t('lastSyncedAt', { datetime: formatLocalDateTime(lastSyncedAt) })}
+                            {t('lastSyncedAt', { datetime: formatLocalDateTime(lastSyncedAt[syncPlatform] ?? null) })}
                         </Typography>
 
-                        <Button
-                            variant="contained"
-                            sx={{ color: 'white', alignSelf: 'flex-start' }}
-                            startIcon={<LinkIcon />}
-                            onClick={() => router.visit('/catalog/categories/lazada-mapping')}
-                        >
-                            {t('mapToLazada')}
-                        </Button>
+                        {(() => {
+                            const platform = CATEGORY_SYNC_PLATFORMS.find((p) => p.value === syncPlatform);
+                            if (!platform) return null;
+
+                            return (
+                                <Button
+                                    variant="contained"
+                                    sx={{ color: 'white', alignSelf: 'flex-start' }}
+                                    startIcon={<LinkIcon />}
+                                    onClick={() => router.visit(platform.mappingRoute)}
+                                >
+                                    {t('mapToPlatformCategories', { platform: platform.label })}
+                                </Button>
+                            );
+                        })()}
                     </Stack>
                 </Paper>
             </Box>

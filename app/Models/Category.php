@@ -23,6 +23,7 @@ class Category extends Model
         'is_ai_translate',
         'parent_id',
         'lazada_category_id',
+        'shopee_category_id',
         'created_by',
         'updated_by',
     ];
@@ -90,6 +91,11 @@ class Category extends Model
     public function lazadaCategory(): BelongsTo
     {
         return $this->belongsTo(LazadaCategory::class, 'lazada_category_id');
+    }
+
+    public function shopeeCategory(): BelongsTo
+    {
+        return $this->belongsTo(ShopeeCategory::class, 'shopee_category_id');
     }
 
     /**
