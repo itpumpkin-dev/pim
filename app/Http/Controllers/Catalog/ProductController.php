@@ -266,8 +266,15 @@ class ProductController extends Controller
                     'code' => $product->family->code,
                     'name' => $product->family->name,
                 ] : null,
-                'created_at' => $product->created_at?->toDateTimeString(),
-                'updated_at' => $product->updated_at?->toDateTimeString(),
+                // toIso8601String(), not toDateTimeString() — the naive
+                // string toDateTimeString() produces has no timezone marker,
+                // so the frontend's `new Date(value)` misreads it as local
+                // time instead of UTC (this app's APP_TIMEZONE), showing a
+                // time offset by however far the viewer's clock is from UTC
+                // (7 hours early for a Thai browser, confirmed live). Same
+                // fix already applied on the edit page (see edit() below).
+                'created_at' => $product->created_at?->toIso8601String(),
+                'updated_at' => $product->updated_at?->toIso8601String(),
                 'attributes' => $attributes->map(function (Attribute $attribute) use ($product, $values) {
                     $rawValue = optional(
                         $values->first(fn ($v) => $v->product_id === $product->id && $v->attribute_id === $attribute->id)

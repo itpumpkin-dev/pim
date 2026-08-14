@@ -30,6 +30,7 @@ import {
     MenuItem,
     Paper,
     Select,
+    Snackbar,
     Stack,
     TextField,
     Typography,
@@ -84,6 +85,20 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     const [assignedGroups, setAssignedGroups] = useState<AssignedGroup[]>([]);
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>(attributes);
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
+    const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
+
+    // Dragging (or clicking) an attribute only means anything once at least
+    // one group exists to receive it — with none yet, there's nowhere to
+    // drop it at all (the group column just shows the empty-state
+    // placeholder). Warn instead of letting the drag/click silently do
+    // nothing, which otherwise looks like a bug rather than a missing step.
+    const requireGroupBeforeAssigning = (): boolean => {
+        if (assignedGroups.length === 0) {
+            setNoGroupWarningOpen(true);
+            return true;
+        }
+        return false;
+    };
 
     const filteredUnassigned = unassignedAttrs.filter((attr) => {
         const title = attr.name || attr.code;
@@ -429,7 +444,13 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                 <ListItem
                                                     key={attr.id}
                                                     draggable
-                                                    onDragStart={() => setDraggedAttr(attr)}
+                                                    onDragStart={(e) => {
+                                                        if (requireGroupBeforeAssigning()) {
+                                                            e.preventDefault();
+                                                            return;
+                                                        }
+                                                        setDraggedAttr(attr);
+                                                    }}
                                                     sx={{
                                                         py: 0.8,
                                                         px: 1,
@@ -441,9 +462,8 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                         cursor: 'grab',
                                                     }}
                                                     onClick={() => {
-                                                        if (assignedGroups.length > 0) {
-                                                            handleMoveAttributeToGroup(attr, assignedGroups[0].id);
-                                                        }
+                                                        if (requireGroupBeforeAssigning()) return;
+                                                        handleMoveAttributeToGroup(attr, assignedGroups[0].id);
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{ minWidth: 28, color: '#cbd5e1' }}>
@@ -554,6 +574,32 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Snackbar
+                open={noGroupWarningOpen}
+                autoHideDuration={5000}
+                onClose={() => setNoGroupWarningOpen(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert
+                    severity="warning"
+                    onClose={() => setNoGroupWarningOpen(false)}
+                    action={
+                        <Button
+                            color="inherit"
+                            size="small"
+                            onClick={() => {
+                                setNoGroupWarningOpen(false);
+                                setAssignDialogOpen(true);
+                            }}
+                        >
+                            {t('assignAttributeGroup')}
+                        </Button>
+                    }
+                >
+                    {t('noAttributeGroupsWarning')}
+                </Alert>
+            </Snackbar>
         </AppLayout>
     );
 }

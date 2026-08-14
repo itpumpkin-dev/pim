@@ -39,6 +39,7 @@ class ImportConfigController extends Controller
         return Inertia::render('import-export/imports/create', [
             'types' => ImportExportRegistry::TYPES,
             'requiredColumnsByType' => $this->requiredColumnsByType(),
+            'columnLabelsByType' => $this->columnLabelsByType(),
         ]);
     }
 
@@ -68,6 +69,7 @@ class ImportConfigController extends Controller
             'config' => $importConfig,
             'types' => ImportExportRegistry::TYPES,
             'requiredColumnsByType' => $this->requiredColumnsByType(),
+            'columnLabelsByType' => $this->columnLabelsByType(),
         ]);
     }
 
@@ -143,6 +145,19 @@ class ImportConfigController extends Controller
     {
         return collect(ImportExportRegistry::TYPES)
             ->mapWithKeys(fn (string $type) => [$type => ImportExportRegistry::importer($type)->requiredColumns()])
+            ->all();
+    }
+
+    /**
+     * code => localized label, per type — lets the "Required fields" chips
+     * show e.g. "Product Name" instead of the raw `pname` code.
+     *
+     * @return array<string, array<string, string>>
+     */
+    private function columnLabelsByType(): array
+    {
+        return collect(ImportExportRegistry::TYPES)
+            ->mapWithKeys(fn (string $type) => [$type => ImportExportRegistry::importer($type)->columnLabels()])
             ->all();
     }
 

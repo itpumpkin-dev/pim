@@ -35,7 +35,8 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
             </Typography>
             <List dense sx={{ px: 1.5, flex: 1, overflowY: 'auto' }}>
                 {items.map((item) => {
-                    const isActive = !!item.url && (currentPath === item.url || currentPath.startsWith(item.url.endsWith('/') ? item.url : item.url + '/'));
+                    const matches = (url?: string) => !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
+                    const isActive = matches(item.url) || (item.matchUrls ?? []).some(matches);
 
                     return (
                         <ListItemButton

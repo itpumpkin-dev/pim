@@ -22,6 +22,13 @@ export interface NavItem {
     isActive?: boolean;
     items?: NavItem[];
     permission?: string;
+    /**
+     * Extra URL prefixes that should also count as "this item is active" —
+     * for a page reachable only via an in-page tab on this item's own page
+     * (e.g. /catalog/sales-platforms, the "Sales Platforms" tab on the
+     * Channels page) rather than its own sidebar link.
+     */
+    matchUrls?: string[];
 }
 
 export interface Locale {

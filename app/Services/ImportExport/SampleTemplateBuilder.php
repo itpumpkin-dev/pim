@@ -15,11 +15,16 @@ class SampleTemplateBuilder
      */
     public static function build(string $type, ?User $user = null): string
     {
-        $columns = ImportExportRegistry::importer($type, $user)->columns();
+        $importer = ImportExportRegistry::importer($type, $user);
+        $columns = $importer->columns();
+        $labels = $importer->columnLabels();
         $example = self::exampleRow($type);
 
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, $columns);
+        // Header row is the localized label, not the raw code — readable to
+        // fill in by hand. RowHeaderNormalizer maps it straight back to the
+        // code on import, so this is purely cosmetic for the importer side.
+        fputcsv($handle, array_map(fn ($col) => $labels[$col] ?? $col, $columns));
         fputcsv($handle, array_map(fn ($col) => $example[$col] ?? '', $columns));
         rewind($handle);
         $csv = stream_get_contents($handle);

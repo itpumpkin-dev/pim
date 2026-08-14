@@ -9,6 +9,8 @@ use App\Services\ImportExport\RowImportException;
 
 class AttributeFamilyRowImporter implements RowImporterInterface
 {
+    use HasStaticColumnLabels;
+
     public function columns(): array
     {
         return ['code', 'name'];

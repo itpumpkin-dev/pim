@@ -42,9 +42,10 @@ interface Props {
     config: ImportConfigItem;
     types: string[];
     requiredColumnsByType: Record<string, string[]>;
+    columnLabelsByType: Record<string, Record<string, string>>;
 }
 
-export default function ImportEdit({ config, types, requiredColumnsByType }: Props) {
+export default function ImportEdit({ config, types, requiredColumnsByType, columnLabelsByType }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -175,7 +176,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType }: Pro
                                             {t('requiredFields')}:
                                         </Typography>
                                         {requiredColumnsByType[data.type].map((column) => (
-                                            <Chip key={column} label={column} size="small" variant="outlined" />
+                                            <Chip key={column} label={columnLabelsByType[data.type]?.[column] ?? column} size="small" variant="outlined" />
                                         ))}
                                     </Stack>
                                 )}

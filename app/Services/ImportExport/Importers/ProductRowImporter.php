@@ -5,6 +5,7 @@ namespace App\Services\ImportExport\Importers;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\ImportConfig;
+use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\User;
@@ -55,6 +56,45 @@ class ProductRowImporter implements RowImporterInterface
     {
         return $this->allowedAttributeCodesCache ??= app(AttributeAccessPolicy::class)
             ->filterAttributeCodes($this->user, self::baseAttributeCodes(), 'edit');
+    }
+
+    /**
+     * FIXED_COLUMNS use the same static lang/{locale}/import.php labels as
+     * the other importers; the dynamic attribute columns use that
+     * attribute's own translated label (same source Category/Attribute
+     * pages already show), falling back to its raw `name` column, then to
+     * the code itself, if no translation exists for the active locale.
+     */
+    public function columnLabels(): array
+    {
+        $labels = [];
+        foreach (self::FIXED_COLUMNS as $column) {
+            $label = __("import.columns.{$column}");
+            $labels[$column] = $label === "import.columns.{$column}" ? $column : $label;
+        }
+
+        $attributeCodes = $this->allowedAttributeCodes();
+        $attributesByCode = Attribute::whereIn('code', $attributeCodes)
+            ->with('translations')
+            ->get()
+            ->keyBy('code');
+
+        $localeId = Locale::idForCode(app()->getLocale());
+
+        foreach ($attributeCodes as $code) {
+            $attribute = $attributesByCode->get($code);
+            if (!$attribute) {
+                $labels[$code] = $code;
+                continue;
+            }
+
+            $translation = $localeId ? $attribute->translations->firstWhere('locale_id', $localeId) : null;
+            $labels[$code] = ($translation && trim((string) $translation->label) !== '')
+                ? $translation->label
+                : ($attribute->name ?: $code);
+        }
+
+        return $labels;
     }
 
     public function requiredColumns(): array

@@ -101,6 +101,10 @@ function useMainNavItems(): NavItem[] {
                 {
                     title: t('channels'),
                     url: '/catalog/channels',
+                    // "Sales Platforms" is a tab on the Channels page, not
+                    // its own sidebar entry — without this, viewing it makes
+                    // the whole sidebar lose its highlighted section.
+                    matchUrls: ['/catalog/sales-platforms'],
                     permission: 'channels.list_channels',
                 },
                 {
@@ -157,13 +161,10 @@ function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
     const currentPath = pageUrl.split('?')[0];
     const matchesCurrentPath = (url?: string) =>
         !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
+    const matchesItem = (item: NavItem) => matchesCurrentPath(item.url) || (item.matchUrls ?? []).some(matchesCurrentPath);
 
     return (
-        items.find(
-            (item) =>
-                matchesCurrentPath(item.url) ||
-                (item.items && item.items.some((sub) => matchesCurrentPath(sub.url)))
-        ) || items[0] || null
+        items.find((item) => matchesItem(item) || (item.items && item.items.some(matchesItem))) || items[0] || null
     );
 }
 

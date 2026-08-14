@@ -8,6 +8,8 @@ use App\Services\ImportExport\RowImportException;
 
 class AttributeRowImporter implements RowImporterInterface
 {
+    use HasStaticColumnLabels;
+
     private const TYPES = ['text', 'textarea', 'price', 'boolean', 'select', 'multiselect', 'datetime', 'date', 'image', 'gallery', 'file', 'checkbox'];
 
     public function columns(): array

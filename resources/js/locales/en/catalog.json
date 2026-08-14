@@ -142,6 +142,7 @@
     "groupsRequired": "Groups *",
     "selectOption": "Select option",
     "noAttributeGroupsAvailable": "No attribute groups available",
+    "noAttributeGroupsWarning": "Please assign an attribute group first, then you can drag attributes into it",
 
     "channelsTitle": "Channels",
     "createChannel": "Create Channel",

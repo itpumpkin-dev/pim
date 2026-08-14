@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Services\ImportExport\ImportExportRegistry;
+use App\Services\ImportExport\RowHeaderNormalizer;
 use App\Services\ImportExport\SpreadsheetReader;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,6 +47,7 @@ class ProcessImportJob implements ShouldQueue
         $tracker->update(['status' => 'processing', 'started_at' => now()]);
 
         $importer = ImportExportRegistry::importer($config->type, $tracker->user);
+        $columnLabels = $importer->columnLabels();
 
         $rowNumber = 1; // header is row 1, data starts at row 2
         $created = 0;
@@ -58,7 +60,11 @@ class ProcessImportJob implements ShouldQueue
             $processed++;
 
             try {
-                $warnings = $importer->importRow($row, $config);
+                // The sample template now ships with the localized label as
+                // its header row (see SampleTemplateBuilder) rather than the
+                // raw code — every importRow() implementation still only
+                // ever sees code-keyed rows, exactly as before.
+                $warnings = $importer->importRow(RowHeaderNormalizer::normalize($row, $columnLabels), $config);
                 foreach ($warnings as $warning) {
                     $tracker->appendWarning($rowNumber, $warning);
                 }

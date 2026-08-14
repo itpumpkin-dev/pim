@@ -8,6 +8,8 @@ use App\Services\ImportExport\RowImportException;
 
 class CategoryRowImporter implements RowImporterInterface
 {
+    use HasStaticColumnLabels;
+
     public function columns(): array
     {
         return ['code', 'name', 'description', 'parent_code'];

@@ -28,9 +28,10 @@ import { useTranslation } from 'react-i18next';
 interface Props {
     types: string[];
     requiredColumnsByType: Record<string, string[]>;
+    columnLabelsByType: Record<string, Record<string, string>>;
 }
 
-export default function ImportCreate({ types, requiredColumnsByType }: Props) {
+export default function ImportCreate({ types, requiredColumnsByType, columnLabelsByType }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -154,7 +155,7 @@ export default function ImportCreate({ types, requiredColumnsByType }: Props) {
                                             {t('requiredFields')}:
                                         </Typography>
                                         {requiredColumnsByType[data.type].map((column) => (
-                                            <Chip key={column} label={column} size="small" variant="outlined" />
+                                            <Chip key={column} label={columnLabelsByType[data.type]?.[column] ?? column} size="small" variant="outlined" />
                                         ))}
                                     </Stack>
                                 )}

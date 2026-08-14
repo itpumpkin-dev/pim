@@ -16,6 +16,8 @@ use App\Services\ImportExport\RowImportException;
  */
 class AttributeOptionRowImporter implements RowImporterInterface
 {
+    use HasStaticColumnLabels;
+
     public function columns(): array
     {
         return ['attribute_code', 'code', 'admin_label', 'swatch_value', 'sort_order'];

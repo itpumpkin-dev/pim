@@ -136,6 +136,7 @@
     "groupsRequired": "กลุ่ม *",
     "selectOption": "เลือกตัวเลือก",
     "noAttributeGroupsAvailable": "ไม่มีกลุ่มแอตทริบิวต์ที่ใช้ได้",
+    "noAttributeGroupsWarning": "กรุณากำหนดกลุ่มแอตทริบิวต์ก่อน แล้วจึงลากแอตทริบิวต์เข้ากลุ่มได้",
     "channelsTitle": "ช่องทางขาย",
     "createChannel": "สร้างช่องทางขาย",
     "editChannel": "แก้ไขช่องทางขาย",

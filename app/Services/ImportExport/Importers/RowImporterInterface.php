@@ -16,6 +16,16 @@ interface RowImporterInterface
     public function columns(): array;
 
     /**
+     * code => localized display label, for every column columns() lists —
+     * used as the sample template's header row, and to accept a label in
+     * place of a code when reading an uploaded file back (see
+     * RowHeaderNormalizer). Always keyed by the same codes columns() returns.
+     *
+     * @return array<string, string>
+     */
+    public function columnLabels(): array;
+
+    /**
      * Subset of columns() that must be non-empty for a row to import
      * successfully, surfaced to the UI next to the sample download.
      *
