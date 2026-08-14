@@ -71,6 +71,7 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('categories'), href: '/catalog/categories' },
+        { title: t('marketplaceSyncTab'), href: '/catalog/categories/marketplace-sync' },
         { title: t('lazadaMappingTitle'), href: '#' },
     ];
 
@@ -176,10 +177,10 @@ export default function LazadaCategoryMapping({ categories, stats, filters }: Pr
                         <Button
                             size="small"
                             startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/categories')}
+                            onClick={() => router.visit('/catalog/categories/marketplace-sync')}
                             sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
                         >
-                            {tNav('categories')}
+                            {t('marketplaceSyncTab')}
                         </Button>
                         <Typography variant="h4" fontWeight={700}>{t('lazadaMappingTitle')}</Typography>
                         <Typography color="text.secondary">

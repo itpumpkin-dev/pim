@@ -10,9 +10,7 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import SyncIcon from '@mui/icons-material/Sync';
-import LinkIcon from '@mui/icons-material/Link';
-import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -43,15 +41,6 @@ interface Props {
     filterColumns: Record<string, GridColumn>;
 }
 
-// One button + platform picker instead of one dedicated button per platform
-// (which doesn't scale — was literally "Sync Lazada Categories" hardcoded).
-// Only Lazada actually has a working category sync today; adding the next
-// platform's is just one more entry here plus its own backend route, not a
-// new button/layout change on this page.
-const CATEGORY_SYNC_PLATFORMS = [
-    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada' },
-] as const;
-
 export default function CategoryIndex({ categories, filters, filterColumns }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tGrid } = useTranslation('grid');
@@ -72,8 +61,6 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 15);
     const [deleteCategoryId, setDeleteCategoryId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
-    const [syncingLazada, setSyncingLazada] = useState(false);
-    const [syncPlatform, setSyncPlatform] = useState<string>(CATEGORY_SYNC_PLATFORMS[0].value);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -112,60 +99,30 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categories')} />
             <Box sx={{ p: 4 }}>
+                <Tabs
+                    value="categories"
+                    onChange={(_, val) => router.visit(val === 'marketplace-sync' ? '/catalog/categories/marketplace-sync' : '/catalog/categories')}
+                    sx={{ mb: 3 }}
+                >
+                    <Tab value="categories" label={tNav('categories')} />
+                    <Tab value="marketplace-sync" label={t('marketplaceSyncTab')} />
+                </Tabs>
+
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h4" fontWeight={700}>{tNav('categories')}</Typography>
                         <Typography color="text.secondary">{tGrid('results', { count: categories.total })}</Typography>
                     </Box>
-                    <Stack direction="row" spacing={1.5}>
-                        {canEdit && (
-                            <Stack direction="row" spacing={0.5} alignItems="center">
-                                <Select
-                                    value={syncPlatform}
-                                    onChange={(e) => setSyncPlatform(e.target.value)}
-                                    size="small"
-                                    disabled={syncingLazada}
-                                    sx={{ minWidth: 120 }}
-                                >
-                                    {CATEGORY_SYNC_PLATFORMS.map((p) => (
-                                        <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
-                                    ))}
-                                </Select>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={syncingLazada ? <CircularProgress size={16} /> : <SyncIcon />}
-                                    disabled={syncingLazada}
-                                    onClick={() => {
-                                        const platform = CATEGORY_SYNC_PLATFORMS.find((p) => p.value === syncPlatform);
-                                        if (!platform) return;
-                                        setSyncingLazada(true);
-                                        router.post(platform.route, {}, { onFinish: () => setSyncingLazada(false) });
-                                    }}
-                                >
-                                    {syncingLazada ? t('syncingLazada') : t('syncCategories')}
-                                </Button>
-                            </Stack>
-                        )}
-                        {canEdit && (
-                            <Button
-                                variant="outlined"
-                                startIcon={<LinkIcon />}
-                                onClick={() => router.visit('/catalog/categories/lazada-mapping')}
-                            >
-                                {t('mapToLazada')}
-                            </Button>
-                        )}
-                        {canCreate && (
-                            <Button
-                                sx={{ color: "white" }}
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit('/catalog/categories/create')}
-                            >
-                                {t('createCategory')}
-                            </Button>
-                        )}
-                    </Stack>
+                    {canCreate && (
+                        <Button
+                            sx={{ color: "white" }}
+                            variant="contained"
+                            startIcon={<AddIcon />}
+                            onClick={() => router.visit('/catalog/categories/create')}
+                        >
+                            {t('createCategory')}
+                        </Button>
+                    )}
                 </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>

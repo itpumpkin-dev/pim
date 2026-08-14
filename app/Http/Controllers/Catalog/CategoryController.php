@@ -482,6 +482,25 @@ class CategoryController extends Controller
     }
 
     /**
+     * Marketplace category sync/mapping tab — kept off the category list
+     * page since it's a bulk admin action, not something touched during
+     * everyday category browsing.
+     */
+    public function marketplaceSync(): Response
+    {
+        // ::max() is a raw aggregate query, so it returns the DB driver's
+        // plain string instead of an Eloquent-cast Carbon instance — no
+        // timezone marker attached. Parse it in the app timezone (UTC)
+        // explicitly before serializing, otherwise the frontend's Date
+        // parser misreads the naive string as local time.
+        $lastSyncedAt = LazadaCategory::max('updated_at');
+
+        return Inertia::render('catalog/categories/marketplace-sync', [
+            'lastSyncedAt' => $lastSyncedAt ? \Carbon\Carbon::parse($lastSyncedAt, 'UTC')->toISOString() : null,
+        ]);
+    }
+
+    /**
      * Refreshes the local lazada_categories cache from Lazada's live
      * category tree, so the mapping picker doesn't hit their API on every
      * page load. Any active seller account can authenticate this — the
