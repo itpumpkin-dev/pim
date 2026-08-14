@@ -9,6 +9,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import PublishIcon from '@mui/icons-material/Publish';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import {
@@ -25,6 +26,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Fab,
     FormControl,
     FormControlLabel,
     Grid,
@@ -204,6 +206,85 @@ export default function ProductEdit({
     const { auth } = usePage<SharedData>().props;
     const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
     const [tabIndex, setTabIndex] = useState(0);
+    // Sub-tabs within the "General" top-level tab, grouping the left-column
+    // form content — order matches the reference layout: General info ->
+    // Attributes -> Details -> Sales info -> Shipping -> Others. The right
+    // sidebar (Product Info/Categories/Associations/Sales Channels) is
+    // unaffected by this — it stays visible regardless of which sub-tab is
+    // active, per explicit direction (kept as-is, not folded into tabs).
+    //
+    // All groups render stacked on the page at once (not swapped in/out) —
+    // the tab bar is a scroll-spy nav: clicking a tab smooth-scrolls to that
+    // section, and scrolling the page updates which tab is highlighted based
+    // on which section is currently under the sticky tab bar.
+    const [groupTabIndex, setGroupTabIndex] = useState(0);
+    const groupSectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const groupTabBarRef = useRef<HTMLDivElement | null>(null);
+    // The scrollable region for this page's whole body — see its JSX below
+    // ("Scrollable Body"). Everything above it (breadcrumb header from the
+    // layout, this page's own top tabs + SKU/Save toolbar) sits outside this
+    // box entirely, so it's simply always visible without any sticky
+    // positioning or runtime header-height math — only what's actually
+    // meant to scroll (group tabs + their stacked sections + sidebar) lives
+    // inside it.
+    const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+    // Scroll-driven tab highlighting is suppressed for a moment after a tab
+    // click's own programmatic scrollIntoView — otherwise the scroll events
+    // that smooth-scroll produces would fight the click for which tab ends
+    // up highlighted.
+    const suppressScrollSpy = useRef(false);
+    // Floating "back to top" button — appears once the user has scrolled
+    // down a meaningful amount, since a fixed nav element only earns its
+    // screen space once scrolling back up by hand would actually be a chore.
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    const scrollToGroup = (idx: number) => {
+        suppressScrollSpy.current = true;
+        setGroupTabIndex(idx);
+        groupSectionRefs.current[idx]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.setTimeout(() => {
+            suppressScrollSpy.current = false;
+        }, 700);
+    };
+
+    const scrollToTop = () => {
+        scrollBodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        const scrollParent = scrollBodyRef.current;
+        if (!scrollParent) return;
+
+        const handleScroll = () => {
+            setShowScrollTop(scrollParent.scrollTop > 400);
+
+            if (suppressScrollSpy.current) return;
+
+            // The section whose top has most recently crossed this line
+            // (i.e. the last one still <= threshold) is what the user is
+            // currently reading — threshold is the sticky tab bar's own
+            // bottom edge, so a section counts as "active" right as it
+            // tucks under it, not only once it's scrolled to the very top.
+            const threshold = groupTabBarRef.current
+                ? groupTabBarRef.current.getBoundingClientRect().bottom
+                : 0;
+            let activeIdx = 0;
+            for (let i = 0; i < groupSectionRefs.current.length; i++) {
+                const el = groupSectionRefs.current[i];
+                if (!el) continue;
+                if (el.getBoundingClientRect().top <= threshold) {
+                    activeIdx = i;
+                }
+            }
+            setGroupTabIndex(activeIdx);
+        };
+
+        scrollParent.addEventListener('scroll', handleScroll, { passive: true });
+        handleScroll();
+        return () => scrollParent.removeEventListener('scroll', handleScroll);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [assignedGroups.length]);
+
     const [relatedProducts, setRelatedProducts] = useState<ProductOption[]>(associations.related);
     const [upSellProducts, setUpSellProducts] = useState<ProductOption[]>(associations.up_sell);
     const [crossSellProducts, setCrossSellProducts] = useState<ProductOption[]>(associations.cross_sell);
@@ -636,7 +717,11 @@ export default function ProductEdit({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Product | SKU: ${data.sku}`} />
-            <Box component="form" onSubmit={submit} sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 6 }}>
+            <Box
+                component="form"
+                onSubmit={submit}
+                sx={{ bgcolor: 'background.default', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
+            >
                 {/* Top Tabs Bar */}
                 <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', px: { xs: 2, md: 4 } }}>
                     <Tabs
@@ -654,7 +739,7 @@ export default function ProductEdit({
                 </Box>
 
                 {/* Sub-Header Toolbar */}
-                <Box sx={{ px: { xs: 2, md: 4 }, py: 2.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 3 }}>
+                <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 0.5 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
                         <Typography variant="h5" fontWeight={700} color="text.primary">
                             Edit Product | SKU: {data.sku}
@@ -739,6 +824,12 @@ export default function ProductEdit({
                     </Stack>
                 </Box>
 
+                {/* Scrollable Body — the only part of this page that scrolls.
+                    Everything above (breadcrumb header from the layout, the
+                    General/History tabs, this SKU/Save toolbar) stays outside
+                    this box entirely, so it's simply always visible without
+                    any sticky positioning or runtime header-height math. */}
+                <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
                 {Object.keys(errors).length > 0 && (
                     <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
                         <Alert severity="error">
@@ -757,6 +848,37 @@ export default function ProductEdit({
                 {/* Main 2-Column Layout */}
                 {tabIndex === 0 && (
                 <Box sx={{ px: { xs: 2, md: 4 } }}>
+                    <Paper
+                        ref={groupTabBarRef}
+                        variant="outlined"
+                        sx={{
+                            mb: 3,
+                            borderRadius: 0,
+                            bgcolor: '#fff',
+                            position: 'sticky',
+                            // Sticks to the top of its own scroll container
+                            // (the "Scrollable Body" box above) — that box is
+                            // the only thing that scrolls on this page, so
+                            // top:0 here needs no header-height math.
+                            top: 0,
+                            zIndex: 1,
+                        }}
+                    >
+                        <Tabs
+                            value={groupTabIndex}
+                            onChange={(_, v) => scrollToGroup(v)}
+                            variant="scrollable"
+                            scrollButtons="auto"
+                            sx={{
+                                px: 2,
+                                '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, minHeight: 48 },
+                            }}
+                        >
+                            {assignedGroups.map((group) => (
+                                <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
+                            ))}
+                        </Tabs>
+                    </Paper>
                     <Grid container spacing={3}>
                         {/* Left Main Area: Real Attribute Groups from Database */}
                         <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
@@ -785,192 +907,169 @@ export default function ProductEdit({
                                     transition: 'opacity 0.15s',
                                 }}
                             >
-                                {/* General Card containing SKU and real General Attributes */}
-                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
-                                        General
-                                    </Typography>
-                                    <Stack spacing={2.5}>
-                                        <TextField
-                                            label="SKU *"
-                                            required
-                                            fullWidth
-                                            size="small"
-                                            value={data.sku}
-                                            onChange={(e) => setData('sku', e.target.value)}
-                                            error={Boolean(errors.sku)}
-                                            helperText={errors.sku}
-                                        />
+                                {/* One panel per real Attribute Group, stacked in the order the backend
+                                    already sorted them (ProductController::edit()'s canonical group
+                                    order) — every group renders at once (scroll-spy nav, not a
+                                    click-to-swap tab), so index-matching against the tabs above is exact
+                                    by construction. SKU is pinned into the 'general' group's panel
+                                    (there's no other natural home for it); the variants table is pinned
+                                    into the 'pricing_packaging' group's panel (sales/pricing data), for
+                                    configurable products only. */}
+                                {assignedGroups.map((group, idx) => {
+                                    const isGeneral = group.code.toLowerCase() === 'general';
+                                    const isSales = group.code.toLowerCase() === 'pricing_packaging';
+                                    const visibleAttrs = group.attributes.filter((attr) => {
+                                        if (data.type.toLowerCase() === 'configurable') {
+                                            return attr.code !== 'price' && attr.code !== 'qty';
+                                        }
+                                        return true;
+                                    });
 
-                                        {/* Render real attributes for General group if exists */}
-                                        {assignedGroups
-                                            .filter((g) => g.code.toLowerCase() === 'general')
-                                            .flatMap((g) => g.attributes)
-                                            .filter((attr) => {
-                                                if (data.type.toLowerCase() === 'configurable') {
-                                                    return attr.code !== 'price' && attr.code !== 'qty';
-                                                }
-                                                return true;
-                                            })
-                                            .map((attr) => {
-                                                const { channelKey, localeKey } = getValueKeys(attr);
-                                                const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
-                                                const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
-                                                return (
-                                                    <RenderAttributeInput
-                                                        key={attr.id}
-                                                        attr={attr}
-                                                        value={val}
-                                                        channelKey={channelKey}
-                                                        localeKey={localeKey}
-                                                        onValueChange={setAttributeValue}
-                                                        label={localizedLabel(attr, activeLocaleId)}
-                                                        activeLocaleCode={activeLocaleCode}
-                                                        activeChannelName={activeChannelName}
-                                                        canAddOptions={canAddAttributeOptions}
-                                                        sku={data.sku}
-                                                    />
-                                                );
-                                            })}
-                                    </Stack>
-                                </Paper>
-
-                                {/* Render other real Attribute Groups assigned in system */}
-                                {assignedGroups
-                                    .filter((g) => g.code.toLowerCase() !== 'general')
-                                    .map((group) => (
-                                        <Paper key={group.id} variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                    return (
+                                        <Paper
+                                            key={group.id}
+                                            ref={(el: HTMLDivElement | null) => {
+                                                groupSectionRefs.current[idx] = el;
+                                            }}
+                                            variant="outlined"
+                                            sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: '80px' }}
+                                        >
                                             <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
                                                 {localizedLabel(group, activeLocaleId)}
                                             </Typography>
                                             <Stack spacing={2.5}>
-                                                {group.attributes.length === 0 ? (
+                                                {isGeneral && (
+                                                    <TextField
+                                                        label="SKU *"
+                                                        required
+                                                        fullWidth
+                                                        size="small"
+                                                        value={data.sku}
+                                                        onChange={(e) => setData('sku', e.target.value)}
+                                                        error={Boolean(errors.sku)}
+                                                        helperText={errors.sku}
+                                                    />
+                                                )}
+
+                                                {visibleAttrs.length === 0 && !isGeneral && !(isSales && data.type.toLowerCase() === 'configurable') && (
                                                     <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                                                         No attributes assigned to this group yet.
                                                     </Typography>
-                                                ) : (
-                                                    group.attributes
-                                                        .filter((attr) => {
-                                                            if (data.type.toLowerCase() === 'configurable') {
-                                                                return attr.code !== 'price' && attr.code !== 'qty';
-                                                            }
-                                                            return true;
-                                                        })
-                                                        .map((attr) => {
-                                                            const { channelKey, localeKey } = getValueKeys(attr);
-                                                            const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
-                                                            const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                            const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
-                                                            return (
-                                                                <RenderAttributeInput
-                                                                    key={attr.id}
-                                                                    attr={attr}
-                                                                    value={val}
-                                                                    channelKey={channelKey}
-                                                                    localeKey={localeKey}
-                                                                    onValueChange={setAttributeValue}
-                                                                    label={localizedLabel(attr, activeLocaleId)}
-                                                                    activeLocaleCode={activeLocaleCode}
-                                                                    activeChannelName={activeChannelName}
-                                                                    canAddOptions={canAddAttributeOptions}
-                                                                    sku={data.sku}
-                                                                />
-                                                            );
-                                                        })
+                                                )}
+
+                                                {visibleAttrs.map((attr) => {
+                                                    const { channelKey, localeKey } = getValueKeys(attr);
+                                                    const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
+                                                    const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                    const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
+                                                    return (
+                                                        <RenderAttributeInput
+                                                            key={attr.id}
+                                                            attr={attr}
+                                                            value={val}
+                                                            channelKey={channelKey}
+                                                            localeKey={localeKey}
+                                                            onValueChange={setAttributeValue}
+                                                            label={localizedLabel(attr, activeLocaleId)}
+                                                            activeLocaleCode={activeLocaleCode}
+                                                            activeChannelName={activeChannelName}
+                                                            canAddOptions={canAddAttributeOptions}
+                                                            sku={data.sku}
+                                                        />
+                                                    );
+                                                })}
+
+                                                {isSales && data.type.toLowerCase() === 'configurable' && (
+                                                    <Box>
+                                                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
+                                                            <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                                                                ตัวเลือกสินค้าย่อย (Variants List)
+                                                            </Typography>
+                                                            <Stack direction="row" spacing={1}>
+                                                                <Button size="small" variant="outlined" startIcon={<AutorenewIcon fontSize="small" />} onClick={openVariantDialog}>
+                                                                    {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
+                                                                </Button>
+                                                                <Button size="small" variant="text" startIcon={<AddIcon fontSize="small" />} onClick={handleAddBlankVariant}>
+                                                                    เพิ่มแถวว่าง
+                                                                </Button>
+                                                            </Stack>
+                                                        </Stack>
+
+                                                        {data.variants.length === 0 ? (
+                                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
+                                                            </Typography>
+                                                        ) : (
+                                                            <TableContainer>
+                                                                <Table size="small">
+                                                                    <TableHead>
+                                                                        <TableRow>
+                                                                            <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
+                                                                            <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
+                                                                            <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
+                                                                            <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
+                                                                            <TableCell sx={{ fontWeight: 700 }} align="right">ลบ</TableCell>
+                                                                        </TableRow>
+                                                                    </TableHead>
+                                                                    <TableBody>
+                                                                        {data.variants.map((v, index) => (
+                                                                            <TableRow key={v.id ?? `new-${index}`}>
+                                                                                <TableCell sx={{ fontWeight: 600 }}>{variantLabel(v)}</TableCell>
+                                                                                <TableCell>
+                                                                                    <TextField
+                                                                                        size="small"
+                                                                                        required
+                                                                                        value={v.sku}
+                                                                                        onChange={(e) => {
+                                                                                            const updated = [...data.variants];
+                                                                                            updated[index] = { ...v, sku: e.target.value };
+                                                                                            setData('variants', updated);
+                                                                                        }}
+                                                                                    />
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                    <TextField
+                                                                                        size="small"
+                                                                                        type="number"
+                                                                                        value={v.price}
+                                                                                        onChange={(e) => {
+                                                                                            const updated = [...data.variants];
+                                                                                            updated[index] = { ...v, price: e.target.value };
+                                                                                            setData('variants', updated);
+                                                                                        }}
+                                                                                        placeholder="ราคา"
+                                                                                    />
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                    <TextField
+                                                                                        size="small"
+                                                                                        type="number"
+                                                                                        value={v.qty}
+                                                                                        onChange={(e) => {
+                                                                                            const updated = [...data.variants];
+                                                                                            updated[index] = { ...v, qty: e.target.value };
+                                                                                            setData('variants', updated);
+                                                                                        }}
+                                                                                        placeholder="สต๊อก"
+                                                                                    />
+                                                                                </TableCell>
+                                                                                <TableCell align="right">
+                                                                                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
+                                                                                        <DeleteOutlineIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        ))}
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </TableContainer>
+                                                        )}
+                                                    </Box>
                                                 )}
                                             </Stack>
                                         </Paper>
-                                    ))}
-
-                                {/* Dynamic Cartesian Variants Table */}
-                                {data.type.toLowerCase() === 'configurable' && (
-                                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                                            <Typography variant="h6" fontWeight={700} color="text.primary">
-                                                ตัวเลือกสินค้าย่อย (Variants List)
-                                            </Typography>
-                                            <Stack direction="row" spacing={1}>
-                                                <Button size="small" variant="outlined" startIcon={<AutorenewIcon fontSize="small" />} onClick={openVariantDialog}>
-                                                    {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
-                                                </Button>
-                                                <Button size="small" variant="text" startIcon={<AddIcon fontSize="small" />} onClick={handleAddBlankVariant}>
-                                                    เพิ่มแถวว่าง
-                                                </Button>
-                                            </Stack>
-                                        </Stack>
-
-                                        {data.variants.length === 0 ? (
-                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
-                                            </Typography>
-                                        ) : (
-                                            <TableContainer>
-                                                <Table size="small">
-                                                    <TableHead>
-                                                        <TableRow>
-                                                            <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
-                                                            <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
-                                                            <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
-                                                            <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
-                                                            <TableCell sx={{ fontWeight: 700 }} align="right">ลบ</TableCell>
-                                                        </TableRow>
-                                                    </TableHead>
-                                                    <TableBody>
-                                                        {data.variants.map((v, index) => (
-                                                            <TableRow key={v.id ?? `new-${index}`}>
-                                                                <TableCell sx={{ fontWeight: 600 }}>{variantLabel(v)}</TableCell>
-                                                                <TableCell>
-                                                                    <TextField
-                                                                        size="small"
-                                                                        required
-                                                                        value={v.sku}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...data.variants];
-                                                                            updated[index] = { ...v, sku: e.target.value };
-                                                                            setData('variants', updated);
-                                                                        }}
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <TextField
-                                                                        size="small"
-                                                                        type="number"
-                                                                        value={v.price}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...data.variants];
-                                                                            updated[index] = { ...v, price: e.target.value };
-                                                                            setData('variants', updated);
-                                                                        }}
-                                                                        placeholder="ราคา"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell>
-                                                                    <TextField
-                                                                        size="small"
-                                                                        type="number"
-                                                                        value={v.qty}
-                                                                        onChange={(e) => {
-                                                                            const updated = [...data.variants];
-                                                                            updated[index] = { ...v, qty: e.target.value };
-                                                                            setData('variants', updated);
-                                                                        }}
-                                                                        placeholder="สต๊อก"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell align="right">
-                                                                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
-                                                                        <DeleteOutlineIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            </TableContainer>
-                                        )}
-                                    </Paper>
-                                )}
+                                    );
+                                })}
                             </Stack>
                         </Grid>
 
@@ -1303,6 +1402,7 @@ export default function ProductEdit({
                 )}
 
                 {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
+                </Box>
             </Box>
 
             <Dialog open={pushConfirmShop !== null} onClose={() => setPushConfirmShop(null)}>

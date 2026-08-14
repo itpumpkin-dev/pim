@@ -882,6 +882,20 @@ class ProductController extends Controller
             }
         } else {
             $groupsData = array_values($groupsData);
+
+            // Canonical group display order for the tabbed edit-product layout
+            // (see resources/js/pages/catalog/products/edit.tsx) — matched by
+            // code (stable across locales), not the translated name. Any
+            // group whose code isn't in this list (a family with its own
+            // custom groups) falls through to the end in its original order
+            // rather than disappearing.
+            $groupOrder = ['general', 'specifications', 'warranty_usage', 'pricing_packaging', 'packaging', 'tis_certification'];
+            usort($groupsData, function ($a, $b) use ($groupOrder) {
+                $posA = array_search($a['code'], $groupOrder);
+                $posB = array_search($b['code'], $groupOrder);
+
+                return ($posA === false ? count($groupOrder) : $posA) <=> ($posB === false ? count($groupOrder) : $posB);
+            });
         }
 
         // Preload values scoped to no channel (global attributes) plus the default
