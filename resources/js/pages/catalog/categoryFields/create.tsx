@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { OptionListEditor } from '@/components/catalog/option-list-editor';
 import { type BreadcrumbItem } from '@/types';
@@ -19,7 +20,7 @@ export default function CategoryFieldCreate() {
         { title: 'Create Field', href: '/catalog/categoryFields/create' },
     ];
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, isDirty } = useForm({
         type: 'Text',
         labels: {} as Record<string, string>,
         options: [] as string[],
@@ -29,11 +30,16 @@ export default function CategoryFieldCreate() {
         position: 0,
         display_section: 'General',
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        skipNavigationGuardRef.current = true;
         post('/catalog/categoryFields', {
             onSuccess: () => router.visit('/catalog/categoryFields', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

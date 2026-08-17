@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -23,14 +24,19 @@ export default function AttributeGroupCreate() {
         { title: t('addAttributeGroupTitle'), href: '/catalog/attributeGroups/create' },
     ];
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, isDirty } = useForm({
         translations: {} as Record<string, string>,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        skipNavigationGuardRef.current = true;
         post('/catalog/attributeGroups', {
             onSuccess: () => router.visit('/catalog/attributeGroups', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

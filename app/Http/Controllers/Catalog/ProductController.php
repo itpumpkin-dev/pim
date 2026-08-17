@@ -1159,6 +1159,61 @@ class ProductController extends Controller
     }
 
     /**
+     * "Check live status" button on the product list — runs checkLazadaStatus()/
+     * checkShopeeStatus()/checkTikTokStatus() (the same real, per-shop checks
+     * the Edit page's push/deactivate dialog uses) against every shop this
+     * product is linked to, so the list's "Sales Channels" cell reflects each
+     * platform's real current state instead of only whatever the last bulk
+     * sync or manual push happened to leave cached in product_platform_shops.
+     * One shop failing to answer (rate limit, expired token, etc.) doesn't
+     * abort the others — its error is collected and returned alongside
+     * whatever did succeed.
+     */
+    public function checkLiveStatus(Product $product): JsonResponse
+    {
+        $links = DB::table('product_platform_shops')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->where('product_platform_shops.product_id', $product->id)
+            ->get(['sales_platform_shops.id as shop_id', 'sales_platform_shops.name as shop_name', 'sales_platforms.code as platform_code', 'sales_platforms.name as platform_name']);
+
+        $errors = [];
+        foreach ($links as $link) {
+            $shop = SalesPlatformShop::find($link->shop_id);
+            if (! $shop) {
+                continue;
+            }
+
+            try {
+                match ($link->platform_code) {
+                    'lazada' => LazadaProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
+                    'shopee' => ShopeeProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
+                    'tiktok' => TikTokProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
+                    default => null,
+                };
+            } catch (\Throwable $e) {
+                $errors[] = "{$link->platform_name} ({$link->shop_name}): {$e->getMessage()}";
+            }
+        }
+
+        $liveRows = DB::table('product_platform_shops')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->where('product_platform_shops.product_id', $product->id)
+            ->where('product_platform_shops.status', 'live')
+            ->get(['sales_platforms.name as platform_name']);
+
+        return response()->json([
+            'sales_channels' => [
+                'total' => $liveRows->count(),
+                'platforms' => $liveRows->groupBy('platform_name')->map->count(),
+            ],
+            'checked' => $links->count(),
+            'errors' => $errors,
+        ]);
+    }
+
+    /**
      * FIRES A REAL, LIVE WRITE TO TIKTOK — creates or updates an actual
      * listing on the seller's storefront. Same "published" guard as
      * pushToLazada(). Will currently fail for every product — see

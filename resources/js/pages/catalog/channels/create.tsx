@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -60,12 +61,13 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
         { title: t('createChannel'), href: '/catalog/channels/create' },
     ];
 
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, isDirty } = useForm({
         translations: {} as Record<string, string>,
         root_category_id: 'none' as string | number,
         locale_ids: [] as number[],
         currency_ids: [] as number[],
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -73,8 +75,12 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
             ...formData,
             root_category_id: formData.root_category_id === 'none' ? '' : formData.root_category_id,
         }));
+        skipNavigationGuardRef.current = true;
         post('/catalog/channels', {
             onSuccess: () => router.visit('/catalog/channels', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

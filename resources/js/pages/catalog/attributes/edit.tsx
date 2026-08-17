@@ -1,6 +1,7 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { AttributeOptionsPanel, type AttributeOptionItem } from '@/components/catalog/attribute-options-panel';
 import { HistoryPanel } from '@/components/history-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -84,7 +85,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         label: t(key),
     }));
 
-    const { data, setData, put, processing, errors } = useForm<AttributeForm>({
+    const { data, setData, put, processing, errors, isDirty } = useForm<AttributeForm>({
         code: attribute.code || '',
         type: attribute.type || 'text',
         swatch_type: attribute.swatch_type || '',
@@ -96,6 +97,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         is_filterable: Boolean(attribute.is_filterable),
         translations: translations || {},
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const showSwatchType = data.type === 'select' || data.type === 'multiselect';
 
@@ -108,8 +110,12 @@ export default function AttributeEdit({ attribute, translations, options = [], c
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        skipNavigationGuardRef.current = true;
         put(`/catalog/attributes/${attribute.id}`, {
             onSuccess: () => router.visit('/catalog/attributes', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
@@ -92,7 +93,7 @@ export default function ProductCreate({ families, attributes }: Props) {
         { title: t('createProduct'), href: '/catalog/products/create' },
     ];
 
-    const { data, setData, post, processing, errors } = useForm<ProductForm>({
+    const { data, setData, post, processing, errors, isDirty } = useForm<ProductForm>({
         enabled: true,
         family_id: families.length > 0 ? families[0].id : '',
         type: 'simple',
@@ -169,12 +170,19 @@ export default function ProductCreate({ families, attributes }: Props) {
         setData('variants', updated);
     };
 
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
+
     const handleFormSubmit = (e?: FormEvent) => {
         if (e) e.preventDefault();
         // The server redirects straight into Edit (or the list, for a role that
         // can create but not edit products) — Inertia already follows that
         // redirect, so there's nothing left to do here on success.
-        post('/catalog/products');
+        skipNavigationGuardRef.current = true;
+        post('/catalog/products', {
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     return (

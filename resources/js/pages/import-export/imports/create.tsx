@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -42,7 +43,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         { title: t('createImport'), href: '/import-export/imports/create' },
     ];
 
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, isDirty, setDefaults } = useForm({
         type: types[0] ?? 'products',
         file_format: 'csv',
         field_separator: ',',
@@ -52,6 +53,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         image_directory_path: '',
         file: null as File | null,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const typeLabel = (type: string) => {
         const key = 'type' + type.replace(/(^|_)([a-z])/g, (_m, _p, c) => c.toUpperCase());
@@ -64,9 +66,13 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     const submit = (e: FormEvent) => {
         e.preventDefault();
         setActiveAction('save');
+        skipNavigationGuardRef.current = true;
         post('/import-export/imports', {
             onSuccess: () => router.visit('/import-export/imports', { replace: true }),
-            onFinish: () => setActiveAction(null),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+                setActiveAction(null);
+            },
         });
     };
 
@@ -74,9 +80,12 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         e.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, run: true }));
+        skipNavigationGuardRef.current = true;
         post('/import-export/imports', {
+            onSuccess: () => setDefaults(),
             onFinish: () => {
                 transform((formData) => formData);
+                skipNavigationGuardRef.current = false;
                 setActiveAction(null);
             },
         });

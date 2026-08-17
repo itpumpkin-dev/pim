@@ -27,6 +27,8 @@
     "noProductsFound": "No products found.",
     "confirmDeletion": "Confirm Deletion",
     "confirmDeleteMessage": "Are you sure you want to delete this product?",
+    "confirmDuplication": "Confirm Duplication",
+    "confirmDuplicateMessage": "Are you sure you want to duplicate this product? A new product will be created as a copy.",
     "cancel": "Cancel",
     "delete": "Delete",
 
@@ -176,6 +178,9 @@
     "salesChannels": "Sales Channels",
     "notLive": "Not live",
     "liveOnCount": "Live on {{count}}",
+    "duplicateProduct": "Duplicate",
+    "checkLiveStatus": "Check Live Status",
+    "checkLiveStatusFailed": "Could not check live status.",
     "mapToPlatformCategories": "Map to {{platform}} Categories",
     "marketplaceMappingButton": "Marketplace Mapping",
     "lazadaMappingTitle": "Lazada Category Mapping",

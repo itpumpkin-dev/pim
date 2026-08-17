@@ -5,6 +5,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import ViewColumnOutlinedIcon from '@mui/icons-material/ViewColumnOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
@@ -16,6 +17,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import CloseIcon from '@mui/icons-material/Close';
 import {
+    Alert,
     Autocomplete,
     Box,
     Button,
@@ -33,6 +35,7 @@ import {
     MenuItem,
     Paper,
     Select,
+    Snackbar,
     Stack,
     Table,
     TableBody,
@@ -42,6 +45,7 @@ import {
     TableRow,
     TableSortLabel,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -208,26 +212,73 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
-    // A Set, not a single id — clicking Copy on one row while another row's
-    // request is still in flight previously overwrote a single id, wrongly
-    // clearing the first row's disabled/spinner state (and the guard against
-    // double-firing that request) while it was still pending.
-    const [duplicatingIds, setDuplicatingIds] = useState<Set<number>>(new Set());
+    // Confirm-then-act, same shape as deleteProductId/deleting above — the
+    // dialog being modal means only one duplicate can ever be in flight at a
+    // time, so a single id (not a Set) is enough here.
+    const [duplicateProductId, setDuplicateProductId] = useState<number | null>(null);
+    const [duplicating, setDuplicating] = useState(false);
 
-    const duplicateProduct = (productId: number) => {
-        setDuplicatingIds((prev) => new Set(prev).add(productId));
+    const duplicateProduct = () => {
+        if (duplicateProductId === null) return;
+        setDuplicating(true);
         router.post(
-            `/catalog/products/${productId}/duplicate`,
+            `/catalog/products/${duplicateProductId}/duplicate`,
             {},
             {
-                onFinish: () =>
-                    setDuplicatingIds((prev) => {
-                        const next = new Set(prev);
-                        next.delete(productId);
-                        return next;
-                    }),
+                onSuccess: () => setDuplicateProductId(null),
+                onFinish: () => setDuplicating(false),
             },
         );
+    };
+
+    // "Check Live Status" — asks each marketplace directly (real API calls via
+    // ProductController::checkLiveStatus()), not router.post(), since that
+    // endpoint returns plain JSON rather than an Inertia response. Same
+    // per-row Set(...) pattern as duplicatingIds above, for the same reason:
+    // multiple rows can be checking concurrently without clobbering each
+    // other's spinner/disabled state. Results are kept in a local override
+    // map rather than triggering a full grid reload, so the rest of the
+    // list (scroll position, other rows) is undisturbed.
+    const [checkingLiveIds, setCheckingLiveIds] = useState<Set<number>>(new Set());
+    const [liveStatusOverrides, setLiveStatusOverrides] = useState<Record<number, { total: number; platforms: Record<string, number> }>>({});
+    const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
+
+    const checkLiveStatus = (productId: number) => {
+        setCheckingLiveIds((prev) => new Set(prev).add(productId));
+
+        // This app has no <meta name="csrf-token">; Laravel's VerifyCsrfToken
+        // also accepts the XSRF-TOKEN cookie it already sets on every
+        // response (mirrored back as a header), so read that instead.
+        const xsrfToken = decodeURIComponent(
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1] ?? '',
+        );
+
+        fetch(`/catalog/products/${productId}/check-live-status`, {
+            method: 'POST',
+            headers: { 'X-XSRF-TOKEN': xsrfToken, Accept: 'application/json' },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                if (!res.ok) {
+                    setLiveStatusError(body.message ?? t('checkLiveStatusFailed'));
+                    return;
+                }
+                setLiveStatusOverrides((prev) => ({ ...prev, [productId]: body.sales_channels }));
+                if (Array.isArray(body.errors) && body.errors.length > 0) {
+                    setLiveStatusError(body.errors.join('; '));
+                }
+            })
+            .catch(() => setLiveStatusError(t('checkLiveStatusFailed')))
+            .finally(() =>
+                setCheckingLiveIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(productId);
+                    return next;
+                }),
+            );
     };
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
     const [quickExportOpen, setQuickExportOpen] = useState(false);
@@ -330,7 +381,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 key: 'sales_channels',
                 label: t('salesChannels'),
                 render: (row) => {
-                    const total = row.sales_channels?.total ?? 0;
+                    const channels = liveStatusOverrides[row.id] ?? row.sales_channels;
+                    const total = channels?.total ?? 0;
                     if (total === 0) {
                         return (
                             <Chip
@@ -340,7 +392,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             />
                         );
                     }
-                    const platforms = row.sales_channels?.platforms ?? {};
+                    const platforms = channels?.platforms ?? {};
                     const tooltip = Object.entries(platforms)
                         .map(([platform, count]) => `${platform}: ${count}`)
                         .join(', ');
@@ -367,7 +419,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
             }));
 
         return [...systemColumns, ...attributeColumns];
-    }, [attributes, t]);
+    }, [attributes, t, liveStatusOverrides]);
 
     const columnsCatalog: ManageColumnOption[] = useMemo(
         () => allColumns.map((col) => ({ key: col.key, label: col.label })),
@@ -698,18 +750,35 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                                     </IconButton>
                                                 )}
                                                 {canCreate && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={{ color: '#64748b' }}
-                                                        disabled={duplicatingIds.has(row.id)}
-                                                        onClick={() => duplicateProduct(row.id)}
-                                                    >
-                                                        {duplicatingIds.has(row.id) ? (
-                                                            <CircularProgress size={16} color="inherit" />
-                                                        ) : (
-                                                            <ContentCopyIcon fontSize="small" />
-                                                        )}
-                                                    </IconButton>
+                                                    <Tooltip title={t('duplicateProduct')}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                sx={{ color: '#64748b' }}
+                                                                onClick={() => setDuplicateProductId(row.id)}
+                                                            >
+                                                                <ContentCopyIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                )}
+                                                {canEdit && (
+                                                    <Tooltip title={t('checkLiveStatus')}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                sx={{ color: '#64748b' }}
+                                                                disabled={checkingLiveIds.has(row.id)}
+                                                                onClick={() => checkLiveStatus(row.id)}
+                                                            >
+                                                                {checkingLiveIds.has(row.id) ? (
+                                                                    <CircularProgress size={16} color="inherit" />
+                                                                ) : (
+                                                                    <FactCheckOutlinedIcon fontSize="small" />
+                                                                )}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
                                                 )}
                                                 {canDelete && (
                                                     <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteProductId(row.id)}>
@@ -803,6 +872,29 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Duplicate Confirmation Dialog */}
+            <Dialog open={duplicateProductId !== null} onClose={() => setDuplicateProductId(null)}>
+                <DialogTitle>{t('confirmDuplication')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {t('confirmDuplicateMessage')}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDuplicateProductId(null)} color="inherit" disabled={duplicating}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={duplicateProduct}
+                        variant="contained"
+                        disabled={duplicating}
+                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    >
+                        {t('duplicateProduct')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
             <ProductFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}
@@ -812,6 +904,12 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 attributeFilters={activeAttributeFilters}
                 onApply={applyFilters}
             />
+
+            <Snackbar open={!!liveStatusError} autoHideDuration={8000} onClose={() => setLiveStatusError(null)}>
+                <Alert severity="error" variant="filled" onClose={() => setLiveStatusError(null)} sx={{ maxWidth: 480 }}>
+                    {liveStatusError}
+                </Alert>
+            </Snackbar>
         </AppLayout>
     );
 }

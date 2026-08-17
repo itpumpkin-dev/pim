@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -74,7 +75,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
         { title: t('createAttributeFamily'), href: '/catalog/attributeFamilies/create' },
     ];
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, isDirty } = useForm({
         translations: {} as Record<string, string>,
         group_attributes: [] as { attribute_id: number; attribute_group_id: number }[],
     });
@@ -86,6 +87,12 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>(attributes);
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
+
+    // Group/attribute assignment lives in local state (assignedGroups) above,
+    // not in useForm's data, so isDirty alone would miss drag-and-drop-only
+    // changes — starting from empty on this Create page, any assigned group
+    // is itself a sign of real, losable progress.
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty || assignedGroups.length > 0);
 
     // Dragging (or clicking) an attribute only means anything once at least
     // one group exists to receive it — with none yet, there's nowhere to
@@ -188,9 +195,14 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
             });
         });
 
+        skipNavigationGuardRef.current = true;
         router.post('/catalog/attributeFamilies', {
             translations: data.translations,
             group_attributes: groupAttrsPayload,
+        }, {
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

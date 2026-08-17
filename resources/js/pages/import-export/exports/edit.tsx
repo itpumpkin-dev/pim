@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -48,13 +49,14 @@ export default function ExportEdit({ config, types }: Props) {
         { title: t('editExport'), href: '#' },
     ];
 
-    const { data, setData, put, processing, errors, transform } = useForm({
+    const { data, setData, put, processing, errors, transform, isDirty, setDefaults } = useForm({
         code: config.code || '',
         type: config.type,
         file_format: config.file_format,
         field_separator: config.field_separator,
         with_media: Boolean(config.with_media),
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const typeLabel = (type: string) => {
         const key = 'type' + type.replace(/(^|_)([a-z])/g, (_m, _p, c) => c.toUpperCase());
@@ -67,9 +69,13 @@ export default function ExportEdit({ config, types }: Props) {
     const submit = (e: FormEvent) => {
         e.preventDefault();
         setActiveAction('save');
+        skipNavigationGuardRef.current = true;
         put(`/import-export/exports/${config.id}`, {
             onSuccess: () => router.visit('/import-export/exports', { replace: true }),
-            onFinish: () => setActiveAction(null),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+                setActiveAction(null);
+            },
         });
     };
 
@@ -77,9 +83,12 @@ export default function ExportEdit({ config, types }: Props) {
         e.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, run: true }));
+        skipNavigationGuardRef.current = true;
         put(`/import-export/exports/${config.id}`, {
+            onSuccess: () => setDefaults(),
             onFinish: () => {
                 transform((formData) => formData);
+                skipNavigationGuardRef.current = false;
                 setActiveAction(null);
             },
         });

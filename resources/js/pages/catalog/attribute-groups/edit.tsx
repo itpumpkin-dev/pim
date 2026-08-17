@@ -1,5 +1,6 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { HistoryPanel } from '@/components/history-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -37,15 +38,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function AttributeGroupEdit({ group, translations, canViewHistory = false }: Props) {
     const [tabIndex, setTabIndex] = useState(0);
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         code: group.code || '',
         translations: translations || {},
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        skipNavigationGuardRef.current = true;
         put(`/catalog/attributeGroups/${group.id}`, {
             onSuccess: () => router.visit('/catalog/attributeGroups', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

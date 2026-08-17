@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { OptionListEditor } from '@/components/catalog/option-list-editor';
 import { HistoryPanel } from '@/components/history-panel';
@@ -39,7 +40,7 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
         { title: 'Edit Field', href: '#' },
     ];
 
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         code: field.code || '',
         type: field.type || 'Text',
         labels: field.labels || {},
@@ -50,11 +51,16 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
         position: field.position || 0,
         display_section: field.display_section || 'General',
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        skipNavigationGuardRef.current = true;
         put(`/catalog/categoryFields/${field.id}`, {
             onSuccess: () => router.visit('/catalog/categoryFields', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

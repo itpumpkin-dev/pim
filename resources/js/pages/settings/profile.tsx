@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 
@@ -20,17 +21,30 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
         },
     ];
 
-    const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
+    const { data, setData, patch, errors, processing, recentlySuccessful, isDirty, setDefaults } = useForm({
         username: auth.user.username,
         first_name: auth.user.first_name,
         last_name: auth.user.last_name,
         email: auth.user.email,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        patch(route('profile.update'));
+        skipNavigationGuardRef.current = true;
+        patch(route('profile.update'), {
+            // This page doesn't navigate away or reset() on success — it
+            // stays put with the just-saved values still in the fields, so
+            // without this, isDirty would stay permanently true (comparing
+            // against the values from when the page first loaded) and the
+            // guard above would nag on every later navigation even though
+            // everything's saved.
+            onSuccess: () => setDefaults(),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     return (

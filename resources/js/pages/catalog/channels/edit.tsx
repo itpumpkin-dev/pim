@@ -1,5 +1,6 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { HistoryPanel } from '@/components/history-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -76,13 +77,14 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
         { title: t('editChannel'), href: '#' },
     ];
 
-    const { data, setData, put, processing, errors, transform } = useForm({
+    const { data, setData, put, processing, errors, transform, isDirty } = useForm({
         code: channel.code || '',
         translations: translations || ({} as Record<string, string>),
         root_category_id: (channel.root_category_id ?? 'none') as string | number,
         locale_ids: localeIds || [],
         currency_ids: currencyIds || [],
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -90,8 +92,12 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
             ...formData,
             root_category_id: formData.root_category_id === 'none' ? '' : formData.root_category_id,
         }));
+        skipNavigationGuardRef.current = true;
         put(`/catalog/channels/${channel.id}`, {
             onSuccess: () => router.visit('/catalog/channels', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

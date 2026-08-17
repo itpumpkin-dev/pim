@@ -8,6 +8,7 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
@@ -28,13 +29,14 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
         { title: t('createCategory'), href: '/catalog/categories/create' },
     ];
 
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, isDirty } = useForm({
         translations: {} as Record<string, string>,
         is_ai_translate: false,
         description: '',
         parent_id: 'root' as string | number,
         additional_data: {} as Record<string, any>,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -42,8 +44,12 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
             ...formData,
             parent_id: formData.parent_id === 'root' ? '' : formData.parent_id,
         }));
+        skipNavigationGuardRef.current = true;
         post('/catalog/categories', {
             onSuccess: () => router.visit('/catalog/categories', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

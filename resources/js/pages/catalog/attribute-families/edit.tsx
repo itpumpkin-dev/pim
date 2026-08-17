@@ -1,5 +1,6 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { HistoryPanel } from '@/components/history-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -93,7 +94,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function AttributeFamilyEdit({ family, translations, groups, attributes, familyAttributes = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const [tabIndex, setTabIndex] = useState(0);
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         code: family.code || '',
         translations: translations || {},
     });
@@ -105,6 +106,12 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>([]);
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
+    // assignedGroups/unassignedAttrs start populated from familyAttributes
+    // (see the effect below), so "non-empty" can't signal dirty the way it
+    // does on the Create page — this flips true the moment any of the
+    // group-assignment handlers actually mutate that arrangement.
+    const [groupsDirty, setGroupsDirty] = useState(false);
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty || groupsDirty);
 
     // Dragging (or clicking) an attribute only means anything once at least
     // one group exists to receive it — with none yet, there's nowhere to
@@ -167,6 +174,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         if (groupObj) {
             const exists = assignedGroups.some((g) => g.id === groupObj.id);
             if (!exists) {
+                setGroupsDirty(true);
                 setAssignedGroups((prev) => [
                     ...prev,
                     {
@@ -190,6 +198,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     // it currently is first, so dragging within the same group moves it
     // rather than duplicating it.
     const handleDropAttribute = (attr: AttributeItem, targetGroupId: number, targetIndex?: number) => {
+        setGroupsDirty(true);
         setUnassignedAttrs((prev) => prev.filter((a) => a.id !== attr.id));
         setAssignedGroups((prev) =>
             prev.map((g) => {
@@ -204,6 +213,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     };
 
     const handleMoveAttributeToUnassigned = (attr: AttributeItem) => {
+        setGroupsDirty(true);
         setAssignedGroups((prev) =>
             prev.map((g) => ({
                 ...g,
@@ -217,6 +227,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     };
 
     const handleRemoveGroup = (groupId: number) => {
+        setGroupsDirty(true);
         const groupToRemove = assignedGroups.find((g) => g.id === groupId);
         if (groupToRemove) {
             setUnassignedAttrs((prev) => [...prev, ...groupToRemove.attributes]);
@@ -225,6 +236,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     };
 
     const handleDeleteAllGroups = () => {
+        setGroupsDirty(true);
         const allAssigned = assignedGroups.flatMap((g) => g.attributes);
         setUnassignedAttrs((prev) => [...prev, ...allAssigned]);
         setAssignedGroups([]);
@@ -243,10 +255,15 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
             });
         });
 
+        skipNavigationGuardRef.current = true;
         router.put(`/catalog/attributeFamilies/${family.id}`, {
             code: data.code,
             translations: data.translations,
             group_attributes: groupAttrsPayload,
+        }, {
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

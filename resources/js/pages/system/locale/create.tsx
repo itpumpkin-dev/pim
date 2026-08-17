@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
@@ -34,15 +35,22 @@ const languageOptions: LanguageOption[] = ISO6391.getLanguages(ISO6391.getAllCod
 );
 
 export default function LocaleCreate() {
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, isDirty } = useForm({
         code: '',
         display_name: '',
         enabled: true as boolean,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        post('/system/locales', { replace: true });
+        skipNavigationGuardRef.current = true;
+        post('/system/locales', {
+            replace: true,
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     return (

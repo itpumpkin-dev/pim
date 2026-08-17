@@ -54,6 +54,7 @@ import { FormEvent, memo, useCallback, useEffect, useRef, useState, useTransitio
 import { useTranslation } from 'react-i18next';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { HistoryPanel } from '@/components/history-panel';
 import { CategoryTreePicker } from '@/components/category-tree-picker';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
@@ -341,7 +342,7 @@ export default function ProductEdit({
         });
     });
 
-    const { data, setData, post, transform, processing, errors } = useForm<ProductForm>({
+    const { data, setData, post, transform, processing, errors, isDirty } = useForm<ProductForm>({
         sku: product.sku || '',
         family_id: product.family_id,
         type: (product.type || 'simple').toLowerCase(),
@@ -786,13 +787,19 @@ export default function ProductEdit({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeChannelId, activeLocaleId]);
 
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
+
     const submit = (e: FormEvent) => {
         e.preventDefault();
         // PHP does not parse multipart/form-data bodies for PUT requests, so file
         // uploads must go through POST with a spoofed _method for Laravel to route it as PUT.
         transform((formData) => ({ ...formData, _method: 'put' }));
+        skipNavigationGuardRef.current = true;
         post(`/catalog/products/${product.id}`, {
             onSuccess: () => router.visit('/catalog/products', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

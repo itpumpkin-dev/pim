@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -56,7 +57,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         { title: t('editImport'), href: '#' },
     ];
 
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, isDirty, setDefaults } = useForm({
         code: config.code || '',
         type: config.type,
         file_format: config.file_format,
@@ -67,6 +68,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         image_directory_path: config.image_directory_path || '',
         file: null as File | null,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const typeLabel = (type: string) => {
         const key = 'type' + type.replace(/(^|_)([a-z])/g, (_m, _p, c) => c.toUpperCase());
@@ -80,9 +82,13 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         e.preventDefault();
         setActiveAction('save');
         transform((formData) => ({ ...formData, _method: 'put' }));
+        skipNavigationGuardRef.current = true;
         post(`/import-export/imports/${config.id}`, {
             onSuccess: () => router.visit('/import-export/imports', { replace: true }),
-            onFinish: () => setActiveAction(null),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+                setActiveAction(null);
+            },
         });
     };
 
@@ -90,9 +96,12 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         e.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, _method: 'put', run: true }));
+        skipNavigationGuardRef.current = true;
         post(`/import-export/imports/${config.id}`, {
+            onSuccess: () => setDefaults(),
             onFinish: () => {
                 transform((formData) => formData);
+                skipNavigationGuardRef.current = false;
                 setActiveAction(null);
             },
         });

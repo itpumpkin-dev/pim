@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
@@ -33,15 +34,22 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function LocaleEdit({ localeModel }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         code: localeModel.code || '',
         display_name: localeModel.display_name || '',
         enabled: localeModel.enabled,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/system/locales/${localeModel.id}`, { replace: true });
+        skipNavigationGuardRef.current = true;
+        put(`/system/locales/${localeModel.id}`, {
+            replace: true,
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     return (

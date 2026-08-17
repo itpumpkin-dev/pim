@@ -1,4 +1,5 @@
 import { TimelinePanel } from '@/components/timeline-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -216,7 +217,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
     const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { data, setData, post, processing, errors, clearErrors } = useForm<UserForm>({
+    const { data, setData, post, processing, errors, clearErrors, isDirty } = useForm<UserForm>({
         _method: 'put',
         name_prefix: user.name_prefix || '',
         first_name: user.first_name,
@@ -234,6 +235,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
         ui_locale_id: user.ui_locale_id ?? '',
         timezone: user.timezone,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const update = (key: keyof UserForm, value: UserForm[keyof UserForm]) => {
         setData(key, value);
@@ -241,8 +243,12 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
     };
 
     const performSubmit = () => {
+        skipNavigationGuardRef.current = true;
         post(route('system.user.update', user.id), {
             forceFormData: true,
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

@@ -9,6 +9,7 @@ import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useLocale } from '@/hooks/use-locale';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
@@ -48,7 +49,7 @@ export default function CategoryEdit({ category, translations, categoryFields = 
 
     const [lazadaCategory, setLazadaCategory] = useState<LazadaCategoryOption | null>(category.lazada_category);
 
-    const { data, setData, post, transform, processing, errors } = useForm({
+    const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         code: category.code || '',
         translations: translations || ({} as Record<string, string>),
         is_ai_translate: Boolean(category.is_ai_translate),
@@ -57,6 +58,7 @@ export default function CategoryEdit({ category, translations, categoryFields = 
         lazada_category_id: category.lazada_category_id,
         additional_data: (category.additional_data || {}) as Record<string, any>,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -65,8 +67,12 @@ export default function CategoryEdit({ category, translations, categoryFields = 
         // category fields put a raw File into additional_data, which forces
         // this request into multipart.
         transform((formData) => ({ ...formData, _method: 'put' }));
+        skipNavigationGuardRef.current = true;
         post(`/catalog/categories/${category.id}`, {
             onSuccess: () => router.visit('/catalog/categories', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

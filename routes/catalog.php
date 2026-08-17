@@ -35,6 +35,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:products,edit_products');
     Route::get('products/{product}/tiktok-status/{shop}', [ProductController::class, 'checkTikTokStatus'])->name('products.checkTiktokStatus')->middleware('permission:products,edit_products');
     Route::get('products/{product}/sync-jobs/{syncJob}', [ProductController::class, 'marketplaceSyncJobStatus'])->name('products.marketplaceSyncJobStatus')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/check-live-status', [ProductController::class, 'checkLiveStatus'])->name('products.checkLiveStatus')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');

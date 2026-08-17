@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -18,15 +19,17 @@ export default function Password() {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
-    const { data, setData, errors, put, reset, processing, recentlySuccessful } = useForm({
+    const { data, setData, errors, put, reset, processing, recentlySuccessful, isDirty } = useForm({
         current_password: '',
         password: '',
         password_confirmation: '',
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
 
+        skipNavigationGuardRef.current = true;
         put(route('password.update'), {
             preserveScroll: true,
             onSuccess: () => reset(),
@@ -40,6 +43,9 @@ export default function Password() {
                     reset('current_password');
                     currentPasswordInput.current?.focus();
                 }
+            },
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
             },
         });
     };

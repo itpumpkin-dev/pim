@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -63,7 +64,7 @@ export default function AttributeCreate() {
         label: t(key),
     }));
 
-    const { data, setData, post, processing, errors } = useForm<AttributeForm>({
+    const { data, setData, post, processing, errors, isDirty } = useForm<AttributeForm>({
         type: 'text',
         swatch_type: '',
         is_required: false,
@@ -74,6 +75,7 @@ export default function AttributeCreate() {
         is_filterable: false,
         translations: {},
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const showSwatchType = data.type === 'select' || data.type === 'multiselect';
 
@@ -86,8 +88,12 @@ export default function AttributeCreate() {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        skipNavigationGuardRef.current = true;
         post('/catalog/attributes', {
             onSuccess: () => router.visit('/catalog/attributes', { replace: true }),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
         });
     };
 

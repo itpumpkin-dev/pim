@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -61,17 +62,24 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function TranslationProviderEdit({ providerTypes, translationProvider }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         type: translationProvider.type,
         name: translationProvider.name,
         enabled: translationProvider.enabled,
         is_default: translationProvider.is_default,
         credentials: {} as Record<string, string>,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/system/translationProviders/${translationProvider.id}`, { replace: true });
+        skipNavigationGuardRef.current = true;
+        put(`/system/translationProviders/${translationProvider.id}`, {
+            replace: true,
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     const fields = data.type ? (providerTypes[data.type]?.fields ?? []) : [];

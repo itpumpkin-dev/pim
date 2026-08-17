@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -38,12 +39,13 @@ export default function ExportCreate({ types }: Props) {
         { title: t('createExport'), href: '/import-export/exports/create' },
     ];
 
-    const { data, setData, post, processing, errors, transform } = useForm({
+    const { data, setData, post, processing, errors, transform, isDirty, setDefaults } = useForm({
         type: types[0] ?? 'products',
         file_format: 'csv',
         field_separator: ',',
         with_media: false,
     });
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
     const typeLabel = (type: string) => {
         const key = 'type' + type.replace(/(^|_)([a-z])/g, (_m, _p, c) => c.toUpperCase());
@@ -56,9 +58,13 @@ export default function ExportCreate({ types }: Props) {
     const submit = (e: FormEvent) => {
         e.preventDefault();
         setActiveAction('save');
+        skipNavigationGuardRef.current = true;
         post('/import-export/exports', {
             onSuccess: () => router.visit('/import-export/exports', { replace: true }),
-            onFinish: () => setActiveAction(null),
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+                setActiveAction(null);
+            },
         });
     };
 
@@ -66,9 +72,16 @@ export default function ExportCreate({ types }: Props) {
         e.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, run: true }));
+        skipNavigationGuardRef.current = true;
         post('/import-export/exports', {
+            // Stays on this page after a successful run (no redirect), with
+            // the just-saved values still in the fields — without this,
+            // isDirty would stay stuck true and the guard would nag on the
+            // next navigation even though the config's already saved.
+            onSuccess: () => setDefaults(),
             onFinish: () => {
                 transform((formData) => formData);
+                skipNavigationGuardRef.current = false;
                 setActiveAction(null);
             },
         });
