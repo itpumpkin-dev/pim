@@ -14,5 +14,6 @@
     "searchPlaceholder": "Search products or categories",
     "exportAll": "Export All",
     "exportCategory": "Export This Category",
-    "noResults": "No products found"
+    "noResults": "No products found",
+    "splashTagline": "Getting your product catalog ready..."
 }

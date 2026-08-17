@@ -2,6 +2,7 @@ import { ProductCard } from '@/components/product-card';
 import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import AppLogoIcon from '@/components/app-logo-icon';
 import LocaleDropdown from '@/components/locale-dropdown';
+import SplashScreen from '@/components/splash-screen';
 import { downloadCsv } from '@/lib/csv';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
@@ -186,12 +187,23 @@ export default function Home({
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const [showSplash, setShowSplash] = useState(true);
+    const [splashExiting, setSplashExiting] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setLoading(false);
         }, 800);
         return () => clearTimeout(timer);
+    }, []);
+
+    useEffect(() => {
+        const exitTimer = setTimeout(() => setSplashExiting(true), 900);
+        const hideTimer = setTimeout(() => setShowSplash(false), 1300);
+        return () => {
+            clearTimeout(exitTimer);
+            clearTimeout(hideTimer);
+        };
     }, []);
 
     const categoryOptions = useMemo(() => categories.map((label) => ({ label, icon: getCategoryIcon(label) })), [categories]);
@@ -268,6 +280,7 @@ export default function Home({
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
             <Head title="Home" />
+            {showSplash && <SplashScreen exiting={splashExiting} />}
             <AppBar position="sticky" color="inherit" elevation={1}>
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>

@@ -14,5 +14,6 @@
     "searchPlaceholder": "搜索产品或分类",
     "exportAll": "导出全部",
     "exportCategory": "导出此分类",
-    "noResults": "未找到相关产品"
+    "noResults": "未找到相关产品",
+    "splashTagline": "正在为您准备产品目录..."
 }

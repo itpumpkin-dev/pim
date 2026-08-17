@@ -14,5 +14,6 @@
     "searchPlaceholder": "商品またはカテゴリーを検索",
     "exportAll": "すべてエクスポート",
     "exportCategory": "このカテゴリーをエクスポート",
-    "noResults": "商品が見つかりません"
+    "noResults": "商品が見つかりません",
+    "splashTagline": "製品カタログを準備しています..."
 }

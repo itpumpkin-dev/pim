@@ -14,5 +14,6 @@
     "searchPlaceholder": "ค้นหาสินค้าหรือหมวดหมู่",
     "exportAll": "Export ทั้งหมด",
     "exportCategory": "Export หมวดหมู่นี้",
-    "noResults": "ไม่พบสินค้าที่ค้นหา"
+    "noResults": "ไม่พบสินค้าที่ค้นหา",
+    "splashTagline": "กำลังเตรียมข้อมูลสินค้าให้คุณ..."
 }
