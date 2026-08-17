@@ -28,6 +28,7 @@ use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Shopee\ShopeeProductSyncService;
+use App\Services\TikTok\TikTokProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1141,9 +1142,48 @@ class ProductController extends Controller
     }
 
     /**
+     * Same role as checkLazadaStatus()/checkShopeeStatus() above, but
+     * degraded — see TikTokProductSyncService::checkLiveStatus()'s
+     * docblock: TikTok has no documented single-item "Get Product" endpoint
+     * yet, so unlike Lazada (asks Lazada directly) or Shopee (asks via
+     * platform_item_id), this only reflects our own cached
+     * product_platform_shops row, not TikTok's actual current state.
+     */
+    public function checkTikTokStatus(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        try {
+            return response()->json(TikTokProductSyncService::forShop($shop)->checkLiveStatus($product, $shop));
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO TIKTOK — creates or updates an actual
+     * listing on the seller's storefront. Same "published" guard as
+     * pushToLazada(). Will currently fail for every product — see
+     * TikTokProductSyncService::buildPayload()'s docblock for why
+     * (no known TikTok warehouse_id, no product-attribute source mapping).
+     */
+    public function pushToTikTok(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        return $this->queueMarketplaceSync($product, $shop, 'tiktok', 'push');
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO TIKTOK — hides an actual listing from the
+     * storefront. Same "published" guard as deactivateLazada().
+     */
+    public function deactivateTikTok(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        return $this->queueMarketplaceSync($product, $shop, 'tiktok', 'deactivate');
+    }
+
+    /**
      * Shared by pushToLazada()/deactivateLazada()/pushToShopee()/
-     * deactivateShopee() — validates the "published" guard synchronously
-     * (cheap, local-only), then hands the actual live write off to
+     * deactivateShopee()/pushToTikTok()/deactivateTikTok() — validates the
+     * "published" guard synchronously (cheap, local-only), then hands the
+     * actual live write off to
      * SyncProductToMarketplaceJob instead of calling the sync service here.
      * Returns 202 with a job id immediately; the frontend polls
      * marketplaceSyncJobStatus() for the real result.

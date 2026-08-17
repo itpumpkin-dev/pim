@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Shopee\ShopeeProductSyncService;
+use App\Services\TikTok\TikTokProductSyncService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -46,6 +47,7 @@ class SyncProductToMarketplaceJob implements ShouldQueue
             $service = match ($record->platform) {
                 'lazada' => LazadaProductSyncService::forShop($record->shop),
                 'shopee' => ShopeeProductSyncService::forShop($record->shop),
+                'tiktok' => TikTokProductSyncService::forShop($record->shop),
                 default => throw new \RuntimeException("Unknown marketplace platform: {$record->platform}"),
             };
 

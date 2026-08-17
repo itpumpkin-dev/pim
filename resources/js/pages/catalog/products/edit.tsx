@@ -10,6 +10,7 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import {
@@ -282,7 +283,7 @@ export default function ProductEdit({
         scrollParent.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
         return () => scrollParent.removeEventListener('scroll', handleScroll);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, [assignedGroups.length]);
 
     const [relatedProducts, setRelatedProducts] = useState<ProductOption[]>(associations.related);
@@ -486,6 +487,7 @@ export default function ProductEdit({
     const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string }> = {
         lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
         shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status' },
+        tiktok: { push: 'push-tiktok', deactivate: 'deactivate-tiktok', status: 'tiktok-status' },
     };
 
     const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
@@ -720,7 +722,7 @@ export default function ProductEdit({
                 },
             };
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+         
     }, []);
 
     // Only channel/locale-based fields are re-fetched on switch; non-scopable
@@ -1230,9 +1232,20 @@ export default function ProductEdit({
 
                                 {/* Categories Panel */}
                                 <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                        Categories
-                                    </Typography>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                                        <Typography variant="h6" fontWeight={700} color="text.primary">
+                                            Categories
+                                        </Typography>
+                                        <Button
+                                            component={Link}
+                                            href="/catalog/categories/marketplace-sync"
+                                            size="small"
+                                            startIcon={<LinkIcon fontSize="small" />}
+                                            sx={{ textTransform: 'none' }}
+                                        >
+                                            {t('marketplaceMappingButton')}
+                                        </Button>
+                                    </Stack>
                                     <CategoryTreePicker
                                         value={data.category_ids}
                                         onChange={(ids) => setData('category_ids', ids)}
