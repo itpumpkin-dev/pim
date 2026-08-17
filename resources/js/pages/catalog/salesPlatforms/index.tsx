@@ -1,17 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
+import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import LinkIcon from '@mui/icons-material/Link';
+import StoreOutlinedIcon from '@mui/icons-material/StoreOutlined';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
     Box,
     Button,
+    Card,
+    CardContent,
     Chip,
     CircularProgress,
     Dialog,
@@ -19,7 +22,9 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     FormControlLabel,
+    Grid,
     IconButton,
     Paper,
     Stack,
@@ -38,12 +43,34 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+// Mirrors dashboard.tsx's AdminLTE-style card language (CARD_SHADOW,
+// TH_SX/TD_SX/TR_SX) so this page reads as the same design system rather
+// than the plain default-MUI look it had before.
+const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
+
+const TH_SX = { padding: '12px 20px', fontWeight: 600, fontSize: '0.8rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.03em' };
+const TD_SX = { padding: '12px 20px', fontSize: '0.875rem' };
+const TR_SX = {
+    borderBottom: '1px solid',
+    borderColor: 'divider',
+    transition: 'background-color 0.15s',
+    '&:hover': { bgcolor: 'action.hover' },
+    '&:last-of-type': { borderBottom: 'none' },
+};
+
+// Cycled by platform index (not brand colors) — this page's platforms are
+// admin-created and arbitrary (see storePlatform()), not just Lazada/Shopee/
+// TikTok, so a per-brand color map would leave any custom platform
+// uncolored. Same 4-color rotation the dashboard's own info boxes use.
+const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
+
 interface ShopItem {
     id: number;
     code: string;
     name: string;
     lazada_seller_account_id: number | null;
     shopee_seller_account_id: string | null;
+    tiktok_seller_account_id: number | null;
     is_active: boolean;
 }
 
@@ -71,6 +98,22 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('channels'), href: '/catalog/channels' },
+    ];
+
+    // Summary strip counts — derived straight from the same `platforms` prop
+    // the sections below render, not a separate fetch.
+    const allShops = platforms.flatMap((p) => p.shops);
+    const totalShops = allShops.length;
+    const activeShopsCount = allShops.filter((s) => s.is_active).length;
+    const linkedShopsCount = allShops.filter(
+        (s) => s.lazada_seller_account_id || s.shopee_seller_account_id || s.tiktok_seller_account_id,
+    ).length;
+
+    const summaryBoxes = [
+        { title: t('salesPlatformsTab'), value: platforms.length, icon: <StorefrontOutlinedIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.accent },
+        { title: t('shopsLabel'), value: totalShops, icon: <StoreOutlinedIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.highlight },
+        { title: t('shopActive'), value: activeShopsCount, icon: <CheckCircleOutlineIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.primary },
+        { title: t('linkedPlatformAccount'), value: linkedShopsCount, icon: <LinkIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.secondary },
     ];
 
     const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
@@ -177,6 +220,18 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         );
     };
 
+    const [syncingTiktok, setSyncingTiktok] = useState(false);
+    const syncTiktok = () => {
+        setSyncingTiktok(true);
+        router.post(
+            '/catalog/sales-platforms/sync-tiktok',
+            {},
+            {
+                onFinish: () => setSyncingTiktok(false),
+            },
+        );
+    };
+
     const [syncingLiveStatus, setSyncingLiveStatus] = useState(false);
     const syncLiveStatus = () => {
         setSyncingLiveStatus(true);
@@ -233,6 +288,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncShopee} disabled={syncingShopee}>
                             {syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
                         </Button>
+                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncTiktok} disabled={syncingTiktok}>
+                            {syncingTiktok ? t('syncingTiktok') : t('syncFromTiktok')}
+                        </Button>
                         <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLiveStatus} disabled={syncingLiveStatus}>
                             {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
                         </Button>
@@ -244,17 +302,56 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     </Stack>
                 </Box>
 
+                {/* Summary strip — same info-box language as dashboard.tsx's Row 2 */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                    {summaryBoxes.map((box, i) => (
+                        <Grid item xs={12} sm={6} md={3} key={i} sx={{ display: 'flex' }}>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    width: '100%',
+                                    borderRadius: '0.25rem',
+                                    bgcolor: 'background.paper',
+                                    boxShadow: CARD_SHADOW,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 70, bgcolor: box.iconBg, flexShrink: 0 }}>
+                                    {box.icon}
+                                </Box>
+                                <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                    <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
+                                        {box.title}
+                                    </Typography>
+                                    <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.25rem', color: 'text.primary', mt: 0.25 }}>
+                                        {box.value}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </Grid>
+                    ))}
+                </Grid>
+
                 {platforms.length === 0 && (
                     <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
                         <Typography color="text.secondary">{t('noPlatformsFound')}</Typography>
                     </Paper>
                 )}
 
-                <Stack spacing={2}>
-                    {platforms.map((platform) => (
-                        <Accordion key={platform.id} defaultExpanded variant="outlined">
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 1 }}>
+                <Stack spacing={3}>
+                    {platforms.map((platform, index) => (
+                        <Card
+                            key={platform.id}
+                            elevation={0}
+                            sx={{
+                                borderRadius: '0.25rem',
+                                borderTop: `3px solid ${PLATFORM_ACCENT_COLORS[index % PLATFORM_ACCENT_COLORS.length]}`,
+                                bgcolor: 'background.paper',
+                                boxShadow: CARD_SHADOW,
+                            }}
+                        >
+                            <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 2 }}>
                                     <Stack direction="row" spacing={1.5} alignItems="center">
                                         <Typography variant="h6" fontWeight={700}>
                                             {platform.name}
@@ -262,7 +359,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                         <Chip label={platform.code} size="small" variant="outlined" />
                                         <Chip label={`${t('shopsLabel')}: ${platform.shops.length}`} size="small" />
                                     </Stack>
-                                    <Stack direction="row" spacing={0.5} onClick={(e) => e.stopPropagation()}>
+                                    <Stack direction="row" spacing={0.5}>
                                         {canEdit && (
                                             <IconButton size="small" onClick={() => openEditPlatform(platform)}>
                                                 <EditIcon fontSize="small" />
@@ -275,40 +372,39 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                         )}
                                     </Stack>
                                 </Box>
-                            </AccordionSummary>
-                            <AccordionDetails>
+                                <Divider />
                                 <TableContainer>
                                     <Table size="small">
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 700 }}>{t('shopCode')}</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{t('shopName')}</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{t('linkedPlatformAccount')}</TableCell>
-                                                <TableCell sx={{ fontWeight: 700 }}>{t('shopActive')}</TableCell>
+                                                <TableCell sx={TH_SX}>{t('shopCode')}</TableCell>
+                                                <TableCell sx={TH_SX}>{t('shopName')}</TableCell>
+                                                <TableCell sx={TH_SX}>{t('linkedPlatformAccount')}</TableCell>
+                                                <TableCell sx={TH_SX}>{t('shopActive')}</TableCell>
                                                 {(canEdit || canDelete) && (
-                                                    <TableCell sx={{ fontWeight: 700 }} align="right">
-                                                        {tGrid('actionsHeader')}
-                                                    </TableCell>
+                                                    <TableCell sx={{ ...TH_SX, textAlign: 'right' }}>{tGrid('actionsHeader')}</TableCell>
                                                 )}
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {platform.shops.map((shop) => (
-                                                <TableRow key={shop.id}>
-                                                    <TableCell>{shop.code}</TableCell>
-                                                    <TableCell sx={{ fontWeight: 600 }}>{shop.name}</TableCell>
-                                                    <TableCell>
+                                                <TableRow key={shop.id} sx={TR_SX}>
+                                                    <TableCell sx={TD_SX}>{shop.code}</TableCell>
+                                                    <TableCell sx={{ ...TD_SX, fontWeight: 600 }}>{shop.name}</TableCell>
+                                                    <TableCell sx={TD_SX}>
                                                         {shop.lazada_seller_account_id ? (
                                                             <Chip label={`Lazada #${shop.lazada_seller_account_id}`} size="small" color="success" variant="outlined" />
                                                         ) : shop.shopee_seller_account_id ? (
                                                             <Chip label={`Shopee #${shop.shopee_seller_account_id}`} size="small" color="success" variant="outlined" />
+                                                        ) : shop.tiktok_seller_account_id ? (
+                                                            <Chip label={`TikTok #${shop.tiktok_seller_account_id}`} size="small" color="success" variant="outlined" />
                                                         ) : (
                                                             <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                                                                 {t('noLinkedAccount')}
                                                             </Typography>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell sx={TD_SX}>
                                                         <Chip
                                                             label={shop.is_active ? t('shopActive') : '-'}
                                                             size="small"
@@ -316,7 +412,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                                         />
                                                     </TableCell>
                                                     {(canEdit || canDelete) && (
-                                                        <TableCell align="right">
+                                                        <TableCell sx={{ ...TD_SX, textAlign: 'right' }}>
                                                             <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                                                                 {canEdit && shop.lazada_seller_account_id && (
                                                                     <IconButton
@@ -349,7 +445,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                             ))}
                                             {platform.shops.length === 0 && (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} align="center">
+                                                    <TableCell colSpan={5} align="center" sx={TD_SX}>
                                                         <Typography variant="body2" color="text.secondary">
                                                             {t('noShopsYet')}
                                                         </Typography>
@@ -360,12 +456,14 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                     </Table>
                                 </TableContainer>
                                 {canEdit && (
-                                    <Button size="small" startIcon={<AddIcon />} sx={{ mt: 2 }} onClick={() => openCreateShop(platform.id)}>
-                                        {t('addShop')}
-                                    </Button>
+                                    <Box sx={{ px: 2.5, py: 2 }}>
+                                        <Button size="small" startIcon={<AddIcon />} onClick={() => openCreateShop(platform.id)}>
+                                            {t('addShop')}
+                                        </Button>
+                                    </Box>
                                 )}
-                            </AccordionDetails>
-                        </Accordion>
+                            </CardContent>
+                        </Card>
                     ))}
                 </Stack>
             </Box>

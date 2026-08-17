@@ -170,6 +170,8 @@
     "linkedPlatformAccount": "已关联账号",
     "noLinkedAccount": "未关联",
     "syncFromShopee": "从 Shopee 同步",
+    "syncFromTiktok": "从 TikTok 同步",
+    "syncingTiktok": "同步中...",
     "noShopsYet": "暂无店铺。",
     "confirmDeleteShop": "确定要删除此店铺吗？"
 }

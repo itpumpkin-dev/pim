@@ -14,14 +14,19 @@ use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\ShopeeCategory;
 use App\Models\ShopeeSellerAccount;
+use App\Models\TikTokCategory;
+use App\Models\TikTokSellerAccount;
 use App\Services\CategoryMatcher;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\Lazada\LazadaClient;
 use App\Services\Shopee\ShopeeClient;
+use App\Services\TikTok\TikTokClient;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,7 +34,6 @@ use Inertia\Response;
 class CategoryController extends Controller
 {
     use HasVersionHistory;
-
 
     /**
      * Display a listing of the categories.
@@ -39,7 +43,7 @@ class CategoryController extends Controller
         $search = $request->input('search');
 
         $perPage = (int) $request->input('per_page', 15);
-        if (!in_array($perPage, [10, 15, 25, 50], true)) {
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
             $perPage = 15;
         }
 
@@ -146,7 +150,7 @@ class CategoryController extends Controller
         $this->autoTranslate($category, $translations);
 
         $newTranslations = $this->currentTranslations($category);
-        if (!empty($newTranslations)) {
+        if (! empty($newTranslations)) {
             AuditLog::record('labels_set', $category, null, $newTranslations);
         }
 
@@ -163,10 +167,10 @@ class CategoryController extends Controller
      * given field, fall back to whatever path was already saved on `$existing`
      * (update) or drop the field entirely (create — nothing to fall back to).
      */
-    private function storeUploadedFields(Request $request, \Illuminate\Support\Collection $categoryFields, array $additionalData, ?Category $existing = null): array
+    private function storeUploadedFields(Request $request, Collection $categoryFields, array $additionalData, ?Category $existing = null): array
     {
         foreach ($categoryFields as $field) {
-            if (!in_array($field->type, ['Image', 'File'], true)) {
+            if (! in_array($field->type, ['Image', 'File'], true)) {
                 continue;
             }
 
@@ -248,10 +252,10 @@ class CategoryController extends Controller
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $nodes
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @param  Collection<int, array<string, mixed>>  $nodes
+     * @return Collection<int, array<string, mixed>>
      */
-    private function excludeFromTree(\Illuminate\Support\Collection $nodes, int $excludeId): \Illuminate\Support\Collection
+    private function excludeFromTree(Collection $nodes, int $excludeId): Collection
     {
         return $nodes
             ->reject(fn (array $node) => $node['id'] === $excludeId)
@@ -290,9 +294,9 @@ class CategoryController extends Controller
             // unconditionally would force a re-upload on every single save.
             // Only require one if there truly isn't a file stored yet.
             $hasExistingFile = in_array($field->type, ['Image', 'File'], true)
-                && !empty($category->additional_data[$field->code] ?? null);
+                && ! empty($category->additional_data[$field->code] ?? null);
 
-            $fieldRules[] = ($field->is_required && !$hasExistingFile) ? 'required' : 'nullable';
+            $fieldRules[] = ($field->is_required && ! $hasExistingFile) ? 'required' : 'nullable';
 
             if ($field->type === 'Text') {
                 $fieldRules[] = 'string';
@@ -384,7 +388,7 @@ class CategoryController extends Controller
     {
         $defaultLocaleId = Locale::where('code', config('app.locale'))->value('id');
 
-        if ($defaultLocaleId !== null && !empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
+        if ($defaultLocaleId !== null && ! empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
             return trim($translations[$defaultLocaleId]);
         }
 
@@ -403,7 +407,7 @@ class CategoryController extends Controller
      */
     private function autoTranslate(Category $category, array $translations): void
     {
-        if (!$category->is_ai_translate) {
+        if (! $category->is_ai_translate) {
             return;
         }
 
@@ -496,12 +500,13 @@ class CategoryController extends Controller
         // timezone marker attached. Parse it in the app timezone (UTC)
         // explicitly before serializing, otherwise the frontend's Date
         // parser misreads the naive string as local time.
-        $toIso = fn (?string $value) => $value ? \Carbon\Carbon::parse($value, 'UTC')->toISOString() : null;
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/marketplace-sync', [
             'lastSyncedAt' => [
                 'lazada' => $toIso(LazadaCategory::max('updated_at')),
                 'shopee' => $toIso(ShopeeCategory::max('updated_at')),
+                'tiktok' => $toIso(TikTokCategory::max('updated_at')),
             ],
         ]);
     }
@@ -515,7 +520,7 @@ class CategoryController extends Controller
     public function syncLazadaCategories(Request $request): RedirectResponse
     {
         $account = LazadaSellerAccount::active()->first();
-        if (!$account) {
+        if (! $account) {
             return back()->with('error', 'No active Lazada seller account found to authenticate the sync.');
         }
 
@@ -551,7 +556,7 @@ class CategoryController extends Controller
                 'is_leaf' => (bool) ($node['leaf'] ?? false),
             ];
 
-            if (!empty($node['children'])) {
+            if (! empty($node['children'])) {
                 $this->flattenLazadaCategoryNodes($node['children'], $node['category_id'], $rows);
             }
         }
@@ -568,7 +573,7 @@ class CategoryController extends Controller
     public function syncShopeeCategories(Request $request): RedirectResponse
     {
         $account = ShopeeSellerAccount::first();
-        if (!$account) {
+        if (! $account) {
             return back()->with('error', 'No Shopee seller account found to authenticate the sync.');
         }
 
@@ -581,7 +586,7 @@ class CategoryController extends Controller
                 'id' => $node['category_id'],
                 'parent_id' => $parentId > 0 ? $parentId : null,
                 'name' => $node['display_category_name'] ?? $node['original_category_name'],
-                'is_leaf' => !($node['has_children'] ?? false),
+                'is_leaf' => ! ($node['has_children'] ?? false),
             ];
         })->all();
 
@@ -614,6 +619,64 @@ class CategoryController extends Controller
         }
 
         return back()->with('success', 'Synced '.count($ordered).' Shopee categories.');
+    }
+
+    /**
+     * Refreshes the local tiktok_categories cache from TikTok Shop's live
+     * category tree — same purpose as syncLazadaCategories()/
+     * syncShopeeCategories() above. TikTok's response is flat like Shopee's
+     * (no order guarantee, needs the same depth-first reorder before the
+     * upsert) but gives id/parent_id/is_leaf directly per row like Lazada's
+     * (no has_children-style derivation needed) — see TikTokClient::
+     * getCategoryTree(), whose signing is NOT yet confirmed against a live
+     * call (see that class's docblock); this sync will fail until
+     * TIKTOK_APP_KEY/TIKTOK_APP_SECRET are set to real values and that's
+     * verified.
+     */
+    public function syncTikTokCategories(Request $request): RedirectResponse
+    {
+        $account = TikTokSellerAccount::first();
+        if (! $account) {
+            return back()->with('error', 'No TikTok seller account found to authenticate the sync.');
+        }
+
+        $tree = (new TikTokClient($account))->getCategoryTree();
+
+        $rows = collect($tree['data']['categories'] ?? [])->map(fn (array $node) => [
+            'id' => $node['id'],
+            'parent_id' => ! empty($node['parent_id']) ? $node['parent_id'] : null,
+            'name' => $node['local_name'],
+            'is_leaf' => (bool) ($node['is_leaf'] ?? false),
+        ])->all();
+
+        // Same reordering requirement as syncShopeeCategories() above —
+        // tiktok_categories.parent_id is a real self-referencing FK, checked
+        // per row within each upsert chunk, but TikTok's flat list gives no
+        // guarantee parents precede children.
+        $byParent = [];
+        foreach ($rows as $row) {
+            $byParent[$row['parent_id'] ?? 0][] = $row;
+        }
+
+        $ordered = [];
+        $walk = function (int $parentId) use (&$walk, &$byParent, &$ordered) {
+            foreach ($byParent[$parentId] ?? [] as $row) {
+                $ordered[] = $row;
+                $walk($row['id']);
+            }
+        };
+        $walk(0);
+
+        $now = now();
+        foreach (array_chunk($ordered, 500) as $chunk) {
+            TikTokCategory::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['id'],
+                ['parent_id', 'name', 'is_leaf', 'updated_at']
+            );
+        }
+
+        return back()->with('success', 'Synced '.count($ordered).' TikTok categories.');
     }
 
     /**
@@ -652,6 +715,24 @@ class CategoryController extends Controller
     }
 
     /**
+     * Search endpoint backing the TikTok category Autocomplete on the
+     * mapping review page — mirrors searchLazadaCategories()/
+     * searchShopeeCategories() above.
+     */
+    public function searchTikTokCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = TikTokCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
+    }
+
+    /**
      * Lightweight product list for one category — powers the Lazada/Shopee
      * mapping review pages' "which products does this affect" expander, so a
      * still-unmapped category with real products attached (blocking every
@@ -674,14 +755,14 @@ class CategoryController extends Controller
     private function parseMappingFilters(Request $request): array
     {
         $status = $request->input('status', 'unmapped');
-        if (!in_array($status, ['unmapped', 'mapped', 'all'], true)) {
+        if (! in_array($status, ['unmapped', 'mapped', 'all'], true)) {
             $status = 'unmapped';
         }
 
         $search = trim((string) $request->input('search', ''));
 
         $perPage = (int) $request->input('per_page', 25);
-        if (!in_array($perPage, [10, 25, 50, 100], true)) {
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
             $perPage = 25;
         }
 
@@ -858,6 +939,20 @@ class CategoryController extends Controller
     }
 
     /**
+     * Same bulk review UI as lazadaMapping()/shopeeMapping() above, but
+     * against TikTok's category tree — see buildCategoryMappingData().
+     */
+    public function tiktokMapping(Request $request): Response
+    {
+        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+
+        return Inertia::render('catalog/categories/tiktok-mapping', [
+            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'tiktok_category_id', 'tiktokCategory', TikTokCategory::class),
+            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+        ]);
+    }
+
+    /**
      * Shared persistence logic behind bulkMapLazada() and bulkMapShopee() —
      * validates each pick resolves to an actual leaf marketplace category,
      * updates only rows that actually changed, and records an audit entry
@@ -884,7 +979,7 @@ class CategoryController extends Controller
 
         foreach ($validated['mappings'] as $mapping) {
             $category = $categories->get($mapping['category_id']);
-            if (!$category) {
+            if (! $category) {
                 continue;
             }
 
@@ -893,7 +988,7 @@ class CategoryController extends Controller
             // A non-null pick must resolve to an actual leaf category —
             // silently drop anything else. The UI only ever offers leaves,
             // but this guards direct API calls too.
-            if ($newId !== null && !$leafIds->contains($newId)) {
+            if ($newId !== null && ! $leafIds->contains($newId)) {
                 continue;
             }
 
@@ -934,5 +1029,14 @@ class CategoryController extends Controller
     public function bulkMapShopee(Request $request): RedirectResponse
     {
         return $this->bulkMapMarketplaceCategory($request, 'shopee_category_id', 'shopee_categories', ShopeeCategory::class, 'shopee_category_mapped');
+    }
+
+    /**
+     * Same as bulkMapLazada()/bulkMapShopee() above, but for TikTok's
+     * category tree.
+     */
+    public function bulkMapTiktok(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceCategory($request, 'tiktok_category_id', 'tiktok_categories', TikTokCategory::class, 'tiktok_category_mapped');
     }
 }

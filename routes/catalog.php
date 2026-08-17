@@ -73,6 +73,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/marketplace-sync', [CategoryController::class, 'marketplaceSync'])->name('categories.marketplaceSync')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:categories,edit_categories');
+    Route::post('categories/sync-tiktok', [CategoryController::class, 'syncTikTokCategories'])->name('categories.syncTiktok')->middleware('permission:categories,edit_categories');
     Route::get('categories/search-lazada', [CategoryController::class, 'searchLazadaCategories'])->name('categories.searchLazada')->middleware('permission:categories,edit_categories');
     Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
     Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:categories,edit_categories');
@@ -80,6 +81,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
     Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
+    Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:categories,edit_categories');
+    Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
+    Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');
 
     Route::get('categoryFields', [CategoryFieldController::class, 'index'])->name('categoryFields.index')->middleware('permission:category_fields,list_category_fields');
     Route::get('categoryFields/create', [CategoryFieldController::class, 'create'])->name('categoryFields.create')->middleware('permission:category_fields,create_category_fields');
@@ -103,6 +107,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::delete('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'destroyPlatform'])->name('salesPlatforms.destroy')->middleware('permission:sales_platforms,delete_sales_platforms');
     Route::post('sales-platforms/sync-lazada', [SalesPlatformController::class, 'syncLazadaShops'])->name('salesPlatforms.syncLazada')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/sync-shopee', [SalesPlatformController::class, 'syncShopeeShops'])->name('salesPlatforms.syncShopee')->middleware('permission:sales_platforms,edit_sales_platforms');
+    Route::post('sales-platforms/sync-tiktok', [SalesPlatformController::class, 'syncTikTokShops'])->name('salesPlatforms.syncTikTok')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/sync-live-status', [SalesPlatformController::class, 'syncLiveStatus'])->name('salesPlatforms.syncLiveStatus')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/shops/{shop}/sync-live-status', [SalesPlatformController::class, 'syncShopLiveStatus'])->name('salesPlatforms.syncShopLiveStatus')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::post('sales-platforms/{salesPlatform}/shops', [SalesPlatformController::class, 'storeShop'])->name('salesPlatforms.shops.store')->middleware('permission:sales_platforms,edit_sales_platforms');

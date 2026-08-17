@@ -47,4 +47,17 @@ return [
         'base_url' => env('SHOPEE_API_BASE_URL', 'https://partner.shopeemobile.com'),
     ],
 
+    // Unlike lazada/shopee (whose app_key/app_secret live per-seller-account
+    // in n8n's tables — see LazadaSellerAccount/ShopeeSellerAccount), TikTok
+    // Shop uses one Partner app shared across every connected seller: the
+    // per-seller n8n row (tiktok_tokens) only carries access_token/
+    // shops_cipher, not app credentials. app_key/app_secret here are that
+    // single Partner app's own credentials, registered once in TikTok Shop
+    // Partner Center — needed before TikTokClient can sign a single request.
+    'tiktok' => [
+        'base_url' => env('TIKTOK_API_BASE_URL', 'https://open-api.tiktokglobalshop.com'),
+        'app_key' => env('TIKTOK_APP_KEY'),
+        'app_secret' => env('TIKTOK_APP_SECRET'),
+    ],
+
 ];

@@ -11,6 +11,7 @@ use App\Models\Locale;
 use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
 use App\Models\ShopeeSellerAccount;
+use App\Models\TikTokSellerAccount;
 use App\Services\CodeGenerator;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\RedirectResponse;
@@ -132,7 +133,7 @@ class SalesPlatformController extends Controller
                 'lazada_seller_account_id' => $account->id,
             ]);
 
-            if (!$shop->exists) {
+            if (! $shop->exists) {
                 $shop->code = 'seller_'.($account->seller_id ?: $account->id);
                 $shop->created_by = $request->user()?->id;
             }
@@ -171,7 +172,7 @@ class SalesPlatformController extends Controller
                 'shopee_seller_account_id' => $account->shop_id,
             ]);
 
-            if (!$shop->exists) {
+            if (! $shop->exists) {
                 $shop->code = 'shop_'.$account->shop_id;
                 $shop->created_by = $request->user()?->id;
             }
@@ -187,6 +188,50 @@ class SalesPlatformController extends Controller
         }
 
         return back()->with('success', "Synced {$synced} Shopee shop(s).");
+    }
+
+    /**
+     * Same bootstrap as syncLazadaShops()/syncShopeeShops() above, but
+     * mirrors n8n's tiktok_tokens into sales_platform_shops under the
+     * 'tiktok' platform, matched by id (tiktok_tokens.id, an auto-increment
+     * int like lazada_tokens.id — unlike shopee_tokens' string shop_id). See
+     * TikTokSellerAccount for why this reads ::all() rather than an
+     * ::active() scope — tiktok_tokens has no is_active column to filter
+     * on, same situation as shopee_tokens. Uses shops_code (TikTok's own
+     * short shop code, e.g. "THLCVRLWA7") for the local shop code rather
+     * than seller_id, which is a long opaque token-like string unsuited to
+     * a human-facing/URL-ish identifier.
+     */
+    public function syncTikTokShops(Request $request): RedirectResponse
+    {
+        $platform = SalesPlatform::firstOrCreate(
+            ['code' => 'tiktok'],
+            ['name' => 'TikTok', 'created_by' => $request->user()?->id, 'updated_by' => $request->user()?->id]
+        );
+
+        $synced = 0;
+        foreach (TikTokSellerAccount::all() as $account) {
+            $shop = SalesPlatformShop::firstOrNew([
+                'sales_platform_id' => $platform->id,
+                'tiktok_seller_account_id' => $account->id,
+            ]);
+
+            if (! $shop->exists) {
+                $shop->code = 'shop_'.($account->shops_code ?: $account->id);
+                $shop->created_by = $request->user()?->id;
+            }
+
+            $shop->name = trim($account->seller_name ?: $account->shops_code ?: (string) $account->id);
+            $shop->is_active = true;
+            $shop->updated_by = $request->user()?->id;
+            $shop->save();
+
+            $this->ensureChannelFor($shop, $platform, $request);
+
+            $synced++;
+        }
+
+        return back()->with('success', "Synced {$synced} TikTok shop(s).");
     }
 
     /**
@@ -233,7 +278,7 @@ class SalesPlatformController extends Controller
             usleep(300_000);
         }
 
-        $message = "Synced live status for ".($shops->count() - $failed)." of {$shops->count()} shop(s), {$totalMatched} product(s) matched live.";
+        $message = 'Synced live status for '.($shops->count() - $failed)." of {$shops->count()} shop(s), {$totalMatched} product(s) matched live.";
         if ($failed > 0) {
             $message .= " {$failed} shop(s) failed — check storage/logs/laravel.log.";
         }
@@ -251,7 +296,7 @@ class SalesPlatformController extends Controller
      */
     public function syncShopLiveStatus(SalesPlatformShop $shop): RedirectResponse
     {
-        if (!$shop->lazada_seller_account_id) {
+        if (! $shop->lazada_seller_account_id) {
             return back()->with('error', "'{$shop->name}' has no linked Lazada account to sync from.");
         }
 
@@ -285,7 +330,7 @@ class SalesPlatformController extends Controller
         $defaultLocale = Locale::where('code', 'th')->first();
         $defaultCurrency = Currency::where('code', 'THB')->first();
 
-        if (!$defaultLocale || !$defaultCurrency) {
+        if (! $defaultLocale || ! $defaultCurrency) {
             return;
         }
 

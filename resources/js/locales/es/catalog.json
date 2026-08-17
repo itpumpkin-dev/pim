@@ -170,6 +170,8 @@
     "linkedPlatformAccount": "Cuenta Vinculada",
     "noLinkedAccount": "No vinculada",
     "syncFromShopee": "Sincronizar desde Shopee",
+    "syncFromTiktok": "Sincronizar desde TikTok",
+    "syncingTiktok": "Sincronizando...",
     "noShopsYet": "Aún no hay tiendas.",
     "confirmDeleteShop": "¿Estás seguro de que deseas eliminar esta tienda?"
 }

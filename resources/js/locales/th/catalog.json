@@ -172,6 +172,7 @@
     "mapToPlatformCategories": "จับคู่หมวดหมู่ {{platform}}",
     "lazadaMappingTitle": "จับคู่หมวดหมู่กับ Lazada",
     "shopeeMappingTitle": "จับคู่หมวดหมู่กับ Shopee",
+    "tiktokMappingTitle": "จับคู่หมวดหมู่กับ TikTok",
     "marketplaceSyncTab": "ซิงค์ Marketplace",
     "marketplaceSyncTitle": "จัดการซิงค์หมวดหมู่กับ Marketplace",
     "marketplaceSyncSubtitle": "ซิงค์และจับคู่หมวดหมู่กับแพลตฟอร์มขายภายนอก",
@@ -198,6 +199,8 @@
     "linkedPlatformAccount": "บัญชีที่เชื่อมโยง",
     "noLinkedAccount": "ยังไม่เชื่อมโยง",
     "syncFromShopee": "ซิงค์จาก Shopee",
+    "syncFromTiktok": "ซิงค์จาก TikTok",
+    "syncingTiktok": "กำลังซิงค์...",
     "noShopsYet": "ยังไม่มีร้านค้า",
     "confirmDeleteShop": "คุณแน่ใจหรือไม่ว่าต้องการลบร้านค้านี้?"
 }

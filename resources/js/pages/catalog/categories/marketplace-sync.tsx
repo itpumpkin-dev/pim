@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 const CATEGORY_SYNC_PLATFORMS = [
     { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada', mappingRoute: '/catalog/categories/lazada-mapping' },
     { value: 'shopee', label: 'Shopee', route: '/catalog/categories/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping' },
+    { value: 'tiktok', label: 'TikTok', route: '/catalog/categories/sync-tiktok', mappingRoute: '/catalog/categories/tiktok-mapping' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {

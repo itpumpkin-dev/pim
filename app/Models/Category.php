@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -24,6 +25,7 @@ class Category extends Model
         'parent_id',
         'lazada_category_id',
         'shopee_category_id',
+        'tiktok_category_id',
         'created_by',
         'updated_by',
     ];
@@ -43,19 +45,20 @@ class Category extends Model
      * closure), so every existing caller (Lazada sync, imports, tree
      * builders that write $category->name directly) is unaffected.
      */
-    protected function name(): \Illuminate\Database\Eloquent\Casts\Attribute
+    protected function name(): Attribute
     {
-        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+        return Attribute::make(
             get: function ($value) {
                 if ($this->relationLoaded('translations')) {
                     $localeId = Locale::idForCode(app()->getLocale());
                     if ($localeId) {
                         $translation = $this->translations->firstWhere('locale_id', $localeId);
-                        if ($translation && !empty(trim((string) $translation->label))) {
+                        if ($translation && ! empty(trim((string) $translation->label))) {
                             return $translation->label;
                         }
                     }
                 }
+
                 return $value;
             }
         );
@@ -98,6 +101,11 @@ class Category extends Model
         return $this->belongsTo(ShopeeCategory::class, 'shopee_category_id');
     }
 
+    public function tiktokCategory(): BelongsTo
+    {
+        return $this->belongsTo(TikTokCategory::class, 'tiktok_category_id');
+    }
+
     /**
      * Recursive relationship for loading all nested subcategories.
      */
@@ -126,7 +134,7 @@ class Category extends Model
                     'id' => $category->id,
                     'code' => $category->code,
                     'name' => $category->name,
-                    'display_name' => str_repeat('— ', $depth) . $category->name,
+                    'display_name' => str_repeat('— ', $depth).$category->name,
                 ];
 
                 $traverse($category->recursiveChildren, $depth + 1);
@@ -134,6 +142,7 @@ class Category extends Model
         };
 
         $traverse($roots);
+
         return $options;
     }
 

@@ -179,6 +179,7 @@
     "mapToPlatformCategories": "Map to {{platform}} Categories",
     "lazadaMappingTitle": "Lazada Category Mapping",
     "shopeeMappingTitle": "Shopee Category Mapping",
+    "tiktokMappingTitle": "TikTok Category Mapping",
     "marketplaceSyncTab": "Marketplace Sync",
     "marketplaceSyncTitle": "Marketplace Category Sync",
     "marketplaceSyncSubtitle": "Sync and map categories with external sales platforms",
@@ -205,6 +206,8 @@
     "linkedPlatformAccount": "Linked Account",
     "noLinkedAccount": "Not linked",
     "syncFromShopee": "Sync from Shopee",
+    "syncFromTiktok": "Sync from TikTok",
+    "syncingTiktok": "Syncing...",
     "noShopsYet": "No shops yet.",
     "confirmDeleteShop": "Are you sure you want to delete this shop?"
 }

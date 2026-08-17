@@ -17,6 +17,7 @@ class SalesPlatformShop extends Model
         'name',
         'lazada_seller_account_id',
         'shopee_seller_account_id',
+        'tiktok_seller_account_id',
         'is_active',
         'created_by',
         'updated_by',
@@ -62,7 +63,7 @@ class SalesPlatformShop extends Model
      */
     public function lazadaAccount(): ?LazadaSellerAccount
     {
-        if (!$this->lazada_seller_account_id) {
+        if (! $this->lazada_seller_account_id) {
             return null;
         }
 
@@ -76,10 +77,25 @@ class SalesPlatformShop extends Model
      */
     public function shopeeAccount(): ?ShopeeSellerAccount
     {
-        if (!$this->shopee_seller_account_id) {
+        if (! $this->shopee_seller_account_id) {
             return null;
         }
 
         return ShopeeSellerAccount::find($this->shopee_seller_account_id);
+    }
+
+    /**
+     * tiktok_seller_account_id points at a row in n8n's separate database
+     * (see TikTokSellerAccount), same cross-database situation as
+     * lazadaAccount()/shopeeAccount() above — resolved with a lookup instead
+     * of a relation.
+     */
+    public function tiktokAccount(): ?TikTokSellerAccount
+    {
+        if (! $this->tiktok_seller_account_id) {
+            return null;
+        }
+
+        return TikTokSellerAccount::find($this->tiktok_seller_account_id);
     }
 }
