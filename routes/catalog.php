@@ -4,11 +4,11 @@ use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\AttributeOptionController;
-use App\Http\Controllers\Catalog\ChannelController;
-use App\Http\Controllers\Catalog\SalesPlatformController;
-use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
+use App\Http\Controllers\Catalog\ChannelController;
+use App\Http\Controllers\Catalog\ProductController;
+use App\Http\Controllers\Catalog\SalesPlatformController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function () {
@@ -31,6 +31,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:products,edit_products');
     Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:products,edit_products');
+    Route::get('products/{product}/sync-jobs/{syncJob}', [ProductController::class, 'marketplaceSyncJobStatus'])->name('products.marketplaceSyncJobStatus')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');

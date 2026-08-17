@@ -112,9 +112,9 @@ class ShopeeClient
         $localPath = $this->resolveLocalPublicStoragePath($imageUrl);
         $imageBytes = $localPath !== null
             ? Storage::disk('public')->get($localPath)
-            : Http::get($imageUrl)->body();
+            : Http::timeout(30)->retry(2, 200)->get($imageUrl)->body();
 
-        if (!$imageBytes) {
+        if (! $imageBytes) {
             throw new RuntimeException("Could not read image to upload to Shopee: {$imageUrl}");
         }
 
@@ -128,14 +128,17 @@ class ShopeeClient
         // every call with "There is no partner_id in query." Common params
         // must go through withQueryParameters() explicitly instead, same as
         // every other call in this client.
-        $response = Http::attach('image', $imageBytes, $filename)
+        //
+        // No retry() here — unlike a plain GET, a partial failure after
+        // Shopee already received the bytes shouldn't be blindly resent.
+        $response = Http::timeout(30)->attach('image', $imageBytes, $filename)
             ->withQueryParameters($this->signedParams($apiPath))
             ->post($this->baseUrl.$apiPath);
 
         $data = $this->handleResponse($response, $apiPath);
 
         $imageId = $data['response']['image_info']['image_id'] ?? null;
-        if (!$imageId) {
+        if (! $imageId) {
             throw new RuntimeException('Shopee image upload succeeded but returned no image_id: '.json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
@@ -224,7 +227,7 @@ class ShopeeClient
     {
         $prefix = rtrim(Storage::disk('public')->url(''), '/').'/';
 
-        if (!str_starts_with($imageUrl, $prefix)) {
+        if (! str_starts_with($imageUrl, $prefix)) {
             return null;
         }
 
@@ -244,9 +247,16 @@ class ShopeeClient
     {
         $query = $this->signedParams($apiPath);
 
+        // timeout() bounds how long a hung/slow Shopee response can hold a
+        // request thread open; retry() only fires on connection-level
+        // failures (timeout, DNS, refused) since handleResponse() below
+        // doesn't throw on Shopee's own error payloads — so a real Shopee
+        // error is never blindly retried, only "we couldn't reach them".
+        $http = Http::timeout(30)->retry(2, 200);
+
         $response = $method === 'POST'
-            ? Http::withQueryParameters($query)->post($this->baseUrl.$apiPath, $jsonBody ? $params : [])
-            : Http::get($this->baseUrl.$apiPath, [...$query, ...$params]);
+            ? $http->withQueryParameters($query)->post($this->baseUrl.$apiPath, $jsonBody ? $params : [])
+            : $http->get($this->baseUrl.$apiPath, [...$query, ...$params]);
 
         return $this->handleResponse($response, $apiPath);
     }
@@ -276,7 +286,7 @@ class ShopeeClient
             throw new RuntimeException("Shopee API returned a non-JSON response (HTTP {$response->status()}): ".$response->body());
         }
 
-        if (!empty($data['error'])) {
+        if (! empty($data['error'])) {
             Log::error('Shopee API error', [
                 'api_path' => $apiPath,
                 'response' => $data,

@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureFreshPermissions;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\VerifyApiKey;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,9 +29,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'permission' => \App\Http\Middleware\CheckPermission::class,
-            'api_key' => \App\Http\Middleware\VerifyApiKey::class,
+            'permission' => CheckPermission::class,
+            'api_key' => VerifyApiKey::class,
         ]);
+
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions) {
         Integration::handles($exceptions);

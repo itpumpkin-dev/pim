@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Catalog;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Events\ProductDataChanged;
+use App\Http\Controllers\Concerns\HasVersionHistory;
+use App\Http\Controllers\Controller;
+use App\Jobs\SyncProductToMarketplaceJob;
+use App\Models\AssociationType;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
-use App\Models\AssociationType;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Channel;
@@ -16,6 +17,7 @@ use App\Models\FamilyAttribute;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductAssociation;
+use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Catalog\AttributeAccessPolicy;
@@ -29,8 +31,10 @@ use App\Services\Shopee\ShopeeProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -43,10 +47,7 @@ class ProductController extends Controller
 {
     use HasVersionHistory;
 
-    public function __construct(private readonly AttributeAccessPolicy $attributeAccess)
-    {
-    }
-
+    public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
 
     public function index(Request $request): Response
     {
@@ -72,7 +73,7 @@ class ProductController extends Controller
             foreach ((array) $attributeFilters as $filter) {
                 $attributeId = $filter['attribute_id'] ?? null;
                 $value = $filter['value'] ?? null;
-                if (!$attributeId || $value === null || $value === '') {
+                if (! $attributeId || $value === null || $value === '') {
                     continue;
                 }
 
@@ -143,7 +144,7 @@ class ProductController extends Controller
         $valueByKey = [];
         foreach ($values as $value) {
             $key = $value->product_id.'-'.$value->attribute_id;
-            if (!array_key_exists($key, $valueByKey)) {
+            if (! array_key_exists($key, $valueByKey)) {
                 $valueByKey[$key] = $value->value;
             }
         }
@@ -178,6 +179,7 @@ class ProductController extends Controller
             } else {
                 $filledCount = $familyAttributeIds->filter(function ($attributeId) use ($product, $valueByKey) {
                     $raw = $valueByKey[$product->id.'-'.$attributeId] ?? null;
+
                     return $raw !== null && trim((string) $raw) !== '';
                 })->count();
                 $product->completeness = (int) round($filledCount / $familyAttributeIds->count() * 100);
@@ -318,12 +320,12 @@ class ProductController extends Controller
             : collect();
 
         $products = Product::where(function ($q) use ($query, $matchingProductIds) {
-                $q->where('sku', 'like', "%{$query}%");
-                if ($matchingProductIds->isNotEmpty()) {
-                    $q->orWhereIn('id', $matchingProductIds);
-                }
-            })
-            ->when(!empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
+            $q->where('sku', 'like', "%{$query}%");
+            if ($matchingProductIds->isNotEmpty()) {
+                $q->orWhereIn('id', $matchingProductIds);
+            }
+        })
+            ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->limit(20)
             ->get(['id', 'sku']);
 
@@ -389,6 +391,7 @@ class ProductController extends Controller
                 $ids[] = $category->parent_id;
                 $category = $categoriesById->get($category->parent_id);
             }
+
             return $ids;
         };
 
@@ -433,9 +436,9 @@ class ProductController extends Controller
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
         $query = Product::with('family')->orderBy('id');
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             $query->whereIn('id', $ids);
-        } elseif (!empty($validated['search'])) {
+        } elseif (! empty($validated['search'])) {
             $query->where('sku', 'like', '%'.$validated['search'].'%');
         }
 
@@ -525,9 +528,9 @@ class ProductController extends Controller
      * uploads before they're even sent, but this is what a request made
      * directly against the endpoint (bypassing the UI) can't get past.
      */
-    private function validateVideoConstraints(\Illuminate\Http\UploadedFile $file): ?string
+    private function validateVideoConstraints(UploadedFile $file): ?string
     {
-        $info = (new \getID3())->analyze($file->getRealPath());
+        $info = (new \getID3)->analyze($file->getRealPath());
 
         $duration = $info['playtime_seconds'] ?? null;
         if ($duration !== null && $duration > 60) {
@@ -652,7 +655,7 @@ class ProductController extends Controller
 
             $parentProduct->applySmartDefaults();
 
-            if ($validated['type'] === 'configurable' && !empty($validated['variants'])) {
+            if ($validated['type'] === 'configurable' && ! empty($validated['variants'])) {
                 $priceAttr = Attribute::where('code', 'price')->first();
                 $qtyAttr = Attribute::where('code', 'qty')->first();
 
@@ -688,7 +691,7 @@ class ProductController extends Controller
                     }
 
                     // Save combination attributes (e.g. color, size option codes/IDs)
-                    if (!empty($variantData['attributes'])) {
+                    if (! empty($variantData['attributes'])) {
                         foreach ($variantData['attributes'] as $attrId => $attrVal) {
                             if ($attrVal !== null && $attrVal !== '') {
                                 ProductValue::create([
@@ -832,20 +835,22 @@ class ProductController extends Controller
         foreach ($familyAttributes as $fa) {
             $group = $fa->attributeGroup;
             $attr = $fa->attribute;
-            if (!$group || !$attr) continue;
+            if (! $group || ! $attr) {
+                continue;
+            }
 
             // Check if user has permission to view this attribute group
-            if ($user && !$this->canUserViewAttributeGroup($user, $group)) {
+            if ($user && ! $this->canUserViewAttributeGroup($user, $group)) {
                 continue;
             }
 
             // Check if user has permission to view this specific attribute
-            if ($user && !$this->canUserViewAttribute($user, $attr)) {
+            if ($user && ! $this->canUserViewAttribute($user, $attr)) {
                 continue;
             }
 
             $groupId = $group->id;
-            if (!isset($groupsData[$groupId])) {
+            if (! isset($groupsData[$groupId])) {
                 $groupsData[$groupId] = [
                     'id' => $group->id,
                     'code' => $group->code,
@@ -863,7 +868,7 @@ class ProductController extends Controller
         }
 
         // Remove empty groups (groups with no visible attributes)
-        $groupsData = array_filter($groupsData, fn ($group) => !empty($group['attributes']));
+        $groupsData = array_filter($groupsData, fn ($group) => ! empty($group['attributes']));
 
         // If product family has no assigned family attributes yet, show all system attributes under General.
         // Note: this must check the family's raw attribute assignments, not $groupsData, so that a family
@@ -1031,7 +1036,7 @@ class ProductController extends Controller
                 'family_id' => $product->family_id,
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
-                'enabled' => (bool)$product->enabled,
+                'enabled' => (bool) $product->enabled,
                 'configurable_attributes' => $product->configurable_attributes ?? [],
                 // ISO 8601 with an explicit UTC offset so the frontend can
                 // localize it, rather than a naive string shown verbatim.
@@ -1081,25 +1086,13 @@ class ProductController extends Controller
      * listing on the seller's storefront. Only reachable for a shop the
      * product is explicitly marked "published" for (see platformShops()),
      * so this can't be triggered for a shop nobody opted into.
+     *
+     * Queued rather than run inline (see queueMarketplaceSync()) — the web
+     * worker used to sit blocked for however long Lazada took to respond.
      */
     public function pushToLazada(Product $product, SalesPlatformShop $shop): JsonResponse
     {
-        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
-        if (!$isPublished) {
-            return response()->json([
-                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
-            ], 422);
-        }
-
-        try {
-            $result = LazadaProductSyncService::forShop($shop)->push($product, $shop);
-
-            AuditLog::record('pushed_to_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
-
-            return response()->json(['message' => "Pushed to '{$shop->name}' successfully.", 'result' => $result]);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
+        return $this->queueMarketplaceSync($product, $shop, 'lazada', 'push');
     }
 
     /**
@@ -1110,22 +1103,7 @@ class ProductController extends Controller
      */
     public function deactivateLazada(Product $product, SalesPlatformShop $shop): JsonResponse
     {
-        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
-        if (!$isPublished) {
-            return response()->json([
-                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
-            ], 422);
-        }
-
-        try {
-            $result = LazadaProductSyncService::forShop($shop)->deactivate($product, $shop);
-
-            AuditLog::record('deactivated_on_lazada', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
-
-            return response()->json(['message' => "Deactivated on '{$shop->name}' successfully.", 'result' => $result]);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
+        return $this->queueMarketplaceSync($product, $shop, 'lazada', 'deactivate');
     }
 
     /**
@@ -1150,22 +1128,7 @@ class ProductController extends Controller
      */
     public function pushToShopee(Product $product, SalesPlatformShop $shop): JsonResponse
     {
-        $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
-        if (!$isPublished) {
-            return response()->json([
-                'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
-            ], 422);
-        }
-
-        try {
-            $result = ShopeeProductSyncService::forShop($shop)->push($product, $shop);
-
-            AuditLog::record('pushed_to_shopee', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
-
-            return response()->json(['message' => "Pushed to '{$shop->name}' successfully.", 'result' => $result]);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
+        return $this->queueMarketplaceSync($product, $shop, 'shopee', 'push');
     }
 
     /**
@@ -1174,28 +1137,67 @@ class ProductController extends Controller
      */
     public function deactivateShopee(Product $product, SalesPlatformShop $shop): JsonResponse
     {
+        return $this->queueMarketplaceSync($product, $shop, 'shopee', 'deactivate');
+    }
+
+    /**
+     * Shared by pushToLazada()/deactivateLazada()/pushToShopee()/
+     * deactivateShopee() — validates the "published" guard synchronously
+     * (cheap, local-only), then hands the actual live write off to
+     * SyncProductToMarketplaceJob instead of calling the sync service here.
+     * Returns 202 with a job id immediately; the frontend polls
+     * marketplaceSyncJobStatus() for the real result.
+     */
+    private function queueMarketplaceSync(Product $product, SalesPlatformShop $shop, string $platform, string $action): JsonResponse
+    {
         $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
-        if (!$isPublished) {
+        if (! $isPublished) {
             return response()->json([
                 'message' => "'{$shop->name}' is not marked as published for this product — check the box next to it first.",
             ], 422);
         }
 
-        try {
-            $result = ShopeeProductSyncService::forShop($shop)->deactivate($product, $shop);
+        $syncJob = ProductMarketplaceSyncJob::create([
+            'product_id' => $product->id,
+            'sales_platform_shop_id' => $shop->id,
+            'platform' => $platform,
+            'action' => $action,
+            'status' => 'queued',
+            'user_id' => auth()->id(),
+        ]);
 
-            AuditLog::record('deactivated_on_shopee', $product, null, ['shop_id' => $shop->id, 'shop_name' => $shop->name]);
+        SyncProductToMarketplaceJob::dispatch($syncJob->id, auth()->id());
 
-            return response()->json(['message' => "Deactivated on '{$shop->name}' successfully.", 'result' => $result]);
-        } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+        return response()->json([
+            'job_id' => $syncJob->id,
+            'status' => 'queued',
+            'message' => ($action === 'deactivate' ? 'Deactivation' : 'Push').' to '."'{$shop->name}'".' queued.',
+        ], 202);
+    }
+
+    /**
+     * Polled by the Edit Product page after pushToLazada()/pushToShopee()/
+     * deactivateLazada()/deactivateShopee() return their initial "queued"
+     * response, until status leaves queued/processing.
+     */
+    public function marketplaceSyncJobStatus(Product $product, ProductMarketplaceSyncJob $syncJob): JsonResponse
+    {
+        if ((int) $syncJob->product_id !== (int) $product->id) {
+            abort(404);
         }
+
+        return response()->json([
+            'job_id' => $syncJob->id,
+            'status' => $syncJob->status,
+            'message' => $syncJob->message,
+            'result' => $syncJob->result,
+        ]);
     }
 
     public function update(Request $request, Product $product): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
-            'sku' => ['required', 'string', 'max:100', 'unique:products,sku,' . $product->id],
+            'sku' => ['required', 'string', 'max:100', 'unique:products,sku,'.$product->id],
             'family_id' => ['required', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
@@ -1283,7 +1285,7 @@ class ProductController extends Controller
             $valueErrors = [];
 
             $storeAttributeFile = function (Attribute $attribute, $file) use (&$valueErrors) {
-                if (!$file) {
+                if (! $file) {
                     return null;
                 }
 
@@ -1302,7 +1304,7 @@ class ProductController extends Controller
                 $validator = Validator::make(['file' => $file], ['file' => $rules]);
 
                 if ($validator->fails()) {
-                    $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: " . $validator->errors()->first('file');
+                    $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: ".$validator->errors()->first('file');
 
                     return null;
                 }
@@ -1325,7 +1327,9 @@ class ProductController extends Controller
 
             foreach ($request->file('values', []) as $attributeId => $channelFiles) {
                 $attribute = Attribute::find($attributeId);
-                if (!$attribute) continue;
+                if (! $attribute) {
+                    continue;
+                }
 
                 if (is_array($channelFiles)) {
                     foreach ($channelFiles as $channelKey => $localeFiles) {
@@ -1392,9 +1396,14 @@ class ProductController extends Controller
                 ->map(fn ($fa) => $fa->attributeGroup);
 
             $canEditTouchedAttribute = function ($attribute) use ($user, $attributeGroupsById) {
-                if (!$user) return true;
+                if (! $user) {
+                    return true;
+                }
                 $group = $attributeGroupsById->get($attribute->id);
-                if ($group && !$this->canUserEditAttributeGroup($user, $group)) return false;
+                if ($group && ! $this->canUserEditAttributeGroup($user, $group)) {
+                    return false;
+                }
+
                 return $this->canUserEditAttribute($user, $attribute);
             };
 
@@ -1409,12 +1418,18 @@ class ProductController extends Controller
             if (is_array($values)) {
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
-                    if (!$attribute || !is_array($channelValues)) continue;
-                    if (!$canEditTouchedAttribute($attribute)) continue;
+                    if (! $attribute || ! is_array($channelValues)) {
+                        continue;
+                    }
+                    if (! $canEditTouchedAttribute($attribute)) {
+                        continue;
+                    }
 
                     foreach ($channelValues as $channelKey => $localeValues) {
                         $channelId = $channelKey === 'global' ? null : $channelKey;
-                        if (!is_array($localeValues)) continue;
+                        if (! is_array($localeValues)) {
+                            continue;
+                        }
 
                         foreach ($localeValues as $localeKey => $val) {
                             $localeId = $localeKey === 'default' ? null : $localeKey;
@@ -1422,10 +1437,11 @@ class ProductController extends Controller
 
                             if ($attribute->is_required && $isEmpty) {
                                 $valueErrors["values.{$attributeId}"] = "{$attribute->name} is required.";
+
                                 continue;
                             }
 
-                            if ($attribute->is_unique && !$isEmpty) {
+                            if ($attribute->is_unique && ! $isEmpty) {
                                 $stringVal = is_array($val) ? json_encode($val) : (string) $val;
                                 $taken = ProductValue::where('attribute_id', $attributeId)
                                     ->where('channel_id', $channelId)
@@ -1443,25 +1459,29 @@ class ProductController extends Controller
                 }
             }
 
-            if (!empty($valueErrors)) {
+            if (! empty($valueErrors)) {
                 throw ValidationException::withMessages($valueErrors);
             }
 
             if (is_array($values)) {
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
-                    if (!$attribute || !is_array($channelValues)) continue;
+                    if (! $attribute || ! is_array($channelValues)) {
+                        continue;
+                    }
 
                     // Check if user has permission to edit this attribute (and that
                     // its attribute group isn't read-only — see $canEditTouchedAttribute above)
-                    if (!$canEditTouchedAttribute($attribute)) {
+                    if (! $canEditTouchedAttribute($attribute)) {
                         continue;
                     }
 
                     foreach ($channelValues as $channelKey => $localeValues) {
                         $channelId = $channelKey === 'global' ? null : $channelKey;
 
-                        if (!is_array($localeValues)) continue;
+                        if (! is_array($localeValues)) {
+                            continue;
+                        }
 
                         foreach ($localeValues as $localeKey => $val) {
                             $localeId = $localeKey === 'default' ? null : $localeKey;
@@ -1484,7 +1504,7 @@ class ProductController extends Controller
                             // string "[]", consistent with the is_required check above.
                             $isEmptyVal = $val === null || $val === '' || (is_array($val) && empty($val));
 
-                            if (!$isEmptyVal) {
+                            if (! $isEmptyVal) {
                                 $newStoredValue = is_array($val) ? json_encode($val) : (string) $val;
 
                                 ProductValue::updateOrCreate(
@@ -1538,7 +1558,7 @@ class ProductController extends Controller
 
                 foreach ($validated['variants'] ?? [] as $variantData) {
                     $childProduct = null;
-                    if (!empty($variantData['id'])) {
+                    if (! empty($variantData['id'])) {
                         $childProduct = Product::find($variantData['id']);
                     }
 
@@ -1582,7 +1602,7 @@ class ProductController extends Controller
                     }
 
                     $existingVariantIds[] = $childProduct->id;
-                    
+
                     // Update price
                     if ($priceAttr) {
                         if (isset($variantData['price']) && $variantData['price'] !== '') {
@@ -1614,7 +1634,7 @@ class ProductController extends Controller
                     }
 
                     // Save attribute combinations (new variants)
-                    if (!empty($variantData['attributes'])) {
+                    if (! empty($variantData['attributes'])) {
                         foreach ($variantData['attributes'] as $attrId => $attrVal) {
                             if ($attrVal !== null && $attrVal !== '') {
                                 ProductValue::updateOrCreate(
@@ -1649,7 +1669,6 @@ class ProductController extends Controller
             $newVariantValues = $this->variantValueSnapshot($product);
             $this->recordProductValueChanges($product, $oldVariantValues, $newVariantValues, 'variant_values_updated');
         });
-
 
         return to_route('catalog.products.index')->with('success', 'Product updated successfully.');
     }
@@ -1690,7 +1709,7 @@ class ProductController extends Controller
 
         // Group attributes by their scoping shape so each group can be fetched with a
         // single batched query instead of one query per attribute (N+1).
-        $attributes->groupBy(fn ($attribute) => ($attribute->is_channel_based ? '1' : '0') . ($attribute->is_locale_based ? '1' : '0'))
+        $attributes->groupBy(fn ($attribute) => ($attribute->is_channel_based ? '1' : '0').($attribute->is_locale_based ? '1' : '0'))
             ->each(function ($group) use (&$values, $product, $channelId, $localeId) {
                 $first = $group->first();
 
@@ -1726,7 +1745,7 @@ class ProductController extends Controller
 
         foreach ($records as $record) {
             $code = $record->associationType?->code;
-            if (!isset($grouped[$code]) || !$record->associatedProduct) {
+            if (! isset($grouped[$code]) || ! $record->associatedProduct) {
                 continue;
             }
 
@@ -1748,7 +1767,7 @@ class ProductController extends Controller
     {
         foreach (['related', 'up_sell', 'cross_sell'] as $code) {
             $typeId = AssociationType::where('code', $code)->value('id');
-            if (!$typeId) {
+            if (! $typeId) {
                 continue;
             }
 
@@ -1773,7 +1792,7 @@ class ProductController extends Controller
      * attribute ids, keyed by a human-readable "code[channel:x,locale:y]"
      * label so it reads sensibly in the audit diff table.
      */
-    private function productValueSnapshot(int $productId, \Illuminate\Support\Collection $attributeIds): array
+    private function productValueSnapshot(int $productId, Collection $attributeIds): array
     {
         if ($attributeIds->isEmpty()) {
             return [];
@@ -1790,7 +1809,7 @@ class ProductController extends Controller
                     $value->channel_id ? "channel:{$value->channel_id}" : null,
                     $value->locale_id ? "locale:{$value->locale_id}" : null,
                 ]);
-                $key = $suffix ? "{$label}[" . implode(',', $suffix) . ']' : $label;
+                $key = $suffix ? "{$label}[".implode(',', $suffix).']' : $label;
 
                 return [$key => $value->value];
             })
@@ -1875,15 +1894,15 @@ class ProductController extends Controller
                 ->filter(function ($fa) use ($user) {
                     $group = $fa->attributeGroup;
                     $attr = $fa->attribute;
-                    if (!$group || !$attr) {
+                    if (! $group || ! $attr) {
                         return false;
                     }
 
-                    if ($user && !$this->canUserViewAttributeGroup($user, $group)) {
+                    if ($user && ! $this->canUserViewAttributeGroup($user, $group)) {
                         return false;
                     }
 
-                    return !$user || $this->canUserViewAttribute($user, $attr);
+                    return ! $user || $this->canUserViewAttribute($user, $attr);
                 })
                 ->map(fn ($fa) => $fa->attribute);
         } else {

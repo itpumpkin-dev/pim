@@ -3,6 +3,7 @@
 namespace App\Services\Lazada;
 
 use App\Models\LazadaSellerAccount;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -224,9 +225,9 @@ class LazadaClient
         $localPath = $this->resolveLocalPublicStoragePath($imageUrl);
         $imageBytes = $localPath !== null
             ? Storage::disk('public')->get($localPath)
-            : Http::get($imageUrl)->body();
+            : Http::timeout(30)->retry(2, 200)->get($imageUrl)->body();
 
-        if (!$imageBytes) {
+        if (! $imageBytes) {
             throw new RuntimeException("Could not read image to upload to Lazada: {$imageUrl}");
         }
 
@@ -234,13 +235,15 @@ class LazadaClient
 
         $params = $this->signedParams('/image/upload', [], requiresAccessToken: true);
 
-        $response = Http::attach('image', $imageBytes, $filename)
+        // No retry() here — unlike a plain GET, a partial failure after
+        // Lazada already received the bytes shouldn't be blindly resent.
+        $response = Http::timeout(30)->attach('image', $imageBytes, $filename)
             ->post($this->baseUrl.'/image/upload', $params);
 
         $data = $this->handleResponse($response, '/image/upload', "[binary image: {$filename}, ".strlen($imageBytes).' bytes]');
 
         $url = $data['data']['image']['url'] ?? null;
-        if (!$url) {
+        if (! $url) {
             throw new RuntimeException('Lazada image upload succeeded but returned no URL: '.json_encode($data, JSON_UNESCAPED_UNICODE));
         }
 
@@ -258,7 +261,7 @@ class LazadaClient
     {
         $prefix = rtrim(Storage::disk('public')->url(''), '/').'/';
 
-        if (!str_starts_with($imageUrl, $prefix)) {
+        if (! str_starts_with($imageUrl, $prefix)) {
             return null;
         }
 
@@ -285,11 +288,11 @@ class LazadaClient
             'PrimaryCategory' => (string) $product['primary_category_id'],
         ];
 
-        if (!empty($product['item_id'])) {
+        if (! empty($product['item_id'])) {
             $productNode['ItemId'] = (string) $product['item_id'];
         }
 
-        if (!empty($product['images'])) {
+        if (! empty($product['images'])) {
             $productNode['Images'] = ['Image' => array_values(array_map('strval', $product['images']))];
         }
 
@@ -301,6 +304,7 @@ class LazadaClient
             foreach ($skuData as $key => $value) {
                 if ($key === 'images') {
                     $sku['Images'] = ['Image' => array_values(array_map('strval', $value))];
+
                     continue;
                 }
                 $sku[$key] = (string) $value;
@@ -316,9 +320,15 @@ class LazadaClient
     {
         $params = $this->signedParams($apiPath, $params, $requiresAccessToken);
 
+        // Same reasoning as ShopeeClient::request() — timeout() bounds a
+        // hung Lazada call, retry() only fires on connection-level failures
+        // since handleResponse() below doesn't throw on Lazada's own error
+        // codes, so a real Lazada error is never blindly retried.
+        $http = Http::timeout(30)->retry(2, 200);
+
         $response = $method === 'POST'
-            ? Http::asForm()->post($this->baseUrl.$apiPath, $params)
-            : Http::get($this->baseUrl.$apiPath, $params);
+            ? $http->asForm()->post($this->baseUrl.$apiPath, $params)
+            : $http->get($this->baseUrl.$apiPath, $params);
 
         return $this->handleResponse($response, $apiPath, $params['payload'] ?? $params['apiRequestBody'] ?? null);
     }
@@ -346,10 +356,10 @@ class LazadaClient
 
     /**
      * @param  mixed  $requestBodyForLogging  the string/description of what was
-     *                sent, for the error log only — not re-derivable from the
-     *                HTTP response, so the caller passes it in explicitly.
+     *                                        sent, for the error log only — not re-derivable from the
+     *                                        HTTP response, so the caller passes it in explicitly.
      */
-    private function handleResponse(\Illuminate\Http\Client\Response $response, string $apiPath, mixed $requestBodyForLogging): array
+    private function handleResponse(Response $response, string $apiPath, mixed $requestBodyForLogging): array
     {
         $data = $response->json();
 

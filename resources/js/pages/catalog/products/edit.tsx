@@ -524,6 +524,62 @@ export default function ProductEdit({
             .catch(() => setStatusCheck({ shopId, loading: false, error: `Network error while checking ${platform} status.` }));
     };
 
+    // Push/deactivate now run as a background job (see
+    // ProductController::queueMarketplaceSync()) instead of inline in the
+    // request — a slow/hung Shopee or Lazada response used to hold the web
+    // worker open for the duration. The initial POST just returns a job id;
+    // this polls marketplaceSyncJobStatus() until the job leaves
+    // queued/processing. setTimeout-chained (not setInterval) so a slow poll
+    // response can't overlap with the next one. Capped at ~60s — past that
+    // the job is still running server-side, just not waited on here anymore.
+    const POLL_INTERVAL_MS = 1500;
+    const POLL_MAX_ATTEMPTS = 40;
+
+    const pollSyncJobStatus = (jobId: number, onDone: (result: { severity: 'success' | 'error'; message: string }) => void) => {
+        let attempts = 0;
+
+        const poll = () => {
+            attempts++;
+            fetch(`/catalog/products/${product.id}/sync-jobs/${jobId}`, {
+                headers: { Accept: 'application/json' },
+            })
+                .then(async (res) => {
+                    const body = await res.json();
+
+                    if (!res.ok) {
+                        onDone({ severity: 'error', message: body.message ?? 'Could not check sync job status.' });
+                        return;
+                    }
+                    if (body.status === 'completed') {
+                        onDone({ severity: 'success', message: body.message });
+                        return;
+                    }
+                    if (body.status === 'failed') {
+                        onDone({ severity: 'error', message: body.message ?? 'Sync failed.' });
+                        return;
+                    }
+
+                    if (attempts >= POLL_MAX_ATTEMPTS) {
+                        onDone({
+                            severity: 'error',
+                            message: 'Still processing — this is taking longer than expected. It may still complete in the background; check the Live status shortly.',
+                        });
+                        return;
+                    }
+                    setTimeout(poll, POLL_INTERVAL_MS);
+                })
+                .catch(() => {
+                    if (attempts >= POLL_MAX_ATTEMPTS) {
+                        onDone({ severity: 'error', message: 'Network error while checking sync status.' });
+                        return;
+                    }
+                    setTimeout(poll, POLL_INTERVAL_MS);
+                });
+        };
+
+        poll();
+    };
+
     const confirmPush = () => {
         if (!pushConfirmShop) return;
         const { id: shopId, platform } = pushConfirmShop;
@@ -550,10 +606,22 @@ export default function ProductEdit({
         })
             .then(async (res) => {
                 const body = await res.json();
-                setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
+
+                if (!res.ok || !body.job_id) {
+                    setPushResult({ severity: 'error', message: body.message ?? `Could not queue push to ${platform}.` });
+                    setPushing(false);
+                    setPushConfirmShop(null);
+                    return;
+                }
+
+                pollSyncJobStatus(body.job_id, (result) => {
+                    setPushResult(result);
+                    setPushing(false);
+                    setPushConfirmShop(null);
+                });
             })
-            .catch(() => setPushResult({ severity: 'error', message: `Network error while pushing to ${platform}.` }))
-            .finally(() => {
+            .catch(() => {
+                setPushResult({ severity: 'error', message: `Network error while pushing to ${platform}.` });
                 setPushing(false);
                 setPushConfirmShop(null);
             });
@@ -588,10 +656,22 @@ export default function ProductEdit({
         })
             .then(async (res) => {
                 const body = await res.json();
-                setPushResult({ severity: res.ok ? 'success' : 'error', message: body.message });
+
+                if (!res.ok || !body.job_id) {
+                    setPushResult({ severity: 'error', message: body.message ?? `Could not queue deactivation on ${platform}.` });
+                    setDeactivating(false);
+                    setDeactivateConfirmShop(null);
+                    return;
+                }
+
+                pollSyncJobStatus(body.job_id, (result) => {
+                    setPushResult(result);
+                    setDeactivating(false);
+                    setDeactivateConfirmShop(null);
+                });
             })
-            .catch(() => setPushResult({ severity: 'error', message: `Network error while deactivating on ${platform}.` }))
-            .finally(() => {
+            .catch(() => {
+                setPushResult({ severity: 'error', message: `Network error while deactivating on ${platform}.` });
                 setDeactivating(false);
                 setDeactivateConfirmShop(null);
             });
