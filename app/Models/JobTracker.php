@@ -17,6 +17,7 @@ class JobTracker extends Model
         'user_id',
         'started_at',
         'completed_at',
+        'cancel_requested_at',
         'total_records_created',
         'total_records_skipped',
         'total_rows_processed',
@@ -29,6 +30,7 @@ class JobTracker extends Model
         return [
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'cancel_requested_at' => 'datetime',
             'total_records_created' => 'integer',
             'total_records_skipped' => 'integer',
             'total_rows_processed' => 'integer',

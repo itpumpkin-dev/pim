@@ -54,6 +54,19 @@ class ProcessImportJob implements ShouldQueue
         $skipped = 0;
         $processed = 0;
         $aborted = false;
+        $cancelled = false;
+
+        // How often (in rows) to flush progress to the DB while the loop is
+        // still running — without this, the counters/error log the frontend
+        // polls every 2s (see JobTrackerController::status()) stay at their
+        // initial values for the whole job and only jump to the final
+        // numbers the instant it finishes, since the only other write was
+        // the single save() after the loop. Also doubles as the interval at
+        // which a cancellation request (JobTrackerController::cancel(), a
+        // separate web request) gets noticed — cancelling can only ever stop
+        // the loop *between* rows, never mid-row, so a row already being
+        // written always finishes first.
+        $progressFlushInterval = 25;
 
         foreach (SpreadsheetReader::read($absolutePath, $config->file_format, $config->field_separator ?: ',') as $row) {
             $rowNumber++;
@@ -78,9 +91,26 @@ class ProcessImportJob implements ShouldQueue
                     break;
                 }
             }
+
+            if ($processed % $progressFlushInterval === 0) {
+                $tracker->update([
+                    'total_records_created' => $created,
+                    'total_records_skipped' => $skipped,
+                    'total_rows_processed' => $processed,
+                ]);
+
+                // Re-fetched fresh from the DB rather than read off $tracker
+                // itself — the cancel request lands via a separate web
+                // request/process and would never be visible on this
+                // long-lived in-memory instance otherwise.
+                if (JobTracker::where('id', $tracker->id)->whereNotNull('cancel_requested_at')->exists()) {
+                    $cancelled = true;
+                    break;
+                }
+            }
         }
 
-        $tracker->status = $aborted ? 'failed' : 'completed';
+        $tracker->status = $cancelled ? 'cancelled' : ($aborted ? 'failed' : 'completed');
         $tracker->completed_at = now();
         $tracker->total_records_created = $created;
         $tracker->total_records_skipped = $skipped;

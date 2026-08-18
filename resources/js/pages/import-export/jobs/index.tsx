@@ -1,8 +1,34 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import CancelIcon from '@mui/icons-material/Cancel';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { Box, Chip, FormControl, IconButton, InputLabel, MenuItem, Paper, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Pagination, Stack } from '@mui/material';
+import {
+    Box,
+    Button,
+    Chip,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    FormControl,
+    IconButton,
+    InputLabel,
+    MenuItem,
+    Paper,
+    Select,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Typography,
+    Pagination,
+    Stack,
+} from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,6 +48,7 @@ interface JobItem {
     user: UserSummary | null;
     started_at: string | null;
     completed_at: string | null;
+    cancel_requested_at: string | null;
 }
 
 interface PaginatedData<T> {
@@ -45,11 +72,12 @@ function formatLocalDateTime(value: string | null): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error'> = {
+const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
     pending: 'default',
     processing: 'primary',
     completed: 'success',
     failed: 'error',
+    cancelled: 'warning',
 };
 
 export default function JobTrackerIndex({ jobs, filters }: Props) {
@@ -65,6 +93,8 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
     const [status, setStatus] = useState(filters.status ?? '');
     const [jobType, setJobType] = useState(filters.job_type ?? '');
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const [cancelId, setCancelId] = useState<number | null>(null);
+    const [cancelling, setCancelling] = useState(false);
 
     const applyFilters = (nextStatus: string, nextJobType: string) => {
         router.get('/import-export/jobs', { status: nextStatus || undefined, job_type: nextJobType || undefined }, { preserveState: true, replace: true });
@@ -78,7 +108,9 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
         }
 
         pollRef.current = setInterval(() => {
-            router.reload({ only: ['jobs'], preserveScroll: true, preserveState: true });
+            // reload() always preserves scroll/state/URL for a partial
+            // reload — ReloadOptions deliberately omits those keys.
+            router.reload({ only: ['jobs'] });
         }, 3000);
 
         return () => {
@@ -100,6 +132,20 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
 
     const handlePageChange = (_: unknown, page: number) => {
         router.get('/import-export/jobs', { status: status || undefined, job_type: jobType || undefined, page }, { preserveState: true });
+    };
+
+    const handleCancelConfirm = () => {
+        if (cancelId === null) return;
+        setCancelling(true);
+        router.post(
+            `/import-export/jobs/${cancelId}/cancel`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setCancelId(null),
+                onFinish: () => setCancelling(false),
+            },
+        );
     };
 
     return (
@@ -181,9 +227,16 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
                                     <TableCell>{formatLocalDateTime(row.started_at)}</TableCell>
                                     <TableCell>{formatLocalDateTime(row.completed_at)}</TableCell>
                                     <TableCell align="right">
-                                        <IconButton size="small" onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
-                                            <VisibilityIcon fontSize="small" />
-                                        </IconButton>
+                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                            {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
+                                                <IconButton size="small" color="error" title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
+                                                    <CancelIcon fontSize="small" />
+                                                </IconButton>
+                                            )}
+                                            <IconButton size="small" onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
+                                                <VisibilityIcon fontSize="small" />
+                                            </IconButton>
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -202,6 +255,28 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
                     </Box>
                 )}
             </Box>
+
+            <Dialog open={cancelId !== null} onClose={() => (cancelling ? null : setCancelId(null))}>
+                <DialogTitle>{t('cancelJob')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>{t('cancelJobConfirm')}</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setCancelId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={cancelling}>
+                        {tGrid('cancel')}
+                    </Button>
+                    <Button
+                        onClick={handleCancelConfirm}
+                        color="error"
+                        variant="contained"
+                        sx={{ fontWeight: 'bold' }}
+                        disabled={cancelling}
+                        startIcon={cancelling ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    >
+                        {t('cancelJob')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </AppLayout>
     );
 }

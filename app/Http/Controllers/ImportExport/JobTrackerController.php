@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\JobTracker;
 use App\Services\Catalog\AttributeAccessPolicy;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -59,8 +60,30 @@ class JobTrackerController extends Controller
             // toDateTimeString() strips the offset, so once a poll response
             // lands it would overwrite a correct value with an ambiguous one.
             'completed_at' => $jobTracker->completed_at?->toIso8601String(),
+            'cancel_requested_at' => $jobTracker->cancel_requested_at?->toIso8601String(),
             'error_log' => $jobTracker->error_log,
         ]);
+    }
+
+    /**
+     * Requests that a still-running job stop. This can only ever take effect
+     * *between* rows (see ProcessImportJob/ProcessExportJob, which poll
+     * cancel_requested_at every 25 rows alongside their progress-flush
+     * write) — a row already being processed always finishes first, so the
+     * job keeps showing 'processing' for a bit after this until it actually
+     * notices and flips to 'cancelled'.
+     */
+    public function cancel(JobTracker $jobTracker): RedirectResponse
+    {
+        $this->assertCanViewJobData($jobTracker);
+
+        abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true), 422);
+
+        if (!$jobTracker->cancel_requested_at) {
+            $jobTracker->update(['cancel_requested_at' => now()]);
+        }
+
+        return back()->with('success', 'Cancellation requested — the job will stop shortly.');
     }
 
     public function download(JobTracker $jobTracker): StreamedResponse

@@ -1808,13 +1808,32 @@ class ProductController extends Controller
             ->each(function ($group) use (&$values, $product, $channelId, $localeId) {
                 $first = $group->first();
 
-                ProductValue::where('product_id', $product->id)
+                $query = ProductValue::where('product_id', $product->id)
                     ->whereIn('attribute_id', $group->pluck('id'))
-                    ->where('channel_id', $first->is_channel_based ? $channelId : null)
-                    ->where('locale_id', $first->is_locale_based ? $localeId : null)
-                    ->pluck('value', 'attribute_id')
-                    ->each(function ($value, $attributeId) use (&$values) {
-                        $values[$attributeId] = $value;
+                    ->where('channel_id', $first->is_channel_based ? $channelId : null);
+
+                if ($first->is_locale_based) {
+                    // Fall back to the global (locale_id IS NULL) value when this
+                    // locale doesn't have its own yet — imported values always land
+                    // in the global scope (see ProductRowImporter) until someone
+                    // translates them per locale, so without this fallback a
+                    // freshly-imported locale-based field reads as empty here even
+                    // though it has a value.
+                    $query->where(function ($q) use ($localeId) {
+                        $q->whereNull('locale_id')->orWhere('locale_id', $localeId);
+                    })->orderByRaw('CASE WHEN locale_id = ? THEN 0 ELSE 1 END ASC', [$localeId]);
+                } else {
+                    $query->whereNull('locale_id');
+                }
+
+                $query->get(['attribute_id', 'value'])
+                    ->each(function ($value) use (&$values) {
+                        $attributeId = $value->attribute_id;
+                        // Rows are active-locale-first for locale-based attributes, so
+                        // only the first one seen per attribute should win.
+                        if ($values[$attributeId] === null) {
+                            $values[$attributeId] = $value->value;
+                        }
                     });
             });
 

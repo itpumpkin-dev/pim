@@ -48,15 +48,53 @@ class ProcessExportJob implements ShouldQueue
         $dataFileName = "data.{$config->file_format}";
         $dataAbsolutePath = Storage::disk('local')->path("{$dir}/{$dataFileName}");
 
+        // How often (in rows) to flush progress to the DB while the writer
+        // below is still pulling from this generator — without this, the
+        // counters the frontend polls every 2s (see JobTrackerController::
+        // status()) stay at their initial values for the whole job and only
+        // jump to the final numbers the instant it finishes, since the only
+        // other write was the single save() at the very end. Also doubles as
+        // the interval at which a cancellation request
+        // (JobTrackerController::cancel(), a separate web request) gets
+        // noticed.
+        $progressFlushInterval = 25;
+
         $rowCount = 0;
-        $rows = (function () use ($exporter, $config, &$rowCount) {
+        $rows = (function () use ($exporter, $config, $tracker, &$rowCount, $progressFlushInterval) {
             foreach ($exporter->rows($config) as $row) {
                 $rowCount++;
+
+                if ($rowCount % $progressFlushInterval === 0) {
+                    $tracker->update(['total_rows_processed' => $rowCount]);
+
+                    // Re-fetched fresh from the DB rather than read off
+                    // $tracker itself — the cancel request lands via a
+                    // separate web request/process and would never be
+                    // visible on this long-lived in-memory instance
+                    // otherwise. Thrown (rather than a break/flag) because
+                    // this generator is driven from inside
+                    // SpreadsheetWriter::write() below, with no other way to
+                    // unwind back out to handle().
+                    if (JobTracker::where('id', $tracker->id)->whereNotNull('cancel_requested_at')->exists()) {
+                        throw new JobCancelledException();
+                    }
+                }
+
                 yield $row;
             }
         })();
 
-        SpreadsheetWriter::write($dataAbsolutePath, $config->file_format, $columns, $rows, $config->field_separator ?: ',');
+        try {
+            SpreadsheetWriter::write($dataAbsolutePath, $config->file_format, $columns, $rows, $config->field_separator ?: ',');
+        } catch (JobCancelledException) {
+            $tracker->status = 'cancelled';
+            $tracker->completed_at = now();
+            $tracker->total_records_created = $rowCount;
+            $tracker->total_rows_processed = $rowCount;
+            $tracker->save();
+
+            return;
+        }
 
         $resultRelativePath = "{$dir}/{$dataFileName}";
 

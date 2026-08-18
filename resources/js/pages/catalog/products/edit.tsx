@@ -1048,7 +1048,11 @@ export default function ProductEdit({
 
                                                 {visibleAttrs.map((attr) => {
                                                     const { channelKey, localeKey } = getValueKeys(attr);
-                                                    const val = data.values[attr.id]?.[channelKey]?.[localeKey] || '';
+                                                    // Falls back to the global ('default') bucket when this locale has
+                                                    // no value of its own yet — imported locale-based fields land there
+                                                    // until someone translates them per locale (see ProductRowImporter),
+                                                    // so without this a freshly-imported field reads as empty.
+                                                    const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
                                                     const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
                                                     const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
                                                     return (

@@ -29,6 +29,7 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::get('jobs', [JobTrackerController::class, 'index'])->name('jobs.index')->middleware('permission:job_trackers,list_job_trackers');
     Route::get('jobs/{jobTracker}', [JobTrackerController::class, 'show'])->name('jobs.show')->middleware('permission:job_trackers,list_job_trackers');
     Route::get('jobs/{jobTracker}/status', [JobTrackerController::class, 'status'])->name('jobs.status')->middleware('permission:job_trackers,list_job_trackers');
+    Route::post('jobs/{jobTracker}/cancel', [JobTrackerController::class, 'cancel'])->name('jobs.cancel')->middleware('permission:job_trackers,list_job_trackers');
     Route::get('jobs/{jobTracker}/download', [JobTrackerController::class, 'download'])->name('jobs.download')->middleware('permission:job_trackers,list_job_trackers');
 
     Route::get('woo-convert', [WooCommerceConversionController::class, 'index'])->name('wooConvert.index')->middleware('permission:woo_conversions,list_woo_conversions');

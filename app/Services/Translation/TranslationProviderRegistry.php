@@ -2,6 +2,7 @@
 
 namespace App\Services\Translation;
 
+use App\Services\Translation\Providers\DeepLProvider;
 use App\Services\Translation\Providers\GoogleCloudTranslateProvider;
 use App\Services\Translation\Providers\LibreTranslateProvider;
 use App\Services\Translation\Providers\NllbProvider;
@@ -9,7 +10,7 @@ use App\Services\Translation\Providers\OllamaProvider;
 
 class TranslationProviderRegistry
 {
-    public const TYPES = ['libretranslate', 'google_cloud_translate', 'ollama', 'nllb'];
+    public const TYPES = ['libretranslate', 'google_cloud_translate', 'ollama', 'nllb', 'deepl'];
 
     public static function resolve(string $type): TranslationProviderInterface
     {
@@ -18,6 +19,7 @@ class TranslationProviderRegistry
             'google_cloud_translate' => new GoogleCloudTranslateProvider(),
             'ollama' => new OllamaProvider(),
             'nllb' => new NllbProvider(),
+            'deepl' => new DeepLProvider(),
             default => throw new \InvalidArgumentException("Unknown translation provider type: {$type}"),
         };
     }
@@ -59,6 +61,7 @@ class TranslationProviderRegistry
             'google_cloud_translate' => GoogleCloudTranslateProvider::class,
             'ollama' => OllamaProvider::class,
             'nllb' => NllbProvider::class,
+            'deepl' => DeepLProvider::class,
             default => throw new \InvalidArgumentException("Unknown translation provider type: {$type}"),
         };
     }
