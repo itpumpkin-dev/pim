@@ -3,6 +3,7 @@
 use App\Http\Controllers\ImportExport\ExportConfigController;
 use App\Http\Controllers\ImportExport\ImportConfigController;
 use App\Http\Controllers\ImportExport\JobTrackerController;
+use App\Http\Controllers\ImportExport\WooCommerceConversionController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->group(function () {
@@ -29,4 +30,12 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::get('jobs/{jobTracker}', [JobTrackerController::class, 'show'])->name('jobs.show')->middleware('permission:job_trackers,list_job_trackers');
     Route::get('jobs/{jobTracker}/status', [JobTrackerController::class, 'status'])->name('jobs.status')->middleware('permission:job_trackers,list_job_trackers');
     Route::get('jobs/{jobTracker}/download', [JobTrackerController::class, 'download'])->name('jobs.download')->middleware('permission:job_trackers,list_job_trackers');
+
+    Route::get('woo-convert', [WooCommerceConversionController::class, 'index'])->name('wooConvert.index')->middleware('permission:woo_conversions,list_woo_conversions');
+    Route::get('woo-convert/create', [WooCommerceConversionController::class, 'create'])->name('wooConvert.create')->middleware('permission:woo_conversions,create_woo_conversions');
+    Route::post('woo-convert', [WooCommerceConversionController::class, 'convert'])->name('wooConvert.convert')->middleware('permission:woo_conversions,create_woo_conversions');
+    Route::get('woo-convert/{wooConversion}', [WooCommerceConversionController::class, 'show'])->name('wooConvert.show')->middleware('permission:woo_conversions,list_woo_conversions');
+    Route::get('woo-convert/{wooConversion}/download', [WooCommerceConversionController::class, 'download'])->name('wooConvert.download')->middleware('permission:woo_conversions,list_woo_conversions');
+    Route::get('woo-convert/{wooConversion}/download-xlsx', [WooCommerceConversionController::class, 'downloadXlsx'])->name('wooConvert.downloadXlsx')->middleware('permission:woo_conversions,list_woo_conversions');
+    Route::get('woo-convert/{wooConversion}/download-unmatched', [WooCommerceConversionController::class, 'downloadUnmatched'])->name('wooConvert.downloadUnmatched')->middleware('permission:woo_conversions,list_woo_conversions');
 });

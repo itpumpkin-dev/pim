@@ -21,5 +21,6 @@
     "importExport": "Import / Export",
     "imports": "Imports",
     "exports": "Exports",
-    "jobTracker": "Job Tracker"
+    "jobTracker": "Job Tracker",
+    "wooConvert": "WooCommerce Converter"
 }

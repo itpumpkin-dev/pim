@@ -92,6 +92,11 @@ function useMainNavItems(): NavItem[] {
                     url: '/import-export/jobs',
                     permission: 'job_trackers.list_job_trackers',
                 },
+                {
+                    title: t('wooConvert'),
+                    url: '/import-export/woo-convert',
+                    permission: 'woo_conversions.list_woo_conversions',
+                },
             ],
         },
         {
