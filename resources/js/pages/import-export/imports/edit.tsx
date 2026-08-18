@@ -1,3 +1,4 @@
+import ImportFilePreview from '@/components/import-export/import-file-preview';
 import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
@@ -37,6 +38,7 @@ interface ImportConfigItem {
     allowed_errors: number;
     image_directory_path: string | null;
     source_file_path: string | null;
+    source_file_name: string | null;
 }
 
 interface Props {
@@ -173,7 +175,9 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                                         />
                                     </Button>
                                     <Typography variant="body2" color="text.secondary">
-                                        {data.file ? data.file.name : config.source_file_path ? config.source_file_path.split('/').pop() : t('noFileUploaded')}
+                                        {data.file
+                                            ? data.file.name
+                                            : (config.source_file_name ?? config.source_file_path?.split('/').pop() ?? t('noFileUploaded'))}
                                     </Typography>
                                     <Button variant="text" startIcon={<DownloadIcon />} onClick={downloadSample}>
                                         {t('downloadSample')}
@@ -190,6 +194,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                                     </Stack>
                                 )}
                                 {errors.file && <FormHelperText error>{errors.file}</FormHelperText>}
+                                <ImportFilePreview file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} />
                             </Box>
 
                             <TextField

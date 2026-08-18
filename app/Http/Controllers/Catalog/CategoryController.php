@@ -53,19 +53,41 @@ class CategoryController extends Controller
             'description' => ['label' => 'Description', 'type' => 'string', 'filterable' => true],
         ];
 
+        // `name` is a language-agnostic fallback column (see Category::name()
+        // accessor) — what the list actually displays is each category's
+        // translated label, which lives in a separate translations table.
+        // Matching by name against just the raw column would miss almost
+        // every search for the name as the user actually sees it, so both
+        // the free-text search and the per-column `name` filter also match
+        // against the translations table; `name` is stripped from the
+        // generic per-column filter pass below so it doesn't additionally
+        // (and wrongly) narrow results by the raw column too.
+        $originalFilters = $request->input('filters', []);
+        $nameFilter = $originalFilters['name'] ?? null;
+        $filtersWithoutName = collect($originalFilters)->except('name')->all();
+
         // Fetch categories with their parent to show in list. Counts are
         // surfaced so the delete confirmation can warn about what a delete
         // would actually affect (children get orphaned, product links cascade).
         $query = Category::with('parent')
             ->withCount(['children', 'products'])
             ->when($search, function ($query, $search) {
-                $query->where('code', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $query->where(function ($q) use ($search) {
+                    $q->where('code', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                });
+            })
+            ->when($nameFilter, function ($query, $nameFilter) {
+                $query->where(function ($q) use ($nameFilter) {
+                    $q->where('name', 'like', "%{$nameFilter}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
+                });
             })
             ->orderBy('id', 'desc');
 
-        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+        GridManager::applyFilters($query, $filterColumns, $filtersWithoutName);
 
         $categories = $query->paginate($perPage)->withQueryString();
 

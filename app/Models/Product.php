@@ -99,9 +99,22 @@ class Product extends Model
             }
         }
 
-        // 2. Set `pname` = SKU for each locale if empty/not set
+        // 2. Set `pname` = SKU for each locale if empty/not set — unless a
+        // locale-agnostic value already exists in the global (locale_id
+        // null) scope, which is where bulk import (see ProductRowImporter)
+        // always writes locale-based attributes since it has no per-locale
+        // columns. Without this, a freshly bulk-imported product's real
+        // name would get shadowed by the raw SKU in every locale, since
+        // read paths prefer the locale-specific row over the global one.
         $pnameAttr = Attribute::where('code', 'pname')->first();
         if ($pnameAttr) {
+            $globalName = $this->values()
+                ->where('attribute_id', $pnameAttr->id)
+                ->whereNull('channel_id')
+                ->whereNull('locale_id')
+                ->value('value');
+            $defaultName = ($globalName !== null && $globalName !== '') ? $globalName : $this->sku;
+
             $locales = Locale::all();
             foreach ($locales as $locale) {
                 $exists = $this->values()
@@ -116,7 +129,7 @@ class Product extends Model
                             'channel_id' => null,
                             'locale_id' => $locale->id,
                         ],
-                        ['value' => $this->sku]
+                        ['value' => $defaultName]
                     );
                 }
             }

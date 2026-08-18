@@ -49,13 +49,6 @@ datagrid:
         type: datetime
         sortable: true
         filterable: true
-    filters:
-      global:
-        type: string
-        fields:
-          - code
-          - name
-          - type
     actions:
       update:
         icon: edit

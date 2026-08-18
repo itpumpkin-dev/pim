@@ -117,6 +117,25 @@ class AttributeAccessPolicy
     }
 
     /**
+     * True only if there's at least one attribute group this user/role
+     * cannot view. Unlike a coarse "has the view_attribute_groups resource
+     * been touched at all" check, this correctly treats a role that has
+     * every group explicitly granted the same as one that's never touched
+     * the section — both mean unrestricted — instead of flagging any
+     * explicit grant as a restriction. Used to gate import/export job
+     * details, which can't be checked against one particular group since a
+     * product job's data spans every attribute group at once.
+     */
+    public function hasAnyGroupRestriction(?User $user): bool
+    {
+        if (!$this->actorFor($user)) {
+            return false;
+        }
+
+        return AttributeGroup::all()->contains(fn (AttributeGroup $group) => !$this->canViewGroup($user, $group));
+    }
+
+    /**
      * An attribute's group membership is per-family (family_attributes.
      * attribute_group_id), not fixed on the attribute itself — the same
      * attribute can sit in an allowed group for one family and a restricted

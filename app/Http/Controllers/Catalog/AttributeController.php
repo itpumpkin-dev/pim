@@ -29,16 +29,54 @@ class AttributeController extends Controller
     {
         $grid = new GridManager('attribute_grid');
 
+        // `name` is a language-agnostic fallback column (see Attribute::name()
+        // accessor) — what the grid actually displays is each attribute's
+        // translated label, which lives in a separate translations table.
+        // GridManager's generic search/per-column filter only know how to
+        // LIKE-match real columns, so matching by name is handled here
+        // instead: attribute_grid.yml's `filters.global` block was removed
+        // entirely (GridManager ANDs its own search clause with whatever
+        // this closure adds, so a narrower built-in `code`/`type`-only
+        // clause would silently absorb — and defeat — the broader one
+        // below), and `name` is stripped from the per-column filters input
+        // before GridManager sees it, then both are handled below against
+        // the fallback column and the translations table.
+        $search = $request->input('search');
+        $originalFilters = $request->input('filters', []);
+        $nameFilter = $originalFilters['name'] ?? null;
+
+        if ($nameFilter !== null && $nameFilter !== '') {
+            $request->merge(['filters' => collect($originalFilters)->except('name')->all()]);
+        }
+
+        $gridData = $grid->getData($request, function ($query) use ($search, $nameFilter) {
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('code', 'like', "%{$search}%")
+                        ->orWhere('type', 'like', "%{$search}%")
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                });
+            }
+
+            if ($nameFilter) {
+                $query->where(function ($q) use ($nameFilter) {
+                    $q->where('name', 'like', "%{$nameFilter}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
+                });
+            }
+        });
+
         return Inertia::render('catalog/attributes/index', [
             'gridConfig' => $grid->getConfig(),
-            'gridData' => $grid->getData($request),
+            'gridData' => $gridData,
             // Explicit keys, not only() — see ProductController::index() for why
             // an empty array here (vs. object) is a landmine for `filters.sort`.
             'filters' => [
-                'search' => $request->input('search', ''),
+                'search' => $search ?? '',
                 'sort' => $request->input('sort', ''),
                 'dir' => $request->input('dir', ''),
-                'filters' => $request->input('filters', []),
+                'filters' => $originalFilters,
             ],
         ]);
     }

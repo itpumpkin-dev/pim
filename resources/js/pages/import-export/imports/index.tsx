@@ -16,6 +16,7 @@ interface ImportConfigItem {
     type: string;
     action: string;
     source_file_path: string | null;
+    source_file_name: string | null;
 }
 
 interface PaginatedData<T> {
@@ -132,7 +133,7 @@ export default function ImportIndex({ configs, filters }: Props) {
                                     <TableCell>{row.action === 'delete' ? t('actionDelete') : t('actionCreateUpdate')}</TableCell>
                                     <TableCell>
                                         {row.source_file_path ? (
-                                            <Chip label={row.source_file_path.split('/').pop()} size="small" />
+                                            <Chip label={row.source_file_name ?? row.source_file_path.split('/').pop()} size="small" />
                                         ) : (
                                             <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                                                 {t('noFileUploaded')}

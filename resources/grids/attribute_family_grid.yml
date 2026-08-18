@@ -18,12 +18,6 @@ datagrid:
         type: string
         sortable: true
         filterable: true
-    filters:
-      global:
-        type: string
-        fields:
-          - code
-          - name
     actions:
       update:
         icon: edit

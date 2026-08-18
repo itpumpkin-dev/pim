@@ -27,6 +27,11 @@
     "typeAttributes": "Attributes",
     "typeAttributeFamilies": "Attribute Families",
     "typeAttributeOptions": "Attribute Options",
+    "filePreview": "File Preview",
+    "previewLoading": "Loading preview...",
+    "previewError": "Unable to preview this file.",
+    "previewEmpty": "No data found in this file.",
+    "previewRowsNote": "Showing first {{count}} rows",
 
     "exportsTitle": "Exports",
     "createExport": "Create Export",

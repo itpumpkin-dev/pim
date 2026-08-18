@@ -1,3 +1,4 @@
+import ImportFilePreview from '@/components/import-export/import-file-preview';
 import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
@@ -169,6 +170,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                     </Stack>
                                 )}
                                 {errors.file && <FormHelperText error>{errors.file}</FormHelperText>}
+                                <ImportFilePreview file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} />
                             </Box>
 
                             <TextField

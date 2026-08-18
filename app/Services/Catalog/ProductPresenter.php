@@ -11,7 +11,6 @@ use App\Models\ProductValue;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Maps EAV-backed Product/ProductValue rows to the plain shape the public
@@ -243,7 +242,7 @@ class ProductPresenter
         ];
 
         if ($imagePath = $get('pimage')) {
-            $result['image'] = Storage::disk('public')->url($imagePath);
+            $result['image'] = AttributeValueFormatter::resolveStorageUrl($imagePath);
         }
 
         if ($get('eol') === '1') {

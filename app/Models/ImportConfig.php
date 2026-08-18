@@ -21,6 +21,7 @@ class ImportConfig extends Model
         'allowed_errors',
         'image_directory_path',
         'source_file_path',
+        'source_file_name',
         'created_by',
         'updated_by',
     ];

@@ -30,13 +30,35 @@ class AttributeValueFormatter
         if ($attribute->type === 'gallery') {
             $paths = json_decode($rawValue, true) ?: [];
 
-            return array_map(fn ($path) => Storage::disk('public')->url($path), $paths);
+            return array_map(fn ($path) => self::resolveStorageUrl($path), $paths);
         }
 
         if (in_array($attribute->type, ['image', 'file', 'video'], true)) {
-            return Storage::disk('public')->url($rawValue);
+            return self::resolveStorageUrl($rawValue);
         }
 
         return $rawValue;
+    }
+
+    /**
+     * Builds a public URL for a stored image/file/video/gallery value —
+     * except when it's already an absolute URL, which happens for rows
+     * brought in via import (e.g. a WooCommerce-converted CSV's `pimage`
+     * column carries the original external image URL, never downloaded
+     * into local storage). Running that through Storage::url() would nest
+     * it under this app's own /storage/ prefix and break it, so pass
+     * already-absolute values through unchanged.
+     */
+    public static function resolveStorageUrl(?string $path): ?string
+    {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $path)) {
+            return $path;
+        }
+
+        return Storage::disk('public')->url($path);
     }
 }

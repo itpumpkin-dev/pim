@@ -194,7 +194,7 @@ class ProductController extends Controller
             $imagePath = $imageAttributeId
                 ? ($valueByKey[$product->id.'-'.$imageAttributeId] ?? null)
                 : null;
-            $product->image_url = $imagePath ? Storage::disk('public')->url($imagePath) : null;
+            $product->image_url = AttributeValueFormatter::resolveStorageUrl($imagePath);
 
             $product->parent_sku = $product->parent_id ? ($parentSkus->get($product->parent_id) ?? null) : null;
 

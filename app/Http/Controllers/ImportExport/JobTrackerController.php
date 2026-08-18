@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
 use App\Models\JobTracker;
+use App\Services\Catalog\AttributeAccessPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class JobTrackerController extends Controller
 {
+    public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
+
     public function index(Request $request): Response
     {
         $status = $request->input('status');
@@ -88,7 +91,7 @@ class JobTrackerController extends Controller
         $user = auth()->user();
 
         abort_if(
-            $jobTracker->entity_type === 'products' && $user && $user->hasAttributeGroupRestrictions(),
+            $jobTracker->entity_type === 'products' && $user && $this->attributeAccess->hasAnyGroupRestriction($user),
             403,
             'Your role\'s Attribute Access restrictions prevent viewing product import/export job details.'
         );

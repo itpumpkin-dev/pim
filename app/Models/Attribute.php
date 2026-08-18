@@ -72,7 +72,12 @@ class Attribute extends Model
 
     public function options(): HasMany
     {
-        return $this->hasMany(AttributeOption::class);
+        // Without an explicit order, Postgres has no guaranteed row order
+        // (unlike MySQL's incidental primary-key ordering), so every select
+        // dropdown built from this relation was showing options in an
+        // effectively arbitrary order instead of the intended sort_order
+        // sequence used for reordering them in the admin UI.
+        return $this->hasMany(AttributeOption::class)->orderBy('sort_order');
     }
 
     public function families(): BelongsToMany

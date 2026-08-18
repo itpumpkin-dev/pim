@@ -185,7 +185,11 @@ class ImportConfigController extends Controller
             Storage::disk('local')->delete($config->source_file_path);
         }
 
-        $path = $request->file('file')->store("imports/{$config->id}", 'local');
-        $config->update(['source_file_path' => $path]);
+        $file = $request->file('file');
+        $path = $file->store("imports/{$config->id}", 'local');
+        $config->update([
+            'source_file_path' => $path,
+            'source_file_name' => $file->getClientOriginalName(),
+        ]);
     }
 }
