@@ -105,6 +105,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     const [assignedGroups, setAssignedGroups] = useState<AssignedGroup[]>([]);
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>([]);
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
+    const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
     // assignedGroups/unassignedAttrs start populated from familyAttributes
     // (see the effect below), so "non-empty" can't signal dirty the way it
@@ -223,6 +224,25 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         setUnassignedAttrs((prev) => {
             if (prev.some((a) => a.id === attr.id)) return prev;
             return [...prev, attr];
+        });
+    };
+
+    // Moves the dragged group to sit where the drop-target group currently
+    // is (array order here is what submit() turns into sort_order, so this
+    // is the entire mechanism — no separate "group order" field to sync).
+    const handleReorderGroup = (sourceGroupId: number, targetGroupId: number) => {
+        if (sourceGroupId === targetGroupId) return;
+
+        setGroupsDirty(true);
+        setAssignedGroups((prev) => {
+            const sourceIndex = prev.findIndex((g) => g.id === sourceGroupId);
+            const targetIndex = prev.findIndex((g) => g.id === targetGroupId);
+            if (sourceIndex === -1 || targetIndex === -1) return prev;
+
+            const next = [...prev];
+            const [moved] = next.splice(sourceIndex, 1);
+            next.splice(targetIndex, 0, moved);
+            return next;
         });
     };
 
@@ -391,7 +411,10 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                         onDragOver={(e) => e.preventDefault()}
                                                         onDrop={(e) => {
                                                             e.preventDefault();
-                                                            if (draggedAttr) {
+                                                            if (draggedGroupId !== null) {
+                                                                handleReorderGroup(draggedGroupId, group.id);
+                                                                setDraggedGroupId(null);
+                                                            } else if (draggedAttr) {
                                                                 handleDropAttribute(draggedAttr, group.id);
                                                                 setDraggedAttr(null);
                                                             }
@@ -415,19 +438,36 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                                 '&:hover': { color: 'primary.main' },
                                                             }}
                                                         >
-                                                            <Stack direction="row" alignItems="center" spacing={0.5} onClick={() => toggleGroupExpand(group.id)}>
-                                                                <IconButton size="small" sx={{ p: 0.2 }}>
+                                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                                <IconButton size="small" sx={{ p: 0.2 }} onClick={() => toggleGroupExpand(group.id)}>
                                                                     {group.expanded ? (
                                                                         <KeyboardArrowDownIcon fontSize="small" />
                                                                     ) : (
                                                                         <KeyboardArrowRightIcon fontSize="small" />
                                                                     )}
                                                                 </IconButton>
-                                                                <DragIndicatorIcon fontSize="small" sx={{ color: '#94a3b8', fontSize: 16 }} />
-                                                                <FolderOutlinedIcon fontSize="small" sx={{ color: '#64748b', ml: 0.5 }} />
-                                                                <Typography variant="body2" fontWeight={600} color="#334155">
-                                                                    {group.name}
-                                                                </Typography>
+                                                                <Box
+                                                                    draggable
+                                                                    onDragStart={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDraggedGroupId(group.id);
+                                                                    }}
+                                                                    onDragEnd={() => setDraggedGroupId(null)}
+                                                                    sx={{ display: 'flex', cursor: 'grab' }}
+                                                                >
+                                                                    <DragIndicatorIcon fontSize="small" sx={{ color: '#94a3b8', fontSize: 16 }} />
+                                                                </Box>
+                                                                <Stack
+                                                                    direction="row"
+                                                                    alignItems="center"
+                                                                    spacing={0.5}
+                                                                    onClick={() => toggleGroupExpand(group.id)}
+                                                                >
+                                                                    <FolderOutlinedIcon fontSize="small" sx={{ color: '#64748b' }} />
+                                                                    <Typography variant="body2" fontWeight={600} color="#334155">
+                                                                        {group.name}
+                                                                    </Typography>
+                                                                </Stack>
                                                             </Stack>
                                                             <IconButton size="small" color="error" onClick={() => handleRemoveGroup(group.id)}>
                                                                 <DeleteIcon fontSize="small" />

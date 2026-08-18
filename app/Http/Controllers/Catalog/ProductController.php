@@ -22,6 +22,7 @@ use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
@@ -1024,17 +1025,7 @@ class ProductController extends Controller
 
         $family = $product->family;
 
-        // Cheap (a handful of rows, not the ~1,086-node full tree) — lets the
-        // Categories panel show what's already assigned immediately, without
-        // the picker's full tree fetch (see CategoryController::tree()) ever
-        // blocking this page. The tree itself only loads if/when the user
-        // opens the picker to change the selection.
-        $selectedCategories = $product->categories()->get(['categories.id', 'categories.name'])
-            ->map(fn (Category $category) => [
-                'id' => $category->id,
-                'name' => $category->name,
-                'translations' => $category->translations,
-            ]);
+        $categoryIds = $product->categories()->pluck('categories.id')->all();
 
         return Inertia::render('catalog/products/edit', [
             'product' => [
@@ -1057,8 +1048,7 @@ class ProductController extends Controller
             'configurableAttributes' => $this->configurableAttributeOptions(),
             'channels' => $channels,
             'channelGroups' => $channelGroups,
-            'categoryIds' => $selectedCategories->pluck('id')->all(),
-            'selectedCategories' => $selectedCategories->values(),
+            'categoryIds' => $categoryIds,
             'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
@@ -1362,6 +1352,10 @@ class ProductController extends Controller
             $newCategoryIds = collect($validated['category_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
             $product->categories()->sync($newCategoryIds);
             $categoryChanged = $oldCategoryIds !== $newCategoryIds;
+
+            if ($categoryChanged) {
+                ProductCategoryLinker::deriveLegacyCodesFromCategories($product, $newCategoryIds);
+            }
 
             $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
             $newShopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();

@@ -84,6 +84,35 @@ class AttributeCatalogSeeder extends Seeder
         'max_stock' => ['price', false, false],
         'qty' => ['price', false, false],
         'current_stock' => ['price', false, false],
+
+        // Added to match fields present on the legacy "สร้างรายการสินค้า"
+        // product-create form that had no equivalent attribute yet.
+        'sale_pack_size' => ['price', false, false],
+        'is_main_sale_unit' => ['boolean', false, false],
+        'is_main_purchase_unit' => ['boolean', false, false],
+        'commission_group' => ['select', false, false],
+        'end_bill_discount' => ['price', false, false],
+        'price_type' => ['select', false, false],
+        'size' => ['text', false, false],
+        'model' => ['text', false, false],
+        'vendor' => ['select', false, false],
+        'sub_vendor' => ['text', false, false],
+        'purchase_currency' => ['select', false, false],
+        'hs_code' => ['text', false, false],
+        'import_duty' => ['price', false, false],
+        'ordinary_certificate_of_origin' => ['select', false, false],
+        'final_duty' => ['price', false, false],
+        'statistics_code' => ['text', false, false],
+        'pcs_per_ctn' => ['price', false, false],
+        'replace_old_product' => ['text', false, false],
+        'replace_out_of_stock' => ['text', false, false],
+        'is_bom' => ['boolean', false, false],
+        'bom_data' => ['textarea', false, false],
+        'rmp_id' => ['text', false, false],
+        'rop' => ['price', false, false],
+        'discount_std' => ['price', false, false],
+        'cost_std' => ['price', false, false],
+        'gp_std' => ['price', false, false],
     ];
 
     public function run(): void

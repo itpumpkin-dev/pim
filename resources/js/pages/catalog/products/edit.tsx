@@ -56,7 +56,7 @@ import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { HistoryPanel } from '@/components/history-panel';
-import { CategoryTreePicker } from '@/components/category-tree-picker';
+import { CategoryCascadeSelect } from '@/components/category-cascade-select';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
@@ -147,7 +147,6 @@ interface Props {
     channels?: ChannelOption[];
     channelGroups?: ChannelGroup[];
     categoryIds?: number[];
-    selectedCategories?: { id: number; name: string; translations?: Translation[] }[];
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
@@ -198,7 +197,6 @@ export default function ProductEdit({
     channels = [],
     channelGroups = [],
     categoryIds = [],
-    selectedCategories = [],
     publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
@@ -1257,12 +1255,7 @@ export default function ProductEdit({
                                             {t('marketplaceMappingButton')}
                                         </Button>
                                     </Stack>
-                                    <CategoryTreePicker
-                                        value={data.category_ids}
-                                        onChange={(ids) => setData('category_ids', ids)}
-                                        initialSelected={selectedCategories}
-                                        activeLocaleId={activeLocaleId}
-                                    />
+                                    <CategoryCascadeSelect value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
                                 </Paper>
 
                                 {/* Associations Panel */}

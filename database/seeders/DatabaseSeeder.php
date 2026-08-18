@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call(AttributeCatalogSeeder::class);
         $this->call(AttributeTranslationSeeder::class);
         $this->call(LegacyCategoryAttributeOptionsSeeder::class);
+        $this->call(AttributeOptionCatalogSeeder::class);
         $this->call(FixCategoryOptionTranslationsSeeder::class);
         $this->call(AttributeGroupSeeder::class);
         $this->call(AttributeGroupTranslationSeeder::class);

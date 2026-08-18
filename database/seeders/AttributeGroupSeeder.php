@@ -17,6 +17,8 @@ class AttributeGroupSeeder extends Seeder
         'packaging' => 'บรรจุภัณฑ์',
         'specifications' => 'ข้อมูลจำเพาะ',
         'warranty_usage' => 'การรับประกันและการใช้งาน',
+        'purchasing' => 'การสั่งซื้อ',
+        'accounting' => 'งานบัญชี',
     ];
 
     public function run(): void
