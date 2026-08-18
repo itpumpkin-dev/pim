@@ -49,24 +49,32 @@ declare(strict_types=1);
  *    an unmatched category gets logged to the unmatched-report file; use
  *    --category-map to supply manual overrides and re-run.
  *
- * 3. Only one price field survives: "Regular price" -> price_recommend.
+ * 3. Brands: "Brands" -> pbrand is passed through as raw text. pbrand is a
+ *    select attribute (its ProductValue must be an AttributeOption code, not
+ *    free text), but this script has no DB access to look up/create options.
+ *    App\Services\ImportExport\WooCommerceConverter (used by the web UI's
+ *    WooCommerce Converter) does that resolution — auto-creating a new
+ *    AttributeOption per distinct brand name — so prefer that path over this
+ *    CLI script when brand linking matters.
+ *
+ * 4. Only one price field survives: "Regular price" -> price_recommend.
  *    "Sale price" has nowhere to go (the closest field, price_std, is
  *    channel-scoped and not settable through this importer) and is dropped.
  *
- * 4. Only the first image URL survives (-> pimage). WooCommerce's Images
+ * 5. Only the first image URL survives (-> pimage). WooCommerce's Images
  *    column is a comma list; there's no multi-image field on this side, and
  *    no actual file-copy support at all — pimage just stores a URL string.
  *
- * 5. Type: only 'simple' and 'configurable' are accepted by the importer.
+ * 6. Type: only 'simple' and 'configurable' are accepted by the importer.
  *    Any other WooCommerce Type (variable/grouped/external) is coerced to
  *    'simple' and logged as a warning — review those rows manually.
  *
- * 6. Dropped entirely (no equivalent field exists): ID, Tags, Shipping class,
+ * 7. Dropped entirely (no equivalent field exists): ID, Tags, Shipping class,
  *    Sale price, Purchase note, Position, Vehicles, Parent/Grouped
  *    products/Upsells/Cross-sells, External URL/Button text, all
  *    "Attribute N name/value(s)/visible/global" columns, Download limit/expiry.
  *
- * 7. "eol" is a heuristic: set to 1 if the word "EOL" appears in the Short
+ * 8. "eol" is a heuristic: set to 1 if the word "EOL" appears in the Short
  *    description or Description, since this particular data set uses that
  *    convention. Verify a sample before trusting it broadly.
  */

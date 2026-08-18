@@ -37,6 +37,9 @@ interface Conversion {
     sku_missing_count: number;
     category_matched_count: number;
     category_unmatched_count: number;
+    brand_new_count: number;
+    brand_new_names: string[];
+    brand_new_names_total: number;
     type_warnings: string[];
     type_warnings_total: number;
     emitted_name: boolean;
@@ -131,6 +134,12 @@ export default function WooConvertShow({ conversion }: Props) {
                         conversion.category_unmatched_count > 0 ? 'warn' : 'neutral',
                         conversion.category_unmatched_count > 0 ? <WarningAmberIcon color="warning" fontSize="small" /> : undefined
                     )}
+                    {stat(
+                        t('wooConvertBrandsCreated'),
+                        conversion.brand_new_count,
+                        conversion.brand_new_count > 0 ? 'warn' : 'neutral',
+                        conversion.brand_new_count > 0 ? <WarningAmberIcon color="warning" fontSize="small" /> : undefined
+                    )}
                 </Grid>
 
                 <Stack spacing={2}>
@@ -195,6 +204,35 @@ export default function WooConvertShow({ conversion }: Props) {
                         <Alert severity="info" sx={{ whiteSpace: 'pre-line' }}>
                             {t('wooConvertLocaleCaveat')}
                         </Alert>
+                    )}
+
+                    {conversion.brand_new_names.length > 0 && (
+                        <Paper variant="outlined" sx={{ p: 3 }}>
+                            <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                                {t('wooConvertNewBrandsTitle', { count: conversion.brand_new_names_total })}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                {t('wooConvertNewBrandsHelp')}
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                                {conversion.brand_new_names.map((name, i) => (
+                                    <Typography
+                                        key={i}
+                                        variant="body2"
+                                        sx={{ px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}
+                                    >
+                                        {name}
+                                    </Typography>
+                                ))}
+                            </Stack>
+                            {conversion.brand_new_names_total > conversion.brand_new_names.length && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                    {t('wooConvertTypeWarningsTruncated', {
+                                        remaining: conversion.brand_new_names_total - conversion.brand_new_names.length,
+                                    })}
+                                </Typography>
+                            )}
+                        </Paper>
                     )}
 
                     {conversion.type_warnings.length > 0 && (

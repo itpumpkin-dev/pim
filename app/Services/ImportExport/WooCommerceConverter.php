@@ -2,6 +2,12 @@
 
 namespace App\Services\ImportExport;
 
+use App\Models\Attribute;
+use App\Models\AttributeOption;
+use App\Models\AuditLog;
+use App\Models\WooCategoryAlias;
+use Illuminate\Support\Str;
+
 /**
  * Maps a WooCommerce product-export CSV onto the column shape ProductRowImporter
  * expects (see that class for the authoritative list of supported columns).
@@ -12,7 +18,9 @@ namespace App\Services\ImportExport;
  *
  * Ported from the CLI prototype at scripts/convert-woocommerce-import.php —
  * keep both in sync if the mapping rules change, or retire the CLI script in
- * favor of this one.
+ * favor of this one. Note: the CLI script does NOT do the brand linking
+ * described below (it has no DB access), so pbrand there still passes
+ * through as raw Woo text.
  */
 class WooCommerceConverter
 {
@@ -24,6 +32,24 @@ class WooCommerceConverter
 
     /** @var array<string,string> normalized name => code */
     private array $groupLookup = [];
+
+    /**
+     * pbrand is a select attribute — its ProductValue must be an
+     * AttributeOption code, not free text (see ProductPresenter's
+     * SELECT_CODES_TO_RESOLVE note). Built lazily in convert() since it
+     * needs the DB. Null attribute id means the pbrand attribute doesn't
+     * exist in this environment, so brand text is passed through unresolved.
+     */
+    private ?Attribute $brandAttribute = null;
+
+    /** @var array<string,string> normalized brand name/code => AttributeOption code */
+    private array $brandLookup = [];
+
+    /** @var array<int,string> newly auto-created brand names, in encounter order */
+    private array $newBrandNames = [];
+
+    /** @var array<string,string> normalized match key => original (pre-normalization) woo_categories text, from the uploaded category_map file */
+    private array $overrideRawText = [];
 
     public function __construct(?string $dataDir = null)
     {
@@ -42,9 +68,14 @@ class WooCommerceConverter
         $emitName = $options['emit_name'] ?? true;
         $emitDescription = $options['emit_description'] ?? true;
         $stripHtml = $options['strip_html'] ?? true;
-        $overrides = isset($options['category_map_path'])
-            ? $this->loadCategoryMapOverride($options['category_map_path'])
-            : [];
+        $overrides = $this->loadCategoryAliases();
+        if (isset($options['category_map_path'])) {
+            $uploaded = $this->loadCategoryMapOverride($options['category_map_path']);
+            $overrides = array_merge($overrides, $uploaded);
+            $this->rememberCategoryAliases($uploaded);
+        }
+
+        $this->loadBrandLookup();
 
         $in = fopen($inputPath, 'r');
         if ($in === false) {
@@ -127,7 +158,7 @@ class WooCommerceConverter
                 'family_code' => $familyCode,
                 'type' => self::mapType((string) ($r['Type'] ?? ''), $sku, $typeWarnings),
                 'enabled' => self::mapEnabled((string) ($r['Published'] ?? '')),
-                'pbrand' => trim((string) ($r['Brands'] ?? '')),
+                'pbrand' => $this->resolveBrand((string) ($r['Brands'] ?? '')),
                 'pcatname' => $catCodes['pcatname'],
                 'psubcatname' => $catCodes['psubcatname'],
                 'productgroupname' => $catCodes['productgroupname'],
@@ -184,8 +215,109 @@ class WooCommerceConverter
                 'type_warnings_total' => count($typeWarnings),
                 'emitted_name' => $emitName,
                 'emitted_description' => $emitDescription,
+                'brand_new_count' => count($this->newBrandNames),
+                'brand_new_names' => array_slice($this->newBrandNames, 0, 50),
+                'brand_new_names_total' => count($this->newBrandNames),
             ],
         ];
+    }
+
+    /**
+     * Loads every existing pbrand AttributeOption into brandLookup, keyed by
+     * its code, its raw (untranslated) admin_label, AND every per-locale
+     * translation label it has — normalized the same way category names
+     * are. Matching on every translation (not just the current-locale one
+     * or the raw admin_label) matters here specifically: several existing
+     * brand options were entered with a Thai admin_label (e.g. "พัมคิน" for
+     * Pumpkin) while WooCommerce exports carry the English brand name — an
+     * English translation row on that option is what lets "PUMPKIN" resolve
+     * to the same option instead of spawning a duplicate.
+     */
+    private function loadBrandLookup(): void
+    {
+        $attribute = Attribute::where('code', 'pbrand')->first();
+        if (!$attribute) {
+            return;
+        }
+        $this->brandAttribute = $attribute;
+
+        foreach (AttributeOption::where('attribute_id', $attribute->id)->with('translations')->get() as $option) {
+            $names = [$option->code, $option->getRawOriginal('admin_label')];
+            foreach ($option->translations as $translation) {
+                $names[] = $translation->label;
+            }
+            foreach ($names as $name) {
+                if ($name !== null && trim((string) $name) !== '') {
+                    $this->brandLookup[self::normalizeName((string) $name)] = $option->code;
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves a raw Woo "Brands" cell to a pbrand AttributeOption code,
+     * auto-creating a new option (admin_label = the raw text) the first time
+     * a given brand name is seen — there's no pre-existing brand list to map
+     * against, unlike categories, so requiring a human to approve every
+     * brand up front isn't practical. Every auto-created brand is reported
+     * back in the conversion summary so it can be reviewed/renamed/merged
+     * afterwards under Attributes > Brand.
+     */
+    private function resolveBrand(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '' || !$this->brandAttribute) {
+            return $raw;
+        }
+
+        $key = self::normalizeName($raw);
+        if (isset($this->brandLookup[$key])) {
+            return $this->brandLookup[$key];
+        }
+
+        $code = $this->makeBrandOptionCode($raw);
+        $option = AttributeOption::create([
+            'attribute_id' => $this->brandAttribute->id,
+            'code' => $code,
+            'admin_label' => $raw,
+            'sort_order' => 0,
+        ]);
+
+        AuditLog::record('option_created', $this->brandAttribute, null, [
+            "option#{$option->id}.code" => $option->code,
+            "option#{$option->id}.admin_label" => $raw,
+            "option#{$option->id}.swatch_value" => null,
+            "option#{$option->id}.sort_order" => 0,
+        ]);
+
+        $this->brandLookup[$key] = $code;
+        $this->newBrandNames[] = $raw;
+
+        return $code;
+    }
+
+    /**
+     * Slugifies the brand name into a code matching what
+     * AttributeOptionRowImporter accepts (^[a-z][a-z0-9_]*$), falling back
+     * to a hash-based code for names that slugify to nothing (e.g. Thai-only
+     * text Str::slug can't transliterate), and de-duping against every code
+     * already used for pbrand this run.
+     */
+    private function makeBrandOptionCode(string $name): string
+    {
+        $slug = Str::slug($name, '_');
+        if ($slug === '' || !preg_match('/^[a-z]/', $slug)) {
+            $slug = 'brand_' . ($slug !== '' ? $slug : substr(md5($name), 0, 8));
+        }
+
+        $code = $slug;
+        $i = 2;
+        while (in_array($code, $this->brandLookup, true)) {
+            $code = "{$slug}_{$i}";
+            $i++;
+        }
+
+        return $code;
     }
 
     private static function stripBom(string $s): string
@@ -313,12 +445,60 @@ class WooCommerceConverter
         return [$categories, $subcategories, $groups];
     }
 
+    /**
+     * Every previously-saved Category Mapping row (see rememberCategoryAliases()),
+     * keyed the same way an uploaded category_map file is — so a Woo
+     * "Categories" cell resolved once (by hand, via an upload) auto-resolves
+     * on every later conversion without re-uploading that file.
+     *
+     * @return array<string,array{pcatname:string,psubcatname:string,productgroupname:string}>
+     */
+    private function loadCategoryAliases(): array
+    {
+        $aliases = [];
+        foreach (WooCategoryAlias::all() as $alias) {
+            $aliases[$alias->match_key] = [
+                'pcatname' => (string) $alias->pcatname,
+                'psubcatname' => (string) $alias->psubcatname,
+                'productgroupname' => (string) $alias->productgroupname,
+            ];
+        }
+        return $aliases;
+    }
+
+    /**
+     * Persists an uploaded category_map file's rows as WooCategoryAlias
+     * records (upserted by match_key) so future conversions apply them
+     * automatically — this is what makes an uploaded mapping "permanent".
+     *
+     * @param  array<string,array{pcatname:string,psubcatname:string,productgroupname:string}>  $overrides
+     */
+    private function rememberCategoryAliases(array $overrides): void
+    {
+        foreach ($overrides as $matchKey => $codes) {
+            if ($codes['pcatname'] === '' && $codes['psubcatname'] === '' && $codes['productgroupname'] === '') {
+                continue;
+            }
+            WooCategoryAlias::updateOrCreate(
+                ['match_key' => $matchKey],
+                [
+                    'woo_category_text' => $this->overrideRawText[$matchKey] ?? $matchKey,
+                    'pcatname' => $codes['pcatname'] !== '' ? $codes['pcatname'] : null,
+                    'psubcatname' => $codes['psubcatname'] !== '' ? $codes['psubcatname'] : null,
+                    'productgroupname' => $codes['productgroupname'] !== '' ? $codes['productgroupname'] : null,
+                    'created_by' => auth()->check() ? auth()->id() : null,
+                ]
+            );
+        }
+    }
+
     /** @return array<string,array{pcatname:string,psubcatname:string,productgroupname:string}> */
     private function loadCategoryMapOverride(string $path): array
     {
         $overrides = [];
         foreach (self::readSimpleCsv($path) as $row) {
-            $key = self::normalizeName((string) ($row['woo_categories'] ?? ''));
+            $text = trim((string) ($row['woo_categories'] ?? ''));
+            $key = self::normalizeName($text);
             if ($key === '') {
                 continue;
             }
@@ -327,6 +507,7 @@ class WooCommerceConverter
                 'psubcatname' => trim((string) ($row['psubcatname'] ?? '')),
                 'productgroupname' => trim((string) ($row['productgroupname'] ?? '')),
             ];
+            $this->overrideRawText[$key] = $text;
         }
         return $overrides;
     }
