@@ -181,8 +181,8 @@ class DashboardController extends Controller
      */
     private function lowStockCount(): int
     {
-        $minStockId = Attribute::where('code', 'min_stock')->value('id');
-        $currentStockId = Attribute::where('code', 'current_stock')->value('id');
+        $minStockId = Attribute::idForCode('min_stock');
+        $currentStockId = Attribute::idForCode('current_stock');
 
         if (!$minStockId || !$currentStockId) {
             return 0;

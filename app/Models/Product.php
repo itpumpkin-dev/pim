@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Product extends Model
 {
@@ -134,6 +135,28 @@ class Product extends Model
                 }
             }
         }
+    }
+
+    private const STOREFRONT_VERSION_KEY = 'storefront:version';
+
+    /**
+     * Cache-key version for StorefrontController::home()'s cached payload.
+     * Bumped wherever ProductController already dispatches ProductDataChanged
+     * (the same event that drives the storefront's live-reload websocket
+     * channel) plus product creation, so the cache goes stale exactly when
+     * the live-reloading browser tab would otherwise be shown fresh data —
+     * see bumpStorefrontVersion() callers. Anything that changes storefront
+     * data through another path (imports, marketplace syncs) isn't covered
+     * by this version bump, but is still bounded by the cache's own TTL.
+     */
+    public static function storefrontVersion(): int
+    {
+        return (int) Cache::get(self::STOREFRONT_VERSION_KEY, 1);
+    }
+
+    public static function bumpStorefrontVersion(): void
+    {
+        Cache::forever(self::STOREFRONT_VERSION_KEY, self::storefrontVersion() + 1);
     }
 }
 

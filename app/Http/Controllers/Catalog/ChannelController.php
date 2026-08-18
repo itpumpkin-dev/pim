@@ -93,6 +93,8 @@ class ChannelController extends Controller
             'currency_ids' => $validated['currency_ids'],
         ]);
 
+        Channel::bumpListVersion();
+
         return to_route('catalog.channels.index')->with('success', 'Channel created successfully.');
     }
 
@@ -148,12 +150,16 @@ class ChannelController extends Controller
             AuditLog::record('currencies_updated', $channel, ['currency_ids' => $oldCurrencyIds], ['currency_ids' => $newCurrencyIds]);
         }
 
+        Channel::bumpListVersion();
+
         return to_route('catalog.channels.index')->with('success', 'Channel updated successfully.');
     }
 
     public function destroy(Channel $channel): RedirectResponse
     {
         $channel->delete();
+
+        Channel::bumpListVersion();
 
         return to_route('catalog.channels.index')->with('success', 'Channel deleted successfully.');
     }

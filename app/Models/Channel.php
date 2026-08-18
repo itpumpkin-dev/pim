@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class Channel extends Model
 {
@@ -73,5 +75,36 @@ class Channel extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    private const LIST_VERSION_KEY = 'channels:list:version';
+
+    /**
+     * Cached replacement for `Channel::all()` in listing/dropdown call sites
+     * (e.g. ProductController's channel filter options) — cheap, but was
+     * re-querying (with its translations relation) on every request. Split
+     * by locale since each cached model carries its translations and the
+     * `name` accessor resolves against `app()->getLocale()` at read time.
+     */
+    public static function cachedAll(): Collection
+    {
+        return Cache::rememberForever(
+            'channels.all:v'.static::listVersion().':'.app()->getLocale(),
+            fn () => static::all()
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    /**
+     * Call after any change to a channel's core fields or translations
+     * (create/update/delete) — see ChannelController::store()/update()/destroy().
+     */
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
     }
 }

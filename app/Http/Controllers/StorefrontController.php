@@ -10,6 +10,7 @@ use App\Models\ProductViewEvent;
 use App\Services\Catalog\ProductPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,19 +28,36 @@ use Inertia\Response;
  */
 class StorefrontController extends Controller
 {
+    /**
+     * Ceiling on how stale the cached home() payload can get from a write
+     * path that doesn't go through Product::bumpStorefrontVersion() (e.g.
+     * an import job or marketplace sync) — the version bump already makes
+     * every ProductController edit/create/delete show up immediately, this
+     * is just a safety net for the rest.
+     */
+    private const CACHE_TTL_SECONDS = 300;
+
     public function home(): Response
     {
-        $products = Product::where('enabled', true)->where('type', 'simple')->orderBy('id')->get();
+        $payload = Cache::remember(
+            'storefront:home:v'.Product::storefrontVersion(),
+            self::CACHE_TTL_SECONDS,
+            function () {
+                $products = Product::where('enabled', true)->where('type', 'simple')->orderBy('id')->get();
 
-        $mapped = ProductPresenter::mapMany($products);
+                $mapped = ProductPresenter::mapMany($products);
 
-        $categories = collect($mapped)->pluck('category')->unique()->sort()->values()->all();
+                $categories = collect($mapped)->pluck('category')->unique()->sort()->values()->all();
 
-        return Inertia::render('home', [
-            'products' => $mapped,
-            'categories' => $categories,
-            'topViewedProducts' => $this->topViewedProducts($mapped),
-        ]);
+                return [
+                    'products' => $mapped,
+                    'categories' => $categories,
+                    'topViewedProducts' => $this->topViewedProducts($mapped),
+                ];
+            }
+        );
+
+        return Inertia::render('home', $payload);
     }
 
     /**
@@ -81,7 +99,7 @@ class StorefrontController extends Controller
         $localeCode = app()->getLocale();
         $mapped = ProductPresenter::mapMany(collect([$product]), $localeCode, $viewer)[0];
 
-        $categoryAttributeId = Attribute::where('code', 'pcatname')->value('id');
+        $categoryAttributeId = Attribute::idForCode('pcatname');
 
         // pcatname is a select field storing an AttributeOption code, not the
         // label — $mapped['category'] is already the resolved label (see

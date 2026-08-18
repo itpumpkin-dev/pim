@@ -54,7 +54,7 @@ class ProductController extends Controller
     {
         $grid = new GridManager('product_grid');
 
-        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+        $nameAttributeId = Attribute::idForCode('pname');
 
         // `name` and any dynamic "Add Filter" attribute filters are EAV
         // (ProductValue), not real columns on `products`, so GridManager's
@@ -314,7 +314,7 @@ class ProductController extends Controller
             return response()->json([]);
         }
 
-        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+        $nameAttributeId = Attribute::idForCode('pname');
 
         $matchingProductIds = $nameAttributeId
             ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$query}%")->pluck('product_id')
@@ -355,7 +355,7 @@ class ProductController extends Controller
 
         $products = Product::where('sku', 'like', '%'.$validated['sku'].'%')->get(['id', 'sku']);
 
-        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+        $nameAttributeId = Attribute::idForCode('pname');
 
         $names = $nameAttributeId
             ? ProductValue::whereIn('product_id', $products->pluck('id'))->where('attribute_id', $nameAttributeId)->pluck('value', 'product_id')
@@ -710,6 +710,12 @@ class ProductController extends Controller
             }
         });
 
+        // Unlike update()/destroy(), creation has no ProductDataChanged
+        // websocket push (a new product only matters once it's actually
+        // findable/edited), but the storefront cache still needs to know
+        // about it — see Product::bumpStorefrontVersion().
+        Product::bumpStorefrontVersion();
+
         // Land the user straight in Edit — the Create form only captures
         // SKU/family/type/variants, so without this they'd have to manually
         // find the product they just made in the grid before they could add
@@ -915,7 +921,7 @@ class ProductController extends Controller
         // channel, across all locales. Values for other channels are fetched on
         // demand via GET .../attribute-values when the user switches the channel
         // selector, to keep this initial payload bounded.
-        $channels = Channel::all()->map(fn (Channel $c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
+        $channels = Channel::cachedAll()->map(fn (Channel $c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
         $defaultChannelId = $channels->first()['id'] ?? null;
 
         // Groups the flat channel list by sales platform (Lazada, ...) for the
@@ -975,8 +981,8 @@ class ProductController extends Controller
 
         $variantsData = [];
         if (strtolower($product->type) === 'configurable') {
-            $priceAttrId = Attribute::where('code', 'price')->value('id');
-            $qtyAttrId = Attribute::where('code', 'qty')->value('id');
+            $priceAttrId = Attribute::idForCode('price');
+            $qtyAttrId = Attribute::idForCode('qty');
 
             $variants = Product::where('parent_id', $product->id)->get();
             // Batched into one query keyed by product_id instead of a
@@ -1636,6 +1642,7 @@ class ProductController extends Controller
 
             if ($valuesChanged || $categoryChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
                 event(new ProductDataChanged($product->id, $product->enabled));
+                Product::bumpStorefrontVersion();
             }
 
             // Sync Variants (Cartesian Product Children)
@@ -1781,6 +1788,7 @@ class ProductController extends Controller
         $product->delete();
 
         event(new ProductDataChanged($productId, false));
+        Product::bumpStorefrontVersion();
 
         return to_route('catalog.products.index')->with('success', 'Product deleted successfully.');
     }
@@ -1848,7 +1856,7 @@ class ProductController extends Controller
     {
         $records = $product->associations()->with(['associatedProduct', 'associationType'])->get();
 
-        $nameAttributeId = Attribute::where('code', 'pname')->value('id');
+        $nameAttributeId = Attribute::idForCode('pname');
         $names = $nameAttributeId
             ? ProductValue::whereIn('product_id', $records->pluck('associated_product_id'))
                 ->where('attribute_id', $nameAttributeId)

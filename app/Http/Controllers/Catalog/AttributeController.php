@@ -199,6 +199,8 @@ class AttributeController extends Controller
             AuditLog::record('labels_set', $attribute, null, $newTranslations);
         }
 
+        Attribute::bumpCodeMapVersion();
+
         return to_route('catalog.attributes.index')->with('success', 'Attribute created successfully.');
     }
 
@@ -354,6 +356,8 @@ class AttributeController extends Controller
     public function destroy(Attribute $attribute): RedirectResponse
     {
         $attribute->delete();
+
+        Attribute::bumpCodeMapVersion();
 
         return to_route('catalog.attributes.index')->with('success', 'Attribute deleted successfully.');
     }

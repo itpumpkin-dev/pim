@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 
 class Attribute extends Model
 {
@@ -96,5 +97,43 @@ class Attribute extends Model
     public function translations(): HasMany
     {
         return $this->hasMany(AttributeTranslation::class);
+    }
+
+    private const CODE_MAP_VERSION_KEY = 'attributes:code_map:version';
+
+    /**
+     * Cached code => id lookup, for the many call sites that only need an
+     * attribute's id (e.g. resolving 'pname'/'price'/'qty' to a column id
+     * for a query) and previously ran a fresh `where('code', ...)->value('id')`
+     * query on every request. `code` is immutable after creation (see
+     * CodeGenerator::createWithRetry in AttributeController::store()), so
+     * only create/delete need to invalidate this — see bumpCodeMapVersion().
+     */
+    public static function idForCode(string $code): ?int
+    {
+        return static::codeToIdMap()[$code] ?? null;
+    }
+
+    public static function codeToIdMap(): array
+    {
+        return Cache::rememberForever(
+            'attributes.code_to_id:v'.static::codeMapVersion(),
+            fn () => static::query()->pluck('id', 'code')->all()
+        );
+    }
+
+    public static function codeMapVersion(): int
+    {
+        return (int) Cache::get(self::CODE_MAP_VERSION_KEY, 1);
+    }
+
+    /**
+     * Call after creating or deleting an attribute (see
+     * AttributeController::store()/destroy()) so idForCode()/codeToIdMap()
+     * stop serving a stale set of codes.
+     */
+    public static function bumpCodeMapVersion(): void
+    {
+        Cache::forever(self::CODE_MAP_VERSION_KEY, self::codeMapVersion() + 1);
     }
 }
