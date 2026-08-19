@@ -3,19 +3,15 @@ import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
-import LinkIcon from '@mui/icons-material/Link';
-import StoreOutlinedIcon from '@mui/icons-material/StoreOutlined';
-import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
+    Avatar,
     Box,
     Button,
-    Card,
-    CardContent,
-    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
@@ -24,8 +20,9 @@ import {
     DialogTitle,
     Divider,
     FormControlLabel,
-    Grid,
     IconButton,
+    Menu,
+    MenuItem,
     Paper,
     Stack,
     Switch,
@@ -43,11 +40,6 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// Mirrors dashboard.tsx's AdminLTE-style card language (CARD_SHADOW,
-// TH_SX/TD_SX/TR_SX) so this page reads as the same design system rather
-// than the plain default-MUI look it had before.
-const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
-
 const TH_SX = { padding: '12px 20px', fontWeight: 600, fontSize: '0.8rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.03em' };
 const TD_SX = { padding: '12px 20px', fontSize: '0.875rem' };
 const TR_SX = {
@@ -63,6 +55,11 @@ const TR_SX = {
 // TikTok, so a per-brand color map would leave any custom platform
 // uncolored. Same 4-color rotation the dashboard's own info boxes use.
 const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
+
+// How many shops show before the "view all" toggle takes over — enough to
+// give a sense of the list without pushing the table past the fold for
+// platforms with many shops.
+const SHOPS_PREVIEW_COUNT = 3;
 
 interface ShopItem {
     id: number;
@@ -85,6 +82,13 @@ interface Props {
     platforms: PlatformItem[];
 }
 
+function linkedAccountLabel(shop: ShopItem): string | null {
+    if (shop.lazada_seller_account_id) return `Lazada #${shop.lazada_seller_account_id}`;
+    if (shop.shopee_seller_account_id) return `Shopee #${shop.shopee_seller_account_id}`;
+    if (shop.tiktok_seller_account_id) return `TikTok #${shop.tiktok_seller_account_id}`;
+    return null;
+}
+
 export default function SalesPlatformIndex({ platforms }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -100,21 +104,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         { title: tNav('channels'), href: '/catalog/channels' },
     ];
 
-    // Summary strip counts — derived straight from the same `platforms` prop
-    // the sections below render, not a separate fetch.
-    const allShops = platforms.flatMap((p) => p.shops);
-    const totalShops = allShops.length;
-    const activeShopsCount = allShops.filter((s) => s.is_active).length;
-    const linkedShopsCount = allShops.filter(
-        (s) => s.lazada_seller_account_id || s.shopee_seller_account_id || s.tiktok_seller_account_id,
-    ).length;
-
-    const summaryBoxes = [
-        { title: t('salesPlatformsTab'), value: platforms.length, icon: <StorefrontOutlinedIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.accent },
-        { title: t('shopsLabel'), value: totalShops, icon: <StoreOutlinedIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.highlight },
-        { title: t('shopActive'), value: activeShopsCount, icon: <CheckCircleOutlineIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.primary },
-        { title: t('linkedPlatformAccount'), value: linkedShopsCount, icon: <LinkIcon sx={{ fontSize: 28, color: '#fff' }} />, iconBg: PALETTE.secondary },
-    ];
+    const [activePlatformId, setActivePlatformId] = useState<number | null>(platforms[0]?.id ?? null);
+    const activePlatform = platforms.find((p) => p.id === activePlatformId) ?? platforms[0] ?? null;
+    const [showAllShops, setShowAllShops] = useState(false);
 
     const [platformDialogOpen, setPlatformDialogOpen] = useState(false);
     const [editingPlatform, setEditingPlatform] = useState<PlatformItem | null>(null);
@@ -123,6 +115,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [deletePlatformId, setDeletePlatformId] = useState<number | null>(null);
     const [savingPlatform, setSavingPlatform] = useState(false);
     const [deletingPlatform, setDeletingPlatform] = useState(false);
+    const [platformMenuAnchor, setPlatformMenuAnchor] = useState<HTMLElement | null>(null);
 
     const [shopDialogPlatformId, setShopDialogPlatformId] = useState<number | null>(null);
     const [editingShop, setEditingShop] = useState<ShopItem | null>(null);
@@ -132,8 +125,14 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [deleteShopId, setDeleteShopId] = useState<number | null>(null);
     const [savingShop, setSavingShop] = useState(false);
     const [deletingShop, setDeletingShop] = useState(false);
+    const [shopMenuAnchor, setShopMenuAnchor] = useState<{ shopId: number; el: HTMLElement } | null>(null);
 
+    const [syncMenuAnchor, setSyncMenuAnchor] = useState<HTMLElement | null>(null);
     const [syncing, setSyncing] = useState(false);
+    const [syncingShopee, setSyncingShopee] = useState(false);
+    const [syncingTiktok, setSyncingTiktok] = useState(false);
+    const [syncingLiveStatus, setSyncingLiveStatus] = useState(false);
+    const anySyncing = syncing || syncingShopee || syncingTiktok || syncingLiveStatus;
 
     const openCreatePlatform = () => {
         setEditingPlatform(null);
@@ -199,49 +198,22 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
     const syncLazada = () => {
         setSyncing(true);
-        router.post(
-            '/catalog/sales-platforms/sync-lazada',
-            {},
-            {
-                onFinish: () => setSyncing(false),
-            },
-        );
+        router.post('/catalog/sales-platforms/sync-lazada', {}, { onFinish: () => setSyncing(false) });
     };
 
-    const [syncingShopee, setSyncingShopee] = useState(false);
     const syncShopee = () => {
         setSyncingShopee(true);
-        router.post(
-            '/catalog/sales-platforms/sync-shopee',
-            {},
-            {
-                onFinish: () => setSyncingShopee(false),
-            },
-        );
+        router.post('/catalog/sales-platforms/sync-shopee', {}, { onFinish: () => setSyncingShopee(false) });
     };
 
-    const [syncingTiktok, setSyncingTiktok] = useState(false);
     const syncTiktok = () => {
         setSyncingTiktok(true);
-        router.post(
-            '/catalog/sales-platforms/sync-tiktok',
-            {},
-            {
-                onFinish: () => setSyncingTiktok(false),
-            },
-        );
+        router.post('/catalog/sales-platforms/sync-tiktok', {}, { onFinish: () => setSyncingTiktok(false) });
     };
 
-    const [syncingLiveStatus, setSyncingLiveStatus] = useState(false);
     const syncLiveStatus = () => {
         setSyncingLiveStatus(true);
-        router.post(
-            '/catalog/sales-platforms/sync-live-status',
-            {},
-            {
-                onFinish: () => setSyncingLiveStatus(false),
-            },
-        );
+        router.post('/catalog/sales-platforms/sync-live-status', {}, { onFinish: () => setSyncingLiveStatus(false) });
     };
 
     // Per-shop sync — a Set (not a single id) since more than one shop's
@@ -264,6 +236,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         );
     };
 
+    const menuShop = activePlatform?.shops.find((s) => s.id === shopMenuAnchor?.shopId) ?? null;
+    const visibleShops = activePlatform ? (showAllShops ? activePlatform.shops : activePlatform.shops.slice(0, SHOPS_PREVIEW_COUNT)) : [];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
@@ -278,22 +253,37 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                 </Tabs>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-                    <Typography variant="h4" fontWeight={700}>
-                        {t('salesPlatformsTitle')}
-                    </Typography>
+                    <Box>
+                        <Typography variant="h4" fontWeight={700}>
+                            {t('salesPlatformsTitle')}
+                        </Typography>
+                        <Typography color="text.secondary">{t('salesPlatformsSubtitle')}</Typography>
+                    </Box>
                     <Stack direction="row" spacing={1.5}>
-                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLazada} disabled={syncing}>
-                            {syncing ? t('syncingLazada') : t('syncFromLazada')}
+                        <Button
+                            variant="outlined"
+                            startIcon={anySyncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                            endIcon={<ArrowDropDownIcon />}
+                            disabled={anySyncing}
+                            onClick={(e) => setSyncMenuAnchor(e.currentTarget)}
+                        >
+                            {t('syncData')}
                         </Button>
-                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncShopee} disabled={syncingShopee}>
-                            {syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
-                        </Button>
-                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncTiktok} disabled={syncingTiktok}>
-                            {syncingTiktok ? t('syncingTiktok') : t('syncFromTiktok')}
-                        </Button>
-                        <Button variant="outlined" startIcon={<SyncIcon />} onClick={syncLiveStatus} disabled={syncingLiveStatus}>
-                            {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
-                        </Button>
+                        <Menu anchorEl={syncMenuAnchor} open={Boolean(syncMenuAnchor)} onClose={() => setSyncMenuAnchor(null)}>
+                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncLazada(); }} disabled={syncing}>
+                                {syncing ? t('syncingLazada') : t('syncFromLazada')}
+                            </MenuItem>
+                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncShopee(); }} disabled={syncingShopee}>
+                                {syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
+                            </MenuItem>
+                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncTiktok(); }} disabled={syncingTiktok}>
+                                {syncingTiktok ? t('syncingTiktok') : t('syncFromTiktok')}
+                            </MenuItem>
+                            <Divider />
+                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncLiveStatus(); }} disabled={syncingLiveStatus}>
+                                {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
+                            </MenuItem>
+                        </Menu>
                         {canCreate && (
                             <Button sx={{ color: 'white' }} variant="contained" startIcon={<AddIcon />} onClick={openCreatePlatform}>
                                 {t('createPlatform')}
@@ -302,150 +292,128 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     </Stack>
                 </Box>
 
-                {/* Summary strip — same info-box language as dashboard.tsx's Row 2 */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    {summaryBoxes.map((box, i) => (
-                        <Grid item xs={12} sm={6} md={3} key={i} sx={{ display: 'flex' }}>
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    width: '100%',
-                                    borderRadius: '0.25rem',
-                                    bgcolor: 'background.paper',
-                                    boxShadow: CARD_SHADOW,
-                                    overflow: 'hidden',
-                                }}
-                            >
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 70, bgcolor: box.iconBg, flexShrink: 0 }}>
-                                    {box.icon}
-                                </Box>
-                                <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
-                                        {box.title}
-                                    </Typography>
-                                    <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.25rem', color: 'text.primary', mt: 0.25 }}>
-                                        {box.value}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </Grid>
-                    ))}
-                </Grid>
-
-                {platforms.length === 0 && (
+                {platforms.length === 0 ? (
                     <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
                         <Typography color="text.secondary">{t('noPlatformsFound')}</Typography>
                     </Paper>
-                )}
-
-                <Stack spacing={3}>
-                    {platforms.map((platform, index) => (
-                        <Card
-                            key={platform.id}
-                            elevation={0}
-                            sx={{
-                                borderRadius: '0.25rem',
-                                borderTop: `3px solid ${PLATFORM_ACCENT_COLORS[index % PLATFORM_ACCENT_COLORS.length]}`,
-                                bgcolor: 'background.paper',
-                                boxShadow: CARD_SHADOW,
+                ) : (
+                    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                        <Tabs
+                            value={activePlatform?.id ?? false}
+                            onChange={(_, val) => {
+                                setActivePlatformId(val);
+                                setShowAllShops(false);
                             }}
+                            sx={{ px: 2, borderBottom: 1, borderColor: 'divider' }}
                         >
-                            <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2.5, py: 2 }}>
-                                    <Stack direction="row" spacing={1.5} alignItems="center">
-                                        <Typography variant="h6" fontWeight={700}>
-                                            {platform.name}
-                                        </Typography>
-                                        <Chip label={platform.code} size="small" variant="outlined" />
-                                        <Chip label={`${t('shopsLabel')}: ${platform.shops.length}`} size="small" />
-                                    </Stack>
-                                    <Stack direction="row" spacing={0.5}>
+                            {platforms.map((platform, index) => (
+                                <Tab
+                                    key={platform.id}
+                                    value={platform.id}
+                                    iconPosition="start"
+                                    icon={
+                                        <Avatar
+                                            sx={{
+                                                width: 22,
+                                                height: 22,
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                bgcolor: PLATFORM_ACCENT_COLORS[index % PLATFORM_ACCENT_COLORS.length],
+                                            }}
+                                        >
+                                            {platform.name.charAt(0).toUpperCase()}
+                                        </Avatar>
+                                    }
+                                    label={`${platform.name} ${platform.shops.length}`}
+                                />
+                            ))}
+                        </Tabs>
+
+                        {activePlatform && (
+                            <>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', px: 2, py: 1 }}>
+                                    {canEdit && (
+                                        <Button size="small" startIcon={<AddIcon fontSize="small" />} onClick={() => openCreateShop(activePlatform.id)}>
+                                            {t('addShop')}
+                                        </Button>
+                                    )}
+                                    {(canEdit || canDelete) && (
+                                        <IconButton size="small" onClick={(e) => setPlatformMenuAnchor(e.currentTarget)}>
+                                            <MoreVertIcon fontSize="small" />
+                                        </IconButton>
+                                    )}
+                                    <Menu anchorEl={platformMenuAnchor} open={Boolean(platformMenuAnchor)} onClose={() => setPlatformMenuAnchor(null)}>
                                         {canEdit && (
-                                            <IconButton size="small" onClick={() => openEditPlatform(platform)}>
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
+                                            <MenuItem
+                                                onClick={() => {
+                                                    setPlatformMenuAnchor(null);
+                                                    openEditPlatform(activePlatform);
+                                                }}
+                                            >
+                                                <EditIcon fontSize="small" sx={{ mr: 1 }} /> {t('editPlatform')}
+                                            </MenuItem>
                                         )}
                                         {canDelete && (
-                                            <IconButton size="small" color="error" onClick={() => setDeletePlatformId(platform.id)}>
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
+                                            <MenuItem
+                                                sx={{ color: 'error.main' }}
+                                                onClick={() => {
+                                                    setPlatformMenuAnchor(null);
+                                                    setDeletePlatformId(activePlatform.id);
+                                                }}
+                                            >
+                                                <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> {tGrid('delete')}
+                                            </MenuItem>
                                         )}
-                                    </Stack>
+                                    </Menu>
                                 </Box>
                                 <Divider />
+
                                 <TableContainer>
-                                    <Table size="small">
+                                    <Table>
                                         <TableHead>
                                             <TableRow>
-                                                <TableCell sx={TH_SX}>{t('shopCode')}</TableCell>
-                                                <TableCell sx={TH_SX}>{t('shopName')}</TableCell>
+                                                <TableCell sx={TH_SX}>{t('shopsLabel')}</TableCell>
                                                 <TableCell sx={TH_SX}>{t('linkedPlatformAccount')}</TableCell>
                                                 <TableCell sx={TH_SX}>{t('shopActive')}</TableCell>
-                                                {(canEdit || canDelete) && (
-                                                    <TableCell sx={{ ...TH_SX, textAlign: 'right' }}>{tGrid('actionsHeader')}</TableCell>
-                                                )}
+                                                <TableCell sx={{ ...TH_SX, width: 48 }} />
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
-                                            {platform.shops.map((shop) => (
+                                            {visibleShops.map((shop) => (
                                                 <TableRow key={shop.id} sx={TR_SX}>
-                                                    <TableCell sx={TD_SX}>{shop.code}</TableCell>
-                                                    <TableCell sx={{ ...TD_SX, fontWeight: 600 }}>{shop.name}</TableCell>
                                                     <TableCell sx={TD_SX}>
-                                                        {shop.lazada_seller_account_id ? (
-                                                            <Chip label={`Lazada #${shop.lazada_seller_account_id}`} size="small" color="success" variant="outlined" />
-                                                        ) : shop.shopee_seller_account_id ? (
-                                                            <Chip label={`Shopee #${shop.shopee_seller_account_id}`} size="small" color="success" variant="outlined" />
-                                                        ) : shop.tiktok_seller_account_id ? (
-                                                            <Chip label={`TikTok #${shop.tiktok_seller_account_id}`} size="small" color="success" variant="outlined" />
-                                                        ) : (
+                                                        <Typography variant="body2" fontWeight={600}>{shop.name}</Typography>
+                                                        <Typography variant="caption" color="text.secondary">{shop.code}</Typography>
+                                                    </TableCell>
+                                                    <TableCell sx={TD_SX}>
+                                                        {linkedAccountLabel(shop) ?? (
                                                             <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
                                                                 {t('noLinkedAccount')}
                                                             </Typography>
                                                         )}
                                                     </TableCell>
                                                     <TableCell sx={TD_SX}>
-                                                        <Chip
-                                                            label={shop.is_active ? t('shopActive') : '-'}
-                                                            size="small"
-                                                            color={shop.is_active ? 'success' : 'default'}
-                                                        />
-                                                    </TableCell>
-                                                    {(canEdit || canDelete) && (
-                                                        <TableCell sx={{ ...TD_SX, textAlign: 'right' }}>
-                                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                                {canEdit && shop.lazada_seller_account_id && (
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        title={t('syncLiveStatus')}
-                                                                        disabled={syncingShopIds.has(shop.id)}
-                                                                        onClick={() => syncShopLiveStatus(shop.id)}
-                                                                    >
-                                                                        {syncingShopIds.has(shop.id) ? (
-                                                                            <CircularProgress size={16} />
-                                                                        ) : (
-                                                                            <SyncIcon fontSize="small" />
-                                                                        )}
-                                                                    </IconButton>
-                                                                )}
-                                                                {canEdit && (
-                                                                    <IconButton size="small" onClick={() => openEditShop(platform.id, shop)}>
-                                                                        <EditIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                )}
-                                                                {canDelete && (
-                                                                    <IconButton size="small" color="error" onClick={() => setDeleteShopId(shop.id)}>
-                                                                        <DeleteIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                )}
+                                                        {shop.is_active ? (
+                                                            <Stack direction="row" spacing={0.75} alignItems="center">
+                                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
+                                                                <Typography variant="body2">{t('shopActive')}</Typography>
                                                             </Stack>
-                                                        </TableCell>
-                                                    )}
+                                                        ) : (
+                                                            '-'
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell sx={{ ...TD_SX, textAlign: 'right' }}>
+                                                        {(canEdit || canDelete) && (
+                                                            <IconButton size="small" onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
+                                                                <MoreVertIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </TableCell>
                                                 </TableRow>
                                             ))}
-                                            {platform.shops.length === 0 && (
+                                            {activePlatform.shops.length === 0 && (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} align="center" sx={TD_SX}>
+                                                    <TableCell colSpan={4} align="center" sx={TD_SX}>
                                                         <Typography variant="body2" color="text.secondary">
                                                             {t('noShopsYet')}
                                                         </Typography>
@@ -455,18 +423,60 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                         </TableBody>
                                     </Table>
                                 </TableContainer>
-                                {canEdit && (
-                                    <Box sx={{ px: 2.5, py: 2 }}>
-                                        <Button size="small" startIcon={<AddIcon />} onClick={() => openCreateShop(platform.id)}>
-                                            {t('addShop')}
+
+                                {activePlatform.shops.length > SHOPS_PREVIEW_COUNT && (
+                                    <Box sx={{ px: 2.5, py: 1.5 }}>
+                                        <Button size="small" onClick={() => setShowAllShops((v) => !v)}>
+                                            {showAllShops ? t('showFewerShops') : t('viewAllShops', { count: activePlatform.shops.length })}
                                         </Button>
                                     </Box>
                                 )}
-                            </CardContent>
-                        </Card>
-                    ))}
-                </Stack>
+                            </>
+                        )}
+                    </Paper>
+                )}
             </Box>
+
+            <Menu anchorEl={shopMenuAnchor?.el ?? null} open={Boolean(shopMenuAnchor)} onClose={() => setShopMenuAnchor(null)}>
+                {menuShop && canEdit && menuShop.lazada_seller_account_id && (
+                    <MenuItem
+                        disabled={syncingShopIds.has(menuShop.id)}
+                        onClick={() => {
+                            const shopId = menuShop.id;
+                            setShopMenuAnchor(null);
+                            syncShopLiveStatus(shopId);
+                        }}
+                    >
+                        {syncingShopIds.has(menuShop.id) ? (
+                            <CircularProgress size={14} sx={{ mr: 1 }} />
+                        ) : (
+                            <SyncIcon fontSize="small" sx={{ mr: 1 }} />
+                        )}
+                        {t('syncLiveStatus')}
+                    </MenuItem>
+                )}
+                {menuShop && canEdit && activePlatform && (
+                    <MenuItem
+                        onClick={() => {
+                            openEditShop(activePlatform.id, menuShop);
+                            setShopMenuAnchor(null);
+                        }}
+                    >
+                        <EditIcon fontSize="small" sx={{ mr: 1 }} /> {t('editShop')}
+                    </MenuItem>
+                )}
+                {menuShop && canDelete && (
+                    <MenuItem
+                        sx={{ color: 'error.main' }}
+                        onClick={() => {
+                            setDeleteShopId(menuShop.id);
+                            setShopMenuAnchor(null);
+                        }}
+                    >
+                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> {tGrid('delete')}
+                    </MenuItem>
+                )}
+            </Menu>
 
             <Dialog open={platformDialogOpen} onClose={() => setPlatformDialogOpen(false)} maxWidth="xs" fullWidth>
                 <Box component="form" onSubmit={submitPlatform}>

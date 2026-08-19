@@ -85,6 +85,12 @@
     "allJobTypes": "All Job Types",
 
     "wooConvertTitle": "WooCommerce Converter",
+    "wooHubSubtitle": "Convert product data between this catalog and your WooCommerce store, in either direction.",
+    "wooImportCardTitle": "Import from WooCommerce",
+    "wooImportCardDesc": "Convert a CSV exported from your WooCommerce store into the format this app's product import expects.",
+    "wooExportCardDesc": "Prepare a CSV of products from this catalog in the format WooCommerce's own Products > Import expects.",
+    "wooExportCardButton": "Go to Export",
+    "wooConvertHistoryTitle": "Import Conversion History",
     "wooConvertNewConversion": "New Conversion",
     "wooConvertNoneFound": "No conversions yet.",
     "wooConvertSubmit": "Convert",
@@ -126,5 +132,19 @@
     "wooConvertNextStep": "Once you're satisfied with the result, use the converted CSV as the file for a Products import.",
     "wooConvertGoToImport": "Go to Product Import",
     "wooConvertTypeWarningsTitle": "Type Warnings ({{count}})",
-    "wooConvertTypeWarningsTruncated": "...and {{remaining}} more."
+    "wooConvertTypeWarningsTruncated": "...and {{remaining}} more.",
+
+    "wooExportTitle": "Export to WooCommerce",
+    "wooExportIntro": "Exports products from this PIM into the column shape WooCommerce's own Products > Import screen expects, for a single chosen language. Configurable products are expanded into a variable parent row plus one variation row per variant, matching WooCommerce's own format for products with options.",
+    "wooExportLanguageSectionTitle": "Language",
+    "wooExportLocale": "Language",
+    "wooExportLocaleHelp": "Which language's product name/description/specifications to export. Content still sitting in this catalog's default (not-yet-split-per-language) scope is included automatically when exporting the Thai language, since that's this catalog's original source language.",
+    "wooExportProductsSectionTitle": "Specific Products (optional)",
+    "wooExportProductsHelp": "Search and pick specific products to export only those, instead of the whole catalog. Leave empty to use the filters below instead.",
+    "wooExportFilterSectionTitle": "Filters",
+    "wooExportFiltersIgnored": "Ignored while specific products are selected above.",
+    "wooExportAllFamilies": "All families",
+    "wooExportEnabledOnly": "Enabled products only",
+    "wooExportFormatSectionTitle": "File Format",
+    "wooExportSubmit": "Download Export"
 }

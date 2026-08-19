@@ -82,7 +82,13 @@
     "allStatuses": "ทุกสถานะ",
     "allJobTypes": "ทุกประเภทงาน",
 
-    "wooConvertTitle": "แปลงไฟล์ WooCommerce",
+    "wooConvertTitle": "WooCommerce",
+    "wooHubSubtitle": "แปลงข้อมูลสินค้าระหว่างระบบนี้กับร้าน WooCommerce ได้ทั้งสองทิศทาง",
+    "wooImportCardTitle": "นำเข้าจาก WooCommerce",
+    "wooImportCardDesc": "แปลงไฟล์ CSV ที่ export จากร้าน WooCommerce ให้อยู่ในรูปแบบที่ระบบนี้ใช้นำเข้าสินค้า",
+    "wooExportCardDesc": "เตรียมไฟล์ CSV สินค้าจากระบบนี้ให้อยู่ในรูปแบบที่หน้า Products > Import ของ WooCommerce ต้องการ",
+    "wooExportCardButton": "ไปที่หน้าส่งออก",
+    "wooConvertHistoryTitle": "ประวัติการแปลงไฟล์นำเข้า",
     "wooConvertNewConversion": "แปลงไฟล์ใหม่",
     "wooConvertNoneFound": "ยังไม่มีประวัติการแปลงไฟล์",
     "wooConvertSubmit": "แปลงไฟล์",
@@ -124,5 +130,19 @@
     "wooConvertNextStep": "เมื่อตรวจสอบผลลัพธ์เรียบร้อยแล้ว สามารถนำไฟล์ CSV ที่แปลงแล้วไปใช้เป็นไฟล์สำหรับนำเข้าสินค้าได้เลย",
     "wooConvertGoToImport": "ไปที่หน้านำเข้าสินค้า",
     "wooConvertTypeWarningsTitle": "คำเตือนเรื่องประเภทสินค้า ({{count}})",
-    "wooConvertTypeWarningsTruncated": "และอีก {{remaining}} รายการ"
+    "wooConvertTypeWarningsTruncated": "และอีก {{remaining}} รายการ",
+
+    "wooExportTitle": "ส่งออกไปยัง WooCommerce",
+    "wooExportIntro": "ส่งออกสินค้าจากระบบ PIM ให้อยู่ในรูปแบบคอลัมน์ที่หน้า Products > Import ของ WooCommerce เองต้องการ โดยเลือกได้ 1 ภาษาต่อการส่งออกหนึ่งครั้ง สินค้าที่มีตัวเลือกย่อย (variant) จะถูกแปลงเป็นแถวสินค้าแม่ชนิด variable พร้อมแถว variation ของแต่ละตัวเลือก ตามรูปแบบที่ WooCommerce ใช้กับสินค้าที่มีตัวเลือกย่อย",
+    "wooExportLanguageSectionTitle": "ภาษา",
+    "wooExportLocale": "ภาษา",
+    "wooExportLocaleHelp": "เลือกภาษาที่จะใช้สำหรับชื่อสินค้า/คำอธิบาย/ข้อมูลจำเพาะ ข้อมูลที่ยังไม่ได้แยกเป็นรายภาษา (อยู่ในสโคปเริ่มต้นของระบบ) จะถูกดึงมาใช้โดยอัตโนมัติเมื่อส่งออกเป็นภาษาไทย เนื่องจากเป็นภาษาต้นฉบับของข้อมูลในระบบนี้",
+    "wooExportProductsSectionTitle": "เลือกสินค้าเฉพาะ (ไม่บังคับ)",
+    "wooExportProductsHelp": "ค้นหาและเลือกสินค้าเฉพาะที่ต้องการส่งออก แทนที่จะส่งออกทั้งแคตตาล็อก หากไม่เลือกไว้ระบบจะใช้ตัวกรองด้านล่างแทน",
+    "wooExportFilterSectionTitle": "ตัวกรอง",
+    "wooExportFiltersIgnored": "จะถูกข้ามเมื่อมีการเลือกสินค้าเฉพาะไว้ด้านบน",
+    "wooExportAllFamilies": "ทุกตระกูล",
+    "wooExportEnabledOnly": "เฉพาะสินค้าที่เปิดใช้งาน",
+    "wooExportFormatSectionTitle": "รูปแบบไฟล์",
+    "wooExportSubmit": "ดาวน์โหลดไฟล์ส่งออก"
 }

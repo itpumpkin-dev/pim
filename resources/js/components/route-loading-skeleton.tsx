@@ -1,6 +1,25 @@
 import { router } from '@inertiajs/react';
-import { Box, Skeleton, Stack } from '@mui/material';
+import { Box, keyframes } from '@mui/material';
 import { useEffect, useState } from 'react';
+
+// From Uiverse.io by adamgiebl
+const pulse = keyframes`
+    0% {
+        transform: scale(0.8);
+        background-color: #ffcc99;
+        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+    }
+    50% {
+        transform: scale(1.2);
+        background-color: #ff8c1a;
+        box-shadow: 0 0 0 10px rgba(255, 204, 153, 0);
+    }
+    100% {
+        transform: scale(0.8);
+        background-color: #ffcc99;
+        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+    }
+`;
 
 // How long a navigation must stay in flight before the skeleton appears.
 // Most navigations (cached grids, warm permission checks) now resolve
@@ -56,24 +75,27 @@ export function RouteLoadingSkeleton() {
                 inset: 0,
                 zIndex: (theme) => theme.zIndex.appBar - 1,
                 bgcolor: 'background.default',
-                p: 3,
-                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
             }}
         >
-            <Skeleton variant="text" width={220} height={40} sx={{ mb: 2 }} />
-
-            <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
-                <Skeleton variant="rounded" width={120} height={36} />
-                <Skeleton variant="rounded" width={120} height={36} />
-                <Skeleton variant="rounded" width={96} height={36} sx={{ ml: 'auto' }} />
-            </Stack>
-
-            <Skeleton variant="rounded" height={52} sx={{ mb: 1 }} />
-            <Stack spacing={1}>
-                {Array.from({ length: 7 }).map((_, i) => (
-                    <Skeleton key={i} variant="rounded" height={44} />
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {[-0.3, -0.1, 0.1].map((delay) => (
+                    <Box
+                        key={delay}
+                        sx={{
+                            height: 20,
+                            width: 20,
+                            mr: delay === 0.1 ? 0 : '10px',
+                            borderRadius: '10px',
+                            bgcolor: '#ffcc99',
+                            animation: `${pulse} 1.5s infinite ease-in-out`,
+                            animationDelay: `${delay}s`,
+                        }}
+                    />
                 ))}
-            </Stack>
+            </Box>
         </Box>
     );
 }

@@ -4,6 +4,7 @@ import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import SaveIcon from '@mui/icons-material/Save';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -19,6 +20,7 @@ import {
     FormControlLabel,
     FormHelperText,
     InputLabel,
+    Menu,
     MenuItem,
     Paper,
     Select,
@@ -83,6 +85,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
     };
 
     const [activeAction, setActiveAction] = useState<'save' | 'run' | null>(null);
+    const [sampleAnchor, setSampleAnchor] = useState<HTMLElement | null>(null);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -111,10 +114,6 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                 setActiveAction(null);
             },
         });
-    };
-
-    const downloadSample = () => {
-        window.open(`/import-export/imports/sample/${data.type}`, '_blank');
     };
 
     return (
@@ -183,9 +182,30 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                                             ? data.file.name
                                             : (config.source_file_name ?? config.source_file_path?.split('/').pop() ?? t('noFileUploaded'))}
                                     </Typography>
-                                    <Button variant="text" startIcon={<DownloadIcon />} onClick={downloadSample}>
+                                    <Button
+                                        variant="text"
+                                        startIcon={<DownloadIcon />}
+                                        endIcon={<ArrowDropDownIcon />}
+                                        onClick={(e) => setSampleAnchor(e.currentTarget)}
+                                    >
                                         {t('downloadSample')}
                                     </Button>
+                                    <Menu anchorEl={sampleAnchor} open={Boolean(sampleAnchor)} onClose={() => setSampleAnchor(null)}>
+                                        <MenuItem
+                                            component="a"
+                                            href={`/import-export/imports/sample/${data.type}?format=csv`}
+                                            onClick={() => setSampleAnchor(null)}
+                                        >
+                                            CSV
+                                        </MenuItem>
+                                        <MenuItem
+                                            component="a"
+                                            href={`/import-export/imports/sample/${data.type}?format=xlsx`}
+                                            onClick={() => setSampleAnchor(null)}
+                                        >
+                                            XLSX
+                                        </MenuItem>
+                                    </Menu>
                                 </Stack>
                                 {(requiredColumnsByType[data.type] ?? []).length > 0 && (
                                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>

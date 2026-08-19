@@ -305,7 +305,9 @@ class ProductController extends Controller
     /**
      * Lightweight product search for the "Add related/up-sell/cross-sell
      * product" picker on the edit page — matches by SKU or by the `pname`
-     * attribute value, excluding whatever's already picked.
+     * attribute value (across every locale — a broader net than the display
+     * name below, deliberately, so e.g. a SKU-like number embedded in any
+     * locale's name still matches), excluding whatever's already picked.
      */
     public function search(Request $request): JsonResponse
     {
@@ -332,15 +334,51 @@ class ProductController extends Controller
             ->limit(20)
             ->get(['id', 'sku']);
 
-        $names = $nameAttributeId
-            ? ProductValue::whereIn('product_id', $products->pluck('id'))->where('attribute_id', $nameAttributeId)->pluck('value', 'product_id')
-            : collect();
+        $names = $this->resolveProductNamesInCurrentLocale($products->pluck('id'));
 
         return response()->json($products->map(fn (Product $product) => [
             'id' => $product->id,
             'sku' => $product->sku,
-            'name' => $names->get($product->id) ?: $product->sku,
+            'name' => ($names[$product->id] ?? null) ?: $product->sku,
         ])->values());
+    }
+
+    /**
+     * Resolves the `pname` attribute's value for each given product id in
+     * the admin's current UI locale (app()->getLocale()), falling back to
+     * the global (locale_id=null) scope when that locale has no row of its
+     * own — same locale-preference index() already applies to its grid.
+     * Without this, a plain `ProductValue::pluck('value', 'product_id')`
+     * has no ORDER BY across a product's several locale rows, so pluck()
+     * keeps whichever one the DB happened to return last — arbitrary, and
+     * not necessarily the viewing admin's language at all (confirmed live:
+     * a Thai-locale admin's product picker was showing Chinese names).
+     *
+     * @param  \Illuminate\Support\Collection<int, int>  $productIds
+     * @return array<int, string|null> product_id => name
+     */
+    private function resolveProductNamesInCurrentLocale(Collection $productIds): array
+    {
+        $nameAttributeId = Attribute::idForCode('pname');
+        if (! $nameAttributeId || $productIds->isEmpty()) {
+            return [];
+        }
+
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+
+        $rowsByProduct = ProductValue::whereIn('product_id', $productIds)
+            ->where('attribute_id', $nameAttributeId)
+            ->whereNull('channel_id')
+            ->get(['product_id', 'locale_id', 'value'])
+            ->groupBy('product_id');
+
+        $names = [];
+        foreach ($rowsByProduct as $productId => $rows) {
+            $match = $activeLocaleId ? $rows->firstWhere('locale_id', $activeLocaleId) : null;
+            $names[$productId] = ($match ?? $rows->firstWhere('locale_id', null))?->value;
+        }
+
+        return $names;
     }
 
     /**
@@ -809,11 +847,7 @@ class ProductController extends Controller
 
         $products = Product::where('sku', 'like', '%'.$validated['sku'].'%')->get(['id', 'sku']);
 
-        $nameAttributeId = Attribute::idForCode('pname');
-
-        $names = $nameAttributeId
-            ? ProductValue::whereIn('product_id', $products->pluck('id'))->where('attribute_id', $nameAttributeId)->pluck('value', 'product_id')
-            : collect();
+        $names = $this->resolveProductNamesInCurrentLocale($products->pluck('id'));
 
         $productCategoryIds = DB::table('product_category')
             ->whereIn('product_id', $products->pluck('id'))
@@ -858,7 +892,7 @@ class ProductController extends Controller
             return [
                 'id' => $product->id,
                 'sku' => $product->sku,
-                'name' => $names->get($product->id) ?: $product->sku,
+                'name' => ($names[$product->id] ?? null) ?: $product->sku,
                 'categories' => $leafCategoryIds->map(fn ($id) => $buildPath($id))->values(),
             ];
         })->values();
@@ -2303,12 +2337,7 @@ class ProductController extends Controller
     {
         $records = $product->associations()->with(['associatedProduct', 'associationType'])->get();
 
-        $nameAttributeId = Attribute::idForCode('pname');
-        $names = $nameAttributeId
-            ? ProductValue::whereIn('product_id', $records->pluck('associated_product_id'))
-                ->where('attribute_id', $nameAttributeId)
-                ->pluck('value', 'product_id')
-            : collect();
+        $names = $this->resolveProductNamesInCurrentLocale($records->pluck('associated_product_id'));
 
         $grouped = ['related' => [], 'up_sell' => [], 'cross_sell' => []];
 
@@ -2321,7 +2350,7 @@ class ProductController extends Controller
             $grouped[$code][] = [
                 'id' => $record->associatedProduct->id,
                 'sku' => $record->associatedProduct->sku,
-                'name' => $names->get($record->associatedProduct->id) ?: $record->associatedProduct->sku,
+                'name' => ($names[$record->associatedProduct->id] ?? null) ?: $record->associatedProduct->sku,
             ];
         }
 

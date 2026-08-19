@@ -4,12 +4,17 @@ namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttributeFamily;
+use App\Models\Locale;
+use App\Models\Product;
 use App\Models\WooConversion;
+use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\ImportExport\WooCommerceConverter;
+use App\Services\ImportExport\WooCommerceExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -111,6 +116,68 @@ class WooCommerceConversionController extends Controller
         ]);
 
         return to_route('importExport.wooConvert.show', $conversion->id)->with('success', 'Conversion complete.');
+    }
+
+    /**
+     * The reverse direction: exports PIM products into WooCommerce's own
+     * Products > Import CSV column shape, for a single chosen locale — see
+     * WooCommerceExporter's docblock for the mapping and its one Thai-source
+     * fallback exception.
+     */
+    public function exportForm(): Response
+    {
+        return Inertia::render('import-export/woo-convert/export', [
+            'locales' => Locale::active()->map(fn ($locale) => [
+                'code' => $locale->code,
+                'display_name' => $locale->display_name,
+            ])->values(),
+            'families' => AttributeFamily::query()->orderBy('code')->get(['code', 'name']),
+        ]);
+    }
+
+    /**
+     * Synchronous, direct-download export — same reasoning as
+     * ProductController::quickExport(): generating the file takes seconds
+     * even for the whole catalog, so there's nothing a queued job/history
+     * record would add here that a plain GET download doesn't already give.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'locale' => ['required', 'string', Rule::in(Locale::active()->pluck('code'))],
+            'format' => ['required', 'in:csv,xlsx'],
+            'family_code' => ['nullable', 'string'],
+            'enabled_only' => ['nullable', 'boolean'],
+            'product_ids' => ['nullable', 'array'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
+
+        $query = Product::whereNull('parent_id');
+        if (! empty($validated['product_ids'])) {
+            // A specific hand-picked selection overrides the family/enabled
+            // filters below rather than combining with them — picking exact
+            // products is a deliberate override of "export everything
+            // matching X", not a further narrowing of it.
+            $query->whereIn('id', $validated['product_ids']);
+        } else {
+            if (! empty($validated['family_code'])) {
+                $query->whereHas('family', fn ($q) => $q->where('code', $validated['family_code']));
+            }
+            if ($request->boolean('enabled_only')) {
+                $query->where('enabled', true);
+            }
+        }
+        $products = $query->orderBy('sku')->get(['id', 'sku', 'family_id', 'type', 'enabled', 'configurable_attributes']);
+
+        $result = (new WooCommerceExporter())->export($products, $validated['locale']);
+
+        $format = $validated['format'];
+        $tempPath = sys_get_temp_dir().'/woo_export_'.Str::uuid().'.'.$format;
+        SpreadsheetWriter::write($tempPath, $format, $result['header'], $result['rows'], ',');
+
+        $downloadName = "woocommerce-export-{$validated['locale']}-".now()->format('Ymd_His').".{$format}";
+
+        return response()->download($tempPath, $downloadName)->deleteFileAfterSend(true);
     }
 
     public function show(WooConversion $wooConversion): Response

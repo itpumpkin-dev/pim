@@ -9,12 +9,15 @@ use App\Models\JobTracker;
 use App\Services\CodeGenerator;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\SampleTemplateBuilder;
+use App\Services\ImportExport\SpreadsheetWriter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ImportConfigController extends Controller
 {
@@ -126,16 +129,21 @@ class ImportConfigController extends Controller
         return to_route('importExport.jobs.show', $tracker->id)->with('success', 'Import job queued.');
     }
 
-    public function sample(string $type): HttpResponse
+    public function sample(Request $request, string $type): BinaryFileResponse
     {
         abort_unless(in_array($type, ImportExportRegistry::TYPES, true), 404);
 
-        $csv = SampleTemplateBuilder::build($type, auth()->user());
-
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$type}_sample.csv\"",
+        $validated = $request->validate([
+            'format' => ['nullable', Rule::in(['csv', 'xlsx'])],
         ]);
+        $format = $validated['format'] ?? 'csv';
+
+        $table = SampleTemplateBuilder::build($type, auth()->user());
+
+        $tempPath = sys_get_temp_dir().'/import_sample_'.Str::uuid().'.'.$format;
+        SpreadsheetWriter::write($tempPath, $format, $table['columns'], $table['rows']);
+
+        return response()->download($tempPath, "{$type}_sample.{$format}")->deleteFileAfterSend(true);
     }
 
     /**

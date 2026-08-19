@@ -2,8 +2,10 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
 import {
     Box,
     Button,
@@ -11,6 +13,7 @@ import {
     IconButton,
     Pagination,
     Paper,
+    Stack,
     Table,
     TableBody,
     TableCell,
@@ -19,6 +22,7 @@ import {
     TableRow,
     Typography,
 } from '@mui/material';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface UserSummary {
@@ -57,6 +61,75 @@ function formatLocalDateTime(value: string): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+/**
+ * The two conversion directions (import a WooCommerce export in, prepare an
+ * export to send to WooCommerce) live under one "WooCommerce" menu entry but
+ * are otherwise unrelated flows. Presenting them as two clearly-labeled
+ * cards up front — rather than a generic "New Conversion" button next to an
+ * "Export" button — is what keeps users from picking the wrong one.
+ */
+function DirectionCard({
+    icon,
+    title,
+    description,
+    buttonLabel,
+    onClick,
+}: {
+    icon: ReactNode;
+    title: string;
+    description: string;
+    buttonLabel: string;
+    onClick: () => void;
+}) {
+    return (
+        <Paper
+            variant="outlined"
+            sx={{
+                p: 3,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                borderRadius: 2,
+                cursor: 'pointer',
+                transition: 'border-color 0.15s, box-shadow 0.15s',
+                '&:hover': { borderColor: 'primary.main', boxShadow: 1 },
+            }}
+            onClick={onClick}
+        >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        bgcolor: 'action.hover',
+                        color: 'primary.main',
+                        flexShrink: 0,
+                    }}
+                >
+                    {icon}
+                </Box>
+                <Typography variant="h6" fontWeight={700}>{title}</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+                {description}
+            </Typography>
+            <Button
+                variant="text"
+                endIcon={<ArrowForwardIcon />}
+                sx={{ alignSelf: 'flex-start', textTransform: 'none', mt: 1 }}
+                onClick={onClick}
+            >
+                {buttonLabel}
+            </Button>
+        </Paper>
+    );
+}
+
 export default function WooConvertIndex({ conversions }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tGrid } = useTranslation('grid');
@@ -85,22 +158,34 @@ export default function WooConvertIndex({ conversions }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
             <Box sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
-                    <Box>
-                        <Typography variant="h4" fontWeight={700}>{t('wooConvertTitle')}</Typography>
-                        <Typography color="text.secondary">{tGrid('results', { count: conversions.total })}</Typography>
-                    </Box>
-                    {canCreate && (
-                        <Button
-                            sx={{ color: 'white' }}
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/import-export/woo-convert/create')}
-                        >
-                            {t('wooConvertNewConversion')}
-                        </Button>
-                    )}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h4" fontWeight={700}>{t('wooConvertTitle')}</Typography>
+                    <Typography color="text.secondary">{t('wooHubSubtitle')}</Typography>
                 </Box>
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 4 }}>
+                    {canCreate && (
+                        <DirectionCard
+                            icon={<UploadFileIcon />}
+                            title={t('wooImportCardTitle')}
+                            description={t('wooImportCardDesc')}
+                            buttonLabel={t('wooConvertNewConversion')}
+                            onClick={() => router.visit('/import-export/woo-convert/create')}
+                        />
+                    )}
+                    <DirectionCard
+                        icon={<DownloadIcon />}
+                        title={t('wooExportTitle')}
+                        description={t('wooExportCardDesc')}
+                        buttonLabel={t('wooExportCardButton')}
+                        onClick={() => router.visit('/import-export/woo-convert/export')}
+                    />
+                </Stack>
+
+                <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1.5 }}>
+                    <Typography variant="h6" fontWeight={700}>{t('wooConvertHistoryTitle')}</Typography>
+                    <Typography variant="body2" color="text.secondary">{tGrid('results', { count: conversions.total })}</Typography>
+                </Stack>
 
                 {conversions.data.length === 0 ? (
                     <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>

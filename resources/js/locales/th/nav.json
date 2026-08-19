@@ -3,7 +3,6 @@
     "dashboard": "แดชบอร์ด",
     "catalog": "แคตตาล็อก",
     "products": "สินค้า",
-    "missingTranslations": "สินค้าที่ยังไม่ได้แปล",
     "categories": "หมวดหมู่",
     "channels": "ช่องทางขาย",
     "categoryFields": "ฟิลด์หมวดหมู่",
@@ -23,5 +22,5 @@
     "exports": "ส่งออกข้อมูล",
     "jobTracker": "ตัวติดตามงาน",
     "activityLogs": "บันทึกกิจกรรม",
-    "wooConvert": "แปลงไฟล์ WooCommerce"
+    "missingTranslations": "สินค้ารอแปลภาษา"
 }

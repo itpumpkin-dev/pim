@@ -34,6 +34,8 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
 
     Route::get('woo-convert', [WooCommerceConversionController::class, 'index'])->name('wooConvert.index')->middleware('permission:woo_conversions,list_woo_conversions');
     Route::get('woo-convert/create', [WooCommerceConversionController::class, 'create'])->name('wooConvert.create')->middleware('permission:woo_conversions,create_woo_conversions');
+    Route::get('woo-convert/export', [WooCommerceConversionController::class, 'exportForm'])->name('wooConvert.exportForm')->middleware('permission:woo_conversions,list_woo_conversions');
+    Route::get('woo-convert/export/download', [WooCommerceConversionController::class, 'export'])->name('wooConvert.export')->middleware('permission:woo_conversions,create_woo_conversions');
     Route::post('woo-convert', [WooCommerceConversionController::class, 'convert'])->name('wooConvert.convert')->middleware('permission:woo_conversions,create_woo_conversions');
     Route::get('woo-convert/{wooConversion}', [WooCommerceConversionController::class, 'show'])->name('wooConvert.show')->middleware('permission:woo_conversions,list_woo_conversions');
     Route::get('woo-convert/{wooConversion}/download', [WooCommerceConversionController::class, 'download'])->name('wooConvert.download')->middleware('permission:woo_conversions,list_woo_conversions');
