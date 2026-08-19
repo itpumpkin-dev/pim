@@ -113,6 +113,17 @@ class AttributeCatalogSeeder extends Seeder
         'discount_std' => ['price', false, false],
         'cost_std' => ['price', false, false],
         'gp_std' => ['price', false, false],
+
+        // Added for WooCommerce import support — see WooCommerceConverter.
+        // 'video' (attribute_6-style) is a file-upload type validated as
+        // MP4, not a URL field, so a plain 'text' attribute is used for the
+        // YouTube link instead. 'file' matches how 'pimage' already handles
+        // externally-hosted URLs brought in via import (see
+        // AttributeValueFormatter::resolveStorageUrl) while still allowing
+        // an admin to upload a real file locally later.
+        'youtube_url' => ['text', false, false],
+        'catalog_pdf' => ['file', false, false],
+        'power_type' => ['select', false, false],
     ];
 
     public function run(): void

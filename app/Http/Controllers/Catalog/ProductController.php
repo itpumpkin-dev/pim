@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Events\ProductDataChanged;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Jobs\AutoTranslateProductValueJob;
 use App\Jobs\SyncProductToMarketplaceJob;
 use App\Models\AssociationType;
 use App\Models\Attribute;
@@ -340,6 +341,458 @@ class ProductController extends Controller
             'sku' => $product->sku,
             'name' => $names->get($product->id) ?: $product->sku,
         ])->values());
+    }
+
+    /**
+     * Read-only report of products still missing a real, translated product
+     * name (`pname`) for one or more enabled locales. A locale counts as
+     * "missing" when its value is empty, or still equal to the SKU —
+     * Product::applySmartDefaults() bootstraps every locale's `pname` to the
+     * SKU on create/duplicate as a placeholder, so an untouched locale reads
+     * as "= SKU", not as a genuinely empty value.
+     */
+    public function missingTranslations(): Response
+    {
+        $locales = Locale::active();
+        $localeIds = $locales->pluck('id')->all();
+        $localeList = $locales->map(fn ($locale) => ['id' => $locale->id, 'code' => $locale->code, 'display_name' => $locale->display_name])->all();
+        $nameAttributeId = Attribute::idForCode('pname');
+        $thaiLocaleId = Locale::idForCode('th');
+
+        // Every attribute flagged "value per locale" (pname, warranty_*,
+        // spec_*, ...) — not just pname — since a product can have its name
+        // translated but still be missing content like warranty notes or
+        // specifications in a given language.
+        $localeBasedAttributes = Attribute::where('is_locale_based', true)->orderBy('code')->get(['id', 'code', 'name']);
+        $attributesById = $localeBasedAttributes->keyBy('id');
+        $localeBasedAttributeIds = $localeBasedAttributes->pluck('id')->all();
+
+        $products = Product::with('family:id,code,name')
+            ->orderBy('sku')
+            ->get(['id', 'sku', 'family_id', 'enabled']);
+
+        // Restrict to whichever of those locale-based attributes are
+        // actually assigned to a product's family — same source edit()
+        // groups its attribute tabs from, so this never flags a field the
+        // product's own Edit page has nowhere to show/fix. A family with no
+        // FamilyAttribute rows at all falls back to every locale-based
+        // attribute, mirroring edit()'s "no assignments -> show all system
+        // attributes" fallback.
+        $familyAttributeIdsByFamily = FamilyAttribute::whereIn('attribute_id', $localeBasedAttributeIds)
+            ->get(['family_id', 'attribute_id'])
+            ->groupBy('family_id')
+            ->map(fn ($rows) => $rows->pluck('attribute_id')->all());
+        $familiesWithAnyAssignment = FamilyAttribute::pluck('family_id')->unique()->all();
+
+        // Grouped by product then attribute — sparse on purpose: most of
+        // this catalog's 17 locale-based attributes are actually used by a
+        // handful of products (or one), so building this from the rows that
+        // actually exist (rather than probing all 17 attributes x 3 locales
+        // for every product regardless) is both the realistic shape of the
+        // data and what makes the loop below fast. Raw query-builder rows
+        // (stdClass), not hydrated ProductValue models, since nothing here
+        // needs more than the four raw column values — Eloquent's per-row
+        // model boot (casts, accessors, event machinery) was the dominant
+        // cost on this page for tens of thousands of rows.
+        //
+        // Also includes locale_id IS NULL rows (grouped under the 'global'
+        // key below) — see foldGlobalValueIntoThai()'s docblock for why
+        // those aren't actually "no locale", and skipping them here was
+        // exactly why a bulk-imported field like spec_specifications never
+        // showed up on this report at all despite never having been split
+        // into EN/ZH.
+        $rowsByProductAttribute = [];
+        if (! empty($localeBasedAttributeIds)) {
+            foreach (
+                DB::table('product_values')
+                    ->whereIn('attribute_id', $localeBasedAttributeIds)
+                    ->whereNull('channel_id')
+                    ->where(fn ($query) => $query->whereIn('locale_id', $localeIds)->orWhereNull('locale_id'))
+                    ->select('product_id', 'attribute_id', 'locale_id', 'value')
+                    ->cursor()
+                as $value
+            ) {
+                $rowsByProductAttribute[$value->product_id][$value->attribute_id][$value->locale_id ?? 'global'] = $value->value;
+            }
+        }
+
+        // Applicable attribute ids depend only on family_id, and a catalog
+        // has far fewer distinct families than products — resolved once per
+        // family and cached here, instead of re-filtering the attribute
+        // list from scratch for every single product below.
+        $applicableAttributeIdsByFamily = [];
+
+        $rows = [];
+        foreach ($products as $product) {
+            $familyId = $product->family_id;
+            if (! array_key_exists($familyId, $applicableAttributeIdsByFamily)) {
+                $ids = $familyAttributeIdsByFamily->get($familyId);
+                if ($ids === null) {
+                    $ids = in_array($familyId, $familiesWithAnyAssignment, true) ? [] : $localeBasedAttributeIds;
+                }
+                $applicableAttributeIdsByFamily[$familyId] = array_flip($ids);
+            }
+            $applicableAttributeIds = $applicableAttributeIdsByFamily[$familyId];
+
+            if (empty($applicableAttributeIds)) {
+                continue;
+            }
+
+            $missingAttributesByLocaleId = [];
+            $productRows = $rowsByProductAttribute[$product->id] ?? [];
+
+            // pname is always checked, even with zero rows — its "still
+            // just the SKU" placeholder (Product::applySmartDefaults())
+            // means a product nobody has ever named in any language is
+            // exactly the case this report most needs to surface, unlike
+            // every other locale-based attribute below.
+            if (isset($applicableAttributeIds[$nameAttributeId])) {
+                $this->collectMissingLocalesForAttribute(
+                    $attributesById[$nameAttributeId],
+                    $this->foldGlobalValueIntoThai($productRows[$nameAttributeId] ?? [], $thaiLocaleId),
+                    $localeList,
+                    $product->sku,
+                    isNameAttribute: true,
+                    requireSource: false,
+                    thaiLocaleId: $thaiLocaleId,
+                    missingAttributesByLocaleId: $missingAttributesByLocaleId,
+                );
+            }
+
+            // Every other locale-based attribute: only ones with at least
+            // one existing row are worth even considering (an attribute
+            // with zero rows anywhere for this product has never been
+            // filled in in any language — that's missing content, not a
+            // translation gap), and only flagged when at least one locale
+            // actually holds real text to translate FROM (requireSource) —
+            // otherwise it's the same "nothing to translate" case, just
+            // spread across every locale instead of none.
+            foreach ($productRows as $attributeId => $valuesByLocale) {
+                if ($attributeId === $nameAttributeId || ! isset($applicableAttributeIds[$attributeId])) {
+                    continue;
+                }
+
+                $this->collectMissingLocalesForAttribute(
+                    $attributesById[$attributeId],
+                    $this->foldGlobalValueIntoThai($valuesByLocale, $thaiLocaleId),
+                    $localeList,
+                    $product->sku,
+                    isNameAttribute: false,
+                    requireSource: true,
+                    thaiLocaleId: $thaiLocaleId,
+                    missingAttributesByLocaleId: $missingAttributesByLocaleId,
+                );
+            }
+
+            if (empty($missingAttributesByLocaleId)) {
+                continue;
+            }
+
+            $missingLocales = [];
+            foreach ($localeList as $locale) {
+                if (! empty($missingAttributesByLocaleId[$locale['id']])) {
+                    $missingLocales[] = ['locale' => $locale, 'missing_attributes' => $missingAttributesByLocaleId[$locale['id']]];
+                }
+            }
+
+            $rows[] = [
+                'id' => $product->id,
+                'sku' => $product->sku,
+                'family' => $product->family ? ($product->family->name ?: $product->family->code) : null,
+                'enabled' => (bool) $product->enabled,
+                'missing_locales' => $missingLocales,
+            ];
+        }
+
+        return Inertia::render('catalog/products/missing-translations', [
+            'rows' => $rows,
+            'totalProducts' => $products->count(),
+        ]);
+    }
+
+    /**
+     * Bulk import (ProductRowImporter) — and any other write path that
+     * doesn't target a specific locale — always lands a locale-based
+     * attribute's value in the global (channel_id=null, locale_id=null)
+     * scope, and that global value is always Thai by convention, not a
+     * genuine "no locale" value: see ProductRowImporter::sourceLocaleId()'s
+     * own docblock, which hardcodes Thai as the source language for exactly
+     * this scope when fanning a bulk-imported value out to other locales.
+     *
+     * Folds it into the Thai slot whenever Thai doesn't already have its
+     * own real row, so every check downstream (missing detection, source
+     * resolution for the Translate action) sees it exactly as if it were a
+     * real Thai-locale row. Without this, an attribute that's only ever
+     * been bulk-imported — never split into per-locale rows — reads as
+     * having no content in any locale at all: invisible to the report, and
+     * starving the Translate action of a source to translate from, even
+     * though there's a perfectly good source sitting right there.
+     *
+     * @param  array<int|string, string|null>  $valuesByLocale locale_id (or 'global') => raw value
+     * @return array<int, string|null> locale_id => raw value, 'global' key removed
+     */
+    private function foldGlobalValueIntoThai(array $valuesByLocale, ?int $thaiLocaleId): array
+    {
+        $globalValue = $valuesByLocale['global'] ?? null;
+        unset($valuesByLocale['global']);
+
+        if ($thaiLocaleId === null || trim((string) $globalValue) === '') {
+            return $valuesByLocale;
+        }
+
+        $hasOwnThaiValue = array_key_exists($thaiLocaleId, $valuesByLocale) && trim((string) $valuesByLocale[$thaiLocaleId]) !== '';
+        if (! $hasOwnThaiValue) {
+            $valuesByLocale[$thaiLocaleId] = $globalValue;
+        }
+
+        return $valuesByLocale;
+    }
+
+    /**
+     * Evaluates one attribute's per-locale values for a single product and
+     * appends it to $missingAttributesByLocaleId[$localeId] for every
+     * locale where it's missing. When $requireSource is true, an attribute
+     * with no usable source anywhere (nothing to translate FROM) is dropped
+     * entirely rather than flagged — see the two call sites in
+     * missingTranslations() for why pname passes false and every other
+     * locale-based attribute passes true.
+     *
+     * @param  array<int, string|null>  $valuesByLocale locale_id => raw value
+     * @param  array<int, array{id: int, code: string, display_name: string|null}>  $localeList
+     * @param  array<int, array<int, array{id: int, code: string, name: string|null}>>  $missingAttributesByLocaleId  locale_id => attribute list, by reference
+     */
+    private function collectMissingLocalesForAttribute(
+        Attribute $attribute,
+        array $valuesByLocale,
+        array $localeList,
+        string $sku,
+        bool $isNameAttribute,
+        bool $requireSource,
+        ?int $thaiLocaleId,
+        array &$missingAttributesByLocaleId,
+    ): void {
+        $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $sku, $isNameAttribute, $thaiLocaleId);
+
+        if (empty($coverage['missingLocaleIds']) || ($requireSource && $coverage['sourceLocaleId'] === null)) {
+            return;
+        }
+
+        $descriptor = ['id' => $attribute->id, 'code' => $attribute->code, 'name' => $attribute->name];
+        foreach ($coverage['missingLocaleIds'] as $localeId) {
+            $missingAttributesByLocaleId[$localeId][] = $descriptor;
+        }
+    }
+
+    /**
+     * A locale-based attribute value counts as "missing" when it's empty,
+     * or — for pname only — still equal to the SKU that
+     * Product::applySmartDefaults() bootstraps every locale with on
+     * create/duplicate (a placeholder, not an actual translation). This
+     * alone doesn't catch a locale whose value is just a verbatim copy of
+     * another locale's real text — see resolveAttributeCoverage(), which
+     * wraps this with that additional check and is what callers should
+     * actually use.
+     */
+    private function isProductValueMissing(?string $value, string $sku, bool $isNameAttribute): bool
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return true;
+        }
+
+        return $isNameAttribute && strcasecmp($value, $sku) === 0;
+    }
+
+    /**
+     * Resolves which locale holds an attribute's real source content and
+     * determines every other active locale that still needs translating —
+     * empty, (pname only) still just the SKU placeholder, or a byte-for-
+     * byte copy of the source text that was never actually translated.
+     *
+     * Both the source-locale priority and the "copy, not a translation"
+     * check follow ProductRowImporter::sourceLocaleId()'s established
+     * convention for this catalog: despite config('app.locale') being
+     * 'en' (just Laravel's untouched default), the real content — names,
+     * specifications, everything imported — is overwhelmingly authored in
+     * Thai, and a large share of this catalog's "English" values turned
+     * out to just be that same Thai text copied verbatim into the EN slot,
+     * never actually translated (confirmed empirically: ~96% of products
+     * have an identical `pname` in en and th). Treating config('app.locale')
+     * as the source, or treating any non-empty value as "already
+     * translated", both silently miss this — which is exactly why the
+     * Translate action was skipping the product name on nearly everything
+     * despite the report/action agreeing there was "nothing missing".
+     *
+     * @param  array<int, string|null>  $valuesByLocale locale_id => raw value
+     * @param  array<int, array{id: int}>  $localeList
+     * @return array{sourceLocaleId: int|null, sourceValue: string, missingLocaleIds: int[]}
+     */
+    private function resolveAttributeCoverage(array $valuesByLocale, array $localeList, string $sku, bool $isNameAttribute, ?int $thaiLocaleId): array
+    {
+        $isRealValue = fn (?string $value) => ! $this->isProductValueMissing($value, $sku, $isNameAttribute);
+
+        $sourceLocaleId = null;
+        $sourceValue = '';
+
+        if ($thaiLocaleId !== null && $isRealValue($valuesByLocale[$thaiLocaleId] ?? null)) {
+            $sourceLocaleId = $thaiLocaleId;
+            $sourceValue = trim($valuesByLocale[$thaiLocaleId]);
+        } else {
+            foreach ($valuesByLocale as $localeId => $value) {
+                if (is_int($localeId) && $isRealValue($value)) {
+                    $sourceLocaleId = $localeId;
+                    $sourceValue = trim((string) $value);
+                    break;
+                }
+            }
+        }
+
+        $missingLocaleIds = [];
+        foreach ($localeList as $locale) {
+            if ($locale['id'] === $sourceLocaleId) {
+                continue;
+            }
+
+            $value = $valuesByLocale[$locale['id']] ?? null;
+            $isDuplicateOfSource = $sourceValue !== '' && trim((string) $value) === $sourceValue;
+
+            if ($isDuplicateOfSource || $this->isProductValueMissing($value, $sku, $isNameAttribute)) {
+                $missingLocaleIds[] = $locale['id'];
+            }
+        }
+
+        return ['sourceLocaleId' => $sourceLocaleId, 'sourceValue' => $sourceValue, 'missingLocaleIds' => $missingLocaleIds];
+    }
+
+    /**
+     * Locale-based attribute ids that apply to $familyId — same restriction
+     * missingTranslations() applies (batched there for its whole-catalog
+     * scan): only attributes actually assigned to the family via
+     * FamilyAttribute, falling back to every locale-based attribute when
+     * the family has no attribute assignments at all, mirroring edit()'s
+     * "no assignments -> show all system attributes" fallback. Queried
+     * per-family (not batched) since the translate actions below only ever
+     * touch one or a handful of explicitly chosen products, not the whole
+     * catalog.
+     */
+    private function applicableLocaleBasedAttributeIds(?int $familyId, Collection $localeBasedAttributeIds): Collection
+    {
+        $assigned = FamilyAttribute::where('family_id', $familyId)
+            ->whereIn('attribute_id', $localeBasedAttributeIds)
+            ->pluck('attribute_id');
+
+        if ($assigned->isNotEmpty()) {
+            return $assigned;
+        }
+
+        $familyHasAnyAssignment = FamilyAttribute::where('family_id', $familyId)->exists();
+
+        return $familyHasAnyAssignment ? collect() : $localeBasedAttributeIds;
+    }
+
+    /**
+     * Queues AI translation for every locale-based attribute (applicable to
+     * each product's family) that's missing a real value in one or more
+     * locales — one AutoTranslateProductValueJob per attribute, not per
+     * locale, since AttributeAutoTranslator::fillMissingProductValue()
+     * already fills every missing locale for that attribute in one go.
+     * Shared by the single-product and bulk "Translate" actions on the
+     * Missing Translations report.
+     *
+     * @param  Collection<int, Product>  $products
+     * @return array{queued: int, missingWithNoSource: int} queued = jobs actually
+     *         dispatched; missingWithNoSource = attributes that had a missing
+     *         locale but no other locale held a real value to translate from
+     *         (every locale-based attribute is empty/placeholder) — callers
+     *         use this to tell "already fully translated" apart from "stuck,
+     *         needs a value typed in by hand first" when queued is 0.
+     */
+    private function queueProductTranslationJobs(Collection $products): array
+    {
+        $localeBasedAttributeIds = Attribute::where('is_locale_based', true)->pluck('id');
+        $nameAttributeId = Attribute::idForCode('pname');
+        $thaiLocaleId = Locale::idForCode('th');
+        $localeList = Locale::active()->map(fn ($locale) => ['id' => $locale->id])->all();
+        $queued = 0;
+        $missingWithNoSource = 0;
+
+        foreach ($products as $product) {
+            $applicableAttributeIds = $this->applicableLocaleBasedAttributeIds($product->family_id, $localeBasedAttributeIds);
+            if ($applicableAttributeIds->isEmpty()) {
+                continue;
+            }
+
+            // Includes locale_id IS NULL rows (the global/bulk-import
+            // scope, folded into Thai below) — not just the active
+            // locales' own rows. See foldGlobalValueIntoThai()'s docblock.
+            $valuesByAttribute = ProductValue::where('product_id', $product->id)
+                ->whereIn('attribute_id', $applicableAttributeIds)
+                ->whereNull('channel_id')
+                ->get(['attribute_id', 'locale_id', 'value'])
+                ->groupBy('attribute_id');
+
+            foreach ($applicableAttributeIds as $attributeId) {
+                $rawValuesByLocale = [];
+                foreach ($valuesByAttribute->get($attributeId) ?? [] as $row) {
+                    $rawValuesByLocale[$row->locale_id ?? 'global'] = $row->value;
+                }
+                $valuesByLocale = $this->foldGlobalValueIntoThai($rawValuesByLocale, $thaiLocaleId);
+                $isNameAttribute = $attributeId === $nameAttributeId;
+
+                $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $product->sku, $isNameAttribute, $thaiLocaleId);
+                if (empty($coverage['missingLocaleIds'])) {
+                    continue;
+                }
+
+                if ($coverage['sourceLocaleId'] === null || $coverage['sourceValue'] === '') {
+                    $missingWithNoSource++;
+
+                    continue;
+                }
+
+                AutoTranslateProductValueJob::dispatch($product->id, $attributeId, $coverage['sourceLocaleId'], $coverage['sourceValue']);
+                $queued++;
+            }
+        }
+
+        return ['queued' => $queued, 'missingWithNoSource' => $missingWithNoSource];
+    }
+
+    /**
+     * Per-product "Translate" action on the Missing Translations report.
+     */
+    public function queueMissingTranslations(Product $product): RedirectResponse
+    {
+        $result = $this->queueProductTranslationJobs(collect([$product]));
+
+        if ($result['queued'] > 0) {
+            return back()->with('success', "Queued {$result['queued']} field(s) for translation.");
+        }
+
+        return back()->with(
+            $result['missingWithNoSource'] > 0 ? 'error' : 'success',
+            $result['missingWithNoSource'] > 0
+                ? 'Nothing to translate — no source value found in any language yet. Type a value into at least one language first.'
+                : 'This product is already fully translated.'
+        );
+    }
+
+    /**
+     * Bulk "Translate selected" action on the Missing Translations report —
+     * the report's checkbox selection posts here with whichever product ids
+     * are checked.
+     */
+    public function queueMissingTranslationsBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+        ]);
+
+        $products = Product::whereIn('id', $validated['product_ids'])->get(['id', 'sku', 'family_id']);
+        $result = $this->queueProductTranslationJobs($products);
+
+        return back()->with('success', "Queued {$result['queued']} field(s) for translation across {$products->count()} product(s).");
     }
 
     /**

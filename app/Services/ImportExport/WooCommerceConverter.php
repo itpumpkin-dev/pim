@@ -82,7 +82,17 @@ class WooCommerceConverter
             throw new \RuntimeException("Cannot open input file: {$inputPath}");
         }
 
-        $header = fgetcsv($in, 0, ',');
+        // escape='' disables fgetcsv's non-standard backslash-escape handling
+        // (PHP's default, unlike every other CSV parser incl. Excel/Python).
+        // WooCommerce meta fields regularly contain JSON with its own \"
+        // sequences (e.g. Meta: _elementor_data); with the default escape
+        // char, fgetcsv treats a literal backslash right before a doubled
+        // quote as un-escaping it, desyncing the quoted-field state for the
+        // rest of the file — silently merging multiple physical rows into
+        // one and shifting every later column's value into the wrong field,
+        // with no error raised. Confirmed against storage/app/productimportFull.txt:
+        // without this, row field counts drift far past the header count.
+        $header = fgetcsv($in, 0, ',', '"', '');
         if ($header === false) {
             fclose($in);
             throw new \RuntimeException('Input file has no header row.');
@@ -90,17 +100,29 @@ class WooCommerceConverter
         $header = array_map(static fn ($h) => self::stripBom(trim((string) $h)), $header);
         $headerCount = count($header);
 
+        // Every "Attribute N name" column present (Woo's per-product custom
+        // attributes are numbered, not fixed — this file only goes up to 3,
+        // but nothing caps it), used by resolvePowerType() to find whichever
+        // one (if any) is the corded/cordless attribute.
+        $attributeNameColumns = array_values(array_filter(
+            $header,
+            static fn ($h) => preg_match('/^Attribute \d+ name$/', $h) === 1
+        ));
+
         $outHeader = [
             'sku', 'family_code', 'type', 'enabled',
             'pbrand', 'pcatname', 'psubcatname', 'productgroupname',
             'barcode_pcs', 'qty', 'weight_pcs', 'length_pcs', 'width_pcs', 'height_pcs',
-            'price_recommend', 'pimage', 'eol',
+            'price_recommend', 'pimage', 'eol', 'youtube_url', 'catalog_pdf', 'power_type',
         ];
         if ($emitName) {
             $outHeader[] = 'pname';
         }
         if ($emitDescription) {
             $outHeader[] = 'product_details_features';
+            $outHeader[] = 'spec_specifications';
+            $outHeader[] = 'spec_features';
+            $outHeader[] = 'included_accessories';
         }
 
         $out = fopen('php://temp', 'r+');
@@ -116,7 +138,7 @@ class WooCommerceConverter
         /** @var array<string,string> $unmatchedCategoriesRaw */
         $unmatchedCategoriesRaw = [];
 
-        while (($row = fgetcsv($in, 0, ',')) !== false) {
+        while (($row = fgetcsv($in, 0, ',', '"', '')) !== false) {
             if ($row === [null]) {
                 continue;
             }
@@ -171,6 +193,9 @@ class WooCommerceConverter
                 'price_recommend' => trim((string) ($r['Regular price'] ?? '')),
                 'pimage' => self::firstImageUrl((string) ($r['Images'] ?? '')),
                 'eol' => self::detectEol($shortDesc, $fullDesc),
+                'youtube_url' => trim((string) ($r['Meta: youtube_url'] ?? '')),
+                'catalog_pdf' => trim((string) ($r['Meta: downloads_catalogue'] ?? '')),
+                'power_type' => self::resolvePowerType($r, $attributeNameColumns),
             ];
 
             if ($emitName) {
@@ -178,8 +203,10 @@ class WooCommerceConverter
                 $outRow['pname'] = $stripHtml ? self::stripHtmlToText($name) : $name;
             }
             if ($emitDescription) {
-                $desc = $fullDesc !== '' ? $fullDesc : $shortDesc;
-                $outRow['product_details_features'] = $stripHtml ? self::stripHtmlToText($desc) : $desc;
+                $outRow['product_details_features'] = self::pickDescription($fullDesc, $shortDesc, $stripHtml);
+                $outRow['spec_specifications'] = self::mapMetaField((string) ($r['Meta: specification'] ?? ''), $stripHtml);
+                $outRow['spec_features'] = self::mapMetaField((string) ($r['Meta: key_features'] ?? ''), $stripHtml);
+                $outRow['included_accessories'] = self::mapMetaField((string) ($r['Meta: in-the-box'] ?? ''), $stripHtml);
             }
 
             fputcsv($out, array_values($outRow));
@@ -332,10 +359,17 @@ class WooCommerceConverter
         return mb_strtolower($s, 'UTF-8');
     }
 
+    /**
+     * Also breaks on table rows/headings, not just the list/paragraph tags
+     * the Name/Description fields use — Woo's "Meta: specification" field
+     * (see mapMetaField()) is an HTML <table> of spec rows, and without this
+     * every cell would run together on one unreadable line.
+     */
     private static function stripHtmlToText(string $html): string
     {
         $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/<(li|br|p|div|ul|ol)\b[^>]*>/i', "\n", $text) ?? $text;
+        $text = preg_replace('/<(li|br|p|div|ul|ol|tr|h[1-6])\b[^>]*>/i', "\n", $text) ?? $text;
+        $text = preg_replace('/<\/?(td|th)\b[^>]*>/i', ' ', $text) ?? $text;
         $text = strip_tags($text);
         $text = str_replace(['\\n', '\\t'], ["\n", ' '], $text);
         $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
@@ -343,10 +377,89 @@ class WooCommerceConverter
         return trim($text);
     }
 
+    /**
+     * "Description" is frequently just an Elementor page-builder banner (an
+     * <img>/lightbox anchor with no real text node) rather than prose, while
+     * "Short description" carries the actual selling-point bullets — the
+     * opposite of what you'd expect from the field names. Deciding by
+     * stripped-text emptiness (not raw-HTML emptiness) means whichever field
+     * actually has content wins, instead of always picking Description just
+     * because it's non-blank markup.
+     */
+    private static function pickDescription(string $fullDesc, string $shortDesc, bool $stripHtml): string
+    {
+        $fullStripped = self::stripHtmlToText($fullDesc);
+        $preferFull = $fullStripped !== '';
+
+        if ($stripHtml) {
+            return $preferFull ? $fullStripped : self::stripHtmlToText($shortDesc);
+        }
+
+        return $preferFull ? $fullDesc : $shortDesc;
+    }
+
+    /**
+     * Shared handling for the three WooCommerce ACF meta fields with a clean
+     * equivalent on this side (specification table -> spec_specifications,
+     * key_features -> spec_features, in-the-box -> included_accessories).
+     * All three are is_locale_based attributes, same as product_details_features,
+     * so they carry the same "lands with locale_id=null" caveat — see the
+     * class docblock and columnLabels() caveats surfaced on the result page.
+     */
+    private static function mapMetaField(string $raw, bool $stripHtml): string
+    {
+        return $stripHtml ? self::stripHtmlToText($raw) : $raw;
+    }
+
     private static function firstImageUrl(string $cell): string
     {
         $parts = array_map('trim', explode(',', $cell));
         return $parts[0] ?? '';
+    }
+
+    /**
+     * The value cell for a Woo "Attribute N value(s)" column, mapped to the
+     * `power_type` AttributeOption code (see AttributeOptionCatalogSeeder).
+     * Woo's custom attributes are unpredictable per product line — the only
+     * one this app has a target for is corded/cordless, so every other
+     * "Attribute N" pair (e.g. this file's "product-feature" = "Recommended"
+     * badge) is left unmapped, same as before.
+     */
+    private const POWER_TYPE_VALUE_MAP = [
+        'ใช้สาย' => 'corded',
+        'ไร้สาย' => 'cordless',
+        'corded' => 'corded',
+        'cordless' => 'cordless',
+    ];
+
+    /**
+     * An "Attribute N name" cell is treated as the corded/cordless attribute
+     * when it mentions both Thai words for corded and cordless — matches
+     * this file's literal name "ใช้สาย/ไร้สาย" without hardcoding its exact
+     * punctuation/ordering, since other Woo exports may format it slightly
+     * differently.
+     *
+     * @param  array<string,string>  $r  The current row, keyed by header.
+     * @param  array<int,string>  $attributeNameColumns  Every "Attribute N name" header present.
+     */
+    private static function resolvePowerType(array $r, array $attributeNameColumns): string
+    {
+        foreach ($attributeNameColumns as $nameColumn) {
+            $name = self::normalizeName((string) ($r[$nameColumn] ?? ''));
+            if ($name === '' || !str_contains($name, 'ใช้สาย') || !str_contains($name, 'ไร้สาย')) {
+                continue;
+            }
+
+            preg_match('/\d+/', $nameColumn, $matches);
+            $valueColumn = "Attribute {$matches[0]} value(s)";
+            $value = self::normalizeName((string) ($r[$valueColumn] ?? ''));
+
+            if (isset(self::POWER_TYPE_VALUE_MAP[$value])) {
+                return self::POWER_TYPE_VALUE_MAP[$value];
+            }
+        }
+
+        return '';
     }
 
     /** @param array<int,string> $warnings */
@@ -386,10 +499,10 @@ class WooCommerceConverter
         if ($handle === false) {
             throw new \RuntimeException("Cannot open {$path}");
         }
-        $header = fgetcsv($handle);
+        $header = fgetcsv($handle, 0, ',', '"', '');
         $header[0] = self::stripBom((string) $header[0]);
         $rows = [];
-        while (($data = fgetcsv($handle)) !== false) {
+        while (($data = fgetcsv($handle, 0, ',', '"', '')) !== false) {
             if ($data === [null]) {
                 continue;
             }

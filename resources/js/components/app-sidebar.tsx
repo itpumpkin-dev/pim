@@ -52,6 +52,10 @@ function useMainNavItems(): NavItem[] {
                     url: '/catalog/products',
                 },
                 {
+                    title: t('missingTranslations'),
+                    url: '/catalog/product-translations',
+                },
+                {
                     title: t('categories'),
                     url: '/catalog/categories',
                 },

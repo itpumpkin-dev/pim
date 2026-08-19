@@ -44,6 +44,13 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Mirrors WooCommerceConversionController::convert()'s 'file' => 'max:38912'
+// (38912 KB = 38MB) — checked client-side so a too-large file is rejected
+// immediately instead of after uploading tens of MB just to have the server
+// say no.
+const MAX_FILE_SIZE_MB = 38;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 /**
  * Click-to-browse (native <label> + hidden input) and drag-and-drop share
  * one drop target so users aren't forced to hunt for a tiny "choose file"
@@ -139,7 +146,7 @@ export default function WooConvertCreate({ families }: Props) {
         { title: t('wooConvertNewConversion'), href: '/import-export/woo-convert/create' },
     ];
 
-    const { data, setData, post, processing, errors, isDirty } = useForm({
+    const { data, setData, post, processing, errors, setError, clearErrors, isDirty } = useForm({
         file: null as File | null,
         category_map: null as File | null,
         family_code: '',
@@ -151,6 +158,16 @@ export default function WooConvertCreate({ families }: Props) {
 
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const advancedErrorCount = ['category_map', 'family_code'].filter((key) => errors[key as keyof typeof errors]).length;
+
+    const selectFile = (file: File | null) => {
+        if (file && file.size > MAX_FILE_SIZE_BYTES) {
+            setData('file', null);
+            setError('file', t('wooConvertFileTooLarge', { size: formatFileSize(file.size) }));
+            return;
+        }
+        clearErrors('file');
+        setData('file', file);
+    };
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -182,7 +199,7 @@ export default function WooConvertCreate({ families }: Props) {
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertFileSectionTitle')}</Typography>
                         <FileDropzone
                             file={data.file}
-                            onSelect={(file) => setData('file', file)}
+                            onSelect={selectFile}
                             label={t('wooConvertDropzoneLabel')}
                             hint={t('wooConvertFileHelp')}
                             error={errors.file}

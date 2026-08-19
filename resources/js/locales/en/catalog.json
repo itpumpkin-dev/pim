@@ -215,5 +215,22 @@
     "syncFromTiktok": "Sync from TikTok",
     "syncingTiktok": "Syncing...",
     "noShopsYet": "No shops yet.",
-    "confirmDeleteShop": "Are you sure you want to delete this shop?"
+    "confirmDeleteShop": "Are you sure you want to delete this shop?",
+
+    "missingTranslationsTitle": "Missing Translations",
+    "missingTranslationsSubtitle": "Products with untranslated content (name and other multilingual fields) in one or more languages. Hover a language chip to see which fields are missing.",
+    "missingTranslationsSearch": "Search SKU or family",
+    "missingTranslationsSummary": "{{missing}} of {{total}} products missing a translation",
+    "missingTranslationsAllTranslated": "All products have a translated name in every language.",
+    "missingTranslationsNoMatches": "No matches.",
+    "missingTranslationsColSku": "SKU",
+    "missingTranslationsColFamily": "Family",
+    "missingTranslationsColStatus": "Status",
+    "missingTranslationsColMissingLocales": "Missing Locales",
+    "missingTranslationsColActions": "Actions",
+    "missingTranslationsEditAction": "Edit",
+    "missingTranslationsTranslateAction": "Translate",
+    "missingTranslationsTranslateSelected": "Translate Selected ({{count}})",
+    "missingTranslationsTranslating": "Translating…",
+    "missingTranslationsRowsPerPage": "Rows per page"
 }

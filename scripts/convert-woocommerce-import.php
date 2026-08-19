@@ -71,8 +71,23 @@ declare(strict_types=1);
  *
  * 7. Dropped entirely (no equivalent field exists): ID, Tags, Shipping class,
  *    Sale price, Purchase note, Position, Vehicles, Parent/Grouped
- *    products/Upsells/Cross-sells, External URL/Button text, all
- *    "Attribute N name/value(s)/visible/global" columns, Download limit/expiry.
+ *    products/Upsells/Cross-sells, External URL/Button text, "Attribute N
+ *    name/value(s)/visible/global" columns other than corded/cordless (see
+ *    #9 below — e.g. this file's "product-feature" = "Recommended" badge has
+ *    no PIM equivalent), Download limit/expiry.
+ *
+ * 9. "Meta: specification" (an HTML table), "Meta: key_features", and
+ *    "Meta: in-the-box" DO have an equivalent and are mapped to
+ *    spec_specifications / spec_features / included_accessories
+ *    respectively (gated by --no-description, same as product_details_features
+ *    — all four are locale-based fields with the same caveat #1 above).
+ *
+ * 10. "Meta: youtube_url" -> youtube_url, "Meta: downloads_catalogue" ->
+ *     catalog_pdf, and whichever "Attribute N name/value(s)" pair is the
+ *     corded/cordless attribute (matched by name containing both "ใช้สาย"
+ *     and "ไร้สาย") -> power_type (an AttributeOption code: 'corded' or
+ *     'cordless'). All three attributes were added specifically for
+ *     WooCommerce import support — see AttributeCatalogSeeder.
  *
  * 8. "eol" is a heuristic: set to 1 if the word "EOL" appears in the Short
  *    description or Description, since this particular data set uses that
@@ -141,7 +156,8 @@ function normalizeName(string $s): string
 function stripHtmlToText(string $html): string
 {
     $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $text = preg_replace('/<(li|br|p|div|ul|ol)\b[^>]*>/i', "\n", $text) ?? $text;
+    $text = preg_replace('/<(li|br|p|div|ul|ol|tr|h[1-6])\b[^>]*>/i', "\n", $text) ?? $text;
+    $text = preg_replace('/<\/?(td|th)\b[^>]*>/i', ' ', $text) ?? $text; // table cells (Meta: specification), so they don't run together
     $text = strip_tags($text);
     $text = str_replace(['\\n', '\\t'], ["\n", ' '], $text); // literal escape sequences some exports leave behind
     $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
@@ -149,10 +165,71 @@ function stripHtmlToText(string $html): string
     return trim($text);
 }
 
+/**
+ * "Description" is frequently just an Elementor banner (an <img>/lightbox
+ * anchor, no real text node) while "Short description" carries the actual
+ * selling-point bullets — deciding by stripped-text emptiness, not raw-HTML
+ * emptiness, means whichever field actually has content wins.
+ */
+function pickDescription(string $fullDesc, string $shortDesc, bool $stripHtml): string
+{
+    $fullStripped = stripHtmlToText($fullDesc);
+    $preferFull = $fullStripped !== '';
+
+    if ($stripHtml) {
+        return $preferFull ? $fullStripped : stripHtmlToText($shortDesc);
+    }
+
+    return $preferFull ? $fullDesc : $shortDesc;
+}
+
+function mapMetaField(string $raw, bool $stripHtml): string
+{
+    return $stripHtml ? stripHtmlToText($raw) : $raw;
+}
+
 function firstImageUrl(string $cell): string
 {
     $parts = array_map('trim', explode(',', $cell));
     return $parts[0] ?? '';
+}
+
+/** Woo value cell -> the `power_type` AttributeOption code. */
+const POWER_TYPE_VALUE_MAP = [
+    'ใช้สาย' => 'corded',
+    'ไร้สาย' => 'cordless',
+    'corded' => 'corded',
+    'cordless' => 'cordless',
+];
+
+/**
+ * An "Attribute N name" cell is treated as the corded/cordless attribute
+ * when it mentions both Thai words for corded and cordless (matches this
+ * file's literal name "ใช้สาย/ไร้สาย" without hardcoding exact punctuation).
+ * Every other "Attribute N" pair (e.g. a "product-feature" = "Recommended"
+ * badge) has no PIM equivalent and is left unmapped.
+ *
+ * @param  array<string,string>  $r
+ * @param  array<int,string>  $attributeNameColumns
+ */
+function resolvePowerType(array $r, array $attributeNameColumns): string
+{
+    foreach ($attributeNameColumns as $nameColumn) {
+        $name = normalizeName((string) ($r[$nameColumn] ?? ''));
+        if ($name === '' || !str_contains($name, 'ใช้สาย') || !str_contains($name, 'ไร้สาย')) {
+            continue;
+        }
+
+        preg_match('/\d+/', $nameColumn, $matches);
+        $valueColumn = "Attribute {$matches[0]} value(s)";
+        $value = normalizeName((string) ($r[$valueColumn] ?? ''));
+
+        if (isset(POWER_TYPE_VALUE_MAP[$value])) {
+            return POWER_TYPE_VALUE_MAP[$value];
+        }
+    }
+
+    return '';
 }
 
 function mapType(string $wooType, ?string $sku, array &$warnings): string
@@ -194,10 +271,10 @@ function readSimpleCsv(string $path): array
     }
     $first = fgets($handle);
     rewind($handle);
-    $header = fgetcsv($handle);
+    $header = fgetcsv($handle, 0, ',', '"', '');
     $header[0] = stripBomFromString((string) $header[0]);
     $rows = [];
-    while (($data = fgetcsv($handle)) !== false) {
+    while (($data = fgetcsv($handle, 0, ',', '"', '')) !== false) {
         if ($data === [null] || $data === false) {
             continue;
         }
@@ -370,7 +447,12 @@ if ($in === false) {
     exit(1);
 }
 
-$header = fgetcsv($in, 0, $delimiter);
+// escape='' disables fgetcsv's non-standard backslash-escape handling — see
+// the matching note in WooCommerceConverter::convert(). Without it, a
+// literal backslash before a doubled quote in field content (e.g. Meta:
+// _elementor_data's embedded JSON) desyncs quoted-field parsing and silently
+// shifts every later column into the wrong field for the rest of the file.
+$header = fgetcsv($in, 0, $delimiter, '"', '');
 if ($header === false) {
     fwrite(STDERR, "Input file has no header row.\n");
     exit(1);
@@ -378,17 +460,26 @@ if ($header === false) {
 $header = array_map(static fn ($h) => stripBomFromString(trim((string) $h)), $header);
 $headerCount = count($header);
 
+// Every "Attribute N name" column present, used by resolvePowerType() below.
+$attributeNameColumns = array_values(array_filter(
+    $header,
+    static fn ($h) => preg_match('/^Attribute \d+ name$/', $h) === 1
+));
+
 $outHeader = [
     'sku', 'family_code', 'type', 'enabled',
     'pbrand', 'pcatname', 'psubcatname', 'productgroupname',
     'barcode_pcs', 'qty', 'weight_pcs', 'length_pcs', 'width_pcs', 'height_pcs',
-    'price_recommend', 'pimage', 'eol',
+    'price_recommend', 'pimage', 'eol', 'youtube_url', 'catalog_pdf', 'power_type',
 ];
 if ($emitName) {
     $outHeader[] = 'pname';
 }
 if ($emitDescription) {
     $outHeader[] = 'product_details_features';
+    $outHeader[] = 'spec_specifications';
+    $outHeader[] = 'spec_features';
+    $outHeader[] = 'included_accessories';
 }
 
 $out = fopen($outPath, 'w');
@@ -408,7 +499,7 @@ $unmatchedCategories = [];
 /** @var array<string,string> $unmatchedCategoriesRaw normalized cell => original text */
 $unmatchedCategoriesRaw = [];
 
-while (($row = fgetcsv($in, 0, $delimiter)) !== false) {
+while (($row = fgetcsv($in, 0, $delimiter, '"', '')) !== false) {
     if ($row === [null]) {
         continue; // blank line
     }
@@ -463,6 +554,9 @@ while (($row = fgetcsv($in, 0, $delimiter)) !== false) {
         'price_recommend' => trim((string) ($r['Regular price'] ?? '')),
         'pimage' => firstImageUrl((string) ($r['Images'] ?? '')),
         'eol' => detectEol($shortDesc, $fullDesc),
+        'youtube_url' => trim((string) ($r['Meta: youtube_url'] ?? '')),
+        'catalog_pdf' => trim((string) ($r['Meta: downloads_catalogue'] ?? '')),
+        'power_type' => resolvePowerType($r, $attributeNameColumns),
     ];
 
     if ($emitName) {
@@ -470,8 +564,10 @@ while (($row = fgetcsv($in, 0, $delimiter)) !== false) {
         $outRow['pname'] = $stripHtml ? stripHtmlToText($name) : $name;
     }
     if ($emitDescription) {
-        $desc = $fullDesc !== '' ? $fullDesc : $shortDesc;
-        $outRow['product_details_features'] = $stripHtml ? stripHtmlToText($desc) : $desc;
+        $outRow['product_details_features'] = pickDescription($fullDesc, $shortDesc, $stripHtml);
+        $outRow['spec_specifications'] = mapMetaField((string) ($r['Meta: specification'] ?? ''), $stripHtml);
+        $outRow['spec_features'] = mapMetaField((string) ($r['Meta: key_features'] ?? ''), $stripHtml);
+        $outRow['included_accessories'] = mapMetaField((string) ($r['Meta: in-the-box'] ?? ''), $stripHtml);
     }
 
     fputcsv($out, array_values($outRow), $delimiter);
@@ -523,4 +619,5 @@ if ($emitName || $emitDescription) {
 }
 fwrite(STDOUT, "\nDropped entirely (no equivalent field): ID, Tags, Sale price, Shipping class,\n");
 fwrite(STDOUT, "Purchase note, Position, Vehicles, Parent/Grouped/Upsells/Cross-sells,\n");
-fwrite(STDOUT, "External URL/Button text, Attribute N columns, Download limit/expiry.\n");
+fwrite(STDOUT, "External URL/Button text, Attribute N columns other than corded/cordless,\n");
+fwrite(STDOUT, "Download limit/expiry.\n");

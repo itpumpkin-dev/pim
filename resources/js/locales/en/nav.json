@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "catalog": "Catalog",
     "products": "Products",
+    "missingTranslations": "Missing Translations",
     "categories": "Categories",
     "channels": "Channels",
     "categoryFields": "Category Fields",

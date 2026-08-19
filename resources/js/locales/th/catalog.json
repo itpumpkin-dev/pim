@@ -208,5 +208,22 @@
     "syncFromTiktok": "ซิงค์จาก TikTok",
     "syncingTiktok": "กำลังซิงค์...",
     "noShopsYet": "ยังไม่มีร้านค้า",
-    "confirmDeleteShop": "คุณแน่ใจหรือไม่ว่าต้องการลบร้านค้านี้?"
+    "confirmDeleteShop": "คุณแน่ใจหรือไม่ว่าต้องการลบร้านค้านี้?",
+
+    "missingTranslationsTitle": "สินค้าที่ยังไม่ได้แปล",
+    "missingTranslationsSubtitle": "สินค้าที่ยังไม่ได้แปลข้อมูล (ชื่อสินค้าและฟิลด์อื่นๆ ที่รองรับหลายภาษา) ในบางภาษา วางเมาส์ที่ป้ายภาษาเพื่อดูว่าขาดฟิลด์ไหนบ้าง",
+    "missingTranslationsSearch": "ค้นหา SKU หรือตระกูล",
+    "missingTranslationsSummary": "สินค้า {{missing}} จาก {{total}} รายการยังไม่ได้แปล",
+    "missingTranslationsAllTranslated": "สินค้าทุกรายการมีชื่อที่แปลแล้วครบทุกภาษา",
+    "missingTranslationsNoMatches": "ไม่พบรายการที่ตรงกัน",
+    "missingTranslationsColSku": "SKU",
+    "missingTranslationsColFamily": "ตระกูล",
+    "missingTranslationsColStatus": "สถานะ",
+    "missingTranslationsColMissingLocales": "ภาษาที่ยังไม่ได้แปล",
+    "missingTranslationsColActions": "การดำเนินการ",
+    "missingTranslationsEditAction": "แก้ไข",
+    "missingTranslationsTranslateAction": "แปลภาษา",
+    "missingTranslationsTranslateSelected": "แปลรายการที่เลือก ({{count}})",
+    "missingTranslationsTranslating": "กำลังแปล…",
+    "missingTranslationsRowsPerPage": "แถวต่อหน้า"
 }

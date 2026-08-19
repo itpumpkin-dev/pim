@@ -162,6 +162,9 @@ return [
         ],
     ],
 
-    'attributes' => [],
+    'attributes' => [
+        'file' => 'ไฟล์',
+        'category_map' => 'ไฟล์แมปหมวดหมู่',
+    ],
 
 ];

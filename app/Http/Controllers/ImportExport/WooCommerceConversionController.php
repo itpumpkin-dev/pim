@@ -53,8 +53,15 @@ class WooCommerceConversionController extends Controller
 
     public function convert(Request $request): RedirectResponse
     {
+        // 38MB, not 40MB: php.ini's upload_max_filesize/post_max_size are
+        // 40M (see C:\xampp\php\php.ini) — this must stay under that hard
+        // ceiling (with headroom for multipart overhead) or a file between
+        // 38-40MB fails to even reach this validator, producing an empty
+        // $_FILES and a confusing "file required" error instead of a clear
+        // size-limit message. Real WooCommerce catalog exports (e.g. a
+        // ~2,600-product/33MB export) routinely exceed the previous 20MB cap.
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:20480'],
+            'file' => ['required', 'file', 'max:38912'],
             'category_map' => ['nullable', 'file', 'max:2048'],
             'family_code' => ['nullable', 'string', 'max:100'],
         ]);

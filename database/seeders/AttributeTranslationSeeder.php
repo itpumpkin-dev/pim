@@ -106,6 +106,10 @@ class AttributeTranslationSeeder extends Seeder
         'discount_std' => ['en' => 'Standard Discount', 'th' => 'ส่วนลด (มาตรฐาน)', 'zh' => '标准折扣'],
         'cost_std' => ['en' => 'Standard Cost', 'th' => 'ต้นทุน (มาตรฐาน)', 'zh' => '标准成本'],
         'gp_std' => ['en' => 'Standard GP', 'th' => 'GP (มาตรฐาน)', 'zh' => '标准毛利'],
+
+        'youtube_url' => ['en' => 'YouTube URL', 'th' => 'ลิงก์วิดีโอ YouTube', 'zh' => 'YouTube 链接'],
+        'catalog_pdf' => ['en' => 'Catalog PDF', 'th' => 'ไฟล์แคตตาล็อก (PDF)', 'zh' => '产品目录 PDF'],
+        'power_type' => ['en' => 'Power Type', 'th' => 'ใช้สาย/ไร้สาย', 'zh' => '有线/无线'],
     ];
 
     /**

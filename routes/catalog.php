@@ -17,6 +17,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
     Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
+    Route::get('product-translations', [ProductController::class, 'missingTranslations'])->name('products.missingTranslations')->middleware('permission:products,list_products');
+    Route::post('product-translations/queue-bulk', [ProductController::class, 'queueMissingTranslationsBulk'])->name('products.queueMissingTranslationsBulk')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/queue-missing-translations', [ProductController::class, 'queueMissingTranslations'])->name('products.queueMissingTranslations')->middleware('permission:products,edit_products');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');

@@ -26,7 +26,13 @@ class SpreadsheetReader
             throw new \RuntimeException("Unable to open file: {$path}");
         }
 
-        $header = fgetcsv($handle, 0, $separator);
+        // escape='' disables fgetcsv's non-standard backslash-escape handling
+        // (PHP's default) — without it, a literal backslash right before a
+        // doubled quote in a field's content (e.g. embedded JSON with \"
+        // sequences) desyncs the quoted-field state and silently shifts
+        // every later column into the wrong field for the rest of the file.
+        // See WooCommerceConverter::convert() for a reproduction.
+        $header = fgetcsv($handle, 0, $separator, '"', '');
         if ($header === false) {
             fclose($handle);
             return;
@@ -34,7 +40,7 @@ class SpreadsheetReader
         $header = array_map(fn ($h) => trim((string) $h), $header);
         $count = count($header);
 
-        while (($row = fgetcsv($handle, 0, $separator)) !== false) {
+        while (($row = fgetcsv($handle, 0, $separator, '"', '')) !== false) {
             $row = array_slice(array_pad($row, $count, null), 0, $count);
             yield array_combine($header, $row);
         }

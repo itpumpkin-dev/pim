@@ -66,6 +66,10 @@ class AttributeFamilySeeder extends Seeder
         'final_duty' => 'purchasing', 'statistics_code' => 'purchasing',
 
         'rop' => 'accounting', 'discount_std' => 'accounting', 'cost_std' => 'accounting', 'gp_std' => 'accounting',
+
+        // WooCommerce import support (see WooCommerceConverter) — grouped
+        // alongside pimage (media, general) and model/size (specifications).
+        'youtube_url' => 'general', 'catalog_pdf' => 'general', 'power_type' => 'specifications',
     ];
 
     public function run(): void

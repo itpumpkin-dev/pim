@@ -140,6 +140,14 @@ class AttributeOptionCatalogSeeder extends Seeder
             'thb' => 'THB',
             'usd' => 'USD',
         ],
+
+        // ใช้สาย/ไร้สาย (corded/cordless) — matches WooCommerceConverter's
+        // POWER_TYPE_VALUE_MAP, which resolves a Woo "Attribute N value(s)"
+        // cell to one of these two option codes.
+        'power_type' => [
+            'corded' => 'ใช้สาย',
+            'cordless' => 'ไร้สาย',
+        ],
     ];
 
     public function run(): void

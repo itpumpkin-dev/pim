@@ -3,6 +3,7 @@
     "dashboard": "แดชบอร์ด",
     "catalog": "แคตตาล็อก",
     "products": "สินค้า",
+    "missingTranslations": "สินค้าที่ยังไม่ได้แปล",
     "categories": "หมวดหมู่",
     "channels": "ช่องทางขาย",
     "categoryFields": "ฟิลด์หมวดหมู่",
