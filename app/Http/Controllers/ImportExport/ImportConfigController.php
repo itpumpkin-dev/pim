@@ -169,6 +169,7 @@ class ImportConfigController extends Controller
             'field_separator' => ['nullable', 'string', 'max:5'],
             'action' => ['required', 'in:create_update,delete'],
             'validation_strategy' => ['required', 'in:skip_errors,stop_on_errors'],
+            'ai_translate' => ['nullable', 'boolean'],
             'allowed_errors' => ['required', 'integer', 'min:0'],
             'image_directory_path' => ['nullable', 'string', 'max:255'],
             'file' => ['nullable', 'file', 'max:20480'],

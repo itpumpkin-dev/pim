@@ -18,6 +18,7 @@ class ImportConfig extends Model
         'field_separator',
         'action',
         'validation_strategy',
+        'ai_translate',
         'allowed_errors',
         'image_directory_path',
         'source_file_path',
@@ -30,6 +31,7 @@ class ImportConfig extends Model
     {
         return [
             'allowed_errors' => 'integer',
+            'ai_translate' => 'boolean',
         ];
     }
 

@@ -5,10 +5,12 @@ namespace App\Services\ImportExport\Importers;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\ImportConfig;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\User;
+use App\Jobs\AutoTranslateProductValueJob;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\ImportExport\RowImportException;
@@ -19,15 +21,24 @@ class ProductRowImporter implements RowImporterInterface
 
     private ?array $allowedAttributeCodesCache = null;
 
+    private false|int|null $sourceLocaleIdCache = false;
+
     /**
      * $user, when given, restricts columns()/importRow() to attributes this
      * user's role can *edit* (per AttributeAccessPolicy — both the
      * attribute itself and its Attribute Group, in every family it belongs
      * to) — null (the default) keeps every existing caller that doesn't
      * pass one unfiltered, matching the prior behavior.
+     *
+     * $jobTrackerId, when given, is the running import's own JobTracker row
+     * — every AI-translate dispatch increments its total_translations_queued
+     * counter, so the job status page can show live progress instead of
+     * those translations running with no visibility at all.
      */
-    public function __construct(private readonly ?User $user = null)
-    {
+    public function __construct(
+        private readonly ?User $user = null,
+        private readonly ?int $jobTrackerId = null,
+    ) {
     }
 
     /**
@@ -56,6 +67,27 @@ class ProductRowImporter implements RowImporterInterface
     {
         return $this->allowedAttributeCodesCache ??= app(AttributeAccessPolicy::class)
             ->filterAttributeCodes($this->user, self::baseAttributeCodes(), 'edit');
+    }
+
+    /**
+     * The locale an imported value is treated as being written in, for AI
+     * translation purposes. Deliberately hardcoded to Thai rather than
+     * config('app.locale') (which is 'en' here, just Laravel's untouched
+     * framework default) — this catalog's actual source data (product
+     * names, brand/category master data, ...) is overwhelmingly Thai, and
+     * translating from the wrong source locale doesn't fail loudly, it just
+     * quietly produces wrong translations (e.g. asking a provider to
+     * translate already-Thai text "from English" into Thai).
+     * `false` is the "not resolved yet" cache sentinel (distinct from a
+     * legitimate `null`, if Thai somehow isn't a row in the `locales` table).
+     */
+    private function sourceLocaleId(): ?int
+    {
+        if ($this->sourceLocaleIdCache === false) {
+            $this->sourceLocaleIdCache = Locale::idForCode('th');
+        }
+
+        return $this->sourceLocaleIdCache;
     }
 
     /**
@@ -183,6 +215,22 @@ class ProductRowImporter implements RowImporterInterface
                 ['product_id' => $product->id, 'attribute_id' => $attribute->id, 'channel_id' => null, 'locale_id' => null],
                 ['value' => (string) $value]
             );
+
+            // Imported locale-based values always land in the untranslated/
+            // global bucket above (see the class doc on baseAttributeCodes())
+            // — with "AI translate" on, fan that value out to every other
+            // enabled locale that doesn't already have one of its own, same
+            // as ticking "AI translate" on an Attribute/Category label does.
+            if ($config->ai_translate && $attribute->is_locale_based) {
+                $sourceLocaleId = $this->sourceLocaleId();
+                if ($sourceLocaleId !== null) {
+                    AutoTranslateProductValueJob::dispatch($product->id, $attribute->id, $sourceLocaleId, (string) $value, $this->jobTrackerId);
+
+                    if ($this->jobTrackerId) {
+                        JobTracker::where('id', $this->jobTrackerId)->increment('total_translations_queued');
+                    }
+                }
+            }
         }
 
         ProductCategoryLinker::linkFromCodes($product, [

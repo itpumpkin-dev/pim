@@ -15,6 +15,7 @@ import {
     DialogContentText,
     DialogTitle,
     Grid,
+    LinearProgress,
     Paper,
     Stack,
     Table,
@@ -54,6 +55,8 @@ interface JobDetail {
     total_records_created: number;
     total_records_skipped: number;
     total_rows_processed: number;
+    total_translations_queued: number;
+    total_translations_completed: number;
     result_file_path: string | null;
     error_log: ErrorLogEntry[] | null;
 }
@@ -95,8 +98,16 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
         { title: job.config_code, href: '#' },
     ];
 
+    // AI-translate dispatches (see ProductRowImporter) are separate queued
+    // jobs that keep running after this import job itself finishes and
+    // flips to 'completed' — so polling has to keep going until those catch
+    // up too, not just while the main job is still pending/processing,
+    // otherwise the counters freeze mid-translation the moment the import
+    // loop itself ends.
+    const translationsPending = job.total_translations_completed < job.total_translations_queued;
+
     useEffect(() => {
-        if (job.status !== 'pending' && job.status !== 'processing') {
+        if (job.status !== 'pending' && job.status !== 'processing' && !translationsPending) {
             return;
         }
 
@@ -115,7 +126,7 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
         return () => {
             if (pollRef.current) clearInterval(pollRef.current);
         };
-    }, [job.id, job.status]);
+    }, [job.id, job.status, translationsPending]);
 
     const userLabel = (user: UserSummary | null) => {
         if (!user) return '-';
@@ -211,6 +222,34 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                         </Paper>
                     </Grid>
                 </Grid>
+
+                {job.total_translations_queued > 0 && (
+                    <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                            <Typography variant="h6" fontWeight={700}>{t('aiTranslationProgress')}</Typography>
+                            <Chip
+                                size="small"
+                                label={
+                                    translationsPending
+                                        ? t('aiTranslationInProgress')
+                                        : t('aiTranslationDone')
+                                }
+                                color={translationsPending ? 'primary' : 'success'}
+                            />
+                        </Stack>
+                        <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, (job.total_translations_completed / job.total_translations_queued) * 100)}
+                            sx={{ height: 8, borderRadius: 4, mb: 1 }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                            {t('aiTranslationCount', {
+                                completed: job.total_translations_completed,
+                                total: job.total_translations_queued,
+                            })}
+                        </Typography>
+                    </Paper>
+                )}
 
                 <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
                     <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('summary')}</Typography>

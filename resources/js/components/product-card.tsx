@@ -62,6 +62,10 @@ export function ProductCard({ product, popular = false }: { product: Product; po
                     color: 'inherit',
                     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                     '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 },
+                    // Instant press feedback the moment you click — bridges the gap
+                    // before the page navigation/fade-in even starts, so the click
+                    // itself feels acknowledged right away instead of sitting dead.
+                    '&:active': { transform: 'translateY(-1px) scale(0.98)', transition: 'transform 0.08s ease' },
                 }}
             >
                 {product.tag && (

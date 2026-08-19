@@ -285,7 +285,7 @@ export default function Home({
                 <Toolbar sx={{ justifyContent: 'space-between' }}>
                     <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
                         <Box sx={{ color: 'primary.main', display: 'flex' }}>
-                            <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
+                            <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
                         </Box>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
                             PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>

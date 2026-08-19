@@ -2,7 +2,7 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import LocaleDropdown from '@/components/locale-dropdown';
 import { ProductCard } from '@/components/product-card';
-import { RouteLoadingSkeleton } from '@/components/route-loading-skeleton';
+import { RouteTopProgressBar } from '@/components/route-top-progress-bar';
 import { currency, productImageUrl, type IconType, type Product } from '@/data/products';
 import { useElementWidth } from '@/hooks/use-element-width';
 import { useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
@@ -22,7 +22,17 @@ import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { alpha, AppBar, Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableRow, Toolbar, Typography } from '@mui/material';
+import { keyframes } from '@emotion/react';
 import { cloneElement, useState } from 'react';
+
+// Plays once whenever this page mounts (i.e. every time Inertia navigates
+// here) — without it the bento grid just pops in the instant data arrives,
+// which is what actually reads as "abrupt" about the click, not the
+// navigation/fetch time itself.
+const pageEnter = keyframes`
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+`;
 
 type GridArea = { gridColumn: string; gridRow: string };
 type CellType = 'hero' | 'spec' | 'product' | 'stat' | 'info' | 'feature' | 'discount' | 'video';
@@ -200,7 +210,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                     </Button>
                 </Stack>
 
-                <RouteLoadingSkeleton />
+                <RouteTopProgressBar />
             </Box>
         );
     }
@@ -642,7 +652,22 @@ export default function ProductShow({ product, related }: { product: Product | n
                 </Toolbar>
             </AppBar>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
+            {/* Keyed by product id so clicking a related product (same page
+                component, new props — no natural remount otherwise) still
+                restarts the entrance animation instead of just snapping to
+                the new content. */}
+            <Box
+                key={product.id}
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                    p: { xs: 2, md: 4 },
+                    flex: 1,
+                    width: '100%',
+                    animation: `${pageEnter} 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
+                }}
+            >
                 <Button component={Link} href="/" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
                     กลับ
                 </Button>
@@ -689,7 +714,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                 )}
             </Box>
 
-            <RouteLoadingSkeleton />
+            <RouteTopProgressBar />
         </Box>
     );
 }

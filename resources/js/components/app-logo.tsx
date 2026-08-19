@@ -8,8 +8,8 @@ export default function AppLogo({ collapsed = false }: { collapsed?: boolean }) 
                 sx={{
                     display: 'flex',
                     aspectRatio: '1 / 1',
-                    width: 32,
-                    height: 32,
+                    width: 46,
+                    height: 46,
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: 1,
@@ -17,7 +17,7 @@ export default function AppLogo({ collapsed = false }: { collapsed?: boolean }) 
                     flexShrink: 0,
                 }}
             >
-                <AppLogoIcon style={{ width: 30, height: 30, fill: 'currentColor' }} />
+                <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
             </Box>
             {!collapsed && (
                 <Box sx={{ ml: 1, display: 'grid', flex: 1, textAlign: 'left' }}>

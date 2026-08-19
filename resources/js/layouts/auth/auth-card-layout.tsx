@@ -32,7 +32,7 @@ export default function AuthCardLayout({
                     sx={{ display: 'flex', alignItems: 'center', gap: 1, alignSelf: 'center', textDecoration: 'none', color: 'inherit' }}
                 >
                     <Box sx={{ display: 'flex', height: 36, width: 36, alignItems: 'center', justifyContent: 'center' }}>
-                        <AppLogoIcon style={{ width: 36, height: 36, fill: 'currentColor' }} />
+                        <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
                     </Box>
                 </Box>
 

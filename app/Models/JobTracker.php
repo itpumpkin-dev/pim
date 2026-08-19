@@ -21,6 +21,8 @@ class JobTracker extends Model
         'total_records_created',
         'total_records_skipped',
         'total_rows_processed',
+        'total_translations_queued',
+        'total_translations_completed',
         'result_file_path',
         'error_log',
     ];
@@ -34,6 +36,8 @@ class JobTracker extends Model
             'total_records_created' => 'integer',
             'total_records_skipped' => 'integer',
             'total_rows_processed' => 'integer',
+            'total_translations_queued' => 'integer',
+            'total_translations_completed' => 'integer',
             'error_log' => 'array',
         ];
     }

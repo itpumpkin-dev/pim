@@ -9,6 +9,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
@@ -49,6 +50,7 @@ import {
     TableContainer,
     TableHead,
     TableRow,
+    Tooltip,
 } from '@mui/material';
 import { FormEvent, memo, useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -301,17 +303,22 @@ export default function ProductEdit({
         }
     }, [currentLocaleCode, locales]);
 
-    // The server preloads values for this (first) channel across all locales;
-    // switching to any other channel triggers a re-fetch of scopable fields.
+    // The server preloads values for this (first) channel across all locales
+    // (see ProductController::edit()'s $defaultChannelId) in addition to the
+    // Default (All Channels) scope's own values, which are always preloaded
+    // — switching to any other channel triggers a re-fetch of scopable fields.
     const defaultChannelId = channels.length > 0 ? channels[0].id : null;
-    const [activeChannelId, setActiveChannelId] = useState<number | null>(defaultChannelId);
+    // Starts on Default (All Channels) rather than the first channel — most
+    // edits are meant to apply everywhere, so that's the safer thing to land
+    // on and edit by default; picking a specific channel is the deliberate
+    // per-channel override, not the common case.
+    const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
 
-    // Only the platform group containing the active channel starts expanded —
-    // the rest stay collapsed until the user clicks into them.
-    const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(() => {
-        const group = channelGroups.find((g) => g.channels.some((c) => c.id === defaultChannelId));
-        return new Set(group ? [group.platform] : []);
-    });
+    // Every platform group starts collapsed — the active scope on load is
+    // "Default (All Channels)" (see activeChannelId above), which doesn't
+    // belong to any platform group, so there's no longer a natural group to
+    // pre-expand as "the active one."
+    const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(new Set());
     const togglePlatform = (platform: string) => {
         setExpandedPlatforms((prev) => {
             const next = new Set(prev);
@@ -726,7 +733,14 @@ export default function ProductEdit({
 
     // Only channel/locale-based fields are re-fetched on switch; non-scopable
     // fields always live under the constant 'global'/'default' keys and never change.
-    const visitedCombosRef = useRef<Set<string>>(new Set(locales.map((l) => `${defaultChannelId ?? 'none'}:${l.id}`)));
+    // Both the Default (All Channels) scope ('none' — always preloaded, no
+    // channel filter in ProductController::edit()'s initial query) and the
+    // first channel (preloaded alongside it) are covered here, for every
+    // locale, since the page now starts on Default rather than that first
+    // channel but both are already sitting in the initial payload either way.
+    const visitedCombosRef = useRef<Set<string>>(
+        new Set(locales.flatMap((l) => [`none:${l.id}`, ...(defaultChannelId ? [`${defaultChannelId}:${l.id}`] : [])])),
+    );
     const [loadingValues, setLoadingValues] = useState(false);
 
     // True while any part of the field area is showing stale data: values
@@ -1052,7 +1066,12 @@ export default function ProductEdit({
                                                     // so without this a freshly-imported field reads as empty.
                                                     const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
                                                     const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                    const activeChannelName = channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
+                                                    // null activeChannelId means the "Default (All Channels)" scope is
+                                                    // active (see the Sales Channels panel) — channel-based fields save
+                                                    // there resolve to channel_id = null, which ResolvesProductAttributeValues
+                                                    // (Lazada/Shopee/TikTok sync) falls back to for any channel that has
+                                                    // no override of its own, so it's a real default, not just unused data.
+                                                    const activeChannelName = activeChannelId === null ? 'Default (All Channels)' : channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
                                                     return (
                                                         <RenderAttributeInput
                                                             key={attr.id}
@@ -1312,6 +1331,28 @@ export default function ProductEdit({
                                         Sales Channels
                                     </Typography>
                                     <Stack spacing={0.5}>
+                                        {/* Editing here (activeChannelId = null) sets the channel-based fields'
+                                            fallback value — any channel below that has no value of its own uses
+                                            this one instead, so it doesn't have to be re-entered per channel. */}
+                                        <Box
+                                            onClick={() => handleChannelChange(null)}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                py: 0.5,
+                                                px: 1.5,
+                                                mb: 0.5,
+                                                borderRadius: 1,
+                                                cursor: 'pointer',
+                                                bgcolor: activeChannelId === null ? 'primary.main' : 'transparent',
+                                                color: activeChannelId === null ? '#fff' : 'text.primary',
+                                                '&:hover': { bgcolor: activeChannelId === null ? 'primary.dark' : 'action.hover' },
+                                            }}
+                                        >
+                                            <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                                                Default (All Channels)
+                                            </Typography>
+                                        </Box>
                                         {channelGroups.map((group) => {
                                             const isExpanded = expandedPlatforms.has(group.platform);
                                             const groupShopIds = group.channels
@@ -1890,11 +1931,19 @@ function RenderAttributeInput({
                     // channel and typing a value looked identical to typing
                     // it for the wrong (or no) channel. Show the real channel
                     // name so that's no longer silently ambiguous.
-                    <Chip
-                        label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
-                        size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#60a5fa', color: '#fff', fontWeight: 700 }}
-                    />
+                    <>
+                        <Chip
+                            label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
+                            size="small"
+                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#60a5fa', color: '#fff', fontWeight: 700 }}
+                        />
+                        <Tooltip
+                            title='This field can have a different value per sales channel. It currently shows the value for the channel selected under "Sales Channels" (or the Default value, used by any channel with no value of its own). Switch channels there to edit another one.'
+                            arrow
+                        >
+                            <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
+                        </Tooltip>
+                    </>
                 ) : (
                     <Chip
                         label="DEFAULT"

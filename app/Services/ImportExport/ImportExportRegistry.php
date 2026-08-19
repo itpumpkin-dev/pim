@@ -23,11 +23,14 @@ class ImportExportRegistry
     /**
      * $user is only meaningful for 'products' — the other entity types
      * aren't gated by Attribute Access, so it's silently ignored for them.
+     * $jobTrackerId is likewise only meaningful for 'products': it's how
+     * ProductRowImporter reports AI-translate dispatch progress back onto
+     * the import's own JobTracker row (see its total_translations_* columns).
      */
-    public static function importer(string $type, ?User $user = null): RowImporterInterface
+    public static function importer(string $type, ?User $user = null, ?int $jobTrackerId = null): RowImporterInterface
     {
         return match ($type) {
-            'products' => new ProductRowImporter($user),
+            'products' => new ProductRowImporter($user, $jobTrackerId),
             'categories' => new CategoryRowImporter(),
             'attributes' => new AttributeRowImporter(),
             'attribute_families' => new AttributeFamilyRowImporter(),

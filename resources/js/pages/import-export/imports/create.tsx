@@ -12,9 +12,11 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     Chip,
     CircularProgress,
     FormControl,
+    FormControlLabel,
     FormHelperText,
     InputLabel,
     MenuItem,
@@ -50,6 +52,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         field_separator: ',',
         action: 'create_update',
         validation_strategy: 'skip_errors',
+        ai_translate: Boolean(false),
         allowed_errors: 10,
         image_directory_path: '',
         file: null as File | null,
@@ -212,6 +215,21 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                     <MenuItem value="stop_on_errors">{t('validationStrategyStop')}</MenuItem>
                                 </Select>
                             </FormControl>
+
+                            {data.type === 'products' && (
+                                <Box>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={data.ai_translate}
+                                                onChange={(e) => setData('ai_translate', e.target.checked)}
+                                            />
+                                        }
+                                        label={t('aiTranslate')}
+                                    />
+                                    <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
+                                </Box>
+                            )}
 
                             <TextField
                                 label={t('allowedErrors')}

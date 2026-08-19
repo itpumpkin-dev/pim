@@ -1,4 +1,4 @@
-import pumpkin from '../../images/pumpkin.png';
+import pumpkin from '../../images/logo_land.png';
 import { ImgHTMLAttributes } from 'react';
 
 export default function AppLogoIcon({ style, ...props }: ImgHTMLAttributes<HTMLImageElement>) {

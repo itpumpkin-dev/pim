@@ -39,13 +39,19 @@ class StorefrontController extends Controller
 
     public function home(): Response
     {
+        // Follows whatever locale the visitor has switched to, same as
+        // show() — cache key includes it (matching CategoryController::tree()'s
+        // convention) so a Thai-resolved payload cached for one visitor never
+        // leaks out to an English/Chinese one, or vice versa.
+        $localeCode = app()->getLocale();
+
         $payload = Cache::remember(
-            'storefront:home:v'.Product::storefrontVersion(),
+            'storefront:home:v'.Product::storefrontVersion().':'.$localeCode,
             self::CACHE_TTL_SECONDS,
-            function () {
+            function () use ($localeCode) {
                 $products = Product::where('enabled', true)->where('type', 'simple')->orderBy('id')->get();
 
-                $mapped = ProductPresenter::mapMany($products);
+                $mapped = ProductPresenter::mapMany($products, $localeCode);
 
                 $categories = collect($mapped)->pluck('category')->unique()->sort()->values()->all();
 

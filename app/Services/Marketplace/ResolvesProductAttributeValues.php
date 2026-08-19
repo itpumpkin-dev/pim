@@ -23,18 +23,23 @@ trait ResolvesProductAttributeValues
             return null;
         }
 
-        $query = ProductValue::where('product_id', $product->id)
+        $localeId = $attribute->is_locale_based && $localeCode ? Locale::where('code', $localeCode)->value('id') : null;
+
+        $lookup = fn (?int $forChannelId) => ProductValue::where('product_id', $product->id)
             ->where('attribute_id', $attribute->id)
-            ->where('channel_id', $attribute->is_channel_based ? $channelId : null);
+            ->where('channel_id', $forChannelId)
+            ->where('locale_id', $localeId)
+            ->value('value');
 
-        if ($attribute->is_locale_based) {
-            $localeId = $localeCode ? Locale::where('code', $localeCode)->value('id') : null;
-            $query->where('locale_id', $localeId);
-        } else {
-            $query->whereNull('locale_id');
+        $raw = $lookup($attribute->is_channel_based ? $channelId : null);
+
+        // A channel with no value of its own falls back to the product's
+        // Default (channel_id = null) — set via the Edit Product page's
+        // "Default (All Channels)" scope, so it actually acts as a default
+        // instead of just being data nobody reads.
+        if ($raw === null && $attribute->is_channel_based && $channelId !== null) {
+            $raw = $lookup(null);
         }
-
-        $raw = $query->value('value');
 
         $formatted = AttributeValueFormatter::format($attribute, $raw);
 

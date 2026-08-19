@@ -55,6 +55,8 @@ class JobTrackerController extends Controller
             'total_records_created' => $jobTracker->total_records_created,
             'total_records_skipped' => $jobTracker->total_records_skipped,
             'total_rows_processed' => $jobTracker->total_rows_processed,
+            'total_translations_queued' => $jobTracker->total_translations_queued,
+            'total_translations_completed' => $jobTracker->total_translations_completed,
             // ISO 8601 with an explicit UTC offset, matching how the model
             // cast itself would serialize it on the initial page load —
             // toDateTimeString() strips the offset, so once a poll response
@@ -72,12 +74,20 @@ class JobTrackerController extends Controller
      * write) — a row already being processed always finishes first, so the
      * job keeps showing 'processing' for a bit after this until it actually
      * notices and flips to 'cancelled'.
+     *
+     * Also allowed once the import itself already shows 'completed' but its
+     * AI-translate dispatches are still trickling in (total_translations_completed
+     * < total_translations_queued — see AutoTranslateProductValueJob) — those
+     * are separate queued jobs that outlive the import job, so status alone
+     * isn't enough to tell whether there's still real work (and provider API
+     * cost) in flight.
      */
     public function cancel(JobTracker $jobTracker): RedirectResponse
     {
         $this->assertCanViewJobData($jobTracker);
 
-        abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true), 422);
+        $translationsPending = $jobTracker->total_translations_completed < $jobTracker->total_translations_queued;
+        abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true) || $translationsPending, 422);
 
         if (!$jobTracker->cancel_requested_at) {
             $jobTracker->update(['cancel_requested_at' => now()]);

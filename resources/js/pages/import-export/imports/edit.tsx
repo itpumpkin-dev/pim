@@ -12,9 +12,11 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     Chip,
     CircularProgress,
     FormControl,
+    FormControlLabel,
     FormHelperText,
     InputLabel,
     MenuItem,
@@ -35,6 +37,7 @@ interface ImportConfigItem {
     field_separator: string;
     action: string;
     validation_strategy: string;
+    ai_translate: boolean;
     allowed_errors: number;
     image_directory_path: string | null;
     source_file_path: string | null;
@@ -66,6 +69,7 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         field_separator: config.field_separator,
         action: config.action,
         validation_strategy: config.validation_strategy,
+        ai_translate: Boolean(config.ai_translate),
         allowed_errors: config.allowed_errors,
         image_directory_path: config.image_directory_path || '',
         file: null as File | null,
@@ -236,6 +240,21 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                                     <MenuItem value="stop_on_errors">{t('validationStrategyStop')}</MenuItem>
                                 </Select>
                             </FormControl>
+
+                            {data.type === 'products' && (
+                                <Box>
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                checked={data.ai_translate}
+                                                onChange={(e) => setData('ai_translate', e.target.checked)}
+                                            />
+                                        }
+                                        label={t('aiTranslate')}
+                                    />
+                                    <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
+                                </Box>
+                            )}
 
                             <TextField
                                 label={t('allowedErrors')}
