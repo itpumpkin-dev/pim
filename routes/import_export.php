@@ -13,7 +13,7 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::get('imports/sample/{type}', [ImportConfigController::class, 'sample'])->name('imports.sample')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/{importConfig}/edit', [ImportConfigController::class, 'edit'])->name('imports.edit')->middleware('permission:import_configs,edit_import_configs');
     Route::put('imports/{importConfig}', [ImportConfigController::class, 'update'])->name('imports.update')->middleware('permission:import_configs,edit_import_configs');
-    Route::put('imports/{importConfig}/edit', [ImportConfigController::class, 'update']);
+    Route::put('imports/{importConfig}/edit', [ImportConfigController::class, 'update'])->middleware('permission:import_configs,edit_import_configs');
     Route::delete('imports/{importConfig}', [ImportConfigController::class, 'destroy'])->name('imports.destroy')->middleware('permission:import_configs,delete_import_configs');
     Route::post('imports/{importConfig}/run', [ImportConfigController::class, 'run'])->name('imports.run')->middleware('permission:import_configs,edit_import_configs');
 
@@ -22,7 +22,7 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::post('exports', [ExportConfigController::class, 'store'])->name('exports.store')->middleware('permission:export_configs,create_export_configs');
     Route::get('exports/{exportConfig}/edit', [ExportConfigController::class, 'edit'])->name('exports.edit')->middleware('permission:export_configs,edit_export_configs');
     Route::put('exports/{exportConfig}', [ExportConfigController::class, 'update'])->name('exports.update')->middleware('permission:export_configs,edit_export_configs');
-    Route::put('exports/{exportConfig}/edit', [ExportConfigController::class, 'update']);
+    Route::put('exports/{exportConfig}/edit', [ExportConfigController::class, 'update'])->middleware('permission:export_configs,edit_export_configs');
     Route::delete('exports/{exportConfig}', [ExportConfigController::class, 'destroy'])->name('exports.destroy')->middleware('permission:export_configs,delete_export_configs');
     Route::post('exports/{exportConfig}/run', [ExportConfigController::class, 'run'])->name('exports.run')->middleware('permission:export_configs,edit_export_configs');
 

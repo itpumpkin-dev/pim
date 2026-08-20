@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import TranslateIcon from '@mui/icons-material/Translate';
@@ -62,6 +62,9 @@ interface Props {
 export default function MissingTranslations({ rows, totalProducts }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const { auth } = usePage<SharedData>().props;
+    const permissions = auth.permissions || [];
+    const canEdit = permissions.includes('product_translations.edit_product_translations');
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
     const [translatingId, setTranslatingId] = useState<number | null>(null);
@@ -152,17 +155,19 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             {t('missingTranslationsSubtitle')}
                         </Typography>
                     </Box>
-                    <Button
-                        variant="contained"
-                        startIcon={bulkTranslating ? <CircularProgress size={16} color="inherit" /> : <TranslateIcon fontSize="small" />}
-                        disabled={selectedIds.size === 0 || bulkTranslating}
-                        onClick={translateSelected}
-                        sx={{ textTransform: 'none', fontWeight: 700 }}
-                    >
-                        {bulkTranslating
-                            ? t('missingTranslationsTranslating')
-                            : t('missingTranslationsTranslateSelected', { count: selectedIds.size })}
-                    </Button>
+                    {canEdit && (
+                        <Button
+                            variant="contained"
+                            startIcon={bulkTranslating ? <CircularProgress size={16} color="inherit" /> : <TranslateIcon fontSize="small" />}
+                            disabled={selectedIds.size === 0 || bulkTranslating}
+                            onClick={translateSelected}
+                            sx={{ textTransform: 'none', fontWeight: 700 }}
+                        >
+                            {bulkTranslating
+                                ? t('missingTranslationsTranslating')
+                                : t('missingTranslationsTranslateSelected', { count: selectedIds.size })}
+                        </Button>
+                    )}
                 </Stack>
 
                 <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5, mb: 2 }}>
@@ -218,14 +223,16 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             <Table size="small">
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                     <TableRow>
-                                        <TableCell padding="checkbox">
-                                            <Checkbox
-                                                size="small"
-                                                checked={allFilteredSelected}
-                                                indeterminate={someFilteredSelected && !allFilteredSelected}
-                                                onChange={toggleSelectAll}
-                                            />
-                                        </TableCell>
+                                        {canEdit && (
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={allFilteredSelected}
+                                                    indeterminate={someFilteredSelected && !allFilteredSelected}
+                                                    onChange={toggleSelectAll}
+                                                />
+                                            </TableCell>
+                                        )}
                                         <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColSku')}</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColFamily')}</TableCell>
                                         <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColStatus')}</TableCell>
@@ -238,9 +245,11 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                                 <TableBody>
                                     {pagedRows.map((row) => (
                                         <TableRow key={row.id} hover selected={selectedIds.has(row.id)}>
-                                            <TableCell padding="checkbox">
-                                                <Checkbox size="small" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                                            </TableCell>
+                                            {canEdit && (
+                                                <TableCell padding="checkbox">
+                                                    <Checkbox size="small" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
+                                                </TableCell>
+                                            )}
                                             <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.sku}</TableCell>
                                             <TableCell>{row.family ?? '-'}</TableCell>
                                             <TableCell>
@@ -275,21 +284,23 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                                             </TableCell>
                                             <TableCell align="right">
                                                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                    <Tooltip title={t('missingTranslationsTranslateAction')}>
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                disabled={translatingId === row.id}
-                                                                onClick={() => translateOne(row.id)}
-                                                            >
-                                                                {translatingId === row.id ? (
-                                                                    <CircularProgress size={16} />
-                                                                ) : (
-                                                                    <TranslateIcon fontSize="small" />
-                                                                )}
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
+                                                    {canEdit && (
+                                                        <Tooltip title={t('missingTranslationsTranslateAction')}>
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    disabled={translatingId === row.id}
+                                                                    onClick={() => translateOne(row.id)}
+                                                                >
+                                                                    {translatingId === row.id ? (
+                                                                        <CircularProgress size={16} />
+                                                                    ) : (
+                                                                        <TranslateIcon fontSize="small" />
+                                                                    )}
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    )}
                                                     <Tooltip title={t('missingTranslationsEditAction')}>
                                                         <IconButton
                                                             size="small"
@@ -305,7 +316,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                                     ))}
                                     {filteredRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                            <TableCell colSpan={canEdit ? 6 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                                                 {t('missingTranslationsNoMatches')}
                                             </TableCell>
                                         </TableRow>

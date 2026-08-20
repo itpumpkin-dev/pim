@@ -4,6 +4,7 @@ use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\AttributeOptionController;
+use App\Http\Controllers\Catalog\BrandController;
 use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
 use App\Http\Controllers\Catalog\ChannelController;
@@ -17,9 +18,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
     Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
-    Route::get('product-translations', [ProductController::class, 'missingTranslations'])->name('products.missingTranslations')->middleware('permission:products,list_products');
-    Route::post('product-translations/queue-bulk', [ProductController::class, 'queueMissingTranslationsBulk'])->name('products.queueMissingTranslationsBulk')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/queue-missing-translations', [ProductController::class, 'queueMissingTranslations'])->name('products.queueMissingTranslations')->middleware('permission:products,edit_products');
+    Route::get('product-translations', [ProductController::class, 'missingTranslations'])->name('products.missingTranslations')->middleware('permission:product_translations,list_product_translations');
+    Route::post('product-translations/queue-bulk', [ProductController::class, 'queueMissingTranslationsBulk'])->name('products.queueMissingTranslationsBulk')->middleware('permission:product_translations,edit_product_translations');
+    Route::post('products/{product}/queue-missing-translations', [ProductController::class, 'queueMissingTranslations'])->name('products.queueMissingTranslations')->middleware('permission:product_translations,edit_product_translations');
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');
@@ -55,6 +56,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('attributes/{attribute}/options/batch', [AttributeOptionController::class, 'batchUpdate'])->name('attributes.options.batchUpdate')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'update'])->name('attributes.options.update')->middleware('permission:attributes,edit_attributes');
     Route::delete('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'destroy'])->name('attributes.options.destroy')->middleware('permission:attributes,edit_attributes');
+
+    Route::get('brands', [BrandController::class, 'index'])->name('brands.index')->middleware('permission:brands,list_brands');
+    Route::post('brands', [BrandController::class, 'store'])->name('brands.store')->middleware('permission:brands,edit_brands');
+    Route::get('brands/{brand}/edit', [BrandController::class, 'edit'])->name('brands.edit')->middleware('permission:brands,edit_brands');
+    Route::put('brands/{brand}', [BrandController::class, 'update'])->name('brands.update')->middleware('permission:brands,edit_brands');
+    Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy')->middleware('permission:brands,edit_brands');
 
     Route::get('attributeGroups', [AttributeGroupController::class, 'index'])->name('attributeGroups.index')->middleware('permission:attribute_groups,list_attribute_groups');
     Route::get('attributeGroups/create', [AttributeGroupController::class, 'create'])->name('attributeGroups.create')->middleware('permission:attribute_groups,create_attribute_groups');

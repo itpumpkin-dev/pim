@@ -50,30 +50,42 @@ function useMainNavItems(): NavItem[] {
                 {
                     title: t('products'),
                     url: '/catalog/products',
+                    permission: 'products.list_products',
                 },
                 {
                     title: t('missingTranslations'),
                     url: '/catalog/product-translations',
+                    permission: 'product_translations.list_product_translations',
                 },
                 {
                     title: t('categories'),
                     url: '/catalog/categories',
+                    permission: 'categories.list_categories',
+                },
+                {
+                    title: t('brands'),
+                    url: '/catalog/brands',
+                    permission: 'brands.list_brands',
                 },
                 {
                     title: t('categoryFields'),
                     url: '/catalog/categoryFields',
+                    permission: 'category_fields.list_category_fields',
                 },
                 {
                     title: t('attributes'),
                     url: '/catalog/attributes',
+                    permission: 'attributes.list_attributes',
                 },
                 {
                     title: t('attributeGroups'),
                     url: '/catalog/attributeGroups',
+                    permission: 'attribute_groups.list_attribute_groups',
                 },
                 {
                     title: t('attributeFamilies'),
                     url: '/catalog/attributeFamilies',
+                    permission: 'attribute_families.list_attribute_families',
                 },
             ],
         },

@@ -14,8 +14,12 @@ class AttributeOption extends Model
 
     protected $fillable = [
         'attribute_id',
+        'parent_id',
         'code',
         'admin_label',
+        'slug',
+        'description',
+        'thumbnail',
         'swatch_value',
         'sort_order',
     ];
@@ -60,5 +64,20 @@ class AttributeOption extends Model
     public function translations(): HasMany
     {
         return $this->hasMany(AttributeOptionTranslation::class);
+    }
+
+    /**
+     * Self-referencing hierarchy (e.g. a Brand option's "Parent Brand") —
+     * generic on the model like the other new columns above, even though
+     * only the Brand pages expose it today.
+     */
+    public function parentOption(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function childOptions(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 }

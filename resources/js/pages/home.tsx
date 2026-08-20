@@ -191,9 +191,12 @@ export default function Home({
     const [splashExiting, setSplashExiting] = useState(false);
 
     useEffect(() => {
+        // Mount the real content while the splash is still fully opaque (not
+        // mid-fade) so the heavy product grid render doesn't compete with the
+        // splash's exit transition on the main thread.
         const timer = setTimeout(() => {
             setLoading(false);
-        }, 800);
+        }, 50);
         return () => clearTimeout(timer);
     }, []);
 

@@ -19,6 +19,14 @@ class Role extends Model
         'is_guest',
     ];
 
+    /** Per-request memoization of allPermissions() — see that method's docblock. */
+    private ?array $permissionsCache = null;
+
+    /** Per-request memoization of guest() — see that method's docblock. */
+    private static ?self $cachedGuest = null;
+
+    private static bool $guestResolved = false;
+
     protected function casts(): array
     {
         return [
@@ -42,25 +50,36 @@ class Role extends Model
      * permissions for a null viewer instead of allowing everything
      * unconditionally. Null if no role has been designated yet, which
      * preserves the original "anonymous = unrestricted" behavior.
+     *
+     * Memoized for the lifetime of the request/process: AttributeAccessPolicy
+     * calls actorFor() — and therefore this — once per attribute and once
+     * per attribute-group check, so an uncached version turned a single
+     * public product page into dozens of `roles` queries.
      */
     public static function guest(): ?self
     {
-        return static::where('is_guest', true)->first();
+        if (! self::$guestResolved) {
+            self::$cachedGuest = static::where('is_guest', true)->first();
+            self::$guestResolved = true;
+        }
+
+        return self::$cachedGuest;
     }
 
     /**
      * Flat "resource.action" permission list for this role alone — same
      * shape as User::getAllPermissions(), but for exactly one role instead
-     * of aggregating a user's own + group-inherited roles. Deliberately
-     * uncached (unlike the user-facing version): this is only ever queried
-     * for anonymous requests to public pages, nowhere near the per-request
-     * volume that justified caching the authenticated path, so it isn't
-     * worth the invalidation complexity (the guest role has no real
-     * `users()`/`userGroups()` rows for SessionInvalidator to bump).
+     * of aggregating a user's own + group-inherited roles.
+     *
+     * Memoized per-instance for the same reason as guest() above:
+     * hasPermission()/hasAnyPermissionForResource() are each called once per
+     * attribute/group by AttributeAccessPolicy, and guest() now returns the
+     * same instance every time, so this cache actually gets reused instead
+     * of re-querying `role_permissions` on every check.
      */
     public function allPermissions(): array
     {
-        return $this->permissions()
+        return $this->permissionsCache ??= $this->permissions()
             ->where('granted', true)
             ->get()
             ->map(fn (RolePermission $p) => "{$p->resource}.{$p->action}")

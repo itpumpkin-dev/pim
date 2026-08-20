@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { PALETTE } from '@/theme';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import DownloadIcon from '@mui/icons-material/Download';
 import LinkIcon from '@mui/icons-material/Link';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
@@ -48,6 +48,14 @@ interface Props {
 export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+
+    // Every action on this page (sync/map/export/import) is backed by a
+    // route that requires categories.edit_categories — there's no
+    // separate create/delete split here, unlike the CRUD list pages, so
+    // one check gates the whole action panel.
+    const { auth } = usePage<SharedData>().props;
+    const permissions = auth.permissions || [];
+    const canEdit = permissions.includes('categories.edit_categories');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
@@ -156,44 +164,46 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                                 <Typography variant="h6" fontWeight={700}>{selected.label}</Typography>
                             </Stack>
 
-                            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
-                                    disabled={syncing}
-                                    onClick={runSync}
-                                >
-                                    {syncing ? t('syncingLazada') : t('syncCategories')}
-                                </Button>
-                                <Button
-                                    variant="contained"
-                                    sx={{ color: 'white' }}
-                                    startIcon={<LinkIcon />}
-                                    onClick={() => router.visit(selected.mappingRoute)}
-                                >
-                                    {t('mapToPlatformCategories', { platform: selected.label })}
-                                </Button>
-                                {selected.exportRoute && (
+                            {canEdit && (
+                                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
                                     <Button
                                         variant="outlined"
-                                        startIcon={<DownloadIcon />}
-                                        component="a"
-                                        href={selected.exportRoute}
+                                        startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                                        disabled={syncing}
+                                        onClick={runSync}
                                     >
-                                        {t('exportCategoriesCsv')}
+                                        {syncing ? t('syncingLazada') : t('syncCategories')}
                                     </Button>
-                                )}
-                                {selected.importRoute && (
                                     <Button
-                                        variant="outlined"
-                                        startIcon={importing ? <CircularProgress size={16} /> : <SystemUpdateAltIcon />}
-                                        disabled={importing}
-                                        onClick={runImport}
+                                        variant="contained"
+                                        sx={{ color: 'white' }}
+                                        startIcon={<LinkIcon />}
+                                        onClick={() => router.visit(selected.mappingRoute)}
                                     >
-                                        {importing ? t('importingCategories') : t('importAsPimCategories')}
+                                        {t('mapToPlatformCategories', { platform: selected.label })}
                                     </Button>
-                                )}
-                            </Stack>
+                                    {selected.exportRoute && (
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<DownloadIcon />}
+                                            component="a"
+                                            href={selected.exportRoute}
+                                        >
+                                            {t('exportCategoriesCsv')}
+                                        </Button>
+                                    )}
+                                    {selected.importRoute && (
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={importing ? <CircularProgress size={16} /> : <SystemUpdateAltIcon />}
+                                            disabled={importing}
+                                            onClick={runImport}
+                                        >
+                                            {importing ? t('importingCategories') : t('importAsPimCategories')}
+                                        </Button>
+                                    )}
+                                </Stack>
+                            )}
                         </Stack>
                     </CardContent>
                 </Card>

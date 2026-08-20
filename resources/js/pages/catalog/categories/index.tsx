@@ -118,7 +118,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     sx={{ mb: 3 }}
                 >
                     <Tab value="categories" label={tNav('categories')} />
-                    <Tab value="marketplace-sync" label={t('marketplaceSyncTab')} />
+                    {canEdit && <Tab value="marketplace-sync" label={t('marketplaceSyncTab')} />}
                 </Tabs>
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
