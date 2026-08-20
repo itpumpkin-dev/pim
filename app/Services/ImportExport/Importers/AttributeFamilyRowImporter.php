@@ -3,13 +3,16 @@
 namespace App\Services\ImportExport\Importers;
 
 use App\Models\AttributeFamily;
+use App\Models\AttributeFamilyTranslation;
 use App\Models\FamilyAttribute;
 use App\Models\ImportConfig;
+use App\Services\ImportExport\Importers\Concerns\WritesLocalizedTranslation;
 use App\Services\ImportExport\RowImportException;
 
 class AttributeFamilyRowImporter implements RowImporterInterface
 {
     use HasStaticColumnLabels;
+    use WritesLocalizedTranslation;
 
     public function columns(): array
     {
@@ -38,12 +41,27 @@ class AttributeFamilyRowImporter implements RowImporterInterface
             return [];
         }
 
+        $existing = AttributeFamily::where('code', $code)->first();
         $name = trim((string) ($row['name'] ?? ''));
+        $rawName = $name !== ''
+            ? $this->resolveRawColumnValue($existing?->getRawOriginal('name'), $name, $config->source_locale)
+            : ucfirst($code);
 
-        AttributeFamily::updateOrCreate(
+        $family = AttributeFamily::updateOrCreate(
             ['code' => $code],
-            ['name' => $name !== '' ? $name : ucfirst($code)]
+            ['name' => $rawName]
         );
+
+        if ($name !== '') {
+            $this->writeLocalizedTranslation(
+                AttributeFamilyTranslation::class,
+                'attribute_family_id',
+                $family->id,
+                $name,
+                $config->source_locale,
+                (bool) $config->ai_translate,
+            );
+        }
 
         return [];
     }

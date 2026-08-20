@@ -4,8 +4,10 @@ namespace App\Services\ImportExport\Importers;
 
 use App\Models\Attribute;
 use App\Models\AttributeOption;
+use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Models\ImportConfig;
+use App\Services\ImportExport\Importers\Concerns\WritesLocalizedTranslation;
 use App\Services\ImportExport\RowImportException;
 
 /**
@@ -17,6 +19,7 @@ use App\Services\ImportExport\RowImportException;
 class AttributeOptionRowImporter implements RowImporterInterface
 {
     use HasStaticColumnLabels;
+    use WritesLocalizedTranslation;
 
     public function columns(): array
     {
@@ -55,15 +58,29 @@ class AttributeOptionRowImporter implements RowImporterInterface
         }
 
         $sortOrderRaw = $row['sort_order'] ?? null;
+        $adminLabel = trim((string) ($row['admin_label'] ?? ''));
+        $rawAdminLabel = $adminLabel !== '' ? $this->resolveRawColumnValue($existing?->getRawOriginal('admin_label'), $adminLabel, $config->source_locale) : null;
 
         $option = AttributeOption::updateOrCreate(
             ['attribute_id' => $attribute->id, 'code' => $code],
             [
-                'admin_label' => ($row['admin_label'] ?? '') !== '' ? $row['admin_label'] : null,
+                'admin_label' => $rawAdminLabel,
                 'swatch_value' => ($row['swatch_value'] ?? '') !== '' ? $row['swatch_value'] : null,
                 'sort_order' => is_numeric($sortOrderRaw) ? (int) $sortOrderRaw : ($existing?->sort_order ?? 0),
             ]
         );
+
+        $translationChanged = false;
+        if ($adminLabel !== '') {
+            $translationChanged = $this->writeLocalizedTranslation(
+                AttributeOptionTranslation::class,
+                'attribute_option_id',
+                $option->id,
+                $adminLabel,
+                $config->source_locale,
+                (bool) $config->ai_translate,
+            );
+        }
 
         $newFields = $this->auditFields($option);
 
@@ -73,7 +90,12 @@ class AttributeOptionRowImporter implements RowImporterInterface
         }
 
         $oldFields = $this->auditFields($existing);
-        if ($oldFields !== $newFields) {
+        // $oldFields/$newFields alone would miss a change that only touched
+        // the AttributeOptionTranslation row (raw admin_label deliberately
+        // left untouched — see resolveRawColumnValue()) — $translationChanged
+        // covers that so re-importing a non-default-locale label still logs
+        // option_updated instead of going silent.
+        if ($oldFields !== $newFields || $translationChanged) {
             AuditLog::record('option_updated', $attribute, $oldFields, $newFields, $config->created_by);
         }
 

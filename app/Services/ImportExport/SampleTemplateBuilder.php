@@ -41,7 +41,10 @@ class SampleTemplateBuilder
     {
         return match ($type) {
             'products' => ['sku' => 'SKU-0001', 'family_code' => 'default', 'type' => 'simple', 'enabled' => '1'],
-            'categories' => ['code' => 'shoes', 'name' => 'Shoes', 'description' => 'Footwear', 'parent_code' => ''],
+            'categories' => [
+                'code' => 'shoes', 'name' => 'Shoes', 'slug' => 'shoes', 'description' => 'Footwear', 'parent_code' => '',
+                'display_type' => 'default', 'thumbnail' => '', 'is_active' => '1',
+            ],
             'attributes' => [
                 'code' => 'color', 'name' => 'Color', 'type' => 'text', 'is_required' => '0',
                 'is_unique' => '0', 'is_locale_based' => '0', 'is_channel_based' => '0', 'is_filterable' => '1',

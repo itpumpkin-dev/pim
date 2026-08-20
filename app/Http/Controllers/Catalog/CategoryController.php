@@ -17,9 +17,11 @@ use App\Models\ShopeeSellerAccount;
 use App\Models\TikTokCategory;
 use App\Models\TikTokSellerAccount;
 use App\Models\WooCommerceCategory;
+use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\CategoryMatcher;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
+use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaClient;
 use App\Services\Shopee\ShopeeClient;
 use App\Services\TikTok\TikTokClient;
@@ -30,12 +32,23 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CategoryController extends Controller
 {
     use HasVersionHistory;
+
+    /**
+     * WooCommerce's own "Display type" values for a product category —
+     * see the categories create/edit pages, which mirror WooCommerce's "Add
+     * new category" form. Stored verbatim (not translated/renamed) so this
+     * stays directly reusable if a category-push feature is built later.
+     */
+    private const DISPLAY_TYPES = ['default', 'products', 'subcategories', 'both'];
 
     /**
      * Display a listing of the categories.
@@ -53,6 +66,7 @@ class CategoryController extends Controller
             'code' => ['label' => 'Code', 'type' => 'string', 'filterable' => true],
             'name' => ['label' => 'Name', 'type' => 'string', 'filterable' => true],
             'description' => ['label' => 'Description', 'type' => 'string', 'filterable' => true],
+            'is_active' => ['label' => 'Active', 'type' => 'boolean', 'filterable' => true],
         ];
 
         // `name` is a language-agnostic fallback column (see Category::name()
@@ -66,11 +80,28 @@ class CategoryController extends Controller
         // (and wrongly) narrow results by the raw column too.
         $originalFilters = $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
+
+        // Defaults the list to active categories only — the ~1,086 legacy
+        // categories deactivated when the real WooCommerce category list was
+        // reconciled in (see the is_active migration) would otherwise
+        // dominate this page. Only defaulted when the request sends no
+        // `is_active` filter at all (first load / filters cleared); an
+        // explicit choice via the filter drawer (including "No", to see
+        // inactive ones) always wins. Applied to $originalFilters (not just
+        // the query-only $filtersWithoutName below) so the filter drawer's
+        // own UI reflects this default as an active "Active: Yes" chip
+        // instead of silently filtering with nothing shown as selected.
+        if (! array_key_exists('is_active', $originalFilters)) {
+            $originalFilters['is_active'] = '1';
+        }
         $filtersWithoutName = collect($originalFilters)->except('name')->all();
 
         // Fetch categories with their parent to show in list. Counts are
         // surfaced so the delete confirmation can warn about what a delete
-        // would actually affect (children get orphaned, product links cascade).
+        // would actually affect (children get orphaned, product links cascade)
+        // and so `products_count` can be sorted on below (an aliased
+        // withCount() column — Postgres allows referencing a SELECT alias in
+        // ORDER BY, unlike HAVING).
         $query = Category::with('parent')
             ->withCount(['children', 'products'])
             ->when($search, function ($query, $search) {
@@ -86,18 +117,85 @@ class CategoryController extends Controller
                     $q->where('name', 'like', "%{$nameFilter}%")
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
                 });
-            })
-            ->orderBy('id', 'desc');
+            });
 
         GridManager::applyFilters($query, $filterColumns, $filtersWithoutName);
 
+        // Click-a-column-header sort, matching the pattern GridManager's own
+        // getData() uses for the YAML-configured grids (Products, ...) —
+        // whitelisted rather than passing $request->input('sort') straight
+        // into orderBy(), which would let an arbitrary column/expression
+        // through. `name` sorts by the raw fallback column (see the
+        // `$nameFilter` comment above) rather than the translated label,
+        // same limitation the free-text search already accepts for that
+        // column pending a real per-locale sort.
+        $sortableColumns = ['name', 'description', 'slug', 'products_count'];
+        $sortField = $request->input('sort');
+        $sortDir = strtolower((string) $request->input('dir')) === 'desc' ? 'desc' : 'asc';
+
+        if ($sortField && in_array($sortField, $sortableColumns, true)) {
+            $query->orderBy($sortField, $sortDir);
+        } else {
+            $query->orderBy('id', 'desc');
+        }
+
         $categories = $query->paginate($perPage)->withQueryString();
+
+        // Raw storage path -> public URL, same resolution the category
+        // edit page's thumbnail preview uses (CategoryController::edit()).
+        $categories->getCollection()->transform(function (Category $category) {
+            $category->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($category->thumbnail);
+
+            return $category;
+        });
 
         return Inertia::render('catalog/categories/index', [
             'categories' => $categories,
-            'filters' => $request->only(['search', 'filters']),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'filters' => $originalFilters,
+                'sort' => $sortField ?? '',
+                'dir' => $sortField ? $sortDir : '',
+            ],
             'filterColumns' => $filterColumns,
         ]);
+    }
+
+    /**
+     * Downloads this app's own category tree as a CSV — same shape/purpose
+     * as exportWoocommerceCategories() below, but for our own `categories`
+     * table rather than the synced woocommerce_categories cache. Always the
+     * full tree, ignoring the list page's current search/filter/sort state
+     * (same "export everything" scope exportWoocommerceCategories() uses),
+     * since this is meant as a full reference/backup file, not a filtered
+     * view export.
+     */
+    public function exportCategories(): BinaryFileResponse
+    {
+        $categories = Category::with('parent')->withCount(['children', 'products'])->orderBy('name')->get();
+
+        $rows = $categories->map(fn (Category $category) => [
+            'Code' => $category->code,
+            'Name' => $category->name,
+            'Slug' => $category->slug ?? '',
+            'Parent' => $category->parent?->name ?? '',
+            'Description' => $category->description ?? '',
+            // Handles both a locally-uploaded thumbnail (a storage path) and
+            // one brought in via importFromWoocommerce() (already an
+            // absolute pumpkin.co.th URL) — same resolution used by the
+            // list/edit pages' thumbnail preview.
+            'Thumbnail' => AttributeValueFormatter::resolveStorageUrl($category->thumbnail) ?? '',
+            'Display Type' => $category->display_type,
+            'Products Count' => $category->products_count,
+            'Is Leaf' => $category->children_count === 0 ? 'Yes' : 'No',
+        ])->all();
+
+        $tempPath = sys_get_temp_dir().'/pim_categories_'.Str::uuid().'.csv';
+        SpreadsheetWriter::write($tempPath, 'csv', ['Code', 'Name', 'Slug', 'Parent', 'Description', 'Thumbnail', 'Display Type', 'Products Count', 'Is Leaf'], $rows, ',');
+
+        $downloadName = 'pim-categories-'.now()->format('Ymd_His').'.csv';
+
+        return response()->download($tempPath, $downloadName)->deleteFileAfterSend(true);
     }
 
     /**
@@ -128,6 +226,10 @@ class CategoryController extends Controller
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
             'additional_data' => ['nullable', 'array'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
+            'thumbnail' => ['nullable', 'image', 'max:4096'],
+            'is_active' => ['boolean'],
         ];
 
         foreach ($categoryFields as $field) {
@@ -155,12 +257,17 @@ class CategoryController extends Controller
 
         $validated = $request->validate($rules);
         $validated['additional_data'] = $this->storeUploadedFields($request, $categoryFields, $validated['additional_data'] ?? []);
+        $thumbnailPath = $request->hasFile('thumbnail') ? $request->file('thumbnail')->store('category-thumbnails', 'public') : null;
 
         $translations = $validated['translations'] ?? [];
 
         $category = CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
             'code' => $code,
             'name' => $this->resolveName($translations, $validated['name'] ?? null, $code),
+            'slug' => $validated['slug'] ?? null,
+            'display_type' => $validated['display_type'] ?? 'default',
+            'thumbnail' => $thumbnailPath,
+            'is_active' => $request->boolean('is_active', true),
             'description' => $validated['description'],
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
@@ -219,9 +326,29 @@ class CategoryController extends Controller
     {
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
+        // A category with no CategoryTranslation row at all (e.g. every one
+        // created by importFromWoocommerce()/CategoryRowImporter, which only
+        // ever write the raw `name` column) would otherwise show an empty
+        // Name input for the admin's current locale — even though
+        // Category::name()'s own accessor already falls back to that same
+        // raw column for display everywhere else. Mirrors that accessor's
+        // fallback here too, but only for this page's initial form values —
+        // NOT applied to currentTranslations()'s other callers (store()/
+        // update()'s before/after audit diff), where injecting a synthetic
+        // value would falsely look like a real translation change.
+        $translations = $this->currentTranslations($category);
+        $activeLocaleId = Locale::where('code', app()->getLocale())->value('id');
+        if ($activeLocaleId && trim((string) ($translations[$activeLocaleId] ?? '')) === '') {
+            $rawName = trim((string) $category->getRawOriginal('name'));
+            if ($rawName !== '') {
+                $translations[$activeLocaleId] = $rawName;
+            }
+        }
+
         return Inertia::render('catalog/categories/edit', [
             'category' => $category->load('lazadaCategory:id,name,parent_id'),
-            'translations' => $this->currentTranslations($category),
+            'thumbnailUrl' => AttributeValueFormatter::resolveStorageUrl($category->thumbnail),
+            'translations' => $translations,
             'categoryFields' => $categoryFields,
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
@@ -307,6 +434,10 @@ class CategoryController extends Controller
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
             'additional_data' => ['nullable', 'array'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
+            'thumbnail' => ['nullable', 'image', 'max:4096'],
+            'is_active' => ['boolean'],
         ];
 
         foreach ($categoryFields as $field) {
@@ -374,8 +505,20 @@ class CategoryController extends Controller
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($category);
 
+        // Same "keep existing unless a new file was uploaded" rule as the
+        // Image/File category fields above (storeUploadedFields()) — the
+        // input always renders empty on the edit form, so a save with no new
+        // thumbnail chosen shouldn't wipe out the one already stored.
+        $thumbnailPath = $request->hasFile('thumbnail')
+            ? $request->file('thumbnail')->store('category-thumbnails', 'public')
+            : $category->thumbnail;
+
         $category->update([
             'name' => $this->resolveName($translations, $validated['name'] ?? null, $category->code),
+            'slug' => $validated['slug'] ?? null,
+            'display_type' => $validated['display_type'] ?? 'default',
+            'thumbnail' => $thumbnailPath,
+            'is_active' => $request->boolean('is_active', true),
             'description' => $validated['description'],
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
@@ -735,6 +878,9 @@ class CategoryController extends Controller
                     'id' => $node['id'],
                     'parent_id' => $parentId > 0 ? $parentId : null,
                     'name' => $node['name'],
+                    'slug' => $node['slug'] ?? null,
+                    'description' => $node['description'] ?? null,
+                    'thumbnail_url' => $node['image']['src'] ?? null,
                 ];
             }
             $page++;
@@ -762,11 +908,138 @@ class CategoryController extends Controller
             WooCommerceCategory::upsert(
                 array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
                 ['id'],
-                ['parent_id', 'name', 'is_leaf', 'updated_at']
+                ['parent_id', 'name', 'slug', 'description', 'thumbnail_url', 'is_leaf', 'updated_at']
             );
         }
 
         return back()->with('success', 'Synced '.count($ordered).' WooCommerce categories.');
+    }
+
+    /**
+     * Downloads the locally cached woocommerce_categories table (populated by
+     * syncWoocommerceCategories() above) as a CSV — a snapshot of what's
+     * actually on the WooCommerce store as of the last sync, not a live
+     * re-fetch. Parent is resolved to its name (not just parent_id) so the
+     * file is readable on its own without cross-referencing IDs.
+     */
+    public function exportWoocommerceCategories(): BinaryFileResponse
+    {
+        $categories = WooCommerceCategory::orderBy('name')->get(['id', 'parent_id', 'name', 'slug', 'description', 'thumbnail_url', 'is_leaf']);
+        $nameById = $categories->pluck('name', 'id');
+
+        $rows = $categories->map(fn (WooCommerceCategory $category) => [
+            'ID' => $category->id,
+            'Name' => $category->name,
+            // Readable in this human-facing CSV — see importFromWoocommerce()'s
+            // docblock for why WordPress stores a Thai slug percent-encoded.
+            'Slug' => $category->slug ? rawurldecode($category->slug) : '',
+            'Parent' => $category->parent_id ? ($nameById[$category->parent_id] ?? $category->parent_id) : '',
+            'Description' => $category->description ?? '',
+            'Thumbnail' => $category->thumbnail_url ?? '',
+            'Is Leaf' => $category->is_leaf ? 'Yes' : 'No',
+        ])->all();
+
+        $tempPath = sys_get_temp_dir().'/woocommerce_categories_'.Str::uuid().'.csv';
+        SpreadsheetWriter::write($tempPath, 'csv', ['ID', 'Name', 'Slug', 'Parent', 'Description', 'Thumbnail', 'Is Leaf'], $rows, ',');
+
+        $downloadName = 'woocommerce-categories-'.now()->format('Ymd_His').'.csv';
+
+        return response()->download($tempPath, $downloadName)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Creates/updates real PIM categories from the locally cached
+     * woocommerce_categories tree (populated by syncWoocommerceCategories()
+     * above) — the reverse of the mapping page: instead of pointing an
+     * existing PIM category at a WooCommerce one, this brings WooCommerce's
+     * own name/slug/description/thumbnail into the PIM catalog directly.
+     *
+     * Matching is deliberately conservative: only a PIM category ALREADY
+     * mapped (categories.woocommerce_category_id = this row's id — set via
+     * the mapping page, or by a previous run of this same import) gets
+     * updated. Every unmapped WooCommerce category creates a brand new PIM
+     * category rather than guessing a name/slug match — silently merging
+     * into a similarly-named existing category would be surprising and hard
+     * to undo. A newly created category is immediately mapped, so re-running
+     * this later updates it instead of creating a duplicate.
+     *
+     * Processed root-first (same depth-first walk as
+     * syncWoocommerceCategories()) so a child's parent_id always resolves to
+     * an already-created/updated PIM category. thumbnail_url is stored
+     * as-is (a real pumpkin.co.th URL, not downloaded) — resolveStorageUrl()
+     * (see index()/edit() above) already passes absolute URLs through
+     * unchanged, so this doesn't need special handling on read.
+     */
+    public function importFromWoocommerce(Request $request): RedirectResponse
+    {
+        $wcCategories = WooCommerceCategory::all()->keyBy('id');
+
+        $byParent = [];
+        foreach ($wcCategories as $wc) {
+            $byParent[$wc->parent_id ?? 0][] = $wc;
+        }
+
+        $ordered = [];
+        $walk = function (int $parentId) use (&$walk, &$byParent, &$ordered) {
+            foreach ($byParent[$parentId] ?? [] as $wc) {
+                $ordered[] = $wc;
+                $walk($wc->id);
+            }
+        };
+        $walk(0);
+
+        $pimIdByWooId = Category::whereNotNull('woocommerce_category_id')
+            ->get(['id', 'woocommerce_category_id'])
+            ->pluck('id', 'woocommerce_category_id');
+
+        $existingById = Category::whereNotNull('woocommerce_category_id')->get()->keyBy('woocommerce_category_id');
+
+        $created = 0;
+        $updated = 0;
+
+        foreach ($ordered as $wc) {
+            $parentPimId = $wc->parent_id ? ($pimIdByWooId[$wc->parent_id] ?? null) : null;
+
+            $attributes = [
+                'name' => $wc->name,
+                // WordPress stores a non-Latin (e.g. Thai) term's slug
+                // percent-encoded (sanitize_title() urlencodes multi-byte
+                // UTF-8 rather than transliterating it) — confirmed live,
+                // 2026-08-20: raw values like "%e0%b9%80%e0%b8..." showed up
+                // unreadable in the categories list. Decoded here, once, so
+                // every read of our own `categories.slug` (list, edit,
+                // export) shows real Thai text. woocommerce_categories.slug
+                // itself is left encoded — that's WooCommerce's actual raw
+                // value, kept faithful in case it's ever needed for a real
+                // API call back to them.
+                'slug' => $wc->slug ? rawurldecode($wc->slug) : null,
+                'description' => $wc->description,
+                'thumbnail' => $wc->thumbnail_url,
+                'parent_id' => $parentPimId,
+                'woocommerce_category_id' => $wc->id,
+                'updated_by' => $request->user()?->id,
+            ];
+
+            $existing = $existingById->get($wc->id);
+
+            if ($existing) {
+                $existing->update($attributes);
+                $pimIdByWooId[$wc->id] = $existing->id;
+                $updated++;
+            } else {
+                $category = CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
+                    ...$attributes,
+                    'code' => $code,
+                    'created_by' => $request->user()?->id,
+                ]));
+                $pimIdByWooId[$wc->id] = $category->id;
+                $created++;
+            }
+        }
+
+        Category::bumpTreeCacheVersion();
+
+        return back()->with('success', "Imported {$created} new / updated {$updated} categories from WooCommerce.");
     }
 
     /**
@@ -896,11 +1169,20 @@ class CategoryController extends Controller
         // ancestor chain can be resolved in memory regardless of depth,
         // instead of firing one query per row per level.
         $allCategories = Category::query()->without('translations')
-            ->get(['id', 'parent_id', 'name', 'additional_data', $fkColumn])
+            ->get(['id', 'parent_id', 'name', 'additional_data', 'is_active', $fkColumn])
             ->keyBy('id');
 
         $childParentIds = $allCategories->pluck('parent_id')->filter()->unique();
         $leafIds = $allCategories->reject(fn (Category $c) => $childParentIds->contains($c->id))->pluck('id');
+
+        // Marketplace mapping is only meaningful for categories actually in
+        // use — the ~1,086 legacy categories deactivated when the real
+        // WooCommerce category list was reconciled in (see the is_active
+        // migration) would otherwise flood this page with stale rows nobody
+        // needs to map. $leafIds itself stays unfiltered (ancestorNameEngTokens/
+        // pathOf below still need to walk through inactive ancestors, if any,
+        // to build an accurate path/hint).
+        $activeLeafIds = $allCategories->whereIn('id', $leafIds)->where('is_active', true)->pluck('id');
 
         $nameEngOf = fn (Category $category) => trim((string) ($category->additional_data['name_eng'] ?? '')) ?: $category->name;
 
@@ -927,7 +1209,7 @@ class CategoryController extends Controller
         };
 
         $query = Category::query()->without('translations')
-            ->whereIn('id', $leafIds)
+            ->whereIn('id', $activeLeafIds)
             ->withCount('products')
             ->with("{$relation}:id,name,parent_id");
 
@@ -1011,8 +1293,8 @@ class CategoryController extends Controller
         return [
             'categories' => $paginated,
             'stats' => [
-                'total' => $leafIds->count(),
-                'mapped' => $allCategories->whereIn('id', $leafIds)->whereNotNull($fkColumn)->count(),
+                'total' => $activeLeafIds->count(),
+                'mapped' => $allCategories->whereIn('id', $activeLeafIds)->whereNotNull($fkColumn)->count(),
             ],
         ];
     }

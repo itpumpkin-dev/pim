@@ -1,8 +1,8 @@
 import ImportFilePreview from '@/components/import-export/import-file-preview';
 import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import SaveIcon from '@mui/icons-material/Save';
@@ -41,6 +41,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const { locales } = usePage<SharedData>().props;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('importExport'), href: '#' },
@@ -55,6 +56,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         action: 'create_update',
         validation_strategy: 'skip_errors',
         ai_translate: Boolean(false),
+        source_locale: locales.find((l) => l.code === 'th')?.code ?? locales[0]?.code ?? 'th',
         allowed_errors: 10,
         image_directory_path: '',
         file: null as File | null,
@@ -139,6 +141,21 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                         <MenuItem key={type} value={type}>{typeLabel(type)}</MenuItem>
                                     ))}
                                 </Select>
+                            </FormControl>
+
+                            <FormControl fullWidth>
+                                <InputLabel id="import-source-locale-label">{t('sourceLocaleLabel')}</InputLabel>
+                                <Select
+                                    labelId="import-source-locale-label"
+                                    label={t('sourceLocaleLabel')}
+                                    value={data.source_locale}
+                                    onChange={(e) => setData('source_locale', e.target.value)}
+                                >
+                                    {locales.map((l) => (
+                                        <MenuItem key={l.code} value={l.code}>{l.display_name ?? l.code}</MenuItem>
+                                    ))}
+                                </Select>
+                                <FormHelperText>{t('sourceLocaleHelp')}</FormHelperText>
                             </FormControl>
 
                             <Box>
@@ -236,20 +253,18 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                 </Select>
                             </FormControl>
 
-                            {data.type === 'products' && (
-                                <Box>
-                                    <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={data.ai_translate}
-                                                onChange={(e) => setData('ai_translate', e.target.checked)}
-                                            />
-                                        }
-                                        label={t('aiTranslate')}
-                                    />
-                                    <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
-                                </Box>
-                            )}
+                            <Box>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={data.ai_translate}
+                                            onChange={(e) => setData('ai_translate', e.target.checked)}
+                                        />
+                                    }
+                                    label={t('aiTranslate')}
+                                />
+                                <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
+                            </Box>
 
                             <TextField
                                 label={t('allowedErrors')}

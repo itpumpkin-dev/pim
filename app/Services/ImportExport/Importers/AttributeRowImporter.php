@@ -3,12 +3,15 @@
 namespace App\Services\ImportExport\Importers;
 
 use App\Models\Attribute;
+use App\Models\AttributeTranslation;
 use App\Models\ImportConfig;
+use App\Services\ImportExport\Importers\Concerns\WritesLocalizedTranslation;
 use App\Services\ImportExport\RowImportException;
 
 class AttributeRowImporter implements RowImporterInterface
 {
     use HasStaticColumnLabels;
+    use WritesLocalizedTranslation;
 
     private const TYPES = ['text', 'textarea', 'price', 'boolean', 'select', 'multiselect', 'datetime', 'date', 'image', 'gallery', 'file', 'checkbox'];
 
@@ -43,10 +46,14 @@ class AttributeRowImporter implements RowImporterInterface
             throw new RowImportException("Invalid attribute type '{$type}'");
         }
 
-        Attribute::updateOrCreate(
+        $existing = Attribute::where('code', $code)->first();
+        $name = trim((string) ($row['name'] ?? ''));
+        $rawName = $name !== '' ? $this->resolveRawColumnValue($existing?->getRawOriginal('name'), $name, $config->source_locale) : null;
+
+        $attribute = Attribute::updateOrCreate(
             ['code' => $code],
             [
-                'name' => ($row['name'] ?? '') !== '' ? $row['name'] : null,
+                'name' => $rawName,
                 'type' => $type,
                 'is_required' => $this->toBool($row['is_required'] ?? false),
                 'is_unique' => $this->toBool($row['is_unique'] ?? false),
@@ -55,6 +62,17 @@ class AttributeRowImporter implements RowImporterInterface
                 'is_filterable' => $this->toBool($row['is_filterable'] ?? false),
             ]
         );
+
+        if ($name !== '') {
+            $this->writeLocalizedTranslation(
+                AttributeTranslation::class,
+                'attribute_id',
+                $attribute->id,
+                $name,
+                $config->source_locale,
+                (bool) $config->ai_translate,
+            );
+        }
 
         return [];
     }

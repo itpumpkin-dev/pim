@@ -4,7 +4,25 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import UploadIcon from '@mui/icons-material/CloudUpload';
+import {
+    Alert,
+    Box,
+    Button,
+    Checkbox,
+    CircularProgress,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    MenuItem,
+    Paper,
+    Select,
+    Stack,
+    Tab,
+    Tabs,
+    TextField,
+    Typography,
+} from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,8 +37,11 @@ interface CategoryItem {
     id: number;
     code: string;
     name: string;
+    slug: string | null;
+    display_type: 'default' | 'products' | 'subcategories' | 'both';
     description: string | null;
     is_ai_translate: boolean;
+    is_active: boolean;
     parent_id: number | null;
     additional_data: Record<string, any> | null;
     lazada_category_id: number | null;
@@ -29,12 +50,13 @@ interface CategoryItem {
 
 interface Props {
     category: CategoryItem;
+    thumbnailUrl: string | null;
     translations: Record<string, string>;
     categoryFields: CategoryFieldItem[];
     canViewHistory?: boolean;
 }
 
-export default function CategoryEdit({ category, translations, categoryFields = [], canViewHistory = false }: Props) {
+export default function CategoryEdit({ category, thumbnailUrl, translations, categoryFields = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -57,6 +79,10 @@ export default function CategoryEdit({ category, translations, categoryFields = 
         parent_id: (category.parent_id !== null ? category.parent_id : '') as string | number,
         lazada_category_id: category.lazada_category_id,
         additional_data: (category.additional_data || {}) as Record<string, any>,
+        slug: category.slug || '',
+        display_type: category.display_type || 'default',
+        thumbnail: null as File | null,
+        is_active: Boolean(category.is_active),
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -108,6 +134,13 @@ export default function CategoryEdit({ category, translations, categoryFields = 
                 </Stack>
 
                 <Stack spacing={2}>
+                    <LocaleLabelFields
+                        title={t('name')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
@@ -118,9 +151,20 @@ export default function CategoryEdit({ category, translations, categoryFields = 
                                 disabled
                                 helperText={t('codeLockedHelperText')}
                             />
+                            <TextField
+                                label={t('slug')}
+                                fullWidth
+                                value={data.slug}
+                                onChange={(e) => setData('slug', e.target.value)}
+                                error={Boolean(errors.slug)}
+                                helperText={errors.slug || t('slugHelperText')}
+                            />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                                     {t('parentCategory')}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    {t('parentCategoryHelperText')}
                                 </Typography>
                                 <CategoryParentTreePicker
                                     value={typeof data.parent_id === 'number' ? data.parent_id : ''}
@@ -130,6 +174,60 @@ export default function CategoryEdit({ category, translations, categoryFields = 
                                 />
                                 {errors.parent_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.parent_id}</Alert>}
                             </Box>
+                            <TextField
+                                label={t('description')}
+                                fullWidth
+                                multiline
+                                rows={4}
+                                value={data.description}
+                                onChange={(e) => setData('description', e.target.value)}
+                                error={Boolean(errors.description)}
+                                helperText={errors.description || t('descriptionHelperText')}
+                            />
+                            <FormControl fullWidth>
+                                <InputLabel id="category-display-type-label">{t('displayType')}</InputLabel>
+                                <Select
+                                    labelId="category-display-type-label"
+                                    label={t('displayType')}
+                                    value={data.display_type}
+                                    onChange={(e) => setData('display_type', e.target.value as typeof data.display_type)}
+                                >
+                                    <MenuItem value="default">{t('displayTypeDefault')}</MenuItem>
+                                    <MenuItem value="products">{t('displayTypeProducts')}</MenuItem>
+                                    <MenuItem value="subcategories">{t('displayTypeSubcategories')}</MenuItem>
+                                    <MenuItem value="both">{t('displayTypeBoth')}</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <Box>
+                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                    {t('thumbnail')}
+                                </Typography>
+                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />}>
+                                        {t('chooseFile')}
+                                        <input
+                                            type="file"
+                                            hidden
+                                            accept="image/*"
+                                            onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
+                                        />
+                                    </Button>
+                                    {data.thumbnail ? (
+                                        <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
+                                    ) : thumbnailUrl ? (
+                                        <Box component="img" src={thumbnailUrl} alt="" sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }} />
+                                    ) : null}
+                                </Stack>
+                                {errors.thumbnail && <Alert severity="error" sx={{ mt: 1 }}>{errors.thumbnail}</Alert>}
+                            </Box>
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                label={t('aiTranslate')}
+                            />
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
+                                label={t('active')}
+                            />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                                     {t('lazadaCategoryLabel')}
@@ -144,28 +242,8 @@ export default function CategoryEdit({ category, translations, categoryFields = 
                                 />
                                 {errors.lazada_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.lazada_category_id}</Alert>}
                             </Box>
-                            <TextField
-                                label={t('description')}
-                                fullWidth
-                                multiline
-                                rows={4}
-                                value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                error={Boolean(errors.description)}
-                                helperText={errors.description}
-                            />
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
-                                label={t('aiTranslate')}
-                            />
                         </Stack>
                     </Paper>
-
-                    <LocaleLabelFields
-                        title={t('name')}
-                        values={data.translations}
-                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                    />
 
                     {categoryFields.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 3 }}>

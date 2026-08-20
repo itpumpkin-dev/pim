@@ -26,6 +26,9 @@ class WooCommerceCategory extends Model
         'id',
         'parent_id',
         'name',
+        'slug',
+        'description',
+        'thumbnail_url',
         'is_leaf',
     ];
 

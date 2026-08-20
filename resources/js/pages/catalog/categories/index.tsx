@@ -10,7 +10,8 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import DownloadIcon from '@mui/icons-material/Download';
+import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -19,11 +20,14 @@ interface CategoryItem {
     id: number;
     code: string;
     name: string;
+    slug: string | null;
+    thumbnail_url: string | null;
     description: string | null;
     parent_id: number | null;
     parent?: CategoryItem | null;
     children_count?: number;
     products_count?: number;
+    is_active: boolean;
 }
 
 interface PaginatedData<T> {
@@ -37,7 +41,7 @@ interface PaginatedData<T> {
 
 interface Props {
     categories: PaginatedData<CategoryItem>;
-    filters: { search?: string; filters?: Record<string, FilterValue> };
+    filters: { search?: string; filters?: Record<string, FilterValue>; sort?: string; dir?: string };
     filterColumns: Record<string, GridColumn>;
 }
 
@@ -63,6 +67,8 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+    const [sortField, setSortField] = useState(filters.sort ?? '');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -72,7 +78,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true });
+            router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -82,17 +88,24 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const lastPage = categories.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/categories', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true });
+        router.get('/catalog/categories', { search, page, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/categories', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true });
+        router.get('/catalog/categories', { search, page: 1, per_page: value, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true });
     };
 
     const applyFilters = (next: Record<string, FilterValue>) => {
         setActiveFilters(next);
-        router.get('/catalog/categories', { search, per_page: perPage, filters: next }, { preserveState: true });
+        router.get('/catalog/categories', { search, per_page: perPage, filters: next, sort: sortField, dir: sortDir }, { preserveState: true });
+    };
+
+    const handleSort = (field: string) => {
+        const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
+        setSortField(field);
+        setSortDir(nextDir);
+        router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: field, dir: nextDir }, { preserveState: true });
     };
 
     return (
@@ -113,16 +126,26 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         <Typography variant="h4" fontWeight={700}>{tNav('categories')}</Typography>
                         <Typography color="text.secondary">{tGrid('results', { count: categories.total })}</Typography>
                     </Box>
-                    {canCreate && (
+                    <Stack direction="row" spacing={1.5}>
                         <Button
-                            sx={{ color: "white" }}
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/categories/create')}
+                            variant="outlined"
+                            startIcon={<DownloadIcon />}
+                            component="a"
+                            href="/catalog/categories/export"
                         >
-                            {t('createCategory')}
+                            {t('exportCategoriesCsv')}
                         </Button>
-                    )}
+                        {canCreate && (
+                            <Button
+                                sx={{ color: "white" }}
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={() => router.visit('/catalog/categories/create')}
+                            >
+                                {t('createCategory')}
+                            </Button>
+                        )}
+                    </Stack>
                 </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
@@ -201,19 +224,42 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('code')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('name')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>{t('thumbnail')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>
+                                    <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
+                                        {t('name')}
+                                    </TableSortLabel>
+                                </TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>{t('parent')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('description')}</TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>
+                                    <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
+                                        {t('description')}
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>
+                                    <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
+                                        {t('slug')}
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }} align="right">
+                                    <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
+                                        {t('productsCount')}
+                                    </TableSortLabel>
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>{t('status')}</TableCell>
                                 {(canEdit || canDelete) && <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {categories.data.map((row) => (
                                 <TableRow key={row.id}>
-                                    <TableCell>{row.id}</TableCell>
-                                    <TableCell>{row.code}</TableCell>
+                                    <TableCell>
+                                        {row.thumbnail_url ? (
+                                            <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1 }} />
+                                        ) : (
+                                            <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'action.hover' }} />
+                                        )}
+                                    </TableCell>
                                     <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
                                     <TableCell>
                                         {row.parent ? (
@@ -227,7 +273,33 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                         )}
                                     </TableCell>
                                     <TableCell sx={{ color: 'text.secondary', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {row.description ?? '-'}
+                                        {row.description || '-'}
+                                    </TableCell>
+                                    <TableCell sx={{ color: 'text.secondary' }}>{row.slug || '-'}</TableCell>
+                                    <TableCell align="right">
+                                        {row.products_count ? (
+                                            <Typography
+                                                component="a"
+                                                href={`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    router.visit(`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`);
+                                                }}
+                                                sx={{ color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                            >
+                                                {row.products_count}
+                                            </Typography>
+                                        ) : (
+                                            <Typography color="text.disabled">0</Typography>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={row.is_active ? t('active') : t('nonActive')}
+                                            size="small"
+                                            color={row.is_active ? 'success' : 'default'}
+                                            variant={row.is_active ? 'filled' : 'outlined'}
+                                        />
                                     </TableCell>
                                     {(canEdit || canDelete) && (
                                         <TableCell align="right">
@@ -256,7 +328,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             ))}
                             {categories.data.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">
+                                    <TableCell colSpan={(canEdit || canDelete) ? 8 : 7} align="center">
                                         {t('noCategoriesFound')}
                                     </TableCell>
                                 </TableRow>

@@ -65,8 +65,9 @@ class ProductController extends Controller
         // as an extra query constraint before pagination instead.
         $filtersInput = $request->input('filters', []);
         $attributeFilters = $request->input('attribute_filters', []);
+        $categoryId = $request->input('category_id');
 
-        $gridData = $grid->getData($request, function ($query) use ($filtersInput, $attributeFilters, $nameAttributeId) {
+        $gridData = $grid->getData($request, function ($query) use ($filtersInput, $attributeFilters, $nameAttributeId, $categoryId) {
             $nameValue = $filtersInput['name'] ?? null;
             if ($nameValue !== null && $nameValue !== '' && $nameAttributeId) {
                 $query->whereHas('values', function ($q) use ($nameAttributeId, $nameValue) {
@@ -84,6 +85,14 @@ class ProductController extends Controller
                 $query->whereHas('values', function ($q) use ($attributeId, $value) {
                     $q->where('attribute_id', $attributeId)->where('value', 'like', '%'.$value.'%');
                 });
+            }
+
+            // Arrived via the Categories list's clickable product count (see
+            // resources/js/pages/catalog/categories/index.tsx) — not a
+            // GridManager column filter since `categories` is a many-to-many
+            // relation (product_category pivot), not a real `products` column.
+            if ($categoryId) {
+                $query->whereHas('categories', fn ($q) => $q->where('categories.id', $categoryId));
             }
         });
 
@@ -235,6 +244,8 @@ class ProductController extends Controller
                 'dir' => $request->input('dir', ''),
                 'filters' => $request->input('filters', []),
                 'attribute_filters' => $request->input('attribute_filters', []),
+                'category_id' => $request->input('category_id', ''),
+                'category_name' => $request->input('category_name', ''),
             ],
             'families' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
             'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
@@ -1011,26 +1022,58 @@ class ProductController extends Controller
             'ids' => ['nullable', 'array'],
             'ids.*' => ['integer'],
             'search' => ['nullable', 'string'],
+            'columns' => ['nullable', 'array'],
+            'columns.*' => ['string'],
+            'types' => ['nullable', 'array'],
+            'types.*' => ['in:simple,configurable'],
+            'category_id' => ['nullable', 'integer'],
         ]);
 
         $format = $validated['format'];
         $ids = $validated['ids'] ?? [];
 
-        $columns = (new ProductRowExporter($request->user()))->columns();
-        $attributeCodes = array_slice($columns, 4);
+        $allColumns = (new ProductRowExporter($request->user()))->columns();
+        // "Which columns should be exported?" left blank/unset means every
+        // column, same as ProductRowExporter's own full set — otherwise only
+        // the intersection (in $allColumns' order, sku always kept so every
+        // exported row still has an identity even if the admin deselects it).
+        $selectedColumns = ! empty($validated['columns'])
+            ? array_values(array_intersect($allColumns, $validated['columns']))
+            : $allColumns;
+        if (! in_array('sku', $selectedColumns, true)) {
+            array_unshift($selectedColumns, 'sku');
+        }
+
+        $attributeCodes = array_slice($allColumns, 4);
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
         $query = Product::with('family')->orderBy('id');
         if (! empty($ids)) {
+            // Explicit row selection means exactly these products — search
+            // and the type/category filters below are dialog-level ways to
+            // pick a product *set*, not extra constraints layered on top of
+            // an already-explicit one, so all of them are skipped once IDs
+            // are given (matches the frontend, which stops sending them too
+            // — see handleQuickExport()).
             $query->whereIn('id', $ids);
-        } elseif (! empty($validated['search'])) {
-            $query->where('sku', 'like', '%'.$validated['search'].'%');
+        } else {
+            if (! empty($validated['search'])) {
+                $query->where('sku', 'like', '%'.$validated['search'].'%');
+            }
+
+            if (! empty($validated['types'])) {
+                $query->whereIn('type', $validated['types']);
+            }
+
+            if (! empty($validated['category_id'])) {
+                $query->whereHas('categories', fn ($q) => $q->where('categories.id', $validated['category_id']));
+            }
         }
 
         // Chunked instead of one ProductValue query per product (N+1 that made
         // large exports crawl) — batches the value lookup per 500 products
         // while `cursor()` still keeps the outer product stream memory-bounded.
-        $rows = (function () use ($query, $attributesByCode) {
+        $rows = (function () use ($query, $attributesByCode, $selectedColumns) {
             foreach ($query->cursor()->chunk(500) as $products) {
                 $valuesByProduct = ProductValue::whereIn('product_id', $products->pluck('id'))
                     ->whereNull('channel_id')
@@ -1041,15 +1084,17 @@ class ProductController extends Controller
                 foreach ($products as $product) {
                     $values = $valuesByProduct->get($product->id, collect())->pluck('value', 'attribute_id');
 
-                    $row = [
+                    $row = array_intersect_key([
                         'sku' => $product->sku,
                         'family_code' => $product->family?->code ?? '',
                         'type' => $product->type,
                         'enabled' => $product->enabled ? '1' : '0',
-                    ];
+                    ], array_flip($selectedColumns));
 
                     foreach ($attributesByCode as $code => $attribute) {
-                        $row[$code] = $values->get($attribute->id, '');
+                        if (in_array($code, $selectedColumns, true)) {
+                            $row[$code] = $values->get($attribute->id, '');
+                        }
                     }
 
                     yield $row;
@@ -1061,7 +1106,7 @@ class ProductController extends Controller
         $tempRelativePath = 'tmp-exports/'.Str::uuid().'.'.$format;
         $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
 
-        SpreadsheetWriter::write($tempAbsolutePath, $format, $columns, $rows, ',');
+        SpreadsheetWriter::write($tempAbsolutePath, $format, $selectedColumns, $rows, ',');
 
         $downloadName = 'products_'.now()->format('Ymd_His').'.'.$format;
 

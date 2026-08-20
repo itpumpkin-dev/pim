@@ -19,6 +19,10 @@ class Category extends Model
     protected $fillable = [
         'code',
         'name',
+        'slug',
+        'display_type',
+        'thumbnail',
+        'is_active',
         'description',
         'additional_data',
         'is_ai_translate',
@@ -36,6 +40,7 @@ class Category extends Model
         return [
             'additional_data' => 'array',
             'is_ai_translate' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

@@ -3,7 +3,23 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, Stack, TextField, Typography } from '@mui/material';
+import UploadIcon from '@mui/icons-material/CloudUpload';
+import {
+    Alert,
+    Box,
+    Button,
+    Checkbox,
+    CircularProgress,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    MenuItem,
+    Paper,
+    Select,
+    Stack,
+    TextField,
+    Typography,
+} from '@mui/material';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -35,6 +51,10 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
         description: '',
         parent_id: 'root' as string | number,
         additional_data: {} as Record<string, any>,
+        slug: '',
+        display_type: 'default' as 'default' | 'products' | 'subcategories' | 'both',
+        thumbnail: null as File | null,
+        is_active: true as boolean,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -70,12 +90,30 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                 </Stack>
 
                 <Stack spacing={2}>
+                    <LocaleLabelFields
+                        title={t('name')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
+                            <TextField
+                                label={t('slug')}
+                                fullWidth
+                                value={data.slug}
+                                onChange={(e) => setData('slug', e.target.value)}
+                                error={Boolean(errors.slug)}
+                                helperText={errors.slug || t('slugHelperText')}
+                            />
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                                     {t('parentCategory')}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                                    {t('parentCategoryHelperText')}
                                 </Typography>
                                 <CategoryParentTreePicker
                                     value={typeof data.parent_id === 'number' ? data.parent_id : ''}
@@ -91,20 +129,52 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
                                 error={Boolean(errors.description)}
-                                helperText={errors.description}
+                                helperText={errors.description || t('descriptionHelperText')}
                             />
+                            <FormControl fullWidth>
+                                <InputLabel id="category-display-type-label">{t('displayType')}</InputLabel>
+                                <Select
+                                    labelId="category-display-type-label"
+                                    label={t('displayType')}
+                                    value={data.display_type}
+                                    onChange={(e) => setData('display_type', e.target.value as typeof data.display_type)}
+                                >
+                                    <MenuItem value="default">{t('displayTypeDefault')}</MenuItem>
+                                    <MenuItem value="products">{t('displayTypeProducts')}</MenuItem>
+                                    <MenuItem value="subcategories">{t('displayTypeSubcategories')}</MenuItem>
+                                    <MenuItem value="both">{t('displayTypeBoth')}</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <Box>
+                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                    {t('thumbnail')}
+                                </Typography>
+                                <Button component="label" variant="outlined" startIcon={<UploadIcon />}>
+                                    {t('chooseFile')}
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
+                                    />
+                                </Button>
+                                {data.thumbnail && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        {data.thumbnail.name}
+                                    </Typography>
+                                )}
+                                {errors.thumbnail && <Alert severity="error" sx={{ mt: 1 }}>{errors.thumbnail}</Alert>}
+                            </Box>
                             <FormControlLabel
                                 control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
                                 label={t('aiTranslate')}
                             />
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
+                                label={t('active')}
+                            />
                         </Stack>
                     </Paper>
-
-                    <LocaleLabelFields
-                        title={t('name')}
-                        values={data.translations}
-                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                    />
 
                     {categoryFields.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 3 }}>

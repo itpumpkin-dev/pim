@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessImportJob;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
+use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\SampleTemplateBuilder;
@@ -178,6 +179,7 @@ class ImportConfigController extends Controller
             'action' => ['required', 'in:create_update,delete'],
             'validation_strategy' => ['required', 'in:skip_errors,stop_on_errors'],
             'ai_translate' => ['nullable', 'boolean'],
+            'source_locale' => ['required', 'string', Rule::in(Locale::active()->pluck('code')->all())],
             'allowed_errors' => ['required', 'integer', 'min:0'],
             'image_directory_path' => ['nullable', 'string', 'max:255'],
             'file' => ['nullable', 'file', 'max:20480'],

@@ -21,8 +21,6 @@ class ProductRowImporter implements RowImporterInterface
 
     private ?array $allowedAttributeCodesCache = null;
 
-    private false|int|null $sourceLocaleIdCache = false;
-
     /**
      * $user, when given, restricts columns()/importRow() to attributes this
      * user's role can *edit* (per AttributeAccessPolicy — both the
@@ -71,23 +69,15 @@ class ProductRowImporter implements RowImporterInterface
 
     /**
      * The locale an imported value is treated as being written in, for AI
-     * translation purposes. Deliberately hardcoded to Thai rather than
-     * config('app.locale') (which is 'en' here, just Laravel's untouched
-     * framework default) — this catalog's actual source data (product
-     * names, brand/category master data, ...) is overwhelmingly Thai, and
-     * translating from the wrong source locale doesn't fail loudly, it just
-     * quietly produces wrong translations (e.g. asking a provider to
-     * translate already-Thai text "from English" into Thai).
-     * `false` is the "not resolved yet" cache sentinel (distinct from a
-     * legitimate `null`, if Thai somehow isn't a row in the `locales` table).
+     * translation purposes — resolved from the import config's own
+     * `source_locale` (an explicit admin choice, defaulting to Thai) rather
+     * than config('app.locale') (which is 'en' here, just Laravel's
+     * untouched framework default and unrelated to what language the
+     * imported text is actually in).
      */
-    private function sourceLocaleId(): ?int
+    private function sourceLocaleId(ImportConfig $config): ?int
     {
-        if ($this->sourceLocaleIdCache === false) {
-            $this->sourceLocaleIdCache = Locale::idForCode('th');
-        }
-
-        return $this->sourceLocaleIdCache;
+        return Locale::idForCode($config->source_locale) ?? Locale::idForCode('th');
     }
 
     /**
@@ -222,7 +212,7 @@ class ProductRowImporter implements RowImporterInterface
             // enabled locale that doesn't already have one of its own, same
             // as ticking "AI translate" on an Attribute/Category label does.
             if ($config->ai_translate && $attribute->is_locale_based) {
-                $sourceLocaleId = $this->sourceLocaleId();
+                $sourceLocaleId = $this->sourceLocaleId($config);
                 if ($sourceLocaleId !== null) {
                     AutoTranslateProductValueJob::dispatch($product->id, $attribute->id, $sourceLocaleId, (string) $value, $this->jobTrackerId);
 

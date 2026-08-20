@@ -2,9 +2,11 @@ import AppLayout from '@/layouts/app-layout';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import DownloadIcon from '@mui/icons-material/Download';
 import LinkIcon from '@mui/icons-material/Link';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SyncIcon from '@mui/icons-material/Sync';
+import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
 import { Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,10 +22,17 @@ const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.prima
 // Adding another platform's category sync is just one more entry here plus
 // its own backend route.
 const CATEGORY_SYNC_PLATFORMS = [
-    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada', mappingRoute: '/catalog/categories/lazada-mapping' },
-    { value: 'shopee', label: 'Shopee', route: '/catalog/categories/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping' },
-    { value: 'tiktok', label: 'TikTok', route: '/catalog/categories/sync-tiktok', mappingRoute: '/catalog/categories/tiktok-mapping' },
-    { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/categories/sync-woocommerce', mappingRoute: '/catalog/categories/woocommerce-mapping' },
+    { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada', mappingRoute: '/catalog/categories/lazada-mapping', exportRoute: null, importRoute: null },
+    { value: 'shopee', label: 'Shopee', route: '/catalog/categories/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping', exportRoute: null, importRoute: null },
+    { value: 'tiktok', label: 'TikTok', route: '/catalog/categories/sync-tiktok', mappingRoute: '/catalog/categories/tiktok-mapping', exportRoute: null, importRoute: null },
+    {
+        value: 'woocommerce',
+        label: 'WooCommerce',
+        route: '/catalog/categories/sync-woocommerce',
+        mappingRoute: '/catalog/categories/woocommerce-mapping',
+        exportRoute: '/catalog/categories/export-woocommerce',
+        importRoute: '/catalog/categories/import-woocommerce',
+    },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -47,6 +56,7 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
     ];
 
     const [syncing, setSyncing] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [syncPlatform, setSyncPlatform] = useState<string>(CATEGORY_SYNC_PLATFORMS[0].value);
 
     const selected = CATEGORY_SYNC_PLATFORMS.find((p) => p.value === syncPlatform) ?? CATEGORY_SYNC_PLATFORMS[0];
@@ -56,6 +66,12 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
     const runSync = () => {
         setSyncing(true);
         router.post(selected.route, {}, { onFinish: () => setSyncing(false) });
+    };
+
+    const runImport = () => {
+        if (!selected.importRoute) return;
+        setImporting(true);
+        router.post(selected.importRoute, {}, { onFinish: () => setImporting(false) });
     };
 
     return (
@@ -157,6 +173,26 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                                 >
                                     {t('mapToPlatformCategories', { platform: selected.label })}
                                 </Button>
+                                {selected.exportRoute && (
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={<DownloadIcon />}
+                                        component="a"
+                                        href={selected.exportRoute}
+                                    >
+                                        {t('exportCategoriesCsv')}
+                                    </Button>
+                                )}
+                                {selected.importRoute && (
+                                    <Button
+                                        variant="outlined"
+                                        startIcon={importing ? <CircularProgress size={16} /> : <SystemUpdateAltIcon />}
+                                        disabled={importing}
+                                        onClick={runImport}
+                                    >
+                                        {importing ? t('importingCategories') : t('importAsPimCategories')}
+                                    </Button>
+                                )}
                             </Stack>
                         </Stack>
                     </CardContent>

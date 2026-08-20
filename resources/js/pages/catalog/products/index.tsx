@@ -105,10 +105,39 @@ interface AttributeMeta {
     type: string;
     is_filterable?: boolean;
 }
+interface ExportColumnOption {
+    code: string;
+    label: string;
+}
+interface ExportCategoryOption {
+    id: number;
+    label: string;
+}
+interface CategoryTreeNode {
+    id: number;
+    code: string;
+    name: string;
+    children: CategoryTreeNode[];
+}
+
+function flattenCategoryTree(nodes: CategoryTreeNode[], depth = 0): ExportCategoryOption[] {
+    return nodes.flatMap((node) => [
+        { id: node.id, label: `${'— '.repeat(depth)}${node.name}` },
+        ...flattenCategoryTree(node.children, depth + 1),
+    ]);
+}
 interface Props {
     gridConfig: GridConfig;
     gridData: GridData;
-    filters: { search?: string; sort?: string; dir?: string; filters?: ProductFilters; attribute_filters?: AttributeFilterRow[] };
+    filters: {
+        search?: string;
+        sort?: string;
+        dir?: string;
+        filters?: ProductFilters;
+        attribute_filters?: AttributeFilterRow[];
+        category_id?: string | number;
+        category_name?: string;
+    };
     attributes: AttributeMeta[];
     families: ProductFamilyOption[];
 }
@@ -283,8 +312,18 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     };
     const [columnsDialogOpen, setColumnsDialogOpen] = useState(false);
     const [quickExportOpen, setQuickExportOpen] = useState(false);
+    const [exportColumns, setExportColumns] = useState<ExportColumnOption[]>([]);
+    const [exportTypes, setExportTypes] = useState<('simple' | 'configurable')[]>([]);
+    const [exportCategory, setExportCategory] = useState<ExportCategoryOption | null>(null);
+    const [exportCategoryOptions, setExportCategoryOptions] = useState<ExportCategoryOption[]>([]);
     const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
     const [activeAttributeFilters, setActiveAttributeFilters] = useState<AttributeFilterRow[]>(filters.attribute_filters ?? []);
+    // Arrived via the Categories list's clickable product count (see
+    // resources/js/pages/catalog/categories/index.tsx) — not part of
+    // activeFilters/ProductFilterDrawer since it's a one-off link-in, not a
+    // filter a user builds through that drawer's UI.
+    const [categoryId, setCategoryId] = useState(filters.category_id ? String(filters.category_id) : '');
+    const [categoryName] = useState(filters.category_name ?? '');
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const [sortField, setSortField] = useState(typeof filters.sort === 'string' ? filters.sort : '');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
@@ -451,6 +490,20 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         [allColumns],
     );
 
+    // Matches ProductRowExporter::columns() (sku, family_code, type, enabled,
+    // then every viewable attribute) — the export CSV's actual column set,
+    // distinct from the grid's own display columnsCatalog above.
+    const exportColumnCatalog: ExportColumnOption[] = useMemo(
+        () => [
+            { code: 'sku', label: t('sku') },
+            { code: 'family_code', label: t('attributeFamily') },
+            { code: 'type', label: t('type') },
+            { code: 'enabled', label: t('status') },
+            ...attributes.map((a) => ({ code: a.code, label: a.label || a.code })),
+        ],
+        [attributes, t],
+    );
+
     const [selectedColumnKeys, setSelectedColumnKeys] = useState<string[]>(() => {
         if (typeof window === 'undefined') return DEFAULT_SELECTED_COLUMNS;
         try {
@@ -474,6 +527,16 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allColumns]);
 
+    useEffect(() => {
+        if (!quickExportOpen || exportCategoryOptions.length > 0) {
+            return;
+        }
+        fetch('/catalog/categories/tree', { headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((data: CategoryTreeNode[]) => setExportCategoryOptions(flattenCategoryTree(data)));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quickExportOpen]);
+
     const handleApplyColumns = (keys: string[]) => {
         setSelectedColumnKeys(keys);
         if (typeof window !== 'undefined') {
@@ -493,7 +556,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         const timeout = setTimeout(() => {
             router.get(
                 '/catalog/products',
-                { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
+                { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
                 { preserveState: true, replace: true },
             );
         }, 300);
@@ -504,7 +567,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const goToPage = (page: number) => {
         router.get(
             '/catalog/products',
-            { search, page, per_page: perPage, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { search, page, per_page: perPage, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
             { preserveState: true },
         );
     };
@@ -513,7 +576,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         setPerPage(value);
         router.get(
             '/catalog/products',
-            { search, page: 1, per_page: value, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { search, page: 1, per_page: value, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
             { preserveState: true },
         );
     };
@@ -524,7 +587,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         setSortDir(nextDir);
         router.get(
             '/catalog/products',
-            { search, sort: field, dir: nextDir, filters: activeFilters, attribute_filters: activeAttributeFilters },
+            { search, sort: field, dir: nextDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: categoryId },
             { preserveState: true },
         );
     };
@@ -534,7 +597,16 @@ export default function ProductIndex({ gridData, filters, attributes, families }
         setActiveAttributeFilters(nextAttributeFilters);
         router.get(
             '/catalog/products',
-            { search, sort: sortField, dir: sortDir, filters: next, attribute_filters: nextAttributeFilters },
+            { search, sort: sortField, dir: sortDir, filters: next, attribute_filters: nextAttributeFilters, category_id: categoryId },
+            { preserveState: true },
+        );
+    };
+
+    const clearCategoryFilter = () => {
+        setCategoryId('');
+        router.get(
+            '/catalog/products',
+            { search, sort: sortField, dir: sortDir, filters: activeFilters, attribute_filters: activeAttributeFilters, category_id: '' },
             { preserveState: true },
         );
     };
@@ -558,10 +630,21 @@ export default function ProductIndex({ gridData, filters, attributes, families }
     const handleQuickExport = () => {
         const params = new URLSearchParams();
         params.set('format', exportFormat.toLowerCase());
+        exportColumns.forEach((col) => params.append('columns[]', col.code));
         if (selectedIds.length > 0) {
+            // Explicit row selection means exactly these products — the
+            // type/category pickers below are disabled in this state (see
+            // the Autocomplete `disabled` props), so don't send them even if
+            // stale values are still sitting in state from before selection.
             selectedIds.forEach((id) => params.append('ids[]', String(id)));
-        } else if (search) {
-            params.set('search', search);
+        } else {
+            if (search) {
+                params.set('search', search);
+            }
+            exportTypes.forEach((type) => params.append('types[]', type));
+            if (exportCategory) {
+                params.set('category_id', String(exportCategory.id));
+            }
         }
         window.location.href = `/catalog/products/quick-export?${params.toString()}`;
         setQuickExportOpen(false);
@@ -641,6 +724,15 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                             {t('results', { count: gridData.total })}
                         </Typography>
+                        {categoryId && (
+                            <Chip
+                                label={t('filteredByCategory', { name: categoryName || categoryId })}
+                                size="small"
+                                onDelete={clearCategoryFilter}
+                                color="primary"
+                                variant="outlined"
+                            />
+                        )}
                     </Stack>
 
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
@@ -828,24 +920,78 @@ export default function ProductIndex({ gridData, filters, attributes, families }
             </Box>
 
             {/* Quick Export Dialog */}
-            <Dialog open={quickExportOpen} onClose={() => setQuickExportOpen(false)} maxWidth="xs" fullWidth>
+            <Dialog open={quickExportOpen} onClose={() => setQuickExportOpen(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
-                    {t('download')}
+                    {t('quickExport')}
                     <IconButton size="small" onClick={() => setQuickExportOpen(false)}>
                         <CloseIcon fontSize="small" />
                     </IconButton>
                 </DialogTitle>
                 <Divider />
                 <DialogContent sx={{ pt: 3 }}>
-                    <Autocomplete
-                        disableClearable
-                        options={['CSV', 'XLS', 'XLSX'] as const}
-                        value={exportFormat}
-                        onChange={(_e, value) => value && setExportFormat(value)}
-                        renderInput={(params) => (
-                            <TextField {...params} label={t('selectOption')} size="small" />
-                        )}
-                    />
+                    <Stack spacing={2.5}>
+                        <Autocomplete
+                            disableClearable
+                            options={['CSV', 'XLS', 'XLSX'] as const}
+                            value={exportFormat}
+                            onChange={(_e, value) => value && setExportFormat(value)}
+                            renderInput={(params) => (
+                                <TextField {...params} label={t('selectOption')} size="small" />
+                            )}
+                        />
+                        <Autocomplete
+                            multiple
+                            disableCloseOnSelect
+                            options={exportColumnCatalog}
+                            getOptionLabel={(opt) => opt.label}
+                            isOptionEqualToValue={(a, b) => a.code === b.code}
+                            value={exportColumns}
+                            onChange={(_e, value) => setExportColumns(value)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label={t('exportColumns')}
+                                    placeholder={exportColumns.length === 0 ? t('exportAllColumns') : undefined}
+                                    size="small"
+                                />
+                            )}
+                        />
+                        <Autocomplete
+                            multiple
+                            disableCloseOnSelect
+                            disabled={selectedIds.length > 0}
+                            options={['simple', 'configurable'] as const}
+                            getOptionLabel={(opt) => t(opt)}
+                            value={exportTypes}
+                            onChange={(_e, value) => setExportTypes(value)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label={t('exportProductTypes')}
+                                    placeholder={exportTypes.length === 0 ? t('exportAllProductTypes') : undefined}
+                                    helperText={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
+                                    size="small"
+                                />
+                            )}
+                        />
+                        <Autocomplete
+                            disabled={selectedIds.length > 0}
+                            options={exportCategoryOptions}
+                            getOptionLabel={(opt) => opt.label}
+                            isOptionEqualToValue={(a, b) => a.id === b.id}
+                            value={exportCategory}
+                            onChange={(_e, value) => setExportCategory(value)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label={t('exportCategory')}
+                                    placeholder={!exportCategory ? t('exportAllCategories') : undefined}
+                                    helperText={selectedIds.length > 0 ? t('exportFiltersDisabledForSelection') : undefined}
+                                    size="small"
+                                />
+                            )}
+                        />
+                    </Stack>
                 </DialogContent>
                 <Divider />
                 <DialogActions sx={{ px: 3, py: 2 }}>

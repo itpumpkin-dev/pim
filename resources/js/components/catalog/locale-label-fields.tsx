@@ -6,10 +6,11 @@ interface LocaleLabelFieldsProps {
     values: Record<string, string>;
     onChange: (localeId: string, value: string) => void;
     title?: string;
+    description?: string;
     errors?: Record<string, string>;
 }
 
-export default function LocaleLabelFields({ values, onChange, title = 'Label', errors }: LocaleLabelFieldsProps) {
+export default function LocaleLabelFields({ values, onChange, title = 'Label', description, errors }: LocaleLabelFieldsProps) {
     const { locales, locale } = useLocale();
     const { t } = useTranslation('common');
 
@@ -21,6 +22,11 @@ export default function LocaleLabelFields({ values, onChange, title = 'Label', e
             <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 0.5 }}>
                 {title}
             </Typography>
+            {description && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    {description}
+                </Typography>
+            )}
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                 {t('editableLocaleHint')}
             </Typography>
