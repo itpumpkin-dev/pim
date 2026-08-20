@@ -32,6 +32,9 @@ use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Shopee\ShopeeProductSyncService;
 use App\Services\TikTok\TikTokProductSyncService;
 use App\Services\WooCommerce\WooCommerceProductSyncService;
+use App\Services\WordPress\TranslatePressTranslationSyncService;
+use App\Services\WordPress\WordPressDatabase;
+use App\Services\WordPress\WordPressTunnel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1668,6 +1671,7 @@ class ProductController extends Controller
                 // localize it, rather than a naive string shown verbatim.
                 'created_at' => ($product->created_at ?? now())->toIso8601String(),
                 'updated_at' => ($product->updated_at ?? now())->toIso8601String(),
+                'translation_completeness' => $this->translationCompletenessByProduct(collect([$product]))[$product->id] ?? null,
             ],
             'families' => $families,
             'assignedGroups' => $groupsData,
@@ -1891,6 +1895,49 @@ class ProductController extends Controller
     public function deactivateWoocommerce(Product $product, SalesPlatformShop $shop): JsonResponse
     {
         return $this->queueMarketplaceSync($product, $shop, 'woocommerce', 'deactivate');
+    }
+
+    /**
+     * Fills this one product's English name into TranslatePress's
+     * dictionary — see TranslatePressTranslationSyncService's docblock for
+     * the exact safety scope (only products TranslatePress has already
+     * rendered are touched). Refuses below 100% translation completeness —
+     * enforced here too, not just by the frontend disabling the button,
+     * since this writes real (if easily overwritable) content to the live
+     * site.
+     *
+     * Synchronous, unlike the queued marketplace pushes above — this is a
+     * single direct DB write behind an SSH tunnel we already have to open
+     * and close per call, not an external platform API call with
+     * unpredictable latency, so there's nothing to poll for.
+     */
+    public function fillWoocommerceTranslationsForProduct(Product $product): JsonResponse
+    {
+        $completeness = $this->translationCompletenessByProduct(collect([$product]))[$product->id] ?? null;
+        if ($completeness !== 100) {
+            return response()->json([
+                'message' => 'Translation must be 100% complete before pushing to TranslatePress (currently '.($completeness ?? 0).'%).',
+            ], 422);
+        }
+
+        $tunnel = new WordPressTunnel();
+
+        try {
+            $tunnel->open();
+            $db = new WordPressDatabase($tunnel->localPort());
+
+            try {
+                $result = (new TranslatePressTranslationSyncService($db))->fillOneProduct($product);
+            } finally {
+                $db->close();
+            }
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        } finally {
+            $tunnel->close();
+        }
+
+        return response()->json($result);
     }
 
     /**

@@ -13,6 +13,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
+import TranslateIcon from '@mui/icons-material/Translate';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import {
     Alert,
@@ -28,6 +29,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     Fab,
     FormControl,
     FormControlLabel,
@@ -128,6 +130,7 @@ interface Product {
     configurable_attributes?: number[];
     created_at: string;
     updated_at: string;
+    translation_completeness?: number | null;
 }
 
 interface VariantItem {
@@ -501,6 +504,73 @@ export default function ProductEdit({
     const [pushing, setPushing] = useState(false);
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
 
+    // WooCommerce-only: pushes just this product's English name into
+    // TranslatePress's dictionary — separate action from the listing push
+    // above, shown inside the same dialog. Gated on 100% translation
+    // completeness both here (button disabled) and server-side (real
+    // enforcement — see ProductController::fillWoocommerceTranslationsForProduct()).
+    const [fillingTranslation, setFillingTranslation] = useState(false);
+    const [fillTranslationResult, setFillTranslationResult] = useState<{ severity: 'success' | 'error' | 'info'; message: string } | null>(null);
+    const translationComplete = product.translation_completeness === 100;
+    // null means "nothing to measure" (e.g. only one active locale, or this
+    // product's family has no translatable attributes) — distinct from 0%,
+    // which means real, measurable translation work is still missing.
+    // Conflating the two would show a permanently-disabled button with a
+    // misleading "0%" instead of explaining there's simply nothing to push.
+    const translationBlockedReason =
+        product.translation_completeness == null
+            ? 'No translatable content tracked for this product — nothing to push.'
+            : `Translation must be 100% complete first (currently ${product.translation_completeness}%).`;
+
+    const closePushDialog = () => {
+        setPushConfirmShop(null);
+        setFillTranslationResult(null);
+    };
+
+    const confirmFillTranslation = () => {
+        setFillingTranslation(true);
+        setFillTranslationResult(null);
+
+        const xsrfToken = decodeURIComponent(
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1] ?? '',
+        );
+
+        fetch(`/catalog/products/${product.id}/fill-woocommerce-translations`, {
+            method: 'POST',
+            headers: {
+                'X-XSRF-TOKEN': xsrfToken,
+                Accept: 'application/json',
+            },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                const messages: Record<string, string> = {
+                    upserted: 'Translation pushed to TranslatePress.',
+                    skipped_no_english_name: 'No English name set in PIM for this product — nothing to push.',
+                    skipped_not_tracked: "TranslatePress hasn't seen this product's page yet (it only learns a string once it's been viewed live) — view the product on the live site first, then try again.",
+                    not_live_on_woocommerce: "This product isn't currently live on WooCommerce.",
+                };
+                const status = body.status as string | undefined;
+
+                if (!res.ok) {
+                    setFillTranslationResult({ severity: 'error', message: body.message ?? 'Could not push translation.' });
+                } else if (status === 'upserted') {
+                    setFillTranslationResult({ severity: 'success', message: messages.upserted });
+                } else if (status && messages[status]) {
+                    setFillTranslationResult({ severity: 'info', message: messages[status] });
+                } else {
+                    setFillTranslationResult({ severity: 'error', message: 'Unexpected response.' });
+                }
+            })
+            .catch(() => {
+                setFillTranslationResult({ severity: 'error', message: 'Network error while pushing translation.' });
+            })
+            .finally(() => setFillingTranslation(false));
+    };
+
     // Fired the moment Push/Deactivate's confirm dialog opens — checks the
     // marketplace directly (not the cached "Live" badge, which is only as
     // fresh as the last sync and may never have run for this product) so the
@@ -619,20 +689,20 @@ export default function ProductEdit({
                 if (!res.ok || !body.job_id) {
                     setPushResult({ severity: 'error', message: body.message ?? `Could not queue push to ${platform}.` });
                     setPushing(false);
-                    setPushConfirmShop(null);
+                    closePushDialog();
                     return;
                 }
 
                 pollSyncJobStatus(body.job_id, (result) => {
                     setPushResult(result);
                     setPushing(false);
-                    setPushConfirmShop(null);
+                    closePushDialog();
                 });
             })
             .catch(() => {
                 setPushResult({ severity: 'error', message: `Network error while pushing to ${platform}.` });
                 setPushing(false);
-                setPushConfirmShop(null);
+                closePushDialog();
             });
     };
 
@@ -1544,7 +1614,7 @@ export default function ProductEdit({
                 </Box>
             </Box>
 
-            <Dialog open={pushConfirmShop !== null} onClose={() => setPushConfirmShop(null)}>
+            <Dialog open={pushConfirmShop !== null} onClose={closePushDialog}>
                 <DialogTitle>Push to {pushConfirmShop?.platform}?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
@@ -1569,9 +1639,45 @@ export default function ProductEdit({
                             )}
                         </Box>
                     )}
+                    {pushConfirmShop?.platform.toLowerCase() === 'woocommerce' && (
+                        <>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                Push translation to TranslatePress
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                Sends this product&apos;s English name into TranslatePress&apos;s dictionary, so the WooCommerce site can show it translated.
+                            </Typography>
+                            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <Tooltip title={translationComplete ? '' : translationBlockedReason}>
+                                    <span>
+                                        <Button
+                                            onClick={confirmFillTranslation}
+                                            variant="outlined"
+                                            size="small"
+                                            disabled={!translationComplete || fillingTranslation}
+                                            startIcon={fillingTranslation ? <CircularProgress size={14} /> : <TranslateIcon fontSize="small" />}
+                                        >
+                                            {fillingTranslation ? 'Pushing...' : 'Push Translation'}
+                                        </Button>
+                                    </span>
+                                </Tooltip>
+                                {!translationComplete && (
+                                    <Typography variant="caption" color="text.secondary">
+                                        {translationBlockedReason}
+                                    </Typography>
+                                )}
+                            </Stack>
+                            {fillTranslationResult && (
+                                <Alert severity={fillTranslationResult.severity} sx={{ mt: 1.5, py: 0 }}>
+                                    {fillTranslationResult.message}
+                                </Alert>
+                            )}
+                        </>
+                    )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setPushConfirmShop(null)} color="inherit" disabled={pushing}>
+                    <Button onClick={closePushDialog} color="inherit" disabled={pushing}>
                         Cancel
                     </Button>
                     <Button onClick={confirmPush} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>

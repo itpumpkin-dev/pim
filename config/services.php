@@ -77,4 +77,21 @@ return [
         'wp_app_password' => env('WOOCOMMERCE_WP_APP_PASSWORD'),
     ],
 
+    // Direct MySQL access to the same WordPress/WooCommerce site's database
+    // (TranslatePress's translation tables aren't exposed by any REST API —
+    // see TranslatePressTranslationSyncService's docblock). MySQL there only
+    // binds to localhost, so it's only reachable through an SSH tunnel —
+    // WordPressTunnel opens it before WordPressDatabase connects.
+    'wordpress_db' => [
+        'ssh_host' => env('WORDPRESS_SSH_HOST'),
+        'ssh_port' => env('WORDPRESS_SSH_PORT', 22),
+        'ssh_username' => env('WORDPRESS_SSH_USERNAME'),
+        'ssh_password' => env('WORDPRESS_SSH_PASSWORD'),
+        'db_host' => env('WORDPRESS_DB_HOST', 'localhost'),
+        'db_port' => env('WORDPRESS_DB_PORT', 3306),
+        'db_database' => env('WORDPRESS_DB_DATABASE'),
+        'db_username' => env('WORDPRESS_DB_USERNAME'),
+        'db_password' => env('WORDPRESS_DB_PASSWORD'),
+    ],
+
 ];
