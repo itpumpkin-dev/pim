@@ -16,12 +16,14 @@ use App\Models\ShopeeCategory;
 use App\Models\ShopeeSellerAccount;
 use App\Models\TikTokCategory;
 use App\Models\TikTokSellerAccount;
+use App\Models\WooCommerceCategory;
 use App\Services\CategoryMatcher;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\Lazada\LazadaClient;
 use App\Services\Shopee\ShopeeClient;
 use App\Services\TikTok\TikTokClient;
+use App\Services\WooCommerce\WooCommerceClient;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -529,6 +531,7 @@ class CategoryController extends Controller
                 'lazada' => $toIso(LazadaCategory::max('updated_at')),
                 'shopee' => $toIso(ShopeeCategory::max('updated_at')),
                 'tiktok' => $toIso(TikTokCategory::max('updated_at')),
+                'woocommerce' => $toIso(WooCommerceCategory::max('updated_at')),
             ],
         ]);
     }
@@ -702,6 +705,71 @@ class CategoryController extends Controller
     }
 
     /**
+     * Refreshes the local woocommerce_categories cache from the WooCommerce
+     * store's live product categories (GET /wp-json/wc/v3/products/categories)
+     * — same purpose as syncLazadaCategories()/syncShopeeCategories()/
+     * syncTikTokCategories() above. No seller-account lookup (WooCommerceClient
+     * reads config('services.woocommerce') directly — see that class's
+     * docblock). Unlike Shopee/TikTok, WooCommerce's response gives no
+     * has_children/is_leaf flag at all, so it's computed here: any category
+     * id that appears as some other row's `parent` isn't a leaf. Paginated
+     * (WooCommerce's own per_page cap is 100), same depth-first reorder as
+     * Shopee/TikTok before the upsert since there's no order guarantee across
+     * pages either.
+     */
+    public function syncWoocommerceCategories(Request $request): RedirectResponse
+    {
+        try {
+            $client = new WooCommerceClient();
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $raw = [];
+        $page = 1;
+        do {
+            $fetched = $client->getCategories($page);
+            foreach ($fetched as $node) {
+                $parentId = (int) ($node['parent'] ?? 0);
+                $raw[] = [
+                    'id' => $node['id'],
+                    'parent_id' => $parentId > 0 ? $parentId : null,
+                    'name' => $node['name'],
+                ];
+            }
+            $page++;
+        } while (count($fetched) === 100);
+
+        $parentIds = collect($raw)->pluck('parent_id')->filter()->unique();
+        $rows = collect($raw)->map(fn ($row) => [...$row, 'is_leaf' => ! $parentIds->contains($row['id'])])->all();
+
+        $byParent = [];
+        foreach ($rows as $row) {
+            $byParent[$row['parent_id'] ?? 0][] = $row;
+        }
+
+        $ordered = [];
+        $walk = function (int $parentId) use (&$walk, &$byParent, &$ordered) {
+            foreach ($byParent[$parentId] ?? [] as $row) {
+                $ordered[] = $row;
+                $walk($row['id']);
+            }
+        };
+        $walk(0);
+
+        $now = now();
+        foreach (array_chunk($ordered, 500) as $chunk) {
+            WooCommerceCategory::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['id'],
+                ['parent_id', 'name', 'is_leaf', 'updated_at']
+            );
+        }
+
+        return back()->with('success', 'Synced '.count($ordered).' WooCommerce categories.');
+    }
+
+    /**
      * Search endpoint backing the Lazada category Autocomplete on the
      * category edit form — only leaf categories are selectable, since
      * Lazada requires products to be assigned to a leaf, not a parent node.
@@ -746,6 +814,24 @@ class CategoryController extends Controller
         $query = trim((string) $request->query('q', ''));
 
         $categories = TikTokCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
+    }
+
+    /**
+     * Search endpoint backing the WooCommerce category Autocomplete on the
+     * mapping review page — mirrors searchLazadaCategories()/
+     * searchShopeeCategories()/searchTikTokCategories() above.
+     */
+    public function searchWoocommerceCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = WooCommerceCategory::where('is_leaf', true)
             ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
             ->orderBy('name')
             ->limit(50)
@@ -975,6 +1061,21 @@ class CategoryController extends Controller
     }
 
     /**
+     * Same bulk review UI as lazadaMapping()/shopeeMapping()/tiktokMapping()
+     * above, but against WooCommerce's product categories — see
+     * buildCategoryMappingData().
+     */
+    public function woocommerceMapping(Request $request): Response
+    {
+        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+
+        return Inertia::render('catalog/categories/woocommerce-mapping', [
+            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'woocommerce_category_id', 'woocommerceCategory', WooCommerceCategory::class),
+            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+        ]);
+    }
+
+    /**
      * Shared persistence logic behind bulkMapLazada() and bulkMapShopee() —
      * validates each pick resolves to an actual leaf marketplace category,
      * updates only rows that actually changed, and records an audit entry
@@ -1060,5 +1161,14 @@ class CategoryController extends Controller
     public function bulkMapTiktok(Request $request): RedirectResponse
     {
         return $this->bulkMapMarketplaceCategory($request, 'tiktok_category_id', 'tiktok_categories', TikTokCategory::class, 'tiktok_category_mapped');
+    }
+
+    /**
+     * Same as bulkMapLazada()/bulkMapShopee()/bulkMapTiktok() above, but for
+     * WooCommerce's product categories.
+     */
+    public function bulkMapWoocommerce(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceCategory($request, 'woocommerce_category_id', 'woocommerce_categories', WooCommerceCategory::class, 'woocommerce_category_mapped');
     }
 }

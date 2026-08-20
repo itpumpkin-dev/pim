@@ -23,6 +23,7 @@ const CATEGORY_SYNC_PLATFORMS = [
     { value: 'lazada', label: 'Lazada', route: '/catalog/categories/sync-lazada', mappingRoute: '/catalog/categories/lazada-mapping' },
     { value: 'shopee', label: 'Shopee', route: '/catalog/categories/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping' },
     { value: 'tiktok', label: 'TikTok', route: '/catalog/categories/sync-tiktok', mappingRoute: '/catalog/categories/tiktok-mapping' },
+    { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/categories/sync-woocommerce', mappingRoute: '/catalog/categories/woocommerce-mapping' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -85,7 +86,7 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                         const isSelected = platform.value === syncPlatform;
 
                         return (
-                            <Grid item xs={12} sm={6} md={4} key={platform.value} sx={{ display: 'flex' }}>
+                            <Grid item xs={12} sm={6} md={3} key={platform.value} sx={{ display: 'flex' }}>
                                 <Box
                                     onClick={() => {
                                         if (syncing) return;

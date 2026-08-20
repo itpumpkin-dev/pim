@@ -19,6 +19,17 @@ use Illuminate\Support\Facades\DB;
  * locale's content — see resolveValue()'s Thai-fallback note for the one
  * deliberate exception.
  *
+ * Optionally scoped to one sales-platform shop's Channel (see
+ * SalesPlatformShop::channel()): channel-based attributes then prefer that
+ * channel's own value (a price/description overridden for that specific
+ * WooCommerce store) before falling back to the product's Default
+ * (channel_id = null) scope — the same channel → null fallback
+ * LazadaProductSyncService/ShopeeProductSyncService use via
+ * ResolvesProductAttributeValues, reimplemented here against this class's
+ * bulk-loaded $valuesByProductAttribute instead of that trait's
+ * one-query-per-attribute lookup, since a full-catalog export can touch
+ * thousands of rows.
+ *
  * A configurable product is expanded into a `variable` parent row plus one
  * `variation` row per child product, matching WooCommerce's own CSV shape
  * for products with options — there is no equivalent expansion anywhere
@@ -50,6 +61,9 @@ class WooCommerceExporter
 
     private ?int $localeId = null;
 
+    /** The exported shop's Channel, if any — see the class docblock. */
+    private ?int $channelId = null;
+
     /** @var Collection<string, Collection> "productId-attributeId" => value rows */
     private Collection $valuesByProductAttribute;
 
@@ -61,9 +75,10 @@ class WooCommerceExporter
 
     /**
      * @param  Collection<int, Product>  $products  Top-level products only (no variants — pulled in automatically per configurable parent).
+     * @param  int|null  $channelId  A sales-platform shop's Channel to prefer channel-based values from — see class docblock.
      * @return array{header: array<int, string>, rows: array<int, array<string, string>>}
      */
-    public function export(Collection $products, string $localeCode): array
+    public function export(Collection $products, string $localeCode, ?int $channelId = null): array
     {
         // Reset every accumulator below — a fresh instance is created per
         // request today (see WooCommerceConversionController::export()),
@@ -77,6 +92,7 @@ class WooCommerceExporter
 
         $this->localeId = Locale::idForCode($localeCode);
         $this->thaiLocaleId = Locale::idForCode('th');
+        $this->channelId = $channelId;
 
         $fixedAttributes = Attribute::whereIn('code', self::FIXED_ATTRIBUTE_CODES)->with('options.translations')->get();
         foreach ($fixedAttributes as $attribute) {
@@ -144,9 +160,28 @@ class WooCommerceExporter
     }
 
     /**
-     * Resolves one attribute's value for the requested export locale.
-     * Non-locale-based attributes (weight, qty, images, ...) always read the
-     * global (channel_id=null, locale_id=null) scope, same as
+     * Channel scopes to try, in preference order, for one attribute — the
+     * requested shop's channel first (if the attribute even varies by
+     * channel and a shop was requested), then the product's Default
+     * (channel_id = null) scope. Same fallback LazadaProductSyncService/
+     * ShopeeProductSyncService get via ResolvesProductAttributeValues.
+     *
+     * @return array<int, int|null>
+     */
+    private function channelCandidates(Attribute $attribute): array
+    {
+        if ($attribute->is_channel_based && $this->channelId !== null) {
+            return [$this->channelId, null];
+        }
+
+        return [null];
+    }
+
+    /**
+     * Resolves one attribute's value for the requested export locale (and,
+     * for channel-based attributes, the requested shop's channel — see
+     * channelCandidates()). Non-locale-based attributes (weight, qty,
+     * images, ...) always read the locale-less scope, same as
      * ProductRowExporter/quickExport.
      *
      * For locale-based attributes: prefers a row explicitly tagged with the
@@ -166,22 +201,32 @@ class WooCommerceExporter
         }
 
         $rows = $this->rawValueRows($product->id, $attribute->id);
+        $channelCandidates = $this->channelCandidates($attribute);
 
         if (! $attribute->is_locale_based) {
-            $row = $rows->first(fn ($r) => $r->channel_id === null && $r->locale_id === null);
+            foreach ($channelCandidates as $channelId) {
+                $row = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === null);
+                if ($row !== null) {
+                    return $this->formatted($attribute, $row->value);
+                }
+            }
 
-            return $this->formatted($attribute, $row->value ?? null);
+            return null;
         }
 
-        $row = $rows->first(fn ($r) => $r->channel_id === null && $r->locale_id === $this->localeId);
-        if ($row !== null && trim((string) $row->value) !== '') {
-            return $this->formatted($attribute, $row->value);
+        foreach ($channelCandidates as $channelId) {
+            $row = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === $this->localeId);
+            if ($row !== null && trim((string) $row->value) !== '') {
+                return $this->formatted($attribute, $row->value);
+            }
         }
 
         if ($this->localeId !== null && $this->localeId === $this->thaiLocaleId) {
-            $globalRow = $rows->first(fn ($r) => $r->channel_id === null && $r->locale_id === null);
-            if ($globalRow !== null) {
-                return $this->formatted($attribute, $globalRow->value);
+            foreach ($channelCandidates as $channelId) {
+                $globalRow = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === null);
+                if ($globalRow !== null) {
+                    return $this->formatted($attribute, $globalRow->value);
+                }
             }
         }
 
@@ -232,9 +277,15 @@ class WooCommerceExporter
             return null;
         }
 
-        $row = $this->rawValueRows($product->id, $attribute->id)->first(fn ($r) => $r->channel_id === null && $r->locale_id === null);
+        $rows = $this->rawValueRows($product->id, $attribute->id);
+        foreach ($this->channelCandidates($attribute) as $channelId) {
+            $row = $rows->first(fn ($r) => $r->channel_id === $channelId && $r->locale_id === null);
+            if ($row !== null) {
+                return $this->optionLabel($attribute, $row->value);
+            }
+        }
 
-        return $this->optionLabel($attribute, $row->value ?? null);
+        return null;
     }
 
     /**

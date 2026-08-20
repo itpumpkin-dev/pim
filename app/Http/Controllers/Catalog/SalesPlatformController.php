@@ -76,7 +76,7 @@ class SalesPlatformController extends Controller
             'is_active' => ['boolean'],
         ]);
 
-        CodeGenerator::createWithRetry(
+        $shop = CodeGenerator::createWithRetry(
             'sales_platform_shops',
             'shop',
             fn ($code) => $salesPlatform->shops()->create([
@@ -87,6 +87,13 @@ class SalesPlatformController extends Controller
             ]),
             scope: ['sales_platform_id' => $salesPlatform->id],
         );
+
+        // The three sync*Shops() methods below already do this for
+        // Lazada/Shopee/TikTok shops; a manually-created shop (the only way
+        // to add one for a platform with no external account source, e.g.
+        // WooCommerce) needs the same channel so its product values can be
+        // scoped per-store too.
+        $this->ensureChannelFor($shop, $salesPlatform, $request);
 
         return back()->with('success', 'Shop created successfully.');
     }
@@ -103,6 +110,10 @@ class SalesPlatformController extends Controller
             ...$validated,
             'updated_by' => $request->user()?->id,
         ]);
+
+        // Backfills a channel for any shop that predates the storeShop() fix
+        // above — ensureChannelFor() no-ops once $shop->channel_id is set.
+        $this->ensureChannelFor($shop, $shop->platform, $request);
 
         return back()->with('success', 'Shop updated successfully.');
     }
@@ -353,5 +364,14 @@ class SalesPlatformController extends Controller
 
         $shop->channel_id = $channel->id;
         $shop->save();
+
+        // Channel::cachedAll() (used by ProductController::edit()'s Sales
+        // Channels panel, among others) is keyed by this version number and
+        // otherwise never notices a channel created outside ChannelController::
+        // store() — confirmed live, 2026-08-20: a shop's new channel existed
+        // in the database but never appeared in the product edit page's Sales
+        // Channels list until this was added, since the cached channel list
+        // was never invalidated.
+        Channel::bumpListVersion();
     }
 }

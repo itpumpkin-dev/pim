@@ -494,6 +494,7 @@ export default function ProductEdit({
         lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
         shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status' },
         tiktok: { push: 'push-tiktok', deactivate: 'deactivate-tiktok', status: 'tiktok-status' },
+        woocommerce: { push: 'push-woocommerce', deactivate: 'deactivate-woocommerce', status: 'woocommerce-status' },
     };
 
     const [pushConfirmShop, setPushConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AttributeFamily;
 use App\Models\Locale;
 use App\Models\Product;
+use App\Models\SalesPlatform;
+use App\Models\SalesPlatformShop;
 use App\Models\WooConversion;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\ImportExport\WooCommerceConverter;
@@ -123,15 +125,29 @@ class WooCommerceConversionController extends Controller
      * Products > Import CSV column shape, for a single chosen locale — see
      * WooCommerceExporter's docblock for the mapping and its one Thai-source
      * fallback exception.
+     *
+     * 'shops' lists the 'woocommerce' SalesPlatform's shops (see the
+     * 2026_08_19_000003 migration, which seeds that platform so it appears
+     * on the Sales Platforms page like Lazada/Shopee/TikTok) — picking one
+     * on the export form scopes channel-based values to that store, same as
+     * those three marketplaces' own sync. It's read-only here: if the
+     * platform hasn't been seeded yet (fresh install pre-migration) this is
+     * just an empty list and the export form falls back to un-scoped values,
+     * same as before.
      */
     public function exportForm(): Response
     {
+        $wooPlatform = SalesPlatform::where('code', 'woocommerce')->first();
+
         return Inertia::render('import-export/woo-convert/export', [
             'locales' => Locale::active()->map(fn ($locale) => [
                 'code' => $locale->code,
                 'display_name' => $locale->display_name,
             ])->values(),
             'families' => AttributeFamily::query()->orderBy('code')->get(['code', 'name']),
+            'shops' => $wooPlatform
+                ? $wooPlatform->shops()->orderBy('name')->get(['id', 'code', 'name', 'is_active'])
+                : [],
         ]);
     }
 
@@ -150,6 +166,7 @@ class WooCommerceConversionController extends Controller
             'enabled_only' => ['nullable', 'boolean'],
             'product_ids' => ['nullable', 'array'],
             'product_ids.*' => ['integer', 'exists:products,id'],
+            'shop_id' => ['nullable', 'integer', 'exists:sales_platform_shops,id'],
         ]);
 
         $query = Product::whereNull('parent_id');
@@ -169,7 +186,9 @@ class WooCommerceConversionController extends Controller
         }
         $products = $query->orderBy('sku')->get(['id', 'sku', 'family_id', 'type', 'enabled', 'configurable_attributes']);
 
-        $result = (new WooCommerceExporter())->export($products, $validated['locale']);
+        $shop = ! empty($validated['shop_id']) ? SalesPlatformShop::find($validated['shop_id']) : null;
+
+        $result = (new WooCommerceExporter())->export($products, $validated['locale'], $shop?->channel_id);
 
         $format = $validated['format'];
         $tempPath = sys_get_temp_dir().'/woo_export_'.Str::uuid().'.'.$format;

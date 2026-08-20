@@ -31,6 +31,7 @@ use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Shopee\ShopeeProductSyncService;
 use App\Services\TikTok\TikTokProductSyncService;
+use App\Services\WooCommerce\WooCommerceProductSyncService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -170,7 +171,9 @@ class ProductController extends Controller
             'platforms' => $rows->groupBy('platform_name')->map->count(),
         ]);
 
-        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct) {
+        $translationCompletenessByProduct = $this->translationCompletenessByProduct($gridData->getCollection());
+
+        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct, $translationCompletenessByProduct) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
@@ -205,6 +208,8 @@ class ProductController extends Controller
                 'total' => $channels['total'] ?? 0,
                 'platforms' => $channels ? $channels['platforms']->toArray() : [],
             ];
+
+            $product->translation_completeness = $translationCompletenessByProduct[$product->id] ?? null;
 
             $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey) {
                 $rawValue = $valueByKey[$product->id.'-'.$attribute->id] ?? null;
@@ -700,6 +705,97 @@ class ProductController extends Controller
         }
 
         return ['sourceLocaleId' => $sourceLocaleId, 'sourceValue' => $sourceValue, 'missingLocaleIds' => $missingLocaleIds];
+    }
+
+    /**
+     * Per-product translation-completeness percentage for the product
+     * grid's "Translation" column — same coverage rules as
+     * missingTranslations() (every locale-based attribute assigned to the
+     * product's family; pname always counted even with no source anywhere,
+     * every other attribute only counted when it has at least one real
+     * value to translate FROM; Thai's global/bulk-import scope treated as
+     * a real Thai value). Kept as a separate, page-scoped pass rather than
+     * reusing missingTranslations()'s own loop, since that one is built to
+     * batch-scan the *entire* catalog — cheap there because it runs once
+     * per report view, but wasteful here where index() already re-runs on
+     * every grid page load/sort/filter for only ~25-100 rows at a time.
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>  $products
+     * @return array<int, int|null> product_id => percent translated (0-100), or null when there's nothing to measure (only one locale enabled, or the family has no applicable locale-based attributes)
+     */
+    private function translationCompletenessByProduct(Collection $products): array
+    {
+        $locales = Locale::active();
+        $localeList = $locales->map(fn ($locale) => ['id' => $locale->id])->all();
+        if (count($localeList) < 2) {
+            return $products->mapWithKeys(fn (Product $p) => [$p->id => null])->all();
+        }
+
+        $nameAttributeId = Attribute::idForCode('pname');
+        $thaiLocaleId = Locale::idForCode('th');
+        $localeBasedAttributeIds = Attribute::where('is_locale_based', true)->pluck('id')->all();
+
+        $familyIds = $products->pluck('family_id')->filter()->unique();
+        $familyAttributeIdsByFamily = FamilyAttribute::whereIn('family_id', $familyIds)
+            ->whereIn('attribute_id', $localeBasedAttributeIds)
+            ->get(['family_id', 'attribute_id'])
+            ->groupBy('family_id')
+            ->map(fn ($rows) => $rows->pluck('attribute_id')->all());
+        $familiesWithAnyAssignment = FamilyAttribute::whereIn('family_id', $familyIds)->pluck('family_id')->unique()->all();
+
+        $rowsByProductAttribute = [];
+        if (! empty($localeBasedAttributeIds)) {
+            $rows = DB::table('product_values')
+                ->whereIn('product_id', $products->pluck('id'))
+                ->whereIn('attribute_id', $localeBasedAttributeIds)
+                ->whereNull('channel_id')
+                ->where(fn ($query) => $query->whereIn('locale_id', $locales->pluck('id'))->orWhereNull('locale_id'))
+                ->select('product_id', 'attribute_id', 'locale_id', 'value')
+                ->get();
+            foreach ($rows as $row) {
+                $rowsByProductAttribute[$row->product_id][$row->attribute_id][$row->locale_id ?? 'global'] = $row->value;
+            }
+        }
+
+        $result = [];
+        foreach ($products as $product) {
+            $applicableIds = $familyAttributeIdsByFamily->get($product->family_id);
+            if ($applicableIds === null) {
+                $applicableIds = in_array($product->family_id, $familiesWithAnyAssignment, true) ? [] : $localeBasedAttributeIds;
+            }
+
+            if (empty($applicableIds)) {
+                $result[$product->id] = null;
+
+                continue;
+            }
+
+            $productRows = $rowsByProductAttribute[$product->id] ?? [];
+            $totalChecks = 0;
+            $missingChecks = 0;
+
+            foreach ($applicableIds as $attributeId) {
+                $isNameAttribute = $attributeId === $nameAttributeId;
+                $valuesByLocale = $this->foldGlobalValueIntoThai($productRows[$attributeId] ?? [], $thaiLocaleId);
+                $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $product->sku, $isNameAttribute, $thaiLocaleId);
+
+                if (! $isNameAttribute && $coverage['sourceLocaleId'] === null) {
+                    // No source anywhere for this attribute — not a
+                    // translation gap (there's nothing to translate FROM),
+                    // so it doesn't count toward the denominator either,
+                    // same requireSource skip as missingTranslations().
+                    continue;
+                }
+
+                $checksForAttribute = count($localeList) - ($coverage['sourceLocaleId'] !== null ? 1 : 0);
+                $totalChecks += $checksForAttribute;
+                $missingChecks += count($coverage['missingLocaleIds']);
+            }
+
+            $result[$product->id] = $totalChecks > 0 ? (int) round(($totalChecks - $missingChecks) / $totalChecks * 100) : null;
+        }
+
+        return $result;
     }
 
     /**
@@ -1672,6 +1768,7 @@ class ProductController extends Controller
                     'lazada' => LazadaProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
                     'shopee' => ShopeeProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
                     'tiktok' => TikTokProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
+                    'woocommerce' => WooCommerceProductSyncService::forShop($shop)->checkLiveStatus($product, $shop),
                     default => null,
                 };
             } catch (\Throwable $e) {
@@ -1715,6 +1812,40 @@ class ProductController extends Controller
     public function deactivateTikTok(Product $product, SalesPlatformShop $shop): JsonResponse
     {
         return $this->queueMarketplaceSync($product, $shop, 'tiktok', 'deactivate');
+    }
+
+    /**
+     * Same role as checkLazadaStatus()/checkShopeeStatus()/checkTikTokStatus()
+     * above, for WooCommerce — see WooCommerceProductSyncService::checkLiveStatus()
+     * for how "live" is determined (asks WooCommerce directly by SKU, same as
+     * Lazada, rather than trusting a cache).
+     */
+    public function checkWoocommerceStatus(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        try {
+            return response()->json(WooCommerceProductSyncService::forShop($shop)->checkLiveStatus($product, $shop));
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO WOOCOMMERCE — creates or updates an actual
+     * listing on the store. Same "published" guard as pushToLazada().
+     */
+    public function pushToWoocommerce(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        return $this->queueMarketplaceSync($product, $shop, 'woocommerce', 'push');
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO WOOCOMMERCE — sets an actual listing to
+     * draft, hiding it from the storefront. Same "published" guard as
+     * deactivateLazada().
+     */
+    public function deactivateWoocommerce(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        return $this->queueMarketplaceSync($product, $shop, 'woocommerce', 'deactivate');
     }
 
     /**

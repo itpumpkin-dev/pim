@@ -86,6 +86,7 @@ interface ProductRow {
     name?: string | null;
     image_url?: string | null;
     completeness?: number | null;
+    translation_completeness?: number | null;
     attribute_values?: Record<string, unknown>;
     sales_channels?: { total: number; platforms: Record<string, number> };
     [key: string]: unknown;
@@ -113,7 +114,7 @@ interface Props {
 }
 
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
-const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete', 'created_at', 'updated_at'];
+const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete', 'translation_complete', 'created_at', 'updated_at'];
 
 /** UI column key -> real, sortable `products` column (per resources/grids/product_grid.yml). */
 const SORTABLE_FIELDS: Record<string, string> = {
@@ -358,6 +359,30 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 label: t('complete'),
                 render: (row) => {
                     const completeness = row.completeness;
+                    if (completeness === null || completeness === undefined) {
+                        return (
+                            <Chip
+                                label={t('notApplicable')}
+                                size="small"
+                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            />
+                        );
+                    }
+                    const color = completeness >= 80 ? '#22c55e' : completeness >= 50 ? '#f59e0b' : '#ef4444';
+                    return (
+                        <Chip
+                            label={`${completeness}%`}
+                            size="small"
+                            sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                        />
+                    );
+                },
+            },
+            {
+                key: 'translation_complete',
+                label: t('translationComplete'),
+                render: (row) => {
+                    const completeness = row.translation_completeness;
                     if (completeness === null || completeness === undefined) {
                         return (
                             <Chip

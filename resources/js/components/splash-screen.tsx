@@ -12,16 +12,26 @@ const fadeIn = keyframes`
     to { opacity: 1; }
 `;
 
-// From Uiverse.io by mrpumps31232 (adapted: sized down to sit under the
-// splash logo instead of its original 300x100 footprint, and colored from
-// the theme's primary color instead of a hardcoded blue).
-const loadingWave = keyframes`
-    0% { height: 6px; }
-    50% { height: 24px; }
-    100% { height: 6px; }
+// From Uiverse.io by adamgiebl
+const dotPulse = keyframes`
+    0% {
+        transform: scale(0.8);
+        background-color: #ffcc99;
+        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+    }
+    50% {
+        transform: scale(1.2);
+        background-color: #ff8c1a;
+        box-shadow: 0 0 0 10px rgba(255, 204, 153, 0);
+    }
+    100% {
+        transform: scale(0.8);
+        background-color: #ffcc99;
+        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+    }
 `;
 
-const WAVE_BAR_DELAYS = [0, 0.1, 0.2, 0.3];
+const DOT_DELAYS = [-0.3, -0.1, 0.1];
 
 export default function SplashScreen({ exiting = false }: { exiting?: boolean }) {
     return (
@@ -34,7 +44,7 @@ export default function SplashScreen({ exiting = false }: { exiting?: boolean })
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-            gap: 4,
+                gap: 1,
                 bgcolor: '#fff',
                 opacity: exiting ? 0 : 1,
                 transition: 'opacity 0.5s ease',
@@ -48,23 +58,22 @@ export default function SplashScreen({ exiting = false }: { exiting?: boolean })
             <Box
                 sx={{
                     display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'center',
-                    alignItems: 'flex-end',
-                    height: 24,
                     opacity: 0,
                     animation: `${fadeIn} 0.5s ease 0.35s forwards`,
                 }}
             >
-                {WAVE_BAR_DELAYS.map((delay) => (
+                {DOT_DELAYS.map((delay, index) => (
                     <Box
                         key={delay}
                         sx={{
-                            width: 8,
-                            height: 6,
-                            mx: 0.5,
-                            bgcolor: 'primary.main',
-                            borderRadius: '4px',
-                            animation: `${loadingWave} 1s ease-in-out infinite`,
+                            width: 12,
+                            height: 12,
+                            mr: index === DOT_DELAYS.length - 1 ? 0 : '6px',
+                            borderRadius: '6px',
+                            bgcolor: '#ffcc99',
+                            animation: `${dotPulse} 1.5s ease-in-out infinite`,
                             animationDelay: `${delay}s`,
                         }}
                     />

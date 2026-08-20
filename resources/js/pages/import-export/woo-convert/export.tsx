@@ -32,12 +32,20 @@ interface AttributeFamilyOption {
     name: string;
 }
 
+interface ShopOption {
+    id: number;
+    code: string;
+    name: string;
+    is_active: boolean;
+}
+
 interface Props {
     locales: LocaleOption[];
     families: AttributeFamilyOption[];
+    shops: ShopOption[];
 }
 
-export default function WooExport({ locales, families }: Props) {
+export default function WooExport({ locales, families, shops }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -49,6 +57,7 @@ export default function WooExport({ locales, families }: Props) {
     ];
 
     const [locale, setLocale] = useState(locales.find((l) => l.code === 'th')?.code ?? locales[0]?.code ?? '');
+    const [shopId, setShopId] = useState('');
     const [familyCode, setFamilyCode] = useState('');
     const [enabledOnly, setEnabledOnly] = useState(false);
     const [format, setFormat] = useState<'csv' | 'xlsx'>('csv');
@@ -60,6 +69,7 @@ export default function WooExport({ locales, families }: Props) {
         const params = new URLSearchParams();
         params.set('locale', locale);
         params.set('format', format);
+        if (shopId) params.set('shop_id', shopId);
         if (hasProductSelection) {
             products.forEach((p) => params.append('product_ids[]', String(p.id)));
         } else {
@@ -87,20 +97,44 @@ export default function WooExport({ locales, families }: Props) {
                 <Stack spacing={2}>
                     <Paper variant="outlined" sx={{ p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooExportLanguageSectionTitle')}</Typography>
-                        <FormControl fullWidth required>
-                            <InputLabel id="woo-export-locale-label">{t('wooExportLocale')}</InputLabel>
-                            <Select
-                                labelId="woo-export-locale-label"
-                                label={t('wooExportLocale')}
-                                value={locale}
-                                onChange={(e) => setLocale(e.target.value)}
-                            >
-                                {locales.map((l) => (
-                                    <MenuItem key={l.code} value={l.code}>{l.display_name || l.code}</MenuItem>
-                                ))}
-                            </Select>
-                            <FormHelperText>{t('wooExportLocaleHelp')}</FormHelperText>
-                        </FormControl>
+                        <Stack spacing={3}>
+                            <FormControl fullWidth required>
+                                <InputLabel id="woo-export-locale-label">{t('wooExportLocale')}</InputLabel>
+                                <Select
+                                    labelId="woo-export-locale-label"
+                                    label={t('wooExportLocale')}
+                                    value={locale}
+                                    onChange={(e) => setLocale(e.target.value)}
+                                >
+                                    {locales.map((l) => (
+                                        <MenuItem key={l.code} value={l.code}>{l.display_name || l.code}</MenuItem>
+                                    ))}
+                                </Select>
+                                <FormHelperText>{t('wooExportLocaleHelp')}</FormHelperText>
+                            </FormControl>
+
+                            <FormControl fullWidth>
+                                <InputLabel id="woo-export-shop-label">{t('wooExportShop')}</InputLabel>
+                                <Select
+                                    labelId="woo-export-shop-label"
+                                    label={t('wooExportShop')}
+                                    value={shopId}
+                                    onChange={(e) => setShopId(e.target.value)}
+                                >
+                                    <MenuItem value=""><em>{t('wooExportShopNone')}</em></MenuItem>
+                                    {shops.map((shop) => (
+                                        <MenuItem key={shop.id} value={String(shop.id)}>{shop.name}</MenuItem>
+                                    ))}
+                                </Select>
+                                <FormHelperText>
+                                    {t('wooExportShopHelp')}
+                                    {' '}
+                                    <Link href="/catalog/sales-platforms" style={{ color: 'inherit', fontWeight: 600 }}>
+                                        {t('wooExportManageShopsLink')}
+                                    </Link>
+                                </FormHelperText>
+                            </FormControl>
+                        </Stack>
                     </Paper>
 
                     <Paper variant="outlined" sx={{ p: 3 }}>

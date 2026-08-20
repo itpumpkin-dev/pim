@@ -60,4 +60,21 @@ return [
         'app_secret' => env('TIKTOK_APP_SECRET'),
     ],
 
+    // Single site's credentials, not yet a per-shop model like the other
+    // three marketplaces (see WooCommerceProductSyncService::forShop()'s
+    // docblock). Two separate credential pairs are needed:
+    // consumer_key/consumer_secret (WooCommerce's own REST API, wc/v3 only)
+    // for products/categories, and wp_username/wp_app_password (a WordPress
+    // core Application Password, NOT the WooCommerce key) for the Media
+    // Library API (wp/v2/media) — confirmed live, 2026-08-20: the WooCommerce
+    // key gets a 401 rest_cannot_create against wp/v2/media even though it
+    // works fine for every wc/v3 call.
+    'woocommerce' => [
+        'url' => env('WOOCOMMERCE_URL'),
+        'consumer_key' => env('WOOCOMMERCE_CONSUMER_KEY'),
+        'consumer_secret' => env('WOOCOMMERCE_CONSUMER_SECRET'),
+        'wp_username' => env('WOOCOMMERCE_WP_USERNAME'),
+        'wp_app_password' => env('WOOCOMMERCE_WP_APP_PASSWORD'),
+    ],
+
 ];

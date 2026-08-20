@@ -26,6 +26,7 @@ class Category extends Model
         'lazada_category_id',
         'shopee_category_id',
         'tiktok_category_id',
+        'woocommerce_category_id',
         'created_by',
         'updated_by',
     ];
@@ -104,6 +105,11 @@ class Category extends Model
     public function tiktokCategory(): BelongsTo
     {
         return $this->belongsTo(TikTokCategory::class, 'tiktok_category_id');
+    }
+
+    public function woocommerceCategory(): BelongsTo
+    {
+        return $this->belongsTo(WooCommerceCategory::class, 'woocommerce_category_id');
     }
 
     /**

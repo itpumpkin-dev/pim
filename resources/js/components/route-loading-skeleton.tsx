@@ -85,10 +85,10 @@ export function RouteLoadingSkeleton() {
                     <Box
                         key={delay}
                         sx={{
-                            height: 20,
-                            width: 20,
-                            mr: delay === 0.1 ? 0 : '10px',
-                            borderRadius: '10px',
+                            height: 12,
+                            width: 12,
+                            mr: delay === 0.1 ? 0 : '6px',
+                            borderRadius: '6px',
                             bgcolor: '#ffcc99',
                             animation: `${pulse} 1.5s infinite ease-in-out`,
                             animationDelay: `${delay}s`,
