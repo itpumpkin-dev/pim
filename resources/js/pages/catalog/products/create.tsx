@@ -37,6 +37,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 
 interface AttributeFamily {
     id: number;
@@ -197,14 +198,20 @@ export default function ProductCreate({ families, attributes }: Props) {
                         <Button component={Link} href="/catalog/products" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button
+                            sx={solidActionSx}
+                            type="submit"
+                            variant="contained"
+                            disabled={processing}
+                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                        >
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
                 </Stack>
 
                 <Stack spacing={3}>
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5 }}>
+                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5, borderColor: UI_BORDER }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
                             {t('productInfo')}
                         </Typography>
@@ -304,7 +311,7 @@ export default function ProductCreate({ families, attributes }: Props) {
 
                     {/* Cartesian Variants Table */}
                     {data.type === 'configurable' && data.variants.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5 }}>
+                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5, borderColor: UI_BORDER }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                                 <Typography variant="h6" fontWeight={700}>
                                     สร้างตัวเลือกสินค้าย่อย (Variants Cartesian List)
@@ -384,7 +391,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                 onClose={() => setConfigModalOpen(false)}
                 fullWidth
                 maxWidth="sm"
-                PaperProps={{ sx: { borderRadius: 2 } }}
+                PaperProps={{ sx: { borderRadius: 2, border: `1px solid ${UI_BORDER_STRONG}` } }}
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={700}>
@@ -410,7 +417,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                                     label={option.name || option.code}
                                     {...getTagProps({ index })}
                                     key={option.id}
-                                    sx={{ bgcolor: '#f0e6ff', color: '#6b21a8', fontWeight: 600 }}
+                                    sx={mappedChipSx}
                                 />
                             ))
                         }
@@ -426,22 +433,14 @@ export default function ProductCreate({ families, attributes }: Props) {
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
                     <Button
                         onClick={() => setConfigModalOpen(false)}
-                        sx={{ color: '#7e22ce', fontWeight: 700, textTransform: 'none' }}
+                        sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}
                     >
                         {t('back')}
                     </Button>
                     <Button
                         variant="contained"
                         onClick={() => setConfigModalOpen(false)}
-                        sx={{
-                            bgcolor: 'primary.main',
-                            color: '#fff',
-                            '&:hover': { bgcolor: 'primary.dark' },
-                            fontWeight: 700,
-                            borderRadius: 1.5,
-                            px: 2.5,
-                            textTransform: 'none',
-                        }}
+                        sx={{ ...solidActionSx, fontWeight: 700, borderRadius: 1.5, px: 2.5, textTransform: 'none' }}
                     >
                         Save Configurations
                     </Button>

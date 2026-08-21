@@ -57,6 +57,9 @@ import {
     type ProductFamilyOption,
     type ProductFilters,
 } from '@/components/product-filter-drawer';
+import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
+
+const NA_CHIP_SX = { ...naChipSx, height: 22, fontSize: '0.75rem' };
 
 interface GridColumn {
     label: string;
@@ -167,9 +170,9 @@ function AttributeThumbnail({ src, alt }: { src: string; alt: string }) {
             sx={{
                 width: 38,
                 height: 38,
-                bgcolor: '#f5f3ff',
+                bgcolor: 'grey.100',
                 borderRadius: 2,
-                border: '1px solid #ede9fe',
+                border: `1px solid ${UI_BORDER}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -343,9 +346,9 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                         sx={{
                             width: 38,
                             height: 38,
-                            bgcolor: '#f5f3ff',
+                            bgcolor: 'grey.100',
                             borderRadius: 2,
-                            border: '1px solid #ede9fe',
+                            border: `1px solid ${UI_BORDER}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -360,7 +363,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                 sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                         ) : (
-                            <CategoryOutlinedIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                            <CategoryOutlinedIcon sx={{ color: 'grey.500', fontSize: 20 }} />
                         )}
                     </Box>
                 ),
@@ -384,7 +387,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     <Chip
                         label={row.enabled ? t('enabled') : t('disabled')}
                         size="small"
-                        sx={{ bgcolor: row.enabled ? '#22c55e' : '#94a3b8', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                        sx={row.enabled ? { ...mappedChipSx, height: 22, fontSize: '0.75rem' } : NA_CHIP_SX}
                     />
                 ),
             },
@@ -399,20 +402,14 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 render: (row) => {
                     const completeness = row.completeness;
                     if (completeness === null || completeness === undefined) {
-                        return (
-                            <Chip
-                                label={t('notApplicable')}
-                                size="small"
-                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                            />
-                        );
+                        return <Chip label={t('notApplicable')} size="small" sx={NA_CHIP_SX} />;
                     }
-                    const color = completeness >= 80 ? '#22c55e' : completeness >= 50 ? '#f59e0b' : '#ef4444';
+                    const tone = percentTone(completeness);
                     return (
                         <Chip
                             label={`${completeness}%`}
                             size="small"
-                            sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            sx={{ bgcolor: tone.bg, color: tone.fg, fontWeight: 600, height: 22, fontSize: '0.75rem' }}
                         />
                     );
                 },
@@ -423,20 +420,14 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 render: (row) => {
                     const completeness = row.translation_completeness;
                     if (completeness === null || completeness === undefined) {
-                        return (
-                            <Chip
-                                label={t('notApplicable')}
-                                size="small"
-                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                            />
-                        );
+                        return <Chip label={t('notApplicable')} size="small" sx={NA_CHIP_SX} />;
                     }
-                    const color = completeness >= 80 ? '#22c55e' : completeness >= 50 ? '#f59e0b' : '#ef4444';
+                    const tone = percentTone(completeness);
                     return (
                         <Chip
                             label={`${completeness}%`}
                             size="small"
-                            sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            sx={{ bgcolor: tone.bg, color: tone.fg, fontWeight: 600, height: 22, fontSize: '0.75rem' }}
                         />
                     );
                 },
@@ -448,13 +439,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     const channels = liveStatusOverrides[row.id] ?? row.sales_channels;
                     const total = channels?.total ?? 0;
                     if (total === 0) {
-                        return (
-                            <Chip
-                                label={t('notLive')}
-                                size="small"
-                                sx={{ bgcolor: '#cbd5e1', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                            />
-                        );
+                        return <Chip label={t('notLive')} size="small" sx={NA_CHIP_SX} />;
                     }
                     const platforms = channels?.platforms ?? {};
                     const tooltip = Object.entries(platforms)
@@ -465,7 +450,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             label={t('liveOnCount', { count: total })}
                             title={tooltip}
                             size="small"
-                            sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
+                            sx={{ ...mappedChipSx, height: 22, fontSize: '0.75rem' }}
                         />
                     );
                 },
@@ -669,11 +654,11 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             startIcon={<FileUploadOutlinedIcon />}
                             onClick={() => setQuickExportOpen(true)}
                             sx={{
-                                color: 'primary.main',
+                                color: 'text.secondary',
                                 textTransform: 'none',
                                 fontWeight: 700,
                                 px: 2,
-                                '&:hover': { bgcolor: '#f5f3ff' },
+                                '&:hover': { bgcolor: 'grey.100' },
                             }}
                         >
                             {t('quickExport')}
@@ -682,16 +667,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             <Button
                                 variant="contained"
                                 onClick={() => router.visit('/catalog/products/create')}
-                                sx={{
-                                    bgcolor: 'primary.main',
-                                    color: '#fff',
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    px: 2.5,
-                                    py: 1,
-                                    borderRadius: 1.5,
-                                    '&:hover': { bgcolor: 'primary.dark' },
-                                }}
+                                sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 2.5, py: 1, borderRadius: 1.5 }}
                             >
                                 {t('createProduct')}
                             </Button>
@@ -729,8 +705,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                 label={t('filteredByCategory', { name: categoryName || categoryId })}
                                 size="small"
                                 onDelete={clearCategoryFilter}
-                                color="primary"
                                 variant="outlined"
+                                sx={{ borderColor: UI_BORDER_STRONG, color: 'text.primary' }}
                             />
                         )}
                     </Stack>
@@ -741,8 +717,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             startIcon={<ViewColumnOutlinedIcon />}
                             onClick={() => setColumnsDialogOpen(true)}
                             sx={{
-                                color: '#64748b',
-                                borderColor: '#cbd5e1',
+                                color: 'text.secondary',
+                                borderColor: UI_BORDER,
                                 textTransform: 'none',
                                 borderRadius: 1.5,
                                 bgcolor: '#fff',
@@ -755,8 +731,8 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                             startIcon={<FilterListIcon />}
                             onClick={() => setFilterDrawerOpen(true)}
                             sx={{
-                                color: '#64748b',
-                                borderColor: '#cbd5e1',
+                                color: 'text.secondary',
+                                borderColor: UI_BORDER,
                                 textTransform: 'none',
                                 borderRadius: 1.5,
                                 bgcolor: '#fff',
@@ -808,9 +784,9 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                 </Stack>
 
                 {/* Table */}
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: UI_BORDER }}>
                     <Table sx={{ minWidth: 800 }}>
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                        <TableHead sx={{ bgcolor: 'grey.100' }}>
                             <TableRow>
                                 <TableCell padding="checkbox">
                                     <Checkbox
@@ -862,7 +838,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                         <TableCell align="right">
                                             <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                                                 {canEdit && (
-                                                    <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
+                                                    <IconButton size="small" sx={{ color: 'text.secondary' }} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 )}
@@ -871,7 +847,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                                         <span>
                                                             <IconButton
                                                                 size="small"
-                                                                sx={{ color: '#64748b' }}
+                                                                sx={{ color: 'text.secondary' }}
                                                                 onClick={() => setDuplicateProductId(row.id)}
                                                             >
                                                                 <ContentCopyIcon fontSize="small" />
@@ -884,7 +860,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                                         <span>
                                                             <IconButton
                                                                 size="small"
-                                                                sx={{ color: '#64748b' }}
+                                                                sx={{ color: 'text.secondary' }}
                                                                 disabled={checkingLiveIds.has(row.id)}
                                                                 onClick={() => checkLiveStatus(row.id)}
                                                             >
@@ -898,7 +874,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                                                     </Tooltip>
                                                 )}
                                                 {canDelete && (
-                                                    <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteProductId(row.id)}>
+                                                    <IconButton size="small" sx={{ color: 'text.secondary' }} onClick={() => setDeleteProductId(row.id)}>
                                                         <DeleteIcon fontSize="small" />
                                                     </IconButton>
                                                 )}
@@ -998,7 +974,11 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                     <Button onClick={() => setQuickExportOpen(false)} color="inherit" sx={{ textTransform: 'none' }}>
                         {t('cancel')}
                     </Button>
-                    <Button onClick={handleQuickExport} variant="contained" sx={{ textTransform: 'none', fontWeight: 700, px: 3 }}>
+                    <Button
+                        onClick={handleQuickExport}
+                        variant="contained"
+                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 3 }}
+                    >
                         {t('download')}
                     </Button>
                 </DialogActions>
@@ -1061,6 +1041,7 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                         variant="contained"
                         disabled={duplicating}
                         startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={solidActionSx}
                     >
                         {t('duplicateProduct')}
                     </Button>

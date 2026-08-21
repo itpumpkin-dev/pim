@@ -64,6 +64,7 @@ import { CategoryCascadeSelect } from '@/components/category-cascade-select';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
+import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 
 interface AttributeOption {
     id: number;
@@ -895,14 +896,16 @@ export default function ProductEdit({
                 sx={{ bgcolor: 'background.default', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
             >
                 {/* Top Tabs Bar */}
-                <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #e2e8f0', px: { xs: 2, md: 4 } }}>
+                <Box sx={{ bgcolor: '#fff', 
+                    // borderBottom: `1px solid ${UI_BORDER}`, 
+                    px: { xs: 2, md: 4 } }}>
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
                         sx={{
                             '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: '0.95rem', minWidth: 100 },
-                            '& .Mui-selected': { color: 'primary.main' },
-                            '& .MuiTabs-indicator': { bgcolor: 'primary.main', height: 3 },
+                            '& .Mui-selected': { color: 'text.primary' },
+                            '& .MuiTabs-indicator': { bgcolor: 'grey.800', height: 3 },
                         }}
                     >
                         <Tab label="General" />
@@ -925,13 +928,13 @@ export default function ProductEdit({
                                     gap: 1,
                                     px: 2,
                                     py: 0.5,
-                                    bgcolor: '#f8fafc',
-                                    border: '1px solid #e2e8f0',
+                                    bgcolor: 'grey.100',
+                                    border: `1px solid ${UI_BORDER}`,
                                     borderRadius: 1.5,
                                     minHeight: 38,
                                 }}
                             >
-                                <Typography variant="caption" fontWeight={600} color="#64748b">
+                                <Typography variant="caption" fontWeight={600} color="text.secondary">
                                     {t('editingLocale') || 'Editing Language'}:
                                 </Typography>
                                 <Select
@@ -947,7 +950,7 @@ export default function ProductEdit({
                                         const loc = locales.find((l) => l.id === Number(e.target.value));
                                         if (loc) setLocale(loc.code);
                                     }}
-                                    sx={{ fontWeight: 700, color: 'primary.main', '& .MuiSelect-select': { py: 0 } }}
+                                    sx={{ fontWeight: 700, color: 'text.primary', '& .MuiSelect-select': { py: 0 } }}
                                 >
                                     {locales.map((loc) => (
                                         <MenuItem key={loc.id} value={loc.id}>
@@ -957,7 +960,7 @@ export default function ProductEdit({
                                 </Select>
                             </Box>
                             {isFieldAreaBusy && <CircularProgress size={18} thickness={5} />}
-                            <Button variant="outlined" size="small" sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none' }}>
+                            <Button variant="outlined" size="small" sx={{ color: 'text.secondary', borderColor: UI_BORDER, textTransform: 'none' }}>
                                 More
                             </Button>
 
@@ -966,12 +969,12 @@ export default function ProductEdit({
                                 href="/catalog/products"
                                 variant="outlined"
                                 sx={{
-                                    color: 'primary.main',
-                                    borderColor: 'primary.main',
+                                    color: 'text.secondary',
+                                    borderColor: UI_BORDER_STRONG,
                                     textTransform: 'none',
                                     fontWeight: 700,
                                     px: 2.5,
-                                    '&:hover': { borderColor: 'primary.main', bgcolor: '#f5f3ff' },
+                                    '&:hover': { borderColor: UI_BORDER_STRONG, bgcolor: 'grey.100' },
                                 }}
                             >
                                 Back
@@ -981,14 +984,7 @@ export default function ProductEdit({
                                 variant="contained"
                                 disabled={processing}
                                 startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={{
-                                    bgcolor: 'primary.main',
-                                    color: '#fff',
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    px: 2.5,
-                                    '&:hover': { bgcolor: 'primary.main' },
-                                }}
+                                sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 2.5 }}
                             >
                                 {processing ? 'Saving…' : 'Save Product'}
                             </Button>
@@ -1044,6 +1040,8 @@ export default function ProductEdit({
                             sx={{
                                 px: 2,
                                 '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, minHeight: 48 },
+                                '& .Mui-selected': { color: 'text.primary' },
+                                '& .MuiTabs-indicator': { bgcolor: 'grey.800' },
                             }}
                         >
                             {assignedGroups.map((group) => (
@@ -1270,7 +1268,7 @@ export default function ProductEdit({
                                             <Switch
                                                 checked={data.enabled}
                                                 onChange={(e) => setData('enabled', e.target.checked)}
-                                                color="primary"
+                                                color="default"
                                             />
                                         </Box>
 
@@ -1415,9 +1413,9 @@ export default function ProductEdit({
                                                 mb: 0.5,
                                                 borderRadius: 1,
                                                 cursor: 'pointer',
-                                                bgcolor: activeChannelId === null ? 'primary.main' : 'transparent',
+                                                bgcolor: activeChannelId === null ? 'grey.800' : 'transparent',
                                                 color: activeChannelId === null ? '#fff' : 'text.primary',
-                                                '&:hover': { bgcolor: activeChannelId === null ? 'primary.dark' : 'action.hover' },
+                                                '&:hover': { bgcolor: activeChannelId === null ? 'grey.900' : 'action.hover' },
                                             }}
                                         >
                                             <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
@@ -1513,9 +1511,9 @@ export default function ProductEdit({
                                                                             pl: isShop ? 0.5 : 1.5,
                                                                             borderRadius: 1,
                                                                             cursor: 'pointer',
-                                                                            bgcolor: active ? 'primary.main' : 'transparent',
+                                                                            bgcolor: active ? 'grey.800' : 'transparent',
                                                                             color: active ? '#fff' : 'text.primary',
-                                                                            '&:hover': { bgcolor: active ? 'primary.dark' : 'action.hover' },
+                                                                            '&:hover': { bgcolor: active ? 'grey.900' : 'action.hover' },
                                                                         }}
                                                                     >
                                                                         {isShop && (
@@ -1542,7 +1540,7 @@ export default function ProductEdit({
                                                                                         ? `Confirmed live as of ${new Date(ch.live_synced_at).toLocaleString()}`
                                                                                         : 'Confirmed live on last sync'
                                                                                 }
-                                                                                sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 700, height: 20, fontSize: '0.65rem', mr: 1 }}
+                                                                                sx={{ ...mappedChipSx, height: 20, fontSize: '0.65rem', mr: 1 }}
                                                                             />
                                                                         )}
                                                                         {hasUnsavedPublishChange && (
@@ -1562,7 +1560,7 @@ export default function ProductEdit({
                                                                                     setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
                                                                                     checkPlatformStatus(ch.shop_id as number, group.platform);
                                                                                 }}
-                                                                                sx={{ color: active ? '#fff' : 'primary.main' }}
+                                                                                sx={{ color: active ? '#fff' : 'grey.800' }}
                                                                             >
                                                                                 <PublishIcon fontSize="small" />
                                                                             </IconButton>
@@ -1680,7 +1678,13 @@ export default function ProductEdit({
                     <Button onClick={closePushDialog} color="inherit" disabled={pushing}>
                         Cancel
                     </Button>
-                    <Button onClick={confirmPush} color="primary" variant="contained" disabled={pushing} startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}>
+                    <Button
+                        onClick={confirmPush}
+                        variant="contained"
+                        disabled={pushing}
+                        startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}
+                        sx={solidActionSx}
+                    >
                         {pushing ? 'Pushing...' : 'Push'}
                     </Button>
                 </DialogActions>
@@ -1779,7 +1783,7 @@ export default function ProductEdit({
                                     label={option.name || option.code}
                                     {...getTagProps({ index })}
                                     key={option.id}
-                                    sx={{ bgcolor: '#f0e6ff', color: '#6b21a8', fontWeight: 600 }}
+                                    sx={mappedChipSx}
                                 />
                             ))
                         }
@@ -1787,10 +1791,14 @@ export default function ProductEdit({
                     />
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
-                    <Button onClick={() => setVariantDialogOpen(false)} sx={{ color: '#7e22ce', fontWeight: 700, textTransform: 'none' }}>
+                    <Button onClick={() => setVariantDialogOpen(false)} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
                         ยกเลิก
                     </Button>
-                    <Button onClick={applyVariantGeneration} variant="contained" sx={{ textTransform: 'none', fontWeight: 700 }}>
+                    <Button
+                        onClick={applyVariantGeneration}
+                        variant="contained"
+                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}
+                    >
                         Generate
                     </Button>
                 </DialogActions>
@@ -2028,7 +2036,7 @@ function RenderAttributeInput({
                     <Chip
                         label={activeLocaleCode ? activeLocaleCode.toUpperCase() : 'LOCALE'}
                         size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#c084fc', color: '#fff', fontWeight: 700 }}
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.600', color: '#fff', fontWeight: 700 }}
                     />
                 ) : attr.is_channel_based ? (
                     // Previously always showed "DEFAULT" here regardless of
@@ -2042,7 +2050,7 @@ function RenderAttributeInput({
                         <Chip
                             label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
                             size="small"
-                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#60a5fa', color: '#fff', fontWeight: 700 }}
+                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.500', color: '#fff', fontWeight: 700 }}
                         />
                         <Tooltip
                             title='This field can have a different value per sales channel. It currently shows the value for the channel selected under "Sales Channels" (or the Default value, used by any channel with no value of its own). Switch channels there to edit another one.'
@@ -2055,14 +2063,14 @@ function RenderAttributeInput({
                     <Chip
                         label="DEFAULT"
                         size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#e2e8f0', color: 'text.primary', fontWeight: 600 }}
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.200', color: 'text.primary', fontWeight: 600 }}
                     />
                 )}
                 {isReadOnly && (
                     <Chip
                         label="READ ONLY"
                         size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: '#fee2e2', color: '#b91c1c', fontWeight: 700 }}
+                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.900', color: '#fff', fontWeight: 700 }}
                     />
                 )}
             </>
@@ -2258,7 +2266,7 @@ function RenderAttributeInput({
                     size="small"
                     disabled={isReadOnly}
                     startIcon={<CloudUploadIcon fontSize="small" />}
-                    sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
+                    sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
                 >
                     Add images
                     <input
@@ -2357,7 +2365,7 @@ function RenderAttributeInput({
                         size="small"
                         disabled={isReadOnly}
                         startIcon={<CloudUploadIcon fontSize="small" />}
-                        sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
+                        sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
                     >
                         Choose file
                         <input
@@ -2446,7 +2454,7 @@ function RenderAttributeInput({
                         size="small"
                         disabled={isReadOnly}
                         startIcon={<CloudUploadIcon fontSize="small" />}
-                        sx={{ textTransform: 'none', color: '#64748b', borderColor: '#cbd5e1' }}
+                        sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
                     >
                         Choose file
                         <input

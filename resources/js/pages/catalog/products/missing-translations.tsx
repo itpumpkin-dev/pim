@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER } from '@/lib/ui-style';
 
 interface LocaleOption {
     id: number;
@@ -91,7 +92,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
 
     const translatedCount = totalProducts - rows.length;
     const percent = totalProducts > 0 ? Math.round((translatedCount / totalProducts) * 100) : 100;
-    const percentColor = percent >= 100 ? '#22c55e' : percent >= 50 ? '#f59e0b' : '#ef4444';
+    const progressTone = percentTone(percent, { high: 100, mid: 50 });
 
     const allFilteredSelected = filteredRows.length > 0 && filteredRows.every((row) => selectedIds.has(row.id));
     const someFilteredSelected = filteredRows.some((row) => selectedIds.has(row.id));
@@ -161,7 +162,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             startIcon={bulkTranslating ? <CircularProgress size={16} color="inherit" /> : <TranslateIcon fontSize="small" />}
                             disabled={selectedIds.size === 0 || bulkTranslating}
                             onClick={translateSelected}
-                            sx={{ textTransform: 'none', fontWeight: 700 }}
+                            sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}
                         >
                             {bulkTranslating
                                 ? t('missingTranslationsTranslating')
@@ -170,7 +171,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                     )}
                 </Stack>
 
-                <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5, mb: 2 }}>
+                <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5, mb: 2, borderColor: UI_BORDER }}>
                     <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Typography variant="subtitle1" fontWeight={700}>
                             {t('missingTranslationsSummary', { missing: rows.length, total: totalProducts })}
@@ -178,7 +179,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                         <Chip
                             label={`${translatedCount} / ${totalProducts} · ${percent}%`}
                             size="small"
-                            sx={{ bgcolor: percentColor, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.7rem' }}
+                            sx={{ bgcolor: progressTone.bg, color: progressTone.fg, fontWeight: 600, height: 22, fontSize: '0.7rem' }}
                         />
                     </Stack>
                     <LinearProgress
@@ -188,9 +189,9 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             mt: 1.5,
                             height: 6,
                             borderRadius: 3,
-                            bgcolor: '#e2e8f0',
+                            bgcolor: 'grey.200',
                             maxWidth: 320,
-                            '& .MuiLinearProgress-bar': { bgcolor: percentColor },
+                            '& .MuiLinearProgress-bar': { bgcolor: progressTone.bg },
                         }}
                     />
                 </Paper>
@@ -256,13 +257,12 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                                                 <Chip
                                                     label={row.enabled ? t('enabled') : t('disabled')}
                                                     size="small"
-                                                    sx={{
-                                                        bgcolor: row.enabled ? '#22c55e' : '#94a3b8',
-                                                        color: '#fff',
-                                                        fontWeight: 600,
-                                                        height: 20,
-                                                        fontSize: '0.7rem',
-                                                    }}
+                                                    variant={row.enabled ? 'filled' : 'outlined'}
+                                                    sx={
+                                                        row.enabled
+                                                            ? { ...mappedChipSx, height: 20, fontSize: '0.7rem' }
+                                                            : { ...naChipSx, height: 20, fontSize: '0.7rem' }
+                                                    }
                                                 />
                                             </TableCell>
                                             <TableCell>

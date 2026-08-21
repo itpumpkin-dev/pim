@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
 interface MappingRow {
     id: number;
@@ -176,7 +177,7 @@ export default function WooCommerceBrandMapping({ brands, stats, filters }: Prop
                         disabled={pendingCount === 0 || saving}
                         onClick={saveChanges}
                         startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ color: 'white' }}
+                        sx={solidActionSx}
                     >
                         {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </Button>
@@ -245,7 +246,7 @@ export default function WooCommerceBrandMapping({ brands, stats, filters }: Prop
                         const hasPendingChange = row.id in pending;
 
                         return (
-                            <Paper key={row.id} variant="outlined" sx={{ p: 2, borderRadius: 2, ...(hasPendingChange ? { borderColor: 'primary.main', bgcolor: 'action.hover' } : {}) }}>
+                            <Paper key={row.id} variant="outlined" sx={{ p: 2, borderRadius: 2, ...pendingRowSx(hasPendingChange) }}>
                                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
                                     <Box sx={{ minWidth: 240, maxWidth: 340 }}>
                                         <Typography fontWeight={600}>{row.name}</Typography>
@@ -268,7 +269,7 @@ export default function WooCommerceBrandMapping({ brands, stats, filters }: Prop
                                                     size="small"
                                                     onDelete={() => clearMapping(row)}
                                                     deleteIcon={<CloseIcon fontSize="small" />}
-                                                    sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 600 }}
+                                                    sx={mappedChipSx}
                                                 />
                                             )}
 
@@ -278,8 +279,8 @@ export default function WooCommerceBrandMapping({ brands, stats, filters }: Prop
                                                     size="small"
                                                     onDelete={() => undoPending(row)}
                                                     deleteIcon={<CloseIcon fontSize="small" />}
-                                                    color="primary"
-                                                    sx={{ fontWeight: 600 }}
+                                                    variant="outlined"
+                                                    sx={pendingChipSx}
                                                 />
                                             )}
                                         </Stack>

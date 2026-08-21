@@ -1,5 +1,4 @@
 import AppLayout from '@/layouts/app-layout';
-import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -9,10 +8,7 @@ import SyncIcon from '@mui/icons-material/Sync';
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-// Mirrors categories/marketplace-sync.tsx's card language exactly.
-const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
-const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
+import { solidActionSx, syncDetailCardSx, syncPlatformCardSx } from '@/lib/ui-style';
 
 // `mode` distinguishes how a platform's sync actually runs: Shopee's brand
 // list can be huge (one real mapped category alone has 10,000+ brands), so
@@ -23,7 +19,6 @@ const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.prima
 // polling, the result shows via the app-wide FlashToast success message.
 const BRAND_SYNC_PLATFORMS = [
     { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/brands/shopee-mapping', mode: 'queued' },
-    { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/brands/sync-woocommerce', mappingRoute: '/catalog/brands/woocommerce-mapping', mode: 'sync' },
     // Lazada's brand list isn't scoped to any category at all (confirmed
     // live: /category/brands/query has no category param) — 153,551 brands
     // total for this account, even bigger than Shopee's per-category count,
@@ -33,6 +28,7 @@ const BRAND_SYNC_PLATFORMS = [
     // list too, but that's still 10,000 records for this account (confirmed
     // live) — queued, same as Shopee/Lazada.
     { value: 'tiktok', label: 'TikTok', route: '/catalog/brands/sync-tiktok', mappingRoute: '/catalog/brands/tiktok-mapping', mode: 'queued' },
+    { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/brands/sync-woocommerce', mappingRoute: '/catalog/brands/woocommerce-mapping', mode: 'sync' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -90,8 +86,6 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
     }, [lastSyncedAt]);
 
     const selected = BRAND_SYNC_PLATFORMS.find((p) => p.value === syncPlatform) ?? BRAND_SYNC_PLATFORMS[0];
-    const selectedIndex = BRAND_SYNC_PLATFORMS.findIndex((p) => p.value === syncPlatform);
-    const selectedColor = PLATFORM_ACCENT_COLORS[Math.max(selectedIndex, 0) % PLATFORM_ACCENT_COLORS.length];
 
     useEffect(() => {
         return () => {
@@ -205,8 +199,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                 </Box>
 
                 <Grid container spacing={3} sx={{ mb: 3 }}>
-                    {BRAND_SYNC_PLATFORMS.map((platform, index) => {
-                        const color = PLATFORM_ACCENT_COLORS[index % PLATFORM_ACCENT_COLORS.length];
+                    {BRAND_SYNC_PLATFORMS.map((platform) => {
                         const isSelected = platform.value === syncPlatform;
 
                         return (
@@ -216,29 +209,26 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                                         if (syncing) return;
                                         setSyncPlatform(platform.value);
                                     }}
-                                    sx={{
-                                        display: 'flex',
-                                        width: '100%',
-                                        borderRadius: '0.25rem',
-                                        bgcolor: 'background.paper',
-                                        boxShadow: CARD_SHADOW,
-                                        overflow: 'hidden',
-                                        cursor: syncing ? 'default' : 'pointer',
-                                        opacity: syncing && !isSelected ? 0.6 : 1,
-                                        outline: isSelected ? `2px solid ${color}` : 'none',
-                                        outlineOffset: '-1px',
-                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease',
-                                        '&:hover': syncing ? {} : { transform: 'translateY(-2px)', boxShadow: 3 },
-                                    }}
+                                    sx={syncPlatformCardSx(isSelected, syncing)}
                                 >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 70, bgcolor: color, flexShrink: 0 }}>
-                                        <StorefrontOutlinedIcon sx={{ fontSize: 28, color: '#fff' }} />
-                                    </Box>
+                                    {/* <Box
+                                        sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 70,
+                                            bgcolor: 'grey.200',
+                                            flexShrink: 0,
+                                            borderRight: `1px solid ${WIREFRAME_BORDER}`,
+                                        }}
+                                    >
+                                        <StorefrontOutlinedIcon sx={{ fontSize: 28, color: 'grey.600' }} />
+                                    </Box> */}
                                     <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                        <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
+                                        <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '1rem', fontWeight: 600 }}>
                                             {platform.label}
                                         </Typography>
-                                        <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.1rem', color: 'text.primary', mt: 0.25 }}>
+                                        <Typography variant="h6" fontWeight={700} sx={{ fontSize: '0.8rem', color: 'text.primary', mt: 0.25 }}>
                                             {t('lastSyncedAt', { datetime: formatLocalDateTime(lastSynced[platform.value] ?? null) })}
                                         </Typography>
                                     </Box>
@@ -248,16 +238,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                     })}
                 </Grid>
 
-                <Card
-                    elevation={0}
-                    sx={{
-                        borderRadius: '0.25rem',
-                        borderTop: `3px solid ${selectedColor}`,
-                        bgcolor: 'background.paper',
-                        boxShadow: CARD_SHADOW,
-                        maxWidth: 640,
-                    }}
-                >
+                <Card elevation={0} sx={syncDetailCardSx('regular')}>
                     <CardContent sx={{ p: 3 }}>
                         <Stack spacing={2.5}>
                             <Stack direction="row" spacing={1.5} alignItems="center">
@@ -265,9 +246,17 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                             </Stack>
 
                             {canEdit && (
-                                <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
+                                <Stack direction="column" spacing={1.5} flexWrap="wrap" useFlexGap>
                                     <Button
-                                        variant="outlined"
+                                        variant="contained"
+                                        sx={solidActionSx}
+                                        startIcon={<LinkIcon />}
+                                        onClick={() => router.visit(selected.mappingRoute)}
+                                    >
+                                        {t('mapToPlatformBrands', { platform: selected.label })}
+                                    </Button>
+                                    <Button
+                                        variant="contained"
                                         startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
                                         disabled={syncing}
                                         onClick={runSync}
@@ -285,14 +274,6 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                                             {t('cancel')}
                                         </Button>
                                     )}
-                                    <Button
-                                        variant="contained"
-                                        sx={{ color: 'white' }}
-                                        startIcon={<LinkIcon />}
-                                        onClick={() => router.visit(selected.mappingRoute)}
-                                    >
-                                        {t('mapToPlatformBrands', { platform: selected.label })}
-                                    </Button>
                                 </Stack>
                             )}
 

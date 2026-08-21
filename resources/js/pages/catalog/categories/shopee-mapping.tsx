@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ShopeeCategoryPicker, type ShopeeCategoryOption } from '@/components/catalog/shopee-category-picker';
 import { CategoryProductsExpander } from '@/components/catalog/category-products-expander';
+import { mappedChipSx, matchScoreTone, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
 interface Suggestion {
     id: number;
@@ -59,12 +60,6 @@ interface Props {
     categories: PaginatedData<MappingRow>;
     stats: { total: number; mapped: number };
     filters: { status: 'unmapped' | 'mapped' | 'all'; search: string; per_page: number; only_with_products: boolean };
-}
-
-function scoreColor(score: number): string {
-    if (score >= 70) return '#22c55e';
-    if (score >= 40) return '#f59e0b';
-    return '#94a3b8';
 }
 
 export default function ShopeeCategoryMapping({ categories, stats, filters }: Props) {
@@ -204,7 +199,7 @@ export default function ShopeeCategoryMapping({ categories, stats, filters }: Pr
                         disabled={pendingCount === 0 || saving}
                         onClick={saveChanges}
                         startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ color: 'white' }}
+                        sx={solidActionSx}
                     >
                         {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </Button>
@@ -273,7 +268,7 @@ export default function ShopeeCategoryMapping({ categories, stats, filters }: Pr
                         const hasPendingChange = row.id in pending;
 
                         return (
-                            <Paper key={row.id} variant="outlined" sx={{ p: 2, borderRadius: 2, ...(hasPendingChange ? { borderColor: 'primary.main', bgcolor: 'action.hover' } : {}) }}>
+                            <Paper key={row.id} variant="outlined" sx={{ p: 2, borderRadius: 2, ...pendingRowSx(hasPendingChange) }}>
                                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
                                     <Box sx={{ minWidth: 240, maxWidth: 340 }}>
                                         <Typography fontWeight={600}>{row.name}</Typography>
@@ -302,7 +297,7 @@ export default function ShopeeCategoryMapping({ categories, stats, filters }: Pr
                                                     size="small"
                                                     onDelete={() => clearMapping(row)}
                                                     deleteIcon={<CloseIcon fontSize="small" />}
-                                                    sx={{ bgcolor: '#22c55e', color: '#fff', fontWeight: 600 }}
+                                                    sx={mappedChipSx}
                                                 />
                                             )}
 
@@ -312,8 +307,8 @@ export default function ShopeeCategoryMapping({ categories, stats, filters }: Pr
                                                     size="small"
                                                     onDelete={() => undoPending(row)}
                                                     deleteIcon={<CloseIcon fontSize="small" />}
-                                                    color="primary"
-                                                    sx={{ fontWeight: 600 }}
+                                                    variant="outlined"
+                                                    sx={pendingChipSx}
                                                 />
                                             )}
 
@@ -326,21 +321,25 @@ export default function ShopeeCategoryMapping({ categories, stats, filters }: Pr
 
                                         {row.suggestions.length > 0 && (
                                             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                                                {row.suggestions.slice(0, 3).map((s) => (
-                                                    <Chip
-                                                        key={s.id}
-                                                        label={`${s.name} · ${s.score}%`}
-                                                        size="small"
-                                                        variant={rowPending?.id === s.id ? 'filled' : 'outlined'}
-                                                        onClick={() => pickSuggestion(row, s)}
-                                                        title={s.path}
-                                                        sx={{
-                                                            cursor: 'pointer',
-                                                            borderColor: scoreColor(s.score),
-                                                            ...(rowPending?.id === s.id ? { bgcolor: scoreColor(s.score), color: '#fff' } : { color: scoreColor(s.score) }),
-                                                        }}
-                                                    />
-                                                ))}
+                                                {row.suggestions.slice(0, 3).map((s) => {
+                                                    const tone = matchScoreTone(s.score);
+                                                    const isPicked = rowPending?.id === s.id;
+                                                    return (
+                                                        <Chip
+                                                            key={s.id}
+                                                            label={`${s.name} · ${s.score}%`}
+                                                            size="small"
+                                                            variant={isPicked ? 'filled' : 'outlined'}
+                                                            onClick={() => pickSuggestion(row, s)}
+                                                            title={s.path}
+                                                            sx={{
+                                                                cursor: 'pointer',
+                                                                borderColor: tone.border,
+                                                                ...(isPicked ? { bgcolor: tone.bg, color: tone.fg } : { color: tone.border }),
+                                                            }}
+                                                        />
+                                                    );
+                                                })}
                                             </Stack>
                                         )}
 
