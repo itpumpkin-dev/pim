@@ -4,6 +4,7 @@ namespace App\Services\Shopee;
 
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
+use App\Models\ShopeeAttributeMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -43,20 +44,6 @@ class ShopeeProductSyncService
         'package_length' => 'length_pcs',
         'package_width' => 'width_pcs',
         'package_height' => 'height_pcs',
-    ];
-
-    /**
-     * Shopee attribute_id (global across categories, confirmed live,
-     * 2026-08-14) → our own attribute code — same role as DIMENSION_FIELD_SOURCE
-     * above, for Shopee's category-schema attribute_list rather than a fixed
-     * top-level field. Currently just the three Thai TIS/มอก. certification
-     * fields that blocked the Power Generators category; add more here as
-     * other categories' mandatory attributes turn up.
-     */
-    private const SHOPEE_ATTRIBUTE_SOURCE = [
-        100967 => 'shopee_tis_no',
-        101055 => 'shopee_tis_certificate_no',
-        101350 => 'shopee_tis_license_website',
     ];
 
     public function __construct(private readonly ShopeeClient $client)
@@ -397,15 +384,20 @@ class ShopeeProductSyncService
      * Confirmed live, 2026-08-14: add_item rejected with product_error_busi
      * ("Attribute \"TIS No.\" is mandatory required") for the Power
      * Generators category — a Thai TIS/มอก. safety-certification field this
-     * app had no data source for at all at the time (since fixed by adding
-     * the shopee_tis_* attributes to SHOPEE_ATTRIBUTE_SOURCE above). Rather
-     * than let each mandatory attribute surface one at a time across
-     * repeated live push attempts (Shopee's add_item appears to validate and
-     * reject on the first failing field, not report every gap at once), this
-     * checks the category's full attribute schema up front — read-only, safe
-     * to call anytime — building the real attribute_list from whatever we
-     * have mapped, and collecting the rest (still genuinely unfillable) into
-     * one clear error before ever attempting a live write.
+     * app had no data source for at all at the time. Rather than let each
+     * mandatory attribute surface one at a time across repeated live push
+     * attempts (Shopee's add_item appears to validate and reject on the
+     * first failing field, not report every gap at once), this checks the
+     * category's full attribute schema up front — read-only, safe to call
+     * anytime — building the real attribute_list from whatever's mapped via
+     * ShopeeAttributeMapping (admin-configurable, see
+     * ShopeeAttributeMappingController — replaces the old hardcoded
+     * SHOPEE_ATTRIBUTE_SOURCE const), and collecting the rest (still
+     * genuinely unfillable) into one clear error before ever attempting a
+     * live write. Only FREE_TEXT_FILED attributes are supported this way —
+     * select/dropdown attributes need a specific value_id, which
+     * ShopeeAttributeMappingController::update() already refuses to let a
+     * mapping target.
      *
      * @return array{attribute_list: list<array{attribute_id: int, attribute_value_list: list<array{original_value_name: string}>}>, missing: list<string>}
      */
@@ -414,14 +406,31 @@ class ShopeeProductSyncService
         $response = $this->client->getAttributeTree([$categoryId]);
         $schema = $response['response']['list'][0]['attribute_tree'] ?? [];
 
+        $mappingsByShopeeAttributeId = ShopeeAttributeMapping::whereNotNull('shopee_attribute_id')
+            ->with('attribute')
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('shopee_attribute_id');
+
         $attributeList = [];
         $missing = [];
 
         foreach ($schema as $attr) {
-            $ourCode = self::SHOPEE_ATTRIBUTE_SOURCE[$attr['attribute_id']] ?? null;
-            $value = $ourCode ? $this->attributeValue($product, $ourCode, $channelId) : null;
+            $value = null;
 
-            if ($value !== null && $value !== '') {
+            foreach ($mappingsByShopeeAttributeId->get($attr['attribute_id'], collect()) as $mapping) {
+                if (!$mapping->attribute) {
+                    continue;
+                }
+
+                $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId);
+                if ($candidate !== null && $candidate !== '') {
+                    $value = $candidate;
+                    break;
+                }
+            }
+
+            if ($value !== null) {
                 // FREE_TEXT_FILED shape (input_type 3, confirmed live for
                 // all three TIS fields) — a plain original_value_name, no
                 // value_id since there's no predefined list to pick from.

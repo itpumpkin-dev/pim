@@ -90,8 +90,13 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                 <Box><Typography variant="h4" fontWeight={700}>{tCatalog('attributesTitle')}</Typography>
                     <Typography color="text.secondary">{t('results', { count: gridData.total })}</Typography>
-                </Box>{canCreate &&
-                    <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
+                </Box>
+                <Stack direction="row" spacing={1.5}>
+                    {canEdit &&
+                        <Button variant="outlined" onClick={() => router.visit('/catalog/attributes/woocommerce-mapping')}>{tCatalog('woocommerceContentMapping')}</Button>}
+                    {canCreate &&
+                        <Button sx={{ color: "white" }} variant="contained" startIcon={<AddIcon />} onClick={() => router.visit('/catalog/attributes/create')}>{tCatalog('createAttribute')}</Button>}
+                </Stack>
             </Box>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
                 <TextField value={search} onChange={(event) => setSearch(event.target.value)} placeholder={tCatalog('searchAttributes')} size="small" sx={{ minWidth: 280 }} InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />

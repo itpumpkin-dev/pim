@@ -122,6 +122,25 @@ class WooCommerceClient
     }
 
     /**
+     * GET /products/attributes — WooCommerce's global Product Attributes
+     * taxonomy list (confirmed live, 2026-08-21: the real store has 12 —
+     * brand, color, condition, cord/cordless, diameter, fitting-position,
+     * litters, material, operating-voltage, product-feature, size,
+     * tires-type — each {id, name, slug, type, order_by, has_archives}).
+     * Same one-page-per-call split as getCategories()/getBrands(); the
+     * caller pages through it (see
+     * WooCommerceAttributeMappingController::syncWoocommerceAttributes()).
+     * Deliberately doesn't also fetch each attribute's terms
+     * (/products/attributes/{id}/terms) — a product push only needs to
+     * send {id, options: [value]} for a global attribute, and WooCommerce
+     * matches or creates the term itself.
+     */
+    public function getAttributes(int $page = 1, int $perPage = 100): array
+    {
+        return $this->request('GET', '/products/attributes', ['page' => $page, 'per_page' => $perPage]);
+    }
+
+    /**
      * POST /wp-json/wp/v2/media — uploads image bytes to WordPress's own
      * Media Library, returning the created attachment (notably `id` and
      * `source_url`). Needed because sending a product's images[].src as a

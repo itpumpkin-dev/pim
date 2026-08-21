@@ -10,6 +10,8 @@ use App\Http\Controllers\Catalog\CategoryFieldController;
 use App\Http\Controllers\Catalog\ChannelController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
+use App\Http\Controllers\Catalog\ShopeeAttributeMappingController;
+use App\Http\Controllers\Catalog\WooCommerceAttributeMappingController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -25,6 +27,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
     Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
+    Route::post('products/push-bulk', [ProductController::class, 'pushBulk'])->name('products.pushBulk')->middleware('permission:products,edit_products');
+    Route::post('products/deactivate-bulk', [ProductController::class, 'deactivateBulk'])->name('products.deactivateBulk')->middleware('permission:products,edit_products');
     Route::get('product-translations', [ProductController::class, 'missingTranslations'])->name('products.missingTranslations')->middleware('permission:product_translations,list_product_translations');
     Route::post('product-translations/queue-bulk', [ProductController::class, 'queueMissingTranslationsBulk'])->name('products.queueMissingTranslationsBulk')->middleware('permission:product_translations,edit_product_translations');
     Route::post('products/{product}/queue-missing-translations', [ProductController::class, 'queueMissingTranslations'])->name('products.queueMissingTranslations')->middleware('permission:product_translations,edit_product_translations');
@@ -54,6 +58,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
+    Route::get('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'index'])->name('attributes.woocommerceMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'index'])->name('attributes.shopeeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/{attribute}/edit', [AttributeController::class, 'edit'])->name('attributes.edit')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}', [AttributeController::class, 'update'])->name('attributes.update')->middleware('permission:attributes,edit_attributes');

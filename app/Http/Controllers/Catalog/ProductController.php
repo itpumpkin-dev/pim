@@ -183,9 +183,24 @@ class ProductController extends Controller
             'platforms' => $rows->groupBy('platform_name')->map->count(),
         ]);
 
+        // Every shop a product is marked "published" for, live or not — the
+        // same set Edit's Sales Channels panel checkboxes and
+        // queueMarketplaceSync()'s "published" guard use (product_
+        // platformShops()). Lets the product list's bulk Share dialog
+        // pre-check channels the selected product(s) are already published
+        // to, instead of always opening blank. Deliberately not scoped to
+        // status='live' like $salesChannelRows above — "published" and
+        // "confirmed live" are different states here.
+        $publishedShopRows = DB::table('product_platform_shops')
+            ->whereIn('product_id', $productIds)
+            ->get(['product_id', 'sales_platform_shop_id']);
+
+        $publishedShopIdsByProduct = $publishedShopRows->groupBy('product_id')
+            ->map(fn ($rows) => $rows->pluck('sales_platform_shop_id')->all());
+
         $translationCompletenessByProduct = $this->translationCompletenessByProduct($gridData->getCollection());
 
-        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct, $translationCompletenessByProduct) {
+        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct, $publishedShopIdsByProduct, $translationCompletenessByProduct) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
@@ -220,6 +235,8 @@ class ProductController extends Controller
                 'total' => $channels['total'] ?? 0,
                 'platforms' => $channels ? $channels['platforms']->toArray() : [],
             ];
+
+            $product->published_shop_ids = $publishedShopIdsByProduct->get($product->id, []);
 
             $product->translation_completeness = $translationCompletenessByProduct[$product->id] ?? null;
 
@@ -258,6 +275,7 @@ class ProductController extends Controller
                 'type' => $attribute->type,
                 'is_filterable' => (bool) $attribute->is_filterable,
             ]),
+            'salesChannels' => SalesPlatformShop::cachedGroupedByPlatform(),
         ]);
     }
 
@@ -1958,6 +1976,26 @@ class ProductController extends Controller
             ], 422);
         }
 
+        $syncJob = $this->dispatchMarketplaceSyncJob($product, $shop, $platform, $action);
+
+        return response()->json([
+            'job_id' => $syncJob->id,
+            'status' => 'queued',
+            'message' => ($action === 'deactivate' ? 'Deactivation' : 'Push').' to '."'{$shop->name}'".' queued.',
+        ], 202);
+    }
+
+    /**
+     * The actual job-queuing behind queueMarketplaceSync() above, without
+     * its "already published" guard — reused by pushBulk() (below), which
+     * publishes the product for this shop itself first (see
+     * Product::platformShops()), so the guard would always pass there
+     * anyway. The required-attribute validation both callers rely on lives
+     * inside SyncProductToMarketplaceJob → {Platform}ProductSyncService,
+     * untouched by this split.
+     */
+    private function dispatchMarketplaceSyncJob(Product $product, SalesPlatformShop $shop, string $platform, string $action): ProductMarketplaceSyncJob
+    {
         $syncJob = ProductMarketplaceSyncJob::create([
             'product_id' => $product->id,
             'sales_platform_shop_id' => $shop->id,
@@ -1969,11 +2007,88 @@ class ProductController extends Controller
 
         SyncProductToMarketplaceJob::dispatch($syncJob->id, auth()->id());
 
-        return response()->json([
-            'job_id' => $syncJob->id,
-            'status' => 'queued',
-            'message' => ($action === 'deactivate' ? 'Deactivation' : 'Push').' to '."'{$shop->name}'".' queued.',
-        ], 202);
+        return $syncJob;
+    }
+
+    /**
+     * Product list's bulk "Share" action — publishes every selected product
+     * to every selected shop (auto-checking the box a user would otherwise
+     * have to set per-product on Edit's Sales Channels panel first) and
+     * queues one push job per product×shop pair via
+     * dispatchMarketplaceSyncJob() above. Fire-and-forget: this returns
+     * immediately with a flash count, same as queueMissingTranslationsBulk()
+     * — per-product/per-shop success or failure (including each platform's
+     * required-attribute validation, which still runs unchanged inside the
+     * queued job) is checked afterwards on that product's Edit page.
+     */
+    public function pushBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+            'shop_ids' => ['required', 'array', 'min:1'],
+            'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+        ]);
+
+        $products = Product::whereIn('id', $validated['product_ids'])->get();
+        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get();
+        $shopIds = $shops->pluck('id')->all();
+
+        foreach ($products as $product) {
+            $product->platformShops()->syncWithoutDetaching($shopIds);
+
+            foreach ($shops as $shop) {
+                $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
+            }
+        }
+
+        return back()->with('success', "Queued push for {$products->count()} product(s) across {$shops->count()} channel(s).");
+    }
+
+    /**
+     * Product list's bulk "Deactivate" action — the Deactivate counterpart
+     * to pushBulk() above. Unlike push, this never auto-publishes: only
+     * product×shop pairs already marked "published" (product->
+     * platformShops()) are queued, mirroring both queueMarketplaceSync()'s
+     * "not marked as published" guard and Edit's Sales Channels panel,
+     * which never offers a Deactivate button for a shop that isn't
+     * checked. Pairs that aren't published are silently skipped (counted,
+     * not errored) rather than failing the whole request over them.
+     */
+    public function deactivateBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'product_ids' => ['required', 'array', 'min:1'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
+            'shop_ids' => ['required', 'array', 'min:1'],
+            'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+        ]);
+
+        $products = Product::whereIn('id', $validated['product_ids'])->get();
+        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get();
+
+        $queued = 0;
+        $skipped = 0;
+        foreach ($products as $product) {
+            $publishedShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->all();
+
+            foreach ($shops as $shop) {
+                if (!in_array($shop->id, $publishedShopIds, true)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'deactivate');
+                $queued++;
+            }
+        }
+
+        $message = "Queued deactivate for {$queued} product/channel pair(s).";
+        if ($skipped > 0) {
+            $message .= " Skipped {$skipped} pair(s) not published there.";
+        }
+
+        return back()->with('success', $message);
     }
 
     /**

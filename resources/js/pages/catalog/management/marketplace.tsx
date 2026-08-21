@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { Box, Divider, Grid, Typography } from '@mui/material';
@@ -48,6 +49,24 @@ export default function CatalogManagementMarketplace() {
             description: t('brandMarketplaceSyncSubtitle'),
             url: '/catalog/brands/marketplace-sync',
             permission: 'brands.list_brands',
+        },
+        {
+            key: 'woocommerceContentMapping',
+            icon: AccountTreeOutlinedIcon,
+            color: PALETTE.accent,
+            title: t('woocommerceContentMapping'),
+            description: t('woocommerceContentMappingCardDescription'),
+            url: '/catalog/attributes/woocommerce-mapping',
+            permission: 'attributes.edit_attributes',
+        },
+        {
+            key: 'shopeeAttributeMapping',
+            icon: AccountTreeOutlinedIcon,
+            color: PALETTE.highlight,
+            title: t('shopeeAttributeMapping'),
+            description: t('shopeeAttributeMappingCardDescription'),
+            url: '/catalog/attributes/shopee-mapping',
+            permission: 'attributes.edit_attributes',
         },
     ];
 

@@ -4,6 +4,7 @@ namespace App\Services\WooCommerce;
 
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
+use App\Models\WooCommerceAttributeMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -62,16 +63,18 @@ class WooCommerceProductSyncService
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
-        $name = $this->attributeValue($product, 'pname', $shop->channel_id, localeCode: 'th');
-        $price = $this->attributeValue($product, 'price_std', $shop->channel_id)
-            ?? $this->attributeValue($product, 'price_recommend', $shop->channel_id);
-        $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
-        $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
-        $description = $this->attributeValue($product, 'product_details_features', $shop->channel_id);
-        $weight = $this->attributeValue($product, 'weight_pcs', $shop->channel_id);
-        $length = $this->attributeValue($product, 'length_pcs', $shop->channel_id);
-        $width = $this->attributeValue($product, 'width_pcs', $shop->channel_id);
-        $height = $this->attributeValue($product, 'height_pcs', $shop->channel_id);
+        $mappings = WooCommerceAttributeMapping::with('attribute')->orderBy('sort_order')->get();
+
+        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id);
+        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
+        $imageUrl = $this->resolveMappedField($mappings, 'image', $product, $shop->channel_id);
+        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
+        $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id);
+        $length = $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id);
+        $width = $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id);
+        $height = $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id);
+        $content = $this->buildContentFields($mappings, $product, $shop->channel_id);
+        $wcAttributes = $this->buildWooCommerceAttributes($mappings, $product, $shop->channel_id);
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to WooCommerce.");
@@ -93,14 +96,130 @@ class WooCommerceProductSyncService
             'sku' => $product->sku,
             'name' => $name,
             'regular_price' => (string) $price,
-            'description' => $description ?: '',
+            'description' => $content['description'],
+            'short_description' => $content['short_description'],
             'manage_stock' => true,
             'stock_quantity' => (int) ($qty ?? 0),
             'weight' => $weight !== null && $weight !== '' ? (string) $weight : null,
             'dimensions' => count($dimensions) ? array_map('strval', $dimensions) : null,
             'images' => $imageUrl ? [['src' => $imageUrl]] : null,
             'categories' => count($categoryIds) ? $categoryIds : null,
+            'attributes' => count($wcAttributes) ? $wcAttributes : null,
         ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * Single-value WooCommerce fields (name/price/image/qty/weight/length/
+     * width/height) — "first match wins": walks every attribute an admin
+     * has mapped to this target, in sort_order, and returns the first one
+     * with an actual value for this product. Mapping both price_std (order
+     * 0) and price_recommend (order 1) to 'price' reproduces the old
+     * `price_std ?? price_recommend` fallback this replaced, for any target,
+     * not just price. Always passes `localeCode: 'th'` — see
+     * buildContentFields()'s docblock for why that's safe unconditionally.
+     */
+    private function resolveMappedField(\Illuminate\Support\Collection $mappings, string $targetField, Product $product, ?int $channelId): ?string
+    {
+        foreach ($mappings->where('target_field', $targetField) as $mapping) {
+            if (!$mapping->attribute) {
+                continue;
+            }
+
+            $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+            if ($value) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Composes WooCommerce's `description`/`short_description` from
+     * whichever PIM attributes an admin has mapped to each — see the
+     * "PIM Attribute → WooCommerce Content" mapping page
+     * (WooCommerceAttributeMappingController), not a hardcoded attribute
+     * list. Unlike resolveMappedField() above, these two targets compose
+     * EVERY mapped attribute (not just the first with a value): each
+     * becomes one `<h4>label</h4>` section, in sort_order, skipping
+     * attributes with no value for this product. Always passes
+     * `localeCode: 'th'` — every attribute eligible for mapping here is
+     * content meant for the storefront, and omitting the locale (like the
+     * original single-field version of this method used to) silently
+     * returns nothing for locale-based attributes.
+     */
+    private function buildContentFields(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId): array
+    {
+        $sections = ['description' => [], 'short_description' => []];
+
+        foreach ($mappings->whereIn('target_field', ['description', 'short_description']) as $mapping) {
+            $attribute = $mapping->attribute;
+            if (!$attribute) {
+                continue;
+            }
+
+            $value = $this->attributeValue($product, $attribute->code, $channelId, localeCode: 'th');
+            if (!$value) {
+                continue;
+            }
+
+            // `textarea` attributes are edited through a rich-text (WYSIWYG)
+            // editor in the PIM UI and can already contain real HTML (<p>,
+            // <ul>, <strong>, ...) — escaping that here would show literal
+            // "&lt;p&gt;" text on the storefront instead of rendering it.
+            // Every other attribute type (text/select/price/date/...) is a
+            // plain scalar, so it's escaped normally. WordPress's own
+            // wpautop() paragraph-wraps plain text on render, so unwrapped
+            // plain values still display correctly without help from here.
+            $content = $attribute->type === 'textarea' ? $value : e($value);
+
+            // CSS hooks for the theme's Additional CSS (or a child theme
+            // stylesheet) to style — `.pim-content-section` per section,
+            // `data-attribute` for targeting one specific field (e.g.
+            // `[data-attribute="warnings"] { color: #b91c1c; }`).
+            $sections[$mapping->target_field][] =
+                '<div class="pim-content-section" data-attribute="'.e($attribute->code).'">'
+                .'<h4 class="pim-content-heading">'.e($attribute->name).'</h4>'
+                .'<div class="pim-content-body">'.$content.'</div>'
+                .'</div>';
+        }
+
+        return [
+            'description' => $sections['description'] ? '<div class="pim-content">'.implode('', $sections['description']).'</div>' : '',
+            'short_description' => $sections['short_description'] ? '<div class="pim-content">'.implode('', $sections['short_description']).'</div>' : '',
+        ];
+    }
+
+    /**
+     * Builds WooCommerce's `attributes[]` payload entries from `wc_attribute`
+     * mappings — one entry per distinct woocommerce_attribute_id, "first
+     * mapped attribute with a value wins" within that group (same semantics
+     * as resolveMappedField()). Only `id` + `options` are sent: these are
+     * all global attributes (real WooCommerce term-based taxonomies, synced
+     * via syncWoocommerceAttributes()), so `name` isn't needed and
+     * WooCommerce matches/creates the term from the option value itself.
+     */
+    private function buildWooCommerceAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId): array
+    {
+        $result = [];
+
+        $groups = $mappings->where('target_field', 'wc_attribute')->groupBy('woocommerce_attribute_id');
+
+        foreach ($groups as $wcAttributeId => $group) {
+            foreach ($group->sortBy('sort_order') as $mapping) {
+                if (!$mapping->attribute) {
+                    continue;
+                }
+
+                $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                if ($value) {
+                    $result[] = ['id' => (int) $wcAttributeId, 'options' => [$value], 'visible' => true, 'variation' => false];
+                    break;
+                }
+            }
+        }
+
+        return $result;
     }
 
     /**

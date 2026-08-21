@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 class SalesPlatformShop extends Model
 {
@@ -54,6 +55,37 @@ class SalesPlatformShop extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Every shop with a linked Channel (the ones a product can actually be
+     * pushed to — see ProductController::edit()'s channelGroups, which
+     * queries this same shape), grouped by platform name — used by the
+     * product list's bulk "Share" dialog to build its channel picker
+     * without re-running this join on every grid search/filter keystroke.
+     * Short TTL rather than the app's usual versioned-cache convention:
+     * shops change rarely and there's no single CRUD entry point worth
+     * wiring invalidation through, same trade-off as
+     * BrandController::brandProductCounts().
+     *
+     * @return array<int, array{platform: string, shops: array<int, array{id: int, name: string}>}>
+     */
+    public static function cachedGroupedByPlatform(): array
+    {
+        return Cache::remember(
+            'sales_platform_shops.grouped_by_platform',
+            now()->addMinutes(10),
+            fn () => static::with('platform:id,code,name')
+                ->whereNotNull('channel_id')
+                ->get(['id', 'name', 'sales_platform_id'])
+                ->groupBy(fn (self $shop) => $shop->platform->name ?? 'Other')
+                ->map(fn ($shops, $platform) => [
+                    'platform' => $platform,
+                    'shops' => $shops->map(fn (self $shop) => ['id' => $shop->id, 'name' => $shop->name])->values()->all(),
+                ])
+                ->values()
+                ->all()
+        );
     }
 
     /**

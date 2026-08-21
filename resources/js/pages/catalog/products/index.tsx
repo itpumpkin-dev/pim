@@ -9,6 +9,7 @@ import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import ViewColumnOutlinedIcon from '@mui/icons-material/ViewColumnOutlined';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
+import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
@@ -92,6 +93,7 @@ interface ProductRow {
     translation_completeness?: number | null;
     attribute_values?: Record<string, unknown>;
     sales_channels?: { total: number; platforms: Record<string, number> };
+    published_shop_ids?: number[];
     [key: string]: unknown;
 }
 interface GridData {
@@ -122,6 +124,10 @@ interface CategoryTreeNode {
     name: string;
     children: CategoryTreeNode[];
 }
+interface SalesChannelGroup {
+    platform: string;
+    shops: { id: number; name: string }[];
+}
 
 function flattenCategoryTree(nodes: CategoryTreeNode[], depth = 0): ExportCategoryOption[] {
     return nodes.flatMap((node) => [
@@ -143,6 +149,7 @@ interface Props {
     };
     attributes: AttributeMeta[];
     families: ProductFamilyOption[];
+    salesChannels: SalesChannelGroup[];
 }
 
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
@@ -226,7 +233,7 @@ interface ColumnDef {
     headerRender?: () => ReactNode;
 }
 
-export default function ProductIndex({ gridData, filters, attributes, families }: Props) {
+export default function ProductIndex({ gridData, filters, attributes, families, salesChannels }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { auth } = usePage<SharedData>().props;
@@ -260,6 +267,78 @@ export default function ProductIndex({ gridData, filters, attributes, families }
             {
                 onSuccess: () => setDuplicateProductId(null),
                 onFinish: () => setDuplicating(false),
+            },
+        );
+    };
+
+    // Bulk "Share" — publishes + pushes every selected product to every
+    // checked sales channel in one request (ProductController::pushBulk()).
+    // Fire-and-forget like translateSelected() in missing-translations.tsx:
+    // the flash message just confirms how many jobs were queued, real
+    // per-product/per-channel success or failure shows up afterwards on
+    // that product's Edit page (Sales Channels panel already has live
+    // status badges for this).
+    const [shareDialogOpen, setShareDialogOpen] = useState(false);
+    const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
+    const [sharing, setSharing] = useState(false);
+    const [deactivating, setDeactivating] = useState(false);
+
+    // 'all' = every selected product is already published there, 'some' =
+    // a mix, 'none' = none of them. Computed from published_shop_ids
+    // (added to each grid row by ProductController::index()) against
+    // whichever selected rows are actually present on the current page —
+    // no extra request needed to open the dialog.
+    const shopPublishStatus = (shopId: number): 'all' | 'some' | 'none' => {
+        const selectedRows = gridData.data.filter((row) => selectedIds.includes(row.id));
+        if (selectedRows.length === 0) return 'none';
+        const publishedCount = selectedRows.filter((row) => (row.published_shop_ids ?? []).includes(shopId)).length;
+        if (publishedCount === 0) return 'none';
+        return publishedCount === selectedRows.length ? 'all' : 'some';
+    };
+
+    const openShareDialog = () => {
+        const alreadyPublishedEverywhere = salesChannels
+            .flatMap((group) => group.shops)
+            .filter((shop) => shopPublishStatus(shop.id) === 'all')
+            .map((shop) => shop.id);
+        setSelectedShopIds(alreadyPublishedEverywhere);
+        setShareDialogOpen(true);
+    };
+
+    const toggleShareShop = (shopId: number, checked: boolean) => {
+        setSelectedShopIds((prev) => (checked ? [...prev, shopId] : prev.filter((id) => id !== shopId)));
+    };
+
+    const shareSelectedProducts = () => {
+        setSharing(true);
+        router.post(
+            '/catalog/products/push-bulk',
+            { product_ids: selectedIds, shop_ids: selectedShopIds },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShareDialogOpen(false);
+                    setSelectedShopIds([]);
+                    setSelectedIds([]);
+                },
+                onFinish: () => setSharing(false),
+            },
+        );
+    };
+
+    const deactivateSelectedProducts = () => {
+        setDeactivating(true);
+        router.post(
+            '/catalog/products/deactivate-bulk',
+            { product_ids: selectedIds, shop_ids: selectedShopIds },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShareDialogOpen(false);
+                    setSelectedShopIds([]);
+                    setSelectedIds([]);
+                },
+                onFinish: () => setDeactivating(false),
             },
         );
     };
@@ -663,6 +742,18 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                         >
                             {t('quickExport')}
                         </Button>
+                        {canEdit && (
+                            <Button
+                                variant="outlined"
+                                startIcon={<ShareOutlinedIcon />}
+                                onClick={openShareDialog}
+                                disabled={selectedIds.length === 0}
+                                sx={{ textTransform: 'none', fontWeight: 700, color: 'text.secondary', borderColor: UI_BORDER }}
+                            >
+                                {t('share')}
+                                {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                            </Button>
+                        )}
                         {canCreate && (
                             <Button
                                 variant="contained"
@@ -980,6 +1071,92 @@ export default function ProductIndex({ gridData, filters, attributes, families }
                         sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 3 }}
                     >
                         {t('download')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Share (bulk push to sales channels) Dialog */}
+            <Dialog open={shareDialogOpen} onClose={() => (sharing || deactivating ? null : setShareDialogOpen(false))} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
+                    {t('shareToChannels')}
+                    <IconButton size="small" onClick={() => setShareDialogOpen(false)} disabled={sharing || deactivating}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <Divider />
+                <DialogContent sx={{ pt: 3 }}>
+                    <Stack spacing={2.5}>
+                        <Typography variant="body2" color="text.secondary">
+                            {t('shareSelectChannelsHelp')}
+                        </Typography>
+
+                        {salesChannels.length === 0 && (
+                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                {t('shareNoChannels')}
+                            </Typography>
+                        )}
+
+                        {salesChannels.map((group) => (
+                            <Box key={group.platform}>
+                                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                    {group.platform}
+                                </Typography>
+                                <Stack spacing={0}>
+                                    {group.shops.map((shop) => {
+                                        const publishStatus = shopPublishStatus(shop.id);
+                                        const checked = selectedShopIds.includes(shop.id);
+
+                                        return (
+                                            <Stack key={shop.id} direction="row" alignItems="center" spacing={1}>
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={checked}
+                                                    indeterminate={publishStatus === 'some' && !checked}
+                                                    onChange={(e) => toggleShareShop(shop.id, e.target.checked)}
+                                                    disabled={sharing || deactivating}
+                                                />
+                                                <Typography variant="body2">{shop.name}</Typography>
+                                                {publishStatus === 'all' && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ({t('alreadyShared')})
+                                                    </Typography>
+                                                )}
+                                                {publishStatus === 'some' && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        ({t('alreadySharedPartial')})
+                                                    </Typography>
+                                                )}
+                                            </Stack>
+                                        );
+                                    })}
+                                </Stack>
+                            </Box>
+                        ))}
+                    </Stack>
+                </DialogContent>
+                <Divider />
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={() => setShareDialogOpen(false)} color="inherit" sx={{ textTransform: 'none' }} disabled={sharing || deactivating}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={deactivateSelectedProducts}
+                        variant="outlined"
+                        color="error"
+                        disabled={selectedShopIds.length === 0 || sharing || deactivating}
+                        startIcon={deactivating ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ textTransform: 'none', fontWeight: 700 }}
+                    >
+                        {t('deactivate')}
+                    </Button>
+                    <Button
+                        onClick={shareSelectedProducts}
+                        variant="contained"
+                        disabled={selectedShopIds.length === 0 || sharing || deactivating}
+                        startIcon={sharing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 3 }}
+                    >
+                        {t('share')}
                     </Button>
                 </DialogActions>
             </Dialog>
