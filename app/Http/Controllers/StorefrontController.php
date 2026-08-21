@@ -7,6 +7,7 @@ use App\Models\AttributeOption;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\ProductViewEvent;
+use App\Models\User;
 use App\Services\Catalog\ProductPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -87,22 +88,45 @@ class StorefrontController extends Controller
 
     public function show(int $id, Request $request): Response
     {
-        $product = Product::where('id', $id)->where('enabled', true)->where('type', 'simple')->first();
-
-        if (!$product) {
-            return Inertia::render('products/show', [
-                'id' => $id,
-                'product' => null,
-                'related' => [],
-            ]);
-        }
-
         $viewer = $request->user();
         // Unlike home() (deliberately fixed to Thai), this page follows
         // whatever locale the visitor has switched to — see the
         // LocaleDropdown on products/show.tsx and SetLocale middleware,
         // which resolves this from a cookie for anonymous visitors too.
         $localeCode = app()->getLocale();
+
+        // Only cache the anonymous-visitor payload. buildShowPayload() passes
+        // $viewer into ProductPresenter::mapMany(), which can blank out
+        // fields whose Attribute Group a logged-in viewer's role can't see
+        // (Attribute Access) — a shared cache keyed without $viewer would
+        // either leak those restricted fields to a restricted staff member
+        // (served an anonymous-computed payload) or wrongly blank fields for
+        // the public (served a payload computed for a restricted viewer).
+        // This is the same risk home() sidesteps by never taking a $viewer
+        // at all, per its class docblock.
+        if (!$viewer) {
+            return Inertia::render('products/show', Cache::remember(
+                'storefront:product:'.$id.':v'.Product::storefrontVersion().':'.$localeCode,
+                self::CACHE_TTL_SECONDS,
+                fn () => $this->buildShowPayload($id, $localeCode, null)
+            ));
+        }
+
+        return Inertia::render('products/show', $this->buildShowPayload($id, $localeCode, $viewer));
+    }
+
+    private function buildShowPayload(int $id, string $localeCode, ?User $viewer): array
+    {
+        $product = Product::where('id', $id)->where('enabled', true)->where('type', 'simple')->first();
+
+        if (!$product) {
+            return [
+                'id' => $id,
+                'product' => null,
+                'related' => [],
+            ];
+        }
+
         $mapped = ProductPresenter::mapMany(collect([$product]), $localeCode, $viewer)[0];
 
         $categoryAttributeId = Attribute::idForCode('pcatname');
@@ -134,11 +158,11 @@ class StorefrontController extends Controller
             ->limit(4)
             ->get();
 
-        return Inertia::render('products/show', [
+        return [
             'id' => $id,
             'product' => $mapped,
             'related' => ProductPresenter::mapMany($related, $localeCode, $viewer),
-        ]);
+        ];
     }
 
     public function trackEvent(Request $request): JsonResponse

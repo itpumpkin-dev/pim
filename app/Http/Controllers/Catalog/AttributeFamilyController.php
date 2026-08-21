@@ -134,6 +134,8 @@ class AttributeFamilyController extends Controller
             AuditLog::record('attributes_set', $family, null, ['attributes' => $newAssignments]);
         }
 
+        AttributeFamily::bumpListVersion();
+
         return to_route('catalog.attributeFamilies.index')->with('success', 'Attribute Family created successfully.');
     }
 
@@ -209,6 +211,8 @@ class AttributeFamilyController extends Controller
             AuditLog::record('attributes_updated', $attributeFamily, ['attributes' => $oldAssignments], ['attributes' => $newAssignments]);
         }
 
+        AttributeFamily::bumpListVersion();
+
         return to_route('catalog.attributeFamilies.index')->with('success', 'Attribute Family updated successfully.');
     }
 
@@ -282,6 +286,8 @@ class AttributeFamilyController extends Controller
     {
         FamilyAttribute::where('family_id', $attributeFamily->id)->delete();
         $attributeFamily->delete();
+
+        AttributeFamily::bumpListVersion();
 
         return to_route('catalog.attributeFamilies.index')->with('success', 'Attribute Family deleted successfully.');
     }

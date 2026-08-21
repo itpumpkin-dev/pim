@@ -122,7 +122,7 @@ class ProductController extends Controller
             ? Product::whereIn('id', $parentIds)->pluck('sku', 'id')
             : collect();
 
-        $allAttributes = Attribute::orderBy('code')->get(['id', 'code', 'name', 'type', 'is_filterable']);
+        $allAttributes = Attribute::cachedList();
 
         // Locale-based attributes (pname, spec_*, ...) store one ProductValue
         // row per locale, and channel-based ones store one per channel. This
@@ -133,7 +133,7 @@ class ProductController extends Controller
         // lookups below land on it instead of an arbitrary row whichever
         // order the DB happened to return them in (which is what silently
         // ignored the locale switcher before this fix).
-        $activeLocaleId = Locale::where('code', app()->getLocale())->value('id');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
 
         $values = ProductValue::whereIn('product_id', $productIds)
             ->whereNull('channel_id')
@@ -250,7 +250,7 @@ class ProductController extends Controller
                 'category_id' => $request->input('category_id', ''),
                 'category_name' => $request->input('category_name', ''),
             ],
-            'families' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
+            'families' => AttributeFamily::cachedList(),
             'attributes' => $allAttributes->map(fn (Attribute $attribute) => [
                 'id' => $attribute->id,
                 'code' => $attribute->code,

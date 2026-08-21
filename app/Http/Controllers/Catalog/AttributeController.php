@@ -200,6 +200,7 @@ class AttributeController extends Controller
         }
 
         Attribute::bumpCodeMapVersion();
+        Attribute::bumpListVersion();
 
         return to_route('catalog.attributes.index')->with('success', 'Attribute created successfully.');
     }
@@ -242,6 +243,8 @@ class AttributeController extends Controller
         if ($oldTranslations !== $newTranslations) {
             AuditLog::record('labels_updated', $attribute, $oldTranslations, $newTranslations);
         }
+
+        Attribute::bumpListVersion();
 
         return to_route('catalog.attributes.index')->with('success', 'Attribute updated successfully.');
     }
@@ -358,6 +361,7 @@ class AttributeController extends Controller
         $attribute->delete();
 
         Attribute::bumpCodeMapVersion();
+        Attribute::bumpListVersion();
 
         return to_route('catalog.attributes.index')->with('success', 'Attribute deleted successfully.');
     }

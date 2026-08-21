@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 
 class AttributeFamily extends Model
 {
@@ -64,5 +65,32 @@ class AttributeFamily extends Model
     public function translations(): HasMany
     {
         return $this->hasMany(AttributeFamilyTranslation::class);
+    }
+
+    private const LIST_VERSION_KEY = 'attribute_families:list:version';
+
+    /**
+     * Cached id/code/name list for every family — used by
+     * ProductController::index() to populate the grid's family filter
+     * dropdown, previously re-queried on every grid page/sort/filter.
+     * Invalidated on family CRUD — see
+     * AttributeFamilyController::store()/update()/destroy().
+     */
+    public static function cachedList(): \Illuminate\Support\Collection
+    {
+        return Cache::rememberForever(
+            'attribute_families.list:v'.static::listVersion(),
+            fn () => static::select('id', 'code', 'name')->orderBy('name')->get()
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
     }
 }

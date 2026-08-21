@@ -136,4 +136,33 @@ class Attribute extends Model
     {
         Cache::forever(self::CODE_MAP_VERSION_KEY, self::codeMapVersion() + 1);
     }
+
+    private const LIST_VERSION_KEY = 'attributes:list:version';
+
+    /**
+     * Cached id/code/name/type/is_filterable list for every attribute —
+     * used by ProductController::index() for the grid's per-row
+     * attribute_values map and "Add Filter" dropdown, previously re-queried
+     * on every grid page/sort/filter/search. Unlike codeToIdMap() above,
+     * name/type/is_filterable can change on update (not just create/
+     * delete), so update() also bumps this — see
+     * AttributeController::store()/update()/destroy().
+     */
+    public static function cachedList(): \Illuminate\Support\Collection
+    {
+        return Cache::rememberForever(
+            'attributes.list:v'.static::listVersion(),
+            fn () => static::orderBy('code')->get(['id', 'code', 'name', 'type', 'is_filterable'])
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
+    }
 }

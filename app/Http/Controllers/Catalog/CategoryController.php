@@ -382,7 +382,7 @@ class CategoryController extends Controller
         // update()'s before/after audit diff), where injecting a synthetic
         // value would falsely look like a real translation change.
         $translations = $this->currentTranslations($category);
-        $activeLocaleId = Locale::where('code', app()->getLocale())->value('id');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
         if ($activeLocaleId && trim((string) ($translations[$activeLocaleId] ?? '')) === '') {
             $rawName = trim((string) $category->getRawOriginal('name'));
             if ($rawName !== '') {

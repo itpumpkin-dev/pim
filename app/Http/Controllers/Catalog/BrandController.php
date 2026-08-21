@@ -30,6 +30,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -54,6 +55,31 @@ class BrandController extends Controller
     private function brandAttribute(): Attribute
     {
         return Attribute::where('code', 'pbrand')->firstOrFail();
+    }
+
+    /**
+     * value(brand option code) => count of distinct products, for the
+     * "products_count" badge on both index() and buildBrandMappingData()
+     * (called by all 4 platform mapping pages). This scans product_values
+     * for every load, so it's cached with a short TTL rather than left
+     * uncached — a plain TTL rather than event-based invalidation because
+     * ProductValue rows for pbrand are written from many places (product
+     * create/update, bulk import, marketplace sync), so a few minutes of
+     * staleness on a count badge is a safer trade than missing an
+     * invalidation call site somewhere.
+     */
+    private function brandProductCounts(int $attributeId): \Illuminate\Support\Collection
+    {
+        return Cache::remember(
+            "brands.product_counts:{$attributeId}",
+            now()->addMinutes(10),
+            fn () => ProductValue::where('attribute_id', $attributeId)
+                ->whereNull('channel_id')
+                ->whereNull('locale_id')
+                ->select('value', DB::raw('count(distinct product_id) as cnt'))
+                ->groupBy('value')
+                ->pluck('cnt', 'value')
+        );
     }
 
     public function index(Request $request): Response
@@ -104,12 +130,7 @@ class BrandController extends Controller
         // in PHP after one fetch is simpler and plenty fast, and avoids a
         // SQL-level count subquery for a join that isn't a real Eloquent
         // relation (ProductValue.value = AttributeOption.code, not an FK).
-        $counts = ProductValue::where('attribute_id', $attribute->id)
-            ->whereNull('channel_id')
-            ->whereNull('locale_id')
-            ->select('value', DB::raw('count(distinct product_id) as cnt'))
-            ->groupBy('value')
-            ->pluck('cnt', 'value');
+        $counts = $this->brandProductCounts($attribute->id);
 
         $labelById = $options->pluck('admin_label', 'id');
 
@@ -688,14 +709,10 @@ class BrandController extends Controller
             ->when($status === 'unmapped', fn ($q) => $q->whereNull($fkColumn))
             ->get();
 
-        // Same PHP-side counting as index() — see that method's comment for
-        // why (small lists, no real Eloquent relation to count() through).
-        $counts = ProductValue::where('attribute_id', $attribute->id)
-            ->whereNull('channel_id')
-            ->whereNull('locale_id')
-            ->select('value', DB::raw('count(distinct product_id) as cnt'))
-            ->groupBy('value')
-            ->pluck('cnt', 'value');
+        // Same cached counting as index() — see brandProductCounts()'s
+        // docblock for why (small lists, no real Eloquent relation to
+        // count() through, short-TTL cache instead of event invalidation).
+        $counts = $this->brandProductCounts($attribute->id);
 
         if ($onlyWithProducts) {
             $options = $options->filter(fn (AttributeOption $o) => ($counts[$o->code] ?? 0) > 0)->values();
