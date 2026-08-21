@@ -84,9 +84,13 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('brands/search-lazada', [BrandController::class, 'searchLazadaBrands'])->name('brands.searchLazada')->middleware('permission:brands,edit_brands');
     Route::get('brands/lazada-mapping', [BrandController::class, 'lazadaMapping'])->name('brands.lazadaMapping')->middleware('permission:brands,edit_brands');
     Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-tiktok', [BrandController::class, 'syncTiktokBrands'])->name('brands.syncTiktok')->middleware('permission:brands,edit_brands');
+    Route::get('brands/search-tiktok', [BrandController::class, 'searchTiktokBrands'])->name('brands.searchTiktok')->middleware('permission:brands,edit_brands');
+    Route::get('brands/tiktok-mapping', [BrandController::class, 'tiktokMapping'])->name('brands.tiktokMapping')->middleware('permission:brands,edit_brands');
+    Route::post('brands/tiktok-mapping', [BrandController::class, 'bulkMapTiktokBrand'])->name('brands.bulkMapTiktok')->middleware('permission:brands,edit_brands');
     // Generic status/cancel for any queued brand-sync job (Shopee, Lazada,
-    // ...) — not platform-specific, so the route path names the concept
-    // ("sync-jobs"), not one platform.
+    // TikTok, ...) — not platform-specific, so the route path names the
+    // concept ("sync-jobs"), not one platform.
     Route::get('brands/sync-jobs/{jobTracker}/status', [BrandController::class, 'brandSyncStatus'])->name('brands.syncStatus')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-jobs/{jobTracker}/cancel', [BrandController::class, 'cancelBrandSync'])->name('brands.syncCancel')->middleware('permission:brands,edit_brands');
 

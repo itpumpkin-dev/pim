@@ -29,6 +29,10 @@ const BRAND_SYNC_PLATFORMS = [
     // total for this account, even bigger than Shopee's per-category count,
     // so it's queued too.
     { value: 'lazada', label: 'Lazada', route: '/catalog/brands/sync-lazada', mappingRoute: '/catalog/brands/lazada-mapping', mode: 'queued' },
+    // TikTok's getBrands() can omit category_id for the shop's whole brand
+    // list too, but that's still 10,000 records for this account (confirmed
+    // live) — queued, same as Shopee/Lazada.
+    { value: 'tiktok', label: 'TikTok', route: '/catalog/brands/sync-tiktok', mappingRoute: '/catalog/brands/tiktok-mapping', mode: 'queued' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {

@@ -25,6 +25,7 @@ class AttributeOption extends Model
         'shopee_brand_id',
         'woocommerce_brand_id',
         'lazada_brand_id',
+        'tiktok_brand_id',
     ];
 
     protected function casts(): array
@@ -97,5 +98,10 @@ class AttributeOption extends Model
     public function lazadaBrand(): BelongsTo
     {
         return $this->belongsTo(LazadaBrand::class, 'lazada_brand_id');
+    }
+
+    public function tiktokBrand(): BelongsTo
+    {
+        return $this->belongsTo(TikTokBrand::class, 'tiktok_brand_id');
     }
 }

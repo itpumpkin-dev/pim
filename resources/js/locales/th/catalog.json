@@ -248,6 +248,7 @@
     "shopeeBrandMappingTitle": "จับคู่แบรนด์กับ Shopee",
     "woocommerceBrandMappingTitle": "จับคู่แบรนด์กับ WooCommerce",
     "lazadaBrandMappingTitle": "จับคู่แบรนด์กับ Lazada",
+    "tiktokBrandMappingTitle": "จับคู่แบรนด์กับ TikTok",
     "lastSyncedAt": "ซิงค์ล่าสุด: {{datetime}}",
     "leafCategoriesMapped": "จับคู่แล้ว {{mapped}} / {{total}} หมวดหมู่ย่อยสุด",
     "statusUnmapped": "ยังไม่จับคู่",

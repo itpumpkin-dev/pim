@@ -10,6 +10,7 @@ use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Jobs\SyncLazadaBrandsJob;
 use App\Jobs\SyncShopeeBrandsJob;
+use App\Jobs\SyncTikTokBrandsJob;
 use App\Models\Category;
 use App\Models\JobTracker;
 use App\Models\LazadaBrand;
@@ -18,6 +19,8 @@ use App\Models\Locale;
 use App\Models\ProductValue;
 use App\Models\ShopeeBrand;
 use App\Models\ShopeeSellerAccount;
+use App\Models\TikTokBrand;
+use App\Models\TikTokSellerAccount;
 use App\Models\WooCommerceBrand;
 use App\Services\CodeGenerator;
 use App\Services\Catalog\AttributeValueFormatter;
@@ -69,6 +72,7 @@ class BrandController extends Controller
             'shopee' => 'shopee_brand_id',
             'woocommerce' => 'woocommerce_brand_id',
             'lazada' => 'lazada_brand_id',
+            'tiktok' => 'tiktok_brand_id',
         ];
 
         $options = AttributeOption::where('attribute_id', $attribute->id)
@@ -117,6 +121,7 @@ class BrandController extends Controller
                 'shopee' => $option->shopee_brand_id,
                 'woocommerce' => $option->woocommerce_brand_id,
                 'lazada' => $option->lazada_brand_id,
+                'tiktok' => $option->tiktok_brand_id,
             ])->filter()->keys()->values()->all();
 
             return $option;
@@ -287,6 +292,7 @@ class BrandController extends Controller
                 'shopee' => $toIso(ShopeeBrand::max('updated_at')),
                 'woocommerce' => $toIso(WooCommerceBrand::max('updated_at')),
                 'lazada' => $toIso(LazadaBrand::max('updated_at')),
+                'tiktok' => $toIso(TikTokBrand::max('updated_at')),
             ],
         ]);
     }
@@ -357,15 +363,43 @@ class BrandController extends Controller
     }
 
     /**
-     * Polled by the marketplace-sync page while a queued sync (Shopee or
-     * Lazada) is running — kept scoped to this controller (rather than
-     * reusing the generic import/export JobTrackerController::status()
-     * route) since this job isn't tied to an ImportConfig/ExportConfig and
-     * shouldn't show up mixed into that unrelated jobs list. Generic on
-     * job_type rather than a specific platform — was named
-     * shopeeBrandSyncStatus() when Shopee was the only queued platform, but
-     * the body never actually checked which one, so Lazada reuses this
-     * unchanged rather than getting a near-identical copy.
+     * Queues the local tiktok_brands cache refresh — SyncTikTokBrandsJob
+     * does the actual fetch loop. Same "no category precondition" shape as
+     * Lazada: TikTokClient::getBrands()'s category_id is optional, and
+     * omitting it returns the shop's whole brand list — confirmed live,
+     * 2026-08-21, that's still 10,000 records for this account, so it's
+     * queued rather than synchronous.
+     */
+    public function syncTiktokBrands(Request $request): JsonResponse
+    {
+        $account = TikTokSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No TikTok seller account found to authenticate the sync.'], 422);
+        }
+
+        $tracker = JobTracker::create([
+            'job_type' => 'brand_sync',
+            'entity_type' => 'tiktok_brands',
+            'config_code' => 'tiktok',
+            'status' => 'pending',
+            'user_id' => $request->user()?->id,
+        ]);
+
+        SyncTikTokBrandsJob::dispatch($tracker->id);
+
+        return response()->json(['job_tracker_id' => $tracker->id]);
+    }
+
+    /**
+     * Polled by the marketplace-sync page while a queued sync (Shopee,
+     * Lazada, or TikTok) is running — kept scoped to this controller
+     * (rather than reusing the generic import/export
+     * JobTrackerController::status() route) since this job isn't tied to an
+     * ImportConfig/ExportConfig and shouldn't show up mixed into that
+     * unrelated jobs list. Generic on job_type rather than a specific
+     * platform — was named shopeeBrandSyncStatus() when Shopee was the only
+     * queued platform, but the body never actually checked which one, so
+     * every other queued platform reuses this unchanged.
      */
     public function brandSyncStatus(JobTracker $jobTracker): JsonResponse
     {
@@ -381,12 +415,12 @@ class BrandController extends Controller
     }
 
     /**
-     * Requests that a still-running sync (Shopee or Lazada) stop — mirrors
-     * JobTrackerController::cancel()'s cancel_requested_at signalling, but
-     * kept as its own JSON endpoint for the same reason as brandSyncStatus()
-     * above. Only takes effect between pages (see SyncShopeeBrandsJob/
-     * SyncLazadaBrandsJob's progress-flush interval), so the tracker can
-     * keep showing 'processing' for a moment after this is called.
+     * Requests that a still-running sync (Shopee, Lazada, or TikTok) stop —
+     * mirrors JobTrackerController::cancel()'s cancel_requested_at
+     * signalling, but kept as its own JSON endpoint for the same reason as
+     * brandSyncStatus() above. Only takes effect between pages (see each
+     * job's progress-flush interval), so the tracker can keep showing
+     * 'processing' for a moment after this is called.
      */
     public function cancelBrandSync(JobTracker $jobTracker): JsonResponse
     {
@@ -471,7 +505,16 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
+     * Backs the TikTokBrandPicker autocomplete on the mapping page — same
+     * shape as the other searchXBrands() methods.
+     */
+    public function searchTiktokBrands(Request $request): JsonResponse
+    {
+        return $this->searchMarketplaceBrands($request, TikTokBrand::class);
+    }
+
+    /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
      */
     private function searchMarketplaceBrands(Request $request, string $marketplaceModel): JsonResponse
     {
@@ -482,7 +525,30 @@ class BrandController extends Controller
             ->limit(50)
             ->get(['id', 'name']);
 
-        return response()->json(['data' => $brands]);
+        return response()->json(['data' => $this->serializeMarketplaceBrands($brands, $marketplaceModel)]);
+    }
+
+    /**
+     * TikTok's brand IDs are 19-digit snowflake-style numbers — PHP's native
+     * 64-bit int handles them exactly (confirmed live), but a plain
+     * response()->json() would serialize `id` as a bare JSON number, and
+     * JavaScript's JSON.parse (used internally by fetch().then(r=>r.json()))
+     * silently rounds anything past Number.MAX_SAFE_INTEGER (2^53-1):
+     * confirmed live, 7417026736480880390 becomes 7417026736480881000 once
+     * parsed in JS — corrupting the id a save would send back. Shopee/
+     * WooCommerce/Lazada's real ids are all comfortably small (largest seen:
+     * Shopee ~1.1M), so this only actually bites for TikTok; left as a
+     * numbers-as-strings fix scoped to that one model rather than changing
+     * the response shape (and every existing picker's assumptions) for
+     * three platforms that don't have the problem.
+     */
+    private function serializeMarketplaceBrands($brands, string $marketplaceModel)
+    {
+        if ($marketplaceModel !== TikTokBrand::class) {
+            return $brands;
+        }
+
+        return $brands->map(fn ($brand) => ['id' => (string) $brand->id, 'name' => $brand->name]);
     }
 
     public function shopeeMapping(Request $request): Response
@@ -515,8 +581,18 @@ class BrandController extends Controller
         return $this->bulkMapMarketplaceBrand($request, 'lazada_brand_id', LazadaBrand::class, 'brand_lazada_mapped');
     }
 
+    public function tiktokMapping(Request $request): Response
+    {
+        return $this->renderMarketplaceMapping($request, 'catalog/brands/tiktok-mapping', 'tiktok_brand_id', TikTokBrand::class);
+    }
+
+    public function bulkMapTiktokBrand(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceBrand($request, 'tiktok_brand_id', TikTokBrand::class, 'brand_tiktok_mapped');
+    }
+
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
      */
     private function renderMarketplaceMapping(Request $request, string $component, string $fkColumn, string $marketplaceModel): Response
     {
@@ -540,7 +616,7 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
      */
     private function bulkMapMarketplaceBrand(Request $request, string $fkColumn, string $marketplaceModel, string $auditEvent): RedirectResponse
     {
@@ -564,7 +640,16 @@ class BrandController extends Controller
                 continue;
             }
 
-            $newId = $mapping['marketplace_brand_id'] ?? null;
+            // Cast to int before comparing/storing — for TikTok specifically
+            // the frontend now sends this as a numeric string (see
+            // serializeMarketplaceBrands()'s docblock on why), which would
+            // never strictly-equal the int PHP/Postgres already returns for
+            // this column, making the "already mapped to this value" skip
+            // below never fire. PHP's native int is exact for these ids
+            // (confirmed live: a 19-digit TikTok id round-trips losslessly),
+            // so this is a safe normalization for every platform, not just
+            // TikTok — the other 3 already send/receive plain ints today.
+            $newId = isset($mapping['marketplace_brand_id']) ? (int) $mapping['marketplace_brand_id'] : null;
             if ($option->{$fkColumn} === $newId) {
                 continue;
             }
@@ -585,7 +670,7 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
      * @return array{brands: \Illuminate\Pagination\LengthAwarePaginator, stats: array{total: int, mapped: int}}
      */
     private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $marketplaceModel): array
@@ -618,14 +703,19 @@ class BrandController extends Controller
 
         $marketplaceBrandsById = $marketplaceModel::whereIn('id', $options->pluck($fkColumn)->filter())->get(['id', 'name'])->keyBy('id');
 
-        $rows = $options->map(function (AttributeOption $option) use ($counts, $marketplaceBrandsById, $fkColumn) {
+        // See serializeMarketplaceBrands()'s docblock — TikTok's 19-digit
+        // brand ids need to reach the frontend as strings, or JS's
+        // JSON.parse silently corrupts them.
+        $isTikTok = $marketplaceModel === TikTokBrand::class;
+
+        $rows = $options->map(function (AttributeOption $option) use ($counts, $marketplaceBrandsById, $fkColumn, $isTikTok) {
             $current = $option->{$fkColumn} ? $marketplaceBrandsById->get($option->{$fkColumn}) : null;
 
             return [
                 'id' => $option->id,
                 'code' => $option->code,
                 'name' => $option->admin_label,
-                'current' => $current ? ['id' => $current->id, 'name' => $current->name] : null,
+                'current' => $current ? ['id' => $isTikTok ? (string) $current->id : $current->id, 'name' => $current->name] : null,
                 'products_count' => (int) ($counts[$option->code] ?? 0),
             ];
         })->sortBy('name')->values();

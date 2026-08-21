@@ -86,6 +86,7 @@ const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
     { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
     { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
     { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
+    { value: 'tiktok', label: 'TikTok', color: PALETTE.primary },
 ];
 
 export default function BrandIndex({ brands, parentOptions, attributeId, filters }: Props) {
