@@ -11,8 +11,14 @@ use App\Http\Controllers\Catalog\ChannelController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function () {
+    // Static hub linking to the missing-translations list and the
+    // Categories/Brands marketplace-sync pages — those routes already
+    // enforce their own permissions, so this needs no middleware of its
+    // own beyond auth; the frontend hides tiles the user can't reach.
+    Route::get('management', fn () => Inertia::render('catalog/management/index'))->name('management');
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
@@ -63,6 +69,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('brands/{brand}/edit', [BrandController::class, 'edit'])->name('brands.edit')->middleware('permission:brands,edit_brands');
     Route::put('brands/{brand}', [BrandController::class, 'update'])->name('brands.update')->middleware('permission:brands,edit_brands');
     Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy')->middleware('permission:brands,edit_brands');
+
+    Route::get('brands/marketplace-sync', [BrandController::class, 'marketplaceSync'])->name('brands.marketplaceSync')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
+    Route::get('brands/sync-shopee/{jobTracker}/status', [BrandController::class, 'shopeeBrandSyncStatus'])->name('brands.syncShopeeStatus')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-shopee/{jobTracker}/cancel', [BrandController::class, 'cancelShopeeBrandSync'])->name('brands.syncShopeeCancel')->middleware('permission:brands,edit_brands');
+    Route::get('brands/search-shopee', [BrandController::class, 'searchShopeeBrands'])->name('brands.searchShopee')->middleware('permission:brands,edit_brands');
+    Route::get('brands/shopee-mapping', [BrandController::class, 'shopeeMapping'])->name('brands.shopeeMapping')->middleware('permission:brands,edit_brands');
+    Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
 
     Route::get('attributeGroups', [AttributeGroupController::class, 'index'])->name('attributeGroups.index')->middleware('permission:attribute_groups,list_attribute_groups');
     Route::get('attributeGroups/create', [AttributeGroupController::class, 'create'])->name('attributeGroups.create')->middleware('permission:attribute_groups,create_attribute_groups');

@@ -8,10 +8,17 @@ use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
+use App\Jobs\SyncShopeeBrandsJob;
+use App\Models\Category;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use App\Models\ProductValue;
+use App\Models\ShopeeBrand;
+use App\Models\ShopeeSellerAccount;
 use App\Services\CodeGenerator;
 use App\Services\Catalog\AttributeValueFormatter;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -231,6 +238,242 @@ class BrandController extends Controller
         AuditLog::record('option_deleted', $attribute, $oldFields, null);
 
         return back()->with('success', 'Brand deleted successfully.');
+    }
+
+    /**
+     * Hub page for the "จัดการ ecommerce" tab — same shape as
+     * CategoryController::marketplaceSync(), just one platform (Shopee) for
+     * now (see the array-driven CATEGORY_SYNC_PLATFORMS-equivalent on the
+     * frontend for how a second platform would slot in later).
+     */
+    public function marketplaceSync(): Response
+    {
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
+
+        return Inertia::render('catalog/brands/marketplace-sync', [
+            'lastSyncedAt' => [
+                'shopee' => $toIso(ShopeeBrand::max('updated_at')),
+            ],
+        ]);
+    }
+
+    /**
+     * Queues the local shopee_brands cache refresh rather than running it
+     * inline — unlike CategoryController::syncShopeeCategories() (one call,
+     * Shopee's whole category tree at once), Shopee's get_brand_list is
+     * scoped to one category_id per call, and at least one real mapped
+     * category in this shop has 10,000+ brands under it (has_next_page was
+     * still true past offset 9950 in a live test), so a full sync is many
+     * minutes of network-bound work — far past any web request timeout.
+     * SyncShopeeBrandsJob does the actual fetch loop; this just does the
+     * fast precondition checks and hands back a JobTracker id for the
+     * frontend to poll via shopeeBrandSyncStatus().
+     */
+    public function syncShopeeBrands(Request $request): JsonResponse
+    {
+        $account = ShopeeSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No Shopee seller account found to authenticate the sync.'], 422);
+        }
+
+        $categoryIds = Category::whereNotNull('shopee_category_id')->distinct()->pluck('shopee_category_id');
+        if ($categoryIds->isEmpty()) {
+            return response()->json(['message' => 'No PIM categories are mapped to a Shopee category yet — map categories first (Categories > Marketplace Sync > Shopee), then sync brands.'], 422);
+        }
+
+        $tracker = JobTracker::create([
+            'job_type' => 'brand_sync',
+            'entity_type' => 'shopee_brands',
+            'config_code' => 'shopee',
+            'status' => 'pending',
+            'user_id' => $request->user()?->id,
+        ]);
+
+        SyncShopeeBrandsJob::dispatch($tracker->id);
+
+        return response()->json(['job_tracker_id' => $tracker->id]);
+    }
+
+    /**
+     * Polled by the marketplace-sync page while a sync is running — kept
+     * scoped to this controller (rather than reusing the generic
+     * import/export JobTrackerController::status() route) since this job
+     * isn't tied to an ImportConfig/ExportConfig and shouldn't show up
+     * mixed into that unrelated jobs list.
+     */
+    public function shopeeBrandSyncStatus(JobTracker $jobTracker): JsonResponse
+    {
+        abort_unless($jobTracker->job_type === 'brand_sync', 404);
+
+        return response()->json([
+            'status' => $jobTracker->status,
+            'total_rows_processed' => $jobTracker->total_rows_processed,
+            'total_records_created' => $jobTracker->total_records_created,
+            'completed_at' => $jobTracker->completed_at?->toIso8601String(),
+            'error_log' => $jobTracker->error_log,
+        ]);
+    }
+
+    /**
+     * Requests that a still-running sync stop — mirrors
+     * JobTrackerController::cancel()'s cancel_requested_at signalling, but
+     * kept as its own JSON endpoint (rather than reusing that generic
+     * import/export route) for the same reason as shopeeBrandSyncStatus()
+     * above. Only takes effect between pages of a category's brand list
+     * (see SyncShopeeBrandsJob's progress-flush interval), so the tracker
+     * can keep showing 'processing' for a moment after this is called.
+     */
+    public function cancelShopeeBrandSync(JobTracker $jobTracker): JsonResponse
+    {
+        abort_unless($jobTracker->job_type === 'brand_sync', 404);
+        abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true), 422);
+
+        if (! $jobTracker->cancel_requested_at) {
+            $jobTracker->update(['cancel_requested_at' => now()]);
+        }
+
+        return response()->json(['message' => 'Cancellation requested — the sync will stop shortly.']);
+    }
+
+    /**
+     * Backs the ShopeeBrandPicker autocomplete on the mapping page — mirrors
+     * CategoryController::searchShopeeCategories() exactly.
+     */
+    public function searchShopeeBrands(Request $request): JsonResponse
+    {
+        $query = $request->input('q');
+
+        $brands = ShopeeBrand::when($query, fn ($q, $query) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $brands]);
+    }
+
+    public function shopeeMapping(Request $request): Response
+    {
+        $search = $request->input('search');
+        $status = $request->input('status', 'all');
+        $onlyWithProducts = $request->boolean('only_with_products');
+        $perPage = (int) $request->input('per_page', 15);
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
+        return Inertia::render('catalog/brands/shopee-mapping', [
+            ...$this->buildBrandMappingData($request, $status, $search ?? '', $perPage, $onlyWithProducts),
+            'filters' => [
+                'search' => $search ?? '',
+                'status' => $status,
+                'only_with_products' => $onlyWithProducts,
+                'per_page' => $perPage,
+            ],
+        ]);
+    }
+
+    public function bulkMapShopeeBrand(Request $request): RedirectResponse
+    {
+        $attribute = $this->brandAttribute();
+
+        $validated = $request->validate([
+            'mappings' => ['required', 'array'],
+            'mappings.*.option_id' => [
+                'required', 'integer',
+                Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
+            ],
+            'mappings.*.shopee_brand_id' => ['nullable', 'integer', Rule::exists('shopee_brands', 'id')],
+        ]);
+
+        $updated = 0;
+
+        foreach ($validated['mappings'] as $mapping) {
+            $option = AttributeOption::where('attribute_id', $attribute->id)->find($mapping['option_id']);
+            if (! $option) {
+                continue;
+            }
+
+            $newId = $mapping['shopee_brand_id'] ?? null;
+            if ($option->shopee_brand_id === $newId) {
+                continue;
+            }
+
+            $oldId = $option->shopee_brand_id;
+            $option->update(['shopee_brand_id' => $newId]);
+
+            AuditLog::record(
+                'brand_shopee_mapped',
+                $attribute,
+                ["option#{$option->id}.shopee_brand_id" => $oldId],
+                ["option#{$option->id}.shopee_brand_id" => $newId],
+            );
+            $updated++;
+        }
+
+        return back()->with('success', "Updated {$updated} brand mapping(s).");
+    }
+
+    /**
+     * @return array{brands: \Illuminate\Pagination\LengthAwarePaginator, stats: array{total: int, mapped: int}}
+     */
+    private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts): array
+    {
+        $attribute = $this->brandAttribute();
+
+        $options = AttributeOption::where('attribute_id', $attribute->id)
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('admin_label', 'like', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                });
+            })
+            ->when($status === 'mapped', fn ($q) => $q->whereNotNull('shopee_brand_id'))
+            ->when($status === 'unmapped', fn ($q) => $q->whereNull('shopee_brand_id'))
+            ->get();
+
+        // Same PHP-side counting as index() — see that method's comment for
+        // why (small lists, no real Eloquent relation to count() through).
+        $counts = ProductValue::where('attribute_id', $attribute->id)
+            ->whereNull('channel_id')
+            ->whereNull('locale_id')
+            ->select('value', DB::raw('count(distinct product_id) as cnt'))
+            ->groupBy('value')
+            ->pluck('cnt', 'value');
+
+        if ($onlyWithProducts) {
+            $options = $options->filter(fn (AttributeOption $o) => ($counts[$o->code] ?? 0) > 0)->values();
+        }
+
+        $shopeeBrandsById = ShopeeBrand::whereIn('id', $options->pluck('shopee_brand_id')->filter())->get(['id', 'name'])->keyBy('id');
+
+        $rows = $options->map(function (AttributeOption $option) use ($counts, $shopeeBrandsById) {
+            $current = $option->shopee_brand_id ? $shopeeBrandsById->get($option->shopee_brand_id) : null;
+
+            return [
+                'id' => $option->id,
+                'code' => $option->code,
+                'name' => $option->admin_label,
+                'current' => $current ? ['id' => $current->id, 'name' => $current->name] : null,
+                'products_count' => (int) ($counts[$option->code] ?? 0),
+            ];
+        })->sortBy('name')->values();
+
+        $page = (int) $request->input('page', 1);
+        $paginated = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        return [
+            'brands' => $paginated,
+            'stats' => [
+                'total' => $options->count(),
+                'mapped' => $options->whereNotNull('shopee_brand_id')->count(),
+            ],
+        ];
     }
 
     /**

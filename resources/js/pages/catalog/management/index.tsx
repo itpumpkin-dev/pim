@@ -1,0 +1,133 @@
+import AppLayout from '@/layouts/app-layout';
+import { PALETTE } from '@/theme';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import LinkIcon from '@mui/icons-material/Link';
+import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import TranslateIcon from '@mui/icons-material/Translate';
+import { Box, Divider, Grid, Typography } from '@mui/material';
+import { type ComponentType } from 'react';
+import { useTranslation } from 'react-i18next';
+
+const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
+
+/**
+ * "จัดการ" hub — a single sidebar entry consolidating three pages that
+ * previously only lived one level down inside their own entities
+ * (Products' missing-translations list, and the Categories/Brands
+ * marketplace-sync tabs) so they're reachable in one click from Catalog's
+ * sidebar instead. Each card just navigates to the real page — all
+ * permission checks and actions still live there, this is purely a
+ * launcher, so it needs no server-side props of its own.
+ */
+export default function CatalogManagement() {
+    const { t } = useTranslation('catalog');
+    const { t: tNav } = useTranslation('nav');
+
+    const { auth } = usePage<SharedData>().props;
+    const permissions = auth.permissions || [];
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('management'), href: '#' },
+    ];
+
+    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; color: string; title: string; description: string; url: string; permission: string }[] = [
+        {
+            key: 'missing-translations',
+            icon: TranslateIcon,
+            color: PALETTE.accent,
+            title: tNav('missingTranslations'),
+            description: t('manageMissingTranslationsDesc'),
+            url: '/catalog/product-translations',
+            permission: 'product_translations.list_product_translations',
+        },
+        {
+            key: 'category-sync',
+            icon: LinkIcon,
+            color: PALETTE.highlight,
+            title: t('marketplaceSyncTab'),
+            description: t('marketplaceSyncSubtitle'),
+            url: '/catalog/categories/marketplace-sync',
+            permission: 'categories.list_categories',
+        },
+        {
+            key: 'brand-sync',
+            icon: StorefrontOutlinedIcon,
+            color: PALETTE.primary,
+            title: t('brandMarketplaceSyncTab'),
+            description: t('brandMarketplaceSyncSubtitle'),
+            url: '/catalog/brands/marketplace-sync',
+            permission: 'brands.list_brands',
+        },
+    ];
+
+    const visibleTiles = tiles.filter((tile) => permissions.includes(tile.permission));
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={tNav('management')} />
+            <Box sx={{ p: 4 }}>
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h4" fontWeight={700}>{t('managementTitle')}</Typography>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography color="text.secondary">{t('managementSubtitle')}</Typography>
+                </Box>
+
+                <Grid container spacing={3}>
+                    {visibleTiles.map((tile) => {
+                        const Icon = tile.icon;
+
+                        return (
+                            <Grid item xs={12} sm={6} md={4} key={tile.key}>
+                                <Box
+                                    onClick={() => router.visit(tile.url)}
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        height: '100%',
+                                        borderRadius: '0.25rem',
+                                        bgcolor: 'background.paper',
+                                        boxShadow: CARD_SHADOW,
+                                        overflow: 'hidden',
+                                        cursor: 'pointer',
+                                        borderTop: `3px solid ${tile.color}`,
+                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                                        '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 },
+                                    }}
+                                >
+                                    <Box sx={{ p: 3 }}>
+                                        <Box
+                                            sx={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: '0.25rem',
+                                                bgcolor: tile.color,
+                                                mb: 2,
+                                            }}
+                                        >
+                                            <Icon sx={{ fontSize: 26, color: '#fff' }} />
+                                        </Box>
+                                        <Typography variant="h6" fontWeight={700}>{tile.title}</Typography>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                            {tile.description}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            </Grid>
+                        );
+                    })}
+
+                    {visibleTiles.length === 0 && (
+                        <Grid item xs={12}>
+                            <Typography color="text.secondary">{t('managementNoAccess')}</Typography>
+                        </Grid>
+                    )}
+                </Grid>
+            </Box>
+        </AppLayout>
+    );
+}

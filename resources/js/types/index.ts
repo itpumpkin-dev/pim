@@ -29,6 +29,14 @@ export interface NavItem {
      * Channels page) rather than its own sidebar link.
      */
     matchUrls?: string[];
+    /**
+     * URL prefixes that would otherwise prefix-match this item's own `url`
+     * but shouldn't — e.g. /catalog/brands/marketplace-sync sits under
+     * /catalog/brands by URL structure (it's routed alongside the Brands
+     * CRUD endpoints), but has been reassigned to the "จัดการ" hub's
+     * matchUrls, so it must not also light up the "แบรนด์" list item.
+     */
+    excludeUrls?: string[];
 }
 
 export interface Locale {

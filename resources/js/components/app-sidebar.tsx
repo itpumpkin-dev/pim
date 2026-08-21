@@ -49,43 +49,115 @@ function useMainNavItems(): NavItem[] {
             items: [
                 {
                     title: t('products'),
-                    url: '/catalog/products',
-                    permission: 'products.list_products',
-                },
-                {
-                    title: t('missingTranslations'),
-                    url: '/catalog/product-translations',
-                    permission: 'product_translations.list_product_translations',
+                    items: [
+                        {
+                            title: t('products'),
+                            url: '/catalog/products',
+                            permission: 'products.list_products',
+                        },
+                    ],
                 },
                 {
                     title: t('categories'),
-                    url: '/catalog/categories',
-                    permission: 'categories.list_categories',
+                    items: [
+                        {
+                            title: t('categories'),
+                            url: '/catalog/categories',
+                            permission: 'categories.list_categories',
+                            // Otherwise these prefix-match this item too
+                            // (they're routed under the Categories CRUD
+                            // prefix) and both this item and "จัดการ" would
+                            // highlight as active at once — the whole
+                            // marketplace-sync + per-platform mapping flow
+                            // belongs to the Management hub now.
+                            excludeUrls: [
+                                '/catalog/categories/marketplace-sync',
+                                '/catalog/categories/lazada-mapping',
+                                '/catalog/categories/shopee-mapping',
+                                '/catalog/categories/tiktok-mapping',
+                                '/catalog/categories/woocommerce-mapping',
+                            ],
+                        },
+                        {
+                            title: t('categoryFields'),
+                            url: '/catalog/categoryFields',
+                            permission: 'category_fields.list_category_fields',
+                        },
+                    ],
                 },
                 {
                     title: t('brands'),
-                    url: '/catalog/brands',
-                    permission: 'brands.list_brands',
-                },
-                {
-                    title: t('categoryFields'),
-                    url: '/catalog/categoryFields',
-                    permission: 'category_fields.list_category_fields',
+                    items: [
+                        {
+                            title: t('brands'),
+                            url: '/catalog/brands',
+                            permission: 'brands.list_brands',
+                            // Same reasoning as Categories' excludeUrls above
+                            // — the marketplace-sync + mapping flow now
+                            // belongs to "จัดการ", not the Brands list.
+                            excludeUrls: [
+                                '/catalog/brands/marketplace-sync',
+                                '/catalog/brands/shopee-mapping',
+                            ],
+                        },
+                    ],
                 },
                 {
                     title: t('attributes'),
-                    url: '/catalog/attributes',
-                    permission: 'attributes.list_attributes',
+                    items: [
+                        {
+                            title: t('attributes'),
+                            url: '/catalog/attributes',
+                            permission: 'attributes.list_attributes',
+                        },
+                        {
+                            title: t('attributeGroups'),
+                            url: '/catalog/attributeGroups',
+                            permission: 'attribute_groups.list_attribute_groups',
+                        },
+                        {
+                            title: t('attributeFamilies'),
+                            url: '/catalog/attributeFamilies',
+                            permission: 'attribute_families.list_attribute_families',
+                        },
+                    ],
                 },
                 {
-                    title: t('attributeGroups'),
-                    url: '/catalog/attributeGroups',
-                    permission: 'attribute_groups.list_attribute_groups',
-                },
-                {
-                    title: t('attributeFamilies'),
-                    url: '/catalog/attributeFamilies',
-                    permission: 'attribute_families.list_attribute_families',
+                    title: t('management'),
+                    items: [
+                        {
+                            // No single permission gates this hub — it's a
+                            // launcher for missing-translations + the
+                            // Categories/Brands marketplace-sync pages, each
+                            // behind its own permission, and the page itself
+                            // hides whichever tiles the user can't reach.
+                            // Gating this entry on products.list_products
+                            // keeps it visible for the same audience as the
+                            // rest of the Catalog section rather than
+                            // requiring a brand-new "management" permission
+                            // resource just for a link list.
+                            title: t('management'),
+                            url: '/catalog/management',
+                            permission: 'products.list_products',
+                            // These pages are only reachable via a card on
+                            // the Management hub now (their own sidebar/tab
+                            // entries were removed) — without this, visiting
+                            // one directly leaves no sidebar item matching
+                            // its URL, so findActiveGroup falls back to
+                            // Dashboard and the whole secondary sidebar
+                            // collapses instead of staying on "จัดการ".
+                            matchUrls: [
+                                '/catalog/product-translations',
+                                '/catalog/categories/marketplace-sync',
+                                '/catalog/categories/lazada-mapping',
+                                '/catalog/categories/shopee-mapping',
+                                '/catalog/categories/tiktok-mapping',
+                                '/catalog/categories/woocommerce-mapping',
+                                '/catalog/brands/marketplace-sync',
+                                '/catalog/brands/shopee-mapping',
+                            ],
+                        },
+                    ],
                 },
             ],
         },
@@ -182,11 +254,17 @@ function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
     const currentPath = pageUrl.split('?')[0];
     const matchesCurrentPath = (url?: string) =>
         !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
-    const matchesItem = (item: NavItem) => matchesCurrentPath(item.url) || (item.matchUrls ?? []).some(matchesCurrentPath);
 
-    return (
-        items.find((item) => matchesItem(item) || (item.items && item.items.some(matchesItem))) || items[0] || null
-    );
+    // Recurses through any depth of nesting (e.g. Catalog > "หมวดหมู่" group >
+    // its leaf links) rather than checking just one level down — the
+    // Catalog section's items are themselves label-only groups with no url
+    // of their own since the sidebar restructure, so a one-level check here
+    // would never find a match and Catalog would stop highlighting as the
+    // active primary-nav section.
+    const matchesItem = (item: NavItem): boolean =>
+        matchesCurrentPath(item.url) || (item.matchUrls ?? []).some(matchesCurrentPath) || (item.items ?? []).some(matchesItem);
+
+    return items.find(matchesItem) || items[0] || null;
 }
 
 export function AppSidebar() {

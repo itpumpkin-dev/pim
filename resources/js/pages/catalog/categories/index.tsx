@@ -11,7 +11,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import DownloadIcon from '@mui/icons-material/Download';
-import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
@@ -112,15 +112,6 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categories')} />
             <Box sx={{ p: 4 }}>
-                <Tabs
-                    value="categories"
-                    onChange={(_, val) => router.visit(val === 'marketplace-sync' ? '/catalog/categories/marketplace-sync' : '/catalog/categories')}
-                    sx={{ mb: 3 }}
-                >
-                    <Tab value="categories" label={tNav('categories')} />
-                    {canEdit && <Tab value="marketplace-sync" label={t('marketplaceSyncTab')} />}
-                </Tabs>
-
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h4" fontWeight={700}>{tNav('categories')}</Typography>

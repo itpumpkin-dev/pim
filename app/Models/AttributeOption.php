@@ -22,6 +22,7 @@ class AttributeOption extends Model
         'thumbnail',
         'swatch_value',
         'sort_order',
+        'shopee_brand_id',
     ];
 
     protected function casts(): array
@@ -79,5 +80,10 @@ class AttributeOption extends Model
     public function childOptions(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function shopeeBrand(): BelongsTo
+    {
+        return $this->belongsTo(ShopeeBrand::class, 'shopee_brand_id');
     }
 }
