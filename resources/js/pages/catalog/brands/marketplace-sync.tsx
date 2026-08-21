@@ -24,6 +24,11 @@ const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.prima
 const BRAND_SYNC_PLATFORMS = [
     { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/brands/shopee-mapping', mode: 'queued' },
     { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/brands/sync-woocommerce', mappingRoute: '/catalog/brands/woocommerce-mapping', mode: 'sync' },
+    // Lazada's brand list isn't scoped to any category at all (confirmed
+    // live: /category/brands/query has no category param) — 153,551 brands
+    // total for this account, even bigger than Shopee's per-category count,
+    // so it's queued too.
+    { value: 'lazada', label: 'Lazada', route: '/catalog/brands/sync-lazada', mappingRoute: '/catalog/brands/lazada-mapping', mode: 'queued' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -90,13 +95,14 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
         };
     }, []);
 
-    // A full Shopee brand sync can take many minutes (one real mapped
-    // category alone has 10,000+ brands) — this polls indefinitely rather
-    // than giving up after a fixed attempt count like the fast product-push
-    // jobs do, since "still running" is the expected state for most of a
-    // sync's lifetime, not a failure.
+    // A full queued brand sync (Shopee or Lazada) can take many minutes —
+    // this polls indefinitely rather than giving up after a fixed attempt
+    // count like the fast product-push jobs do, since "still running" is
+    // the expected state for most of a sync's lifetime, not a failure.
+    // The status/cancel endpoints below are generic on job_tracker_id, not
+    // tied to any one platform (see BrandController::brandSyncStatus()).
     const pollJobStatus = (jobTrackerId: number) => {
-        fetch(`/catalog/brands/sync-shopee/${jobTrackerId}/status`, { headers: { Accept: 'application/json' } })
+        fetch(`/catalog/brands/sync-jobs/${jobTrackerId}/status`, { headers: { Accept: 'application/json' } })
             .then(async (res) => {
                 const body = await res.json();
 
@@ -174,7 +180,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
         if (!activeJobTrackerId) return;
         setCancelling(true);
 
-        fetch(`/catalog/brands/sync-shopee/${activeJobTrackerId}/cancel`, {
+        fetch(`/catalog/brands/sync-jobs/${activeJobTrackerId}/cancel`, {
             method: 'POST',
             headers: { 'X-XSRF-TOKEN': readXsrfToken(), Accept: 'application/json' },
         })

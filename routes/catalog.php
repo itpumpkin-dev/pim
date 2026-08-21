@@ -73,8 +73,6 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::get('brands/marketplace-sync', [BrandController::class, 'marketplaceSync'])->name('brands.marketplaceSync')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
-    Route::get('brands/sync-shopee/{jobTracker}/status', [BrandController::class, 'shopeeBrandSyncStatus'])->name('brands.syncShopeeStatus')->middleware('permission:brands,edit_brands');
-    Route::post('brands/sync-shopee/{jobTracker}/cancel', [BrandController::class, 'cancelShopeeBrandSync'])->name('brands.syncShopeeCancel')->middleware('permission:brands,edit_brands');
     Route::get('brands/search-shopee', [BrandController::class, 'searchShopeeBrands'])->name('brands.searchShopee')->middleware('permission:brands,edit_brands');
     Route::get('brands/shopee-mapping', [BrandController::class, 'shopeeMapping'])->name('brands.shopeeMapping')->middleware('permission:brands,edit_brands');
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
@@ -82,6 +80,15 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('brands/search-woocommerce', [BrandController::class, 'searchWoocommerceBrands'])->name('brands.searchWoocommerce')->middleware('permission:brands,edit_brands');
     Route::get('brands/woocommerce-mapping', [BrandController::class, 'woocommerceMapping'])->name('brands.woocommerceMapping')->middleware('permission:brands,edit_brands');
     Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-lazada', [BrandController::class, 'syncLazadaBrands'])->name('brands.syncLazada')->middleware('permission:brands,edit_brands');
+    Route::get('brands/search-lazada', [BrandController::class, 'searchLazadaBrands'])->name('brands.searchLazada')->middleware('permission:brands,edit_brands');
+    Route::get('brands/lazada-mapping', [BrandController::class, 'lazadaMapping'])->name('brands.lazadaMapping')->middleware('permission:brands,edit_brands');
+    Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:brands,edit_brands');
+    // Generic status/cancel for any queued brand-sync job (Shopee, Lazada,
+    // ...) — not platform-specific, so the route path names the concept
+    // ("sync-jobs"), not one platform.
+    Route::get('brands/sync-jobs/{jobTracker}/status', [BrandController::class, 'brandSyncStatus'])->name('brands.syncStatus')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-jobs/{jobTracker}/cancel', [BrandController::class, 'cancelBrandSync'])->name('brands.syncCancel')->middleware('permission:brands,edit_brands');
 
     Route::get('attributeGroups', [AttributeGroupController::class, 'index'])->name('attributeGroups.index')->middleware('permission:attribute_groups,list_attribute_groups');
     Route::get('attributeGroups/create', [AttributeGroupController::class, 'create'])->name('attributeGroups.create')->middleware('permission:attribute_groups,create_attribute_groups');

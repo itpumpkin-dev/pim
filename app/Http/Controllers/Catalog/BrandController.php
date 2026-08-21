@@ -8,9 +8,12 @@ use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
+use App\Jobs\SyncLazadaBrandsJob;
 use App\Jobs\SyncShopeeBrandsJob;
 use App\Models\Category;
 use App\Models\JobTracker;
+use App\Models\LazadaBrand;
+use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\ProductValue;
 use App\Models\ShopeeBrand;
@@ -65,6 +68,7 @@ class BrandController extends Controller
         $platformColumns = [
             'shopee' => 'shopee_brand_id',
             'woocommerce' => 'woocommerce_brand_id',
+            'lazada' => 'lazada_brand_id',
         ];
 
         $options = AttributeOption::where('attribute_id', $attribute->id)
@@ -112,6 +116,7 @@ class BrandController extends Controller
             $option->mapped_platforms = collect([
                 'shopee' => $option->shopee_brand_id,
                 'woocommerce' => $option->woocommerce_brand_id,
+                'lazada' => $option->lazada_brand_id,
             ])->filter()->keys()->values()->all();
 
             return $option;
@@ -281,6 +286,7 @@ class BrandController extends Controller
             'lastSyncedAt' => [
                 'shopee' => $toIso(ShopeeBrand::max('updated_at')),
                 'woocommerce' => $toIso(WooCommerceBrand::max('updated_at')),
+                'lazada' => $toIso(LazadaBrand::max('updated_at')),
             ],
         ]);
     }
@@ -323,13 +329,45 @@ class BrandController extends Controller
     }
 
     /**
-     * Polled by the marketplace-sync page while a sync is running — kept
-     * scoped to this controller (rather than reusing the generic
-     * import/export JobTrackerController::status() route) since this job
-     * isn't tied to an ImportConfig/ExportConfig and shouldn't show up
-     * mixed into that unrelated jobs list.
+     * Queues the local lazada_brands cache refresh — SyncLazadaBrandsJob
+     * does the actual fetch loop, this just hands back a JobTracker id.
+     * Unlike syncShopeeBrands(), there's no "must map categories first"
+     * precondition: Lazada's /category/brands/query isn't scoped to any
+     * category at all (confirmed live: no category param exists on this
+     * endpoint), so the whole 153k+ brand catalog is fetched unconditionally.
      */
-    public function shopeeBrandSyncStatus(JobTracker $jobTracker): JsonResponse
+    public function syncLazadaBrands(Request $request): JsonResponse
+    {
+        $account = LazadaSellerAccount::active()->first();
+        if (! $account) {
+            return response()->json(['message' => 'No active Lazada seller account found to authenticate the sync.'], 422);
+        }
+
+        $tracker = JobTracker::create([
+            'job_type' => 'brand_sync',
+            'entity_type' => 'lazada_brands',
+            'config_code' => 'lazada',
+            'status' => 'pending',
+            'user_id' => $request->user()?->id,
+        ]);
+
+        SyncLazadaBrandsJob::dispatch($tracker->id);
+
+        return response()->json(['job_tracker_id' => $tracker->id]);
+    }
+
+    /**
+     * Polled by the marketplace-sync page while a queued sync (Shopee or
+     * Lazada) is running — kept scoped to this controller (rather than
+     * reusing the generic import/export JobTrackerController::status()
+     * route) since this job isn't tied to an ImportConfig/ExportConfig and
+     * shouldn't show up mixed into that unrelated jobs list. Generic on
+     * job_type rather than a specific platform — was named
+     * shopeeBrandSyncStatus() when Shopee was the only queued platform, but
+     * the body never actually checked which one, so Lazada reuses this
+     * unchanged rather than getting a near-identical copy.
+     */
+    public function brandSyncStatus(JobTracker $jobTracker): JsonResponse
     {
         abort_unless($jobTracker->job_type === 'brand_sync', 404);
 
@@ -343,15 +381,14 @@ class BrandController extends Controller
     }
 
     /**
-     * Requests that a still-running sync stop — mirrors
+     * Requests that a still-running sync (Shopee or Lazada) stop — mirrors
      * JobTrackerController::cancel()'s cancel_requested_at signalling, but
-     * kept as its own JSON endpoint (rather than reusing that generic
-     * import/export route) for the same reason as shopeeBrandSyncStatus()
-     * above. Only takes effect between pages of a category's brand list
-     * (see SyncShopeeBrandsJob's progress-flush interval), so the tracker
-     * can keep showing 'processing' for a moment after this is called.
+     * kept as its own JSON endpoint for the same reason as brandSyncStatus()
+     * above. Only takes effect between pages (see SyncShopeeBrandsJob/
+     * SyncLazadaBrandsJob's progress-flush interval), so the tracker can
+     * keep showing 'processing' for a moment after this is called.
      */
-    public function cancelShopeeBrandSync(JobTracker $jobTracker): JsonResponse
+    public function cancelBrandSync(JobTracker $jobTracker): JsonResponse
     {
         abort_unless($jobTracker->job_type === 'brand_sync', 404);
         abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true), 422);
@@ -425,7 +462,16 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     * Backs the LazadaBrandPicker autocomplete on the mapping page — same
+     * shape as searchShopeeBrands()/searchWoocommerceBrands().
+     */
+    public function searchLazadaBrands(Request $request): JsonResponse
+    {
+        return $this->searchMarketplaceBrands($request, LazadaBrand::class);
+    }
+
+    /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
      */
     private function searchMarketplaceBrands(Request $request, string $marketplaceModel): JsonResponse
     {
@@ -459,8 +505,18 @@ class BrandController extends Controller
         return $this->bulkMapMarketplaceBrand($request, 'woocommerce_brand_id', WooCommerceBrand::class, 'brand_woocommerce_mapped');
     }
 
+    public function lazadaMapping(Request $request): Response
+    {
+        return $this->renderMarketplaceMapping($request, 'catalog/brands/lazada-mapping', 'lazada_brand_id', LazadaBrand::class);
+    }
+
+    public function bulkMapLazadaBrand(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceBrand($request, 'lazada_brand_id', LazadaBrand::class, 'brand_lazada_mapped');
+    }
+
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
      */
     private function renderMarketplaceMapping(Request $request, string $component, string $fkColumn, string $marketplaceModel): Response
     {
@@ -484,7 +540,7 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
      */
     private function bulkMapMarketplaceBrand(Request $request, string $fkColumn, string $marketplaceModel, string $auditEvent): RedirectResponse
     {
@@ -529,7 +585,7 @@ class BrandController extends Controller
     }
 
     /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand>  $marketplaceModel
      * @return array{brands: \Illuminate\Pagination\LengthAwarePaginator, stats: array{total: int, mapped: int}}
      */
     private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $marketplaceModel): array

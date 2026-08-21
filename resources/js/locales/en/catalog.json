@@ -249,6 +249,7 @@
     "manageBrandsCard": "Manage Brands",
     "shopeeBrandMappingTitle": "Shopee Brand Mapping",
     "woocommerceBrandMappingTitle": "WooCommerce Brand Mapping",
+    "lazadaBrandMappingTitle": "Lazada Brand Mapping",
     "syncBrands": "Sync Brands",
     "mapToPlatformBrands": "Map {{platform}} Brands",
     "syncingBrands": "Syncing brands... this can take several minutes for categories with a large brand catalog.",
