@@ -119,6 +119,37 @@ class CategoryController extends Controller
                 });
             });
 
+        // "Which marketplace(s) is this mapped to" isn't a literal column —
+        // it's derived from 4 nullable FK columns (see mapped_platforms
+        // below) — so it can't go through GridManager::applyFilters() like
+        // the rest of $filterColumns, which only ever does a plain where()
+        // on the filter key as a column name. Handled as its own request
+        // input instead, same way BrandController::buildBrandMappingData()
+        // handles its 'status' (mapped/unmapped/all) filter outside the
+        // generic grid filter system.
+        $platformColumns = [
+            'lazada' => 'lazada_category_id',
+            'shopee' => 'shopee_category_id',
+            'tiktok' => 'tiktok_category_id',
+            'woocommerce' => 'woocommerce_category_id',
+        ];
+        $platformFilter = $request->input('platform');
+        $query->when($platformFilter, function ($query, $platformFilter) use ($platformColumns) {
+            if ($platformFilter === 'unmapped') {
+                foreach ($platformColumns as $column) {
+                    $query->whereNull($column);
+                }
+            } elseif ($platformFilter === 'mapped') {
+                $query->where(function ($q) use ($platformColumns) {
+                    foreach ($platformColumns as $column) {
+                        $q->orWhereNotNull($column);
+                    }
+                });
+            } elseif (isset($platformColumns[$platformFilter])) {
+                $query->whereNotNull($platformColumns[$platformFilter]);
+            }
+        });
+
         GridManager::applyFilters($query, $filterColumns, $filtersWithoutName);
 
         // Click-a-column-header sort, matching the pattern GridManager's own
@@ -146,6 +177,19 @@ class CategoryController extends Controller
         $categories->getCollection()->transform(function (Category $category) {
             $category->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($category->thumbnail);
 
+            // The 4 marketplace FK columns (lazada/shopee/tiktok/woocommerce_
+            // category_id) are already on the model — the query above has no
+            // select() narrowing — so this is just reading what's there, no
+            // extra query. Exposed as which platforms are mapped, not the
+            // FK ids themselves, since the list page only needs to show
+            // "mapped to X" and doesn't link out to any of those categories.
+            $category->mapped_platforms = collect([
+                'lazada' => $category->lazada_category_id,
+                'shopee' => $category->shopee_category_id,
+                'tiktok' => $category->tiktok_category_id,
+                'woocommerce' => $category->woocommerce_category_id,
+            ])->filter()->keys()->values()->all();
+
             return $category;
         });
 
@@ -156,6 +200,7 @@ class CategoryController extends Controller
                 'filters' => $originalFilters,
                 'sort' => $sortField ?? '',
                 'dir' => $sortField ? $sortDir : '',
+                'platform' => $platformFilter ?? '',
             ],
             'filterColumns' => $filterColumns,
         ]);

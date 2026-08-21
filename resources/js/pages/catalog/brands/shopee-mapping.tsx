@@ -63,8 +63,9 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: t('brandsTitle'), href: '/catalog/brands' },
-        { title: t('brandMarketplaceSyncTab'), href: '/catalog/brands/marketplace-sync' },
+        { title: tNav('management'), href: '/catalog/management' },
+        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
+        { title: t('brandMarketplaceSyncTitle'), href: '/catalog/brands/marketplace-sync' },
         { title: t('shopeeMappingTitle'), href: '#' },
     ];
 
@@ -162,7 +163,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
                             onClick={() => router.visit('/catalog/brands/marketplace-sync')}
                             sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
                         >
-                            {t('brandMarketplaceSyncTab')}
+                            {t('brandMarketplaceSyncTitle')}
                         </Button>
                         <Typography variant="h4" fontWeight={700}>{t('shopeeMappingTitle')}</Typography>
                         <Typography color="text.secondary">

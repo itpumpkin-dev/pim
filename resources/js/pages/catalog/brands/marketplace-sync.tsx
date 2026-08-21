@@ -6,7 +6,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import LinkIcon from '@mui/icons-material/Link';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SyncIcon from '@mui/icons-material/Sync';
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -50,8 +50,9 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: t('brandsTitle'), href: '/catalog/brands' },
-        { title: t('brandMarketplaceSyncTab'), href: '#' },
+        { title: tNav('management'), href: '/catalog/management' },
+        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
+        { title: t('brandMarketplaceSyncTitle'), href: '#' },
     ];
 
     const [syncing, setSyncing] = useState(false);
@@ -160,17 +161,8 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('brandMarketplaceSyncTab')} />
+            <Head title={t('brandMarketplaceSyncTitle')} />
             <Box sx={{ p: 4 }}>
-                <Tabs
-                    value="marketplace-sync"
-                    onChange={(_, val) => router.visit(val === 'brands' ? '/catalog/brands' : '/catalog/brands/marketplace-sync')}
-                    sx={{ mb: 3 }}
-                >
-                    <Tab value="brands" label={t('brandsTitle')} />
-                    <Tab value="marketplace-sync" label={t('brandMarketplaceSyncTab')} />
-                </Tabs>
-
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h4" fontWeight={700}>{t('brandMarketplaceSyncTitle')}</Typography>
                     <Divider sx={{ my: 1 }} />

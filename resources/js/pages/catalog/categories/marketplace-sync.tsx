@@ -7,7 +7,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SyncIcon from '@mui/icons-material/Sync';
 import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
-import { Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, CircularProgress, Divider, Grid, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -59,8 +59,9 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('categories'), href: '/catalog/categories' },
-        { title: t('marketplaceSyncTab'), href: '#' },
+        { title: tNav('management'), href: '/catalog/management' },
+        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
+        { title: t('marketplaceSyncTitle'), href: '#' },
     ];
 
     const [syncing, setSyncing] = useState(false);
@@ -84,17 +85,8 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('marketplaceSyncTab')} />
+            <Head title={t('marketplaceSyncTitle')} />
             <Box sx={{ p: 4 }}>
-                <Tabs
-                    value="marketplace-sync"
-                    onChange={(_, val) => router.visit(val === 'categories' ? '/catalog/categories' : '/catalog/categories/marketplace-sync')}
-                    sx={{ mb: 3 }}
-                >
-                    <Tab value="categories" label={tNav('categories')} />
-                    <Tab value="marketplace-sync" label={t('marketplaceSyncTab')} />
-                </Tabs>
-
                 <Box sx={{ mb: 3 }}>
                     <Typography variant="h4" fontWeight={700}>{t('marketplaceSyncTitle')}</Typography>
                     <Divider sx={{ my: 1 }} />

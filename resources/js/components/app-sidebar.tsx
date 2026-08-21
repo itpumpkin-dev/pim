@@ -148,6 +148,7 @@ function useMainNavItems(): NavItem[] {
                             // collapses instead of staying on "จัดการ".
                             matchUrls: [
                                 '/catalog/product-translations',
+                                '/catalog/management/marketplace',
                                 '/catalog/categories/marketplace-sync',
                                 '/catalog/categories/lazada-mapping',
                                 '/catalog/categories/shopee-mapping',

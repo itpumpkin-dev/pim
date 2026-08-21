@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
@@ -28,6 +29,7 @@ interface CategoryItem {
     children_count?: number;
     products_count?: number;
     is_active: boolean;
+    mapped_platforms?: string[];
 }
 
 interface PaginatedData<T> {
@@ -41,9 +43,20 @@ interface PaginatedData<T> {
 
 interface Props {
     categories: PaginatedData<CategoryItem>;
-    filters: { search?: string; filters?: Record<string, FilterValue>; sort?: string; dir?: string };
+    filters: { search?: string; filters?: Record<string, FilterValue>; sort?: string; dir?: string; platform?: string };
     filterColumns: Record<string, GridColumn>;
 }
+
+// Same 4-color rotation as marketplace-sync.tsx's PLATFORM_ACCENT_COLORS /
+// CATEGORY_SYNC_PLATFORMS order (Lazada, Shopee, TikTok, WooCommerce) — kept
+// as a plain label+color map here since this column just needs to mark
+// which platforms a row is mapped to, not link out to each sync flow.
+const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
+    { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
+    { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
+    { value: 'tiktok', label: 'TikTok', color: PALETTE.primary },
+    { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
+];
 
 export default function CategoryIndex({ categories, filters, filterColumns }: Props) {
     const { t } = useTranslation('catalog');
@@ -69,6 +82,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const [sortField, setSortField] = useState(filters.sort ?? '');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
+    const [platformFilter, setPlatformFilter] = useState(filters.platform ?? '');
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -78,7 +92,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true, replace: true });
+            router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -88,24 +102,29 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     const lastPage = categories.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/categories', { search, page, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true });
+        router.get('/catalog/categories', { search, page, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/categories', { search, page: 1, per_page: value, filters: activeFilters, sort: sortField, dir: sortDir }, { preserveState: true });
+        router.get('/catalog/categories', { search, page: 1, per_page: value, filters: activeFilters, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true });
     };
 
     const applyFilters = (next: Record<string, FilterValue>) => {
         setActiveFilters(next);
-        router.get('/catalog/categories', { search, per_page: perPage, filters: next, sort: sortField, dir: sortDir }, { preserveState: true });
+        router.get('/catalog/categories', { search, per_page: perPage, filters: next, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true });
     };
 
     const handleSort = (field: string) => {
         const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(nextDir);
-        router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: field, dir: nextDir }, { preserveState: true });
+        router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: field, dir: nextDir, platform: platformFilter }, { preserveState: true });
+    };
+
+    const applyPlatformFilter = (value: string) => {
+        setPlatformFilter(value);
+        router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir, platform: value }, { preserveState: true });
     };
 
     return (
@@ -156,6 +175,20 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     />
 
                     <Stack direction="row" alignItems="center" spacing={1.5}>
+                        <Select
+                            value={platformFilter}
+                            onChange={(e) => applyPlatformFilter(e.target.value)}
+                            displayEmpty
+                            size="small"
+                            sx={{ minWidth: 180 }}
+                        >
+                            <MenuItem value="">{t('allPlatforms')}</MenuItem>
+                            {MAPPED_PLATFORMS.map((platform) => (
+                                <MenuItem key={platform.value} value={platform.value}>{platform.label}</MenuItem>
+                            ))}
+                            <MenuItem value="mapped">{t('mappedToAny')}</MenuItem>
+                            <MenuItem value="unmapped">{t('notMapped')}</MenuItem>
+                        </Select>
                         <Button
                             variant="outlined"
                             startIcon={<FilterListIcon />}
@@ -237,6 +270,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                         {t('productsCount')}
                                     </TableSortLabel>
                                 </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>{t('mappedPlatforms')}</TableCell>
                                 <TableCell sx={{ fontWeight: 700 }}>{t('status')}</TableCell>
                                 {(canEdit || canDelete) && <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>}
                             </TableRow>
@@ -285,6 +319,24 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                         )}
                                     </TableCell>
                                     <TableCell>
+                                        {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
+                                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                                {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
+                                                    <Chip
+                                                        key={platform.value}
+                                                        label={platform.label}
+                                                        size="small"
+                                                        sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
+                                                    />
+                                                ))}
+                                            </Box>
+                                        ) : (
+                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                                {t('notMapped')}
+                                            </Typography>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
                                         <Chip
                                             label={row.is_active ? t('active') : t('nonActive')}
                                             size="small"
@@ -319,7 +371,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             ))}
                             {categories.data.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={(canEdit || canDelete) ? 8 : 7} align="center">
+                                    <TableCell colSpan={(canEdit || canDelete) ? 9 : 8} align="center">
                                         {t('noCategoriesFound')}
                                     </TableCell>
                                 </TableRow>

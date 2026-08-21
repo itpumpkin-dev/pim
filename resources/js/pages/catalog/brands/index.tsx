@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
@@ -56,6 +57,7 @@ interface BrandItem {
     parent_id: number | null;
     parent_name: string | null;
     products_count: number;
+    mapped_platforms?: string[];
 }
 
 interface ParentOption {
@@ -75,8 +77,16 @@ interface Props {
     brands: PaginatedData<BrandItem>;
     parentOptions: ParentOption[];
     attributeId: number;
-    filters: { search?: string; sort?: string; dir?: string };
+    filters: { search?: string; sort?: string; dir?: string; platform?: string };
 }
+
+// Only Shopee brand sync exists so far (see SyncShopeeBrandsJob) — kept as
+// an array like categories/index.tsx's MAPPED_PLATFORMS so a second
+// platform later is just one more entry, not a redesign. Same color as
+// Shopee's entry there for visual consistency across the app.
+const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
+    { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
+];
 
 export default function BrandIndex({ brands, parentOptions, attributeId, filters }: Props) {
     const { t } = useTranslation('catalog');
@@ -121,6 +131,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     const [search, setSearch] = useState(filters.search ?? '');
     const [sortField, setSortField] = useState(filters.sort ?? '');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
+    const [platformFilter, setPlatformFilter] = useState(filters.platform ?? '');
     const [deleteBrandId, setDeleteBrandId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const firstRender = useRef(true);
@@ -131,7 +142,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
             return;
         }
         const timeout = setTimeout(() => {
-            router.get('/catalog/brands', { search, sort: sortField, dir: sortDir }, { preserveState: true, replace: true });
+            router.get('/catalog/brands', { search, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true, replace: true });
         }, 300);
         return () => clearTimeout(timeout);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,14 +152,19 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     const lastPage = brands.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/brands', { search, page, sort: sortField, dir: sortDir }, { preserveState: true });
+        router.get('/catalog/brands', { search, page, sort: sortField, dir: sortDir, platform: platformFilter }, { preserveState: true });
     };
 
     const handleSort = (field: string) => {
         const nextDir: 'asc' | 'desc' = sortField === field && sortDir === 'asc' ? 'desc' : 'asc';
         setSortField(field);
         setSortDir(nextDir);
-        router.get('/catalog/brands', { search, sort: field, dir: nextDir }, { preserveState: true });
+        router.get('/catalog/brands', { search, sort: field, dir: nextDir, platform: platformFilter }, { preserveState: true });
+    };
+
+    const applyPlatformFilter = (value: string) => {
+        setPlatformFilter(value);
+        router.get('/catalog/brands', { search, sort: sortField, dir: sortDir, platform: value }, { preserveState: true });
     };
 
     const goToProducts = (option: BrandItem) => {
@@ -307,25 +323,41 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                             <Typography variant="body2" color="text.secondary">
                                 {tGrid('results', { count: brands.total })}
                             </Typography>
-                            <TextField
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={t('searchBrands')}
-                                size="small"
-                                sx={{
-                                    minWidth: 260,
-                                    bgcolor: '#fff',
-                                    borderRadius: 5,
-                                    '& .MuiOutlinedInput-root': { borderRadius: 5 },
-                                }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
+                            <Stack direction="row" spacing={1.5}>
+                                <Select
+                                    value={platformFilter}
+                                    onChange={(e) => applyPlatformFilter(e.target.value)}
+                                    displayEmpty
+                                    size="small"
+                                    sx={{ minWidth: 180, bgcolor: '#fff' }}
+                                >
+                                    <MenuItem value="">{t('allPlatforms')}</MenuItem>
+                                    {MAPPED_PLATFORMS.map((platform) => (
+                                        <MenuItem key={platform.value} value={platform.value}>{platform.label}</MenuItem>
+                                    ))}
+                                    <MenuItem value="mapped">{t('mappedToAny')}</MenuItem>
+                                    <MenuItem value="unmapped">{t('notMapped')}</MenuItem>
+                                </Select>
+                                <TextField
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder={t('searchBrands')}
+                                    size="small"
+                                    sx={{
+                                        minWidth: 260,
+                                        bgcolor: '#fff',
+                                        borderRadius: 5,
+                                        '& .MuiOutlinedInput-root': { borderRadius: 5 },
+                                    }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                />
+                            </Stack>
                         </Stack>
 
                         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
@@ -353,6 +385,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                 {t('productsCount')}
                                             </TableSortLabel>
                                         </TableCell>
+                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('mappedPlatforms')}</TableCell>
                                         {canEdit && <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }} align="right">{tGrid('actionsHeader')}</TableCell>}
                                     </TableRow>
                                 </TableHead>
@@ -407,6 +440,24 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                     <Typography color="text.disabled">0</Typography>
                                                 )}
                                             </TableCell>
+                                            <TableCell>
+                                                {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
+                                                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                                                        {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
+                                                            <Chip
+                                                                key={platform.value}
+                                                                label={platform.label}
+                                                                size="small"
+                                                                sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
+                                                            />
+                                                        ))}
+                                                    </Box>
+                                                ) : (
+                                                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                                        {t('notMapped')}
+                                                    </Typography>
+                                                )}
+                                            </TableCell>
                                             {canEdit && (
                                                 <TableCell align="right">
                                                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -423,7 +474,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                     ))}
                                     {brands.data.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={canEdit ? 6 : 5} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                                            <TableCell colSpan={canEdit ? 7 : 6} align="center" sx={{ py: 5, color: 'text.secondary' }}>
                                                 {t('noBrandsFound')}
                                             </TableCell>
                                         </TableRow>

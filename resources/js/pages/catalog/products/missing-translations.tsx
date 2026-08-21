@@ -74,7 +74,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('products'), href: '/catalog/products' },
+        { title: tNav('management'), href: '/catalog/management' },
         { title: tNav('missingTranslations'), href: '#' },
     ];
 

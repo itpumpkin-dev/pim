@@ -58,6 +58,12 @@ class BrandController extends Controller
             $perPage = 15;
         }
 
+        // Same shape as CategoryController::index()'s platform filter — only
+        // Shopee brand sync exists so far (see SyncShopeeBrandsJob), but
+        // 'mapped'/'unmapped' are kept generic so a second platform later
+        // just adds another branch here, not a redesign.
+        $platformFilter = $request->input('platform');
+
         $options = AttributeOption::where('attribute_id', $attribute->id)
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
@@ -65,6 +71,13 @@ class BrandController extends Controller
                         ->orWhere('slug', 'like', "%{$search}%")
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
                 });
+            })
+            ->when($platformFilter, function ($query, $platformFilter) {
+                if ($platformFilter === 'unmapped') {
+                    $query->whereNull('shopee_brand_id');
+                } elseif ($platformFilter === 'mapped' || $platformFilter === 'shopee') {
+                    $query->whereNotNull('shopee_brand_id');
+                }
             })
             ->get();
 
@@ -85,6 +98,7 @@ class BrandController extends Controller
             $option->products_count = (int) ($counts[$option->code] ?? 0);
             $option->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($option->thumbnail);
             $option->parent_name = $option->parent_id ? ($labelById[$option->parent_id] ?? null) : null;
+            $option->mapped_platforms = $option->shopee_brand_id ? ['shopee'] : [];
 
             return $option;
         });
@@ -117,6 +131,7 @@ class BrandController extends Controller
                 'search' => $search ?? '',
                 'sort' => $sortField ?? '',
                 'dir' => $sortField ? $sortDir : '',
+                'platform' => $platformFilter ?? '',
             ],
         ]);
     }

@@ -2,8 +2,8 @@ import AppLayout from '@/layouts/app-layout';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import TranslateIcon from '@mui/icons-material/Translate';
 import { Box, Divider, Grid, Typography } from '@mui/material';
 import { type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,15 +11,13 @@ import { useTranslation } from 'react-i18next';
 const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
 
 /**
- * "จัดการ" hub — a single sidebar entry consolidating three pages that
- * previously only lived one level down inside their own entities
- * (Products' missing-translations list, and the Categories/Brands
- * marketplace-sync tabs) so they're reachable in one click from Catalog's
- * sidebar instead. Each card just navigates to the real page — all
- * permission checks and actions still live there, this is purely a
- * launcher, so it needs no server-side props of its own.
+ * "จัดการ Ecommerce/Marketplace" — sits between the Management hub and the
+ * two real sync pages (categories/marketplace-sync, brands/marketplace-sync),
+ * which used to be separate tiles on that hub. Purely a launcher like the
+ * hub itself: each card just navigates to the existing page, which still
+ * owns all of its own sync/mapping actions and permission checks.
  */
-export default function CatalogManagement() {
+export default function CatalogManagementMarketplace() {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -28,47 +26,41 @@ export default function CatalogManagement() {
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('management'), href: '#' },
+        { title: tNav('management'), href: '/catalog/management' },
+        { title: t('manageEcommerceMarketplaceTab'), href: '#' },
     ];
 
-    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; color: string; title: string; description: string; url: string; permission: string | string[] }[] = [
+    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; color: string; title: string; description: string; url: string; permission: string }[] = [
         {
-            key: 'missing-translations',
-            icon: TranslateIcon,
-            color: PALETTE.accent,
-            title: tNav('missingTranslations'),
-            description: t('manageMissingTranslationsDesc'),
-            url: '/catalog/product-translations',
-            permission: 'product_translations.list_product_translations',
+            key: 'categories',
+            icon: CategoryOutlinedIcon,
+            color: PALETTE.highlight,
+            title: t('manageCategoriesCard'),
+            description: t('marketplaceSyncSubtitle'),
+            url: '/catalog/categories/marketplace-sync',
+            permission: 'categories.list_categories',
         },
         {
-            // Combines what used to be two separate tiles ("ซิงค์
-            // Marketplace" for Categories, "จัดการ Ecommerce" for Brands)
-            // into one entry point — visible to anyone who can reach either
-            // destination, since the page it links to (management/marketplace)
-            // shows only the cards the viewer actually has permission for.
-            key: 'ecommerce-marketplace',
+            key: 'brands',
             icon: StorefrontOutlinedIcon,
             color: PALETTE.primary,
-            title: t('manageEcommerceMarketplaceTab'),
-            description: t('manageEcommerceMarketplaceSubtitle'),
-            url: '/catalog/management/marketplace',
-            permission: ['categories.list_categories', 'brands.list_brands'],
+            title: t('manageBrandsCard'),
+            description: t('brandMarketplaceSyncSubtitle'),
+            url: '/catalog/brands/marketplace-sync',
+            permission: 'brands.list_brands',
         },
     ];
 
-    const visibleTiles = tiles.filter((tile) =>
-        Array.isArray(tile.permission) ? tile.permission.some((p) => permissions.includes(p)) : permissions.includes(tile.permission),
-    );
+    const visibleTiles = tiles.filter((tile) => permissions.includes(tile.permission));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={tNav('management')} />
+            <Head title={t('manageEcommerceMarketplaceTab')} />
             <Box sx={{ p: 4 }}>
                 <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('managementTitle')}</Typography>
+                    <Typography variant="h4" fontWeight={700}>{t('manageEcommerceMarketplaceTab')}</Typography>
                     <Divider sx={{ my: 1 }} />
-                    <Typography color="text.secondary">{t('managementSubtitle')}</Typography>
+                    <Typography color="text.secondary">{t('manageEcommerceMarketplaceSubtitle')}</Typography>
                 </Box>
 
                 <Grid container spacing={3}>

@@ -19,6 +19,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // enforce their own permissions, so this needs no middleware of its
     // own beyond auth; the frontend hides tiles the user can't reach.
     Route::get('management', fn () => Inertia::render('catalog/management/index'))->name('management');
+    Route::get('management/marketplace', fn () => Inertia::render('catalog/management/marketplace'))->name('management.marketplace');
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
