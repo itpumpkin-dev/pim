@@ -78,6 +78,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('brands/search-shopee', [BrandController::class, 'searchShopeeBrands'])->name('brands.searchShopee')->middleware('permission:brands,edit_brands');
     Route::get('brands/shopee-mapping', [BrandController::class, 'shopeeMapping'])->name('brands.shopeeMapping')->middleware('permission:brands,edit_brands');
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
+    Route::get('brands/search-woocommerce', [BrandController::class, 'searchWoocommerceBrands'])->name('brands.searchWoocommerce')->middleware('permission:brands,edit_brands');
+    Route::get('brands/woocommerce-mapping', [BrandController::class, 'woocommerceMapping'])->name('brands.woocommerceMapping')->middleware('permission:brands,edit_brands');
+    Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:brands,edit_brands');
 
     Route::get('attributeGroups', [AttributeGroupController::class, 'index'])->name('attributeGroups.index')->middleware('permission:attribute_groups,list_attribute_groups');
     Route::get('attributeGroups/create', [AttributeGroupController::class, 'create'])->name('attributeGroups.create')->middleware('permission:attribute_groups,create_attribute_groups');

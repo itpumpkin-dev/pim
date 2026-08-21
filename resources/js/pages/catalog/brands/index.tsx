@@ -80,12 +80,11 @@ interface Props {
     filters: { search?: string; sort?: string; dir?: string; platform?: string };
 }
 
-// Only Shopee brand sync exists so far (see SyncShopeeBrandsJob) — kept as
-// an array like categories/index.tsx's MAPPED_PLATFORMS so a second
-// platform later is just one more entry, not a redesign. Same color as
-// Shopee's entry there for visual consistency across the app.
+// Same colors as categories/index.tsx's MAPPED_PLATFORMS for visual
+// consistency across the app.
 const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
     { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
+    { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
 ];
 
 export default function BrandIndex({ brands, parentOptions, attributeId, filters }: Props) {

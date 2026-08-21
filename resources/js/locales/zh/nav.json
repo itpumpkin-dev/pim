@@ -21,5 +21,9 @@
     "imports": "进口",
     "exports": "出口",
     "jobTracker": "任务跟踪器",
-    "activityLogs": "活动日志"
+    "activityLogs": "活动日志",
+    "missingTranslations": "缺失的译文",
+    "brands": "品牌",
+    "management": "管理",
+    "wooConvert": "WooCommerce 转换器"
 }

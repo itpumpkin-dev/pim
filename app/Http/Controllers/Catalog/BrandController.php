@@ -15,8 +15,10 @@ use App\Models\Locale;
 use App\Models\ProductValue;
 use App\Models\ShopeeBrand;
 use App\Models\ShopeeSellerAccount;
+use App\Models\WooCommerceBrand;
 use App\Services\CodeGenerator;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\WooCommerce\WooCommerceClient;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -58,11 +60,12 @@ class BrandController extends Controller
             $perPage = 15;
         }
 
-        // Same shape as CategoryController::index()'s platform filter — only
-        // Shopee brand sync exists so far (see SyncShopeeBrandsJob), but
-        // 'mapped'/'unmapped' are kept generic so a second platform later
-        // just adds another branch here, not a redesign.
+        // Same shape as CategoryController::index()'s platform filter.
         $platformFilter = $request->input('platform');
+        $platformColumns = [
+            'shopee' => 'shopee_brand_id',
+            'woocommerce' => 'woocommerce_brand_id',
+        ];
 
         $options = AttributeOption::where('attribute_id', $attribute->id)
             ->when($search, function ($query, $search) {
@@ -72,11 +75,19 @@ class BrandController extends Controller
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
                 });
             })
-            ->when($platformFilter, function ($query, $platformFilter) {
+            ->when($platformFilter, function ($query, $platformFilter) use ($platformColumns) {
                 if ($platformFilter === 'unmapped') {
-                    $query->whereNull('shopee_brand_id');
-                } elseif ($platformFilter === 'mapped' || $platformFilter === 'shopee') {
-                    $query->whereNotNull('shopee_brand_id');
+                    foreach ($platformColumns as $column) {
+                        $query->whereNull($column);
+                    }
+                } elseif ($platformFilter === 'mapped') {
+                    $query->where(function ($q) use ($platformColumns) {
+                        foreach ($platformColumns as $column) {
+                            $q->orWhereNotNull($column);
+                        }
+                    });
+                } elseif (isset($platformColumns[$platformFilter])) {
+                    $query->whereNotNull($platformColumns[$platformFilter]);
                 }
             })
             ->get();
@@ -98,7 +109,10 @@ class BrandController extends Controller
             $option->products_count = (int) ($counts[$option->code] ?? 0);
             $option->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($option->thumbnail);
             $option->parent_name = $option->parent_id ? ($labelById[$option->parent_id] ?? null) : null;
-            $option->mapped_platforms = $option->shopee_brand_id ? ['shopee'] : [];
+            $option->mapped_platforms = collect([
+                'shopee' => $option->shopee_brand_id,
+                'woocommerce' => $option->woocommerce_brand_id,
+            ])->filter()->keys()->values()->all();
 
             return $option;
         });
@@ -257,9 +271,7 @@ class BrandController extends Controller
 
     /**
      * Hub page for the "จัดการ ecommerce" tab — same shape as
-     * CategoryController::marketplaceSync(), just one platform (Shopee) for
-     * now (see the array-driven CATEGORY_SYNC_PLATFORMS-equivalent on the
-     * frontend for how a second platform would slot in later).
+     * CategoryController::marketplaceSync().
      */
     public function marketplaceSync(): Response
     {
@@ -268,6 +280,7 @@ class BrandController extends Controller
         return Inertia::render('catalog/brands/marketplace-sync', [
             'lastSyncedAt' => [
                 'shopee' => $toIso(ShopeeBrand::max('updated_at')),
+                'woocommerce' => $toIso(WooCommerceBrand::max('updated_at')),
             ],
         ]);
     }
@@ -356,9 +369,69 @@ class BrandController extends Controller
      */
     public function searchShopeeBrands(Request $request): JsonResponse
     {
+        return $this->searchMarketplaceBrands($request, ShopeeBrand::class);
+    }
+
+    /**
+     * Refreshes the local woocommerce_brands cache — unlike Shopee, this
+     * runs synchronously (no JobTracker/queued job): WooCommerce's Product
+     * Brands endpoint returns everything in a small number of pages
+     * (confirmed live, 2026-08-21: the real store has only 4 brands total),
+     * so it's nowhere near the scale that forced SyncShopeeBrandsJob to
+     * exist. Mirrors CategoryController::syncWoocommerceCategories() exactly
+     * — same do/while-until-a-short-page pagination shape.
+     */
+    public function syncWoocommerceBrands(): RedirectResponse
+    {
+        try {
+            $client = new WooCommerceClient();
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $rows = [];
+        $page = 1;
+        do {
+            $fetched = $client->getBrands($page);
+            foreach ($fetched as $node) {
+                $rows[] = [
+                    'id' => $node['id'],
+                    'name' => $node['name'],
+                    'slug' => $node['slug'] ?? null,
+                ];
+            }
+            $page++;
+        } while (count($fetched) === 100);
+
+        $now = now();
+        foreach (array_chunk($rows, 500) as $chunk) {
+            WooCommerceBrand::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['id'],
+                ['name', 'slug', 'updated_at']
+            );
+        }
+
+        return back()->with('success', 'Synced '.count($rows).' WooCommerce brands.');
+    }
+
+    /**
+     * Backs the WooCommerceBrandPicker autocomplete on the mapping page —
+     * same shape as searchShopeeBrands().
+     */
+    public function searchWoocommerceBrands(Request $request): JsonResponse
+    {
+        return $this->searchMarketplaceBrands($request, WooCommerceBrand::class);
+    }
+
+    /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     */
+    private function searchMarketplaceBrands(Request $request, string $marketplaceModel): JsonResponse
+    {
         $query = $request->input('q');
 
-        $brands = ShopeeBrand::when($query, fn ($q, $query) => $q->where('name', 'like', "%{$query}%"))
+        $brands = $marketplaceModel::when($query, fn ($q, $query) => $q->where('name', 'like', "%{$query}%"))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name']);
@@ -368,6 +441,29 @@ class BrandController extends Controller
 
     public function shopeeMapping(Request $request): Response
     {
+        return $this->renderMarketplaceMapping($request, 'catalog/brands/shopee-mapping', 'shopee_brand_id', ShopeeBrand::class);
+    }
+
+    public function bulkMapShopeeBrand(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceBrand($request, 'shopee_brand_id', ShopeeBrand::class, 'brand_shopee_mapped');
+    }
+
+    public function woocommerceMapping(Request $request): Response
+    {
+        return $this->renderMarketplaceMapping($request, 'catalog/brands/woocommerce-mapping', 'woocommerce_brand_id', WooCommerceBrand::class);
+    }
+
+    public function bulkMapWoocommerceBrand(Request $request): RedirectResponse
+    {
+        return $this->bulkMapMarketplaceBrand($request, 'woocommerce_brand_id', WooCommerceBrand::class, 'brand_woocommerce_mapped');
+    }
+
+    /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     */
+    private function renderMarketplaceMapping(Request $request, string $component, string $fkColumn, string $marketplaceModel): Response
+    {
         $search = $request->input('search');
         $status = $request->input('status', 'all');
         $onlyWithProducts = $request->boolean('only_with_products');
@@ -376,8 +472,8 @@ class BrandController extends Controller
             $perPage = 15;
         }
 
-        return Inertia::render('catalog/brands/shopee-mapping', [
-            ...$this->buildBrandMappingData($request, $status, $search ?? '', $perPage, $onlyWithProducts),
+        return Inertia::render($component, [
+            ...$this->buildBrandMappingData($request, $status, $search ?? '', $perPage, $onlyWithProducts, $fkColumn, $marketplaceModel),
             'filters' => [
                 'search' => $search ?? '',
                 'status' => $status,
@@ -387,9 +483,13 @@ class BrandController extends Controller
         ]);
     }
 
-    public function bulkMapShopeeBrand(Request $request): RedirectResponse
+    /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
+     */
+    private function bulkMapMarketplaceBrand(Request $request, string $fkColumn, string $marketplaceModel, string $auditEvent): RedirectResponse
     {
         $attribute = $this->brandAttribute();
+        $table = (new $marketplaceModel())->getTable();
 
         $validated = $request->validate([
             'mappings' => ['required', 'array'],
@@ -397,7 +497,7 @@ class BrandController extends Controller
                 'required', 'integer',
                 Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
             ],
-            'mappings.*.shopee_brand_id' => ['nullable', 'integer', Rule::exists('shopee_brands', 'id')],
+            'mappings.*.marketplace_brand_id' => ['nullable', 'integer', Rule::exists($table, 'id')],
         ]);
 
         $updated = 0;
@@ -408,19 +508,19 @@ class BrandController extends Controller
                 continue;
             }
 
-            $newId = $mapping['shopee_brand_id'] ?? null;
-            if ($option->shopee_brand_id === $newId) {
+            $newId = $mapping['marketplace_brand_id'] ?? null;
+            if ($option->{$fkColumn} === $newId) {
                 continue;
             }
 
-            $oldId = $option->shopee_brand_id;
-            $option->update(['shopee_brand_id' => $newId]);
+            $oldId = $option->{$fkColumn};
+            $option->update([$fkColumn => $newId]);
 
             AuditLog::record(
-                'brand_shopee_mapped',
+                $auditEvent,
                 $attribute,
-                ["option#{$option->id}.shopee_brand_id" => $oldId],
-                ["option#{$option->id}.shopee_brand_id" => $newId],
+                ["option#{$option->id}.{$fkColumn}" => $oldId],
+                ["option#{$option->id}.{$fkColumn}" => $newId],
             );
             $updated++;
         }
@@ -429,9 +529,10 @@ class BrandController extends Controller
     }
 
     /**
+     * @param  class-string<ShopeeBrand|WooCommerceBrand>  $marketplaceModel
      * @return array{brands: \Illuminate\Pagination\LengthAwarePaginator, stats: array{total: int, mapped: int}}
      */
-    private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts): array
+    private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $marketplaceModel): array
     {
         $attribute = $this->brandAttribute();
 
@@ -442,8 +543,8 @@ class BrandController extends Controller
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
                 });
             })
-            ->when($status === 'mapped', fn ($q) => $q->whereNotNull('shopee_brand_id'))
-            ->when($status === 'unmapped', fn ($q) => $q->whereNull('shopee_brand_id'))
+            ->when($status === 'mapped', fn ($q) => $q->whereNotNull($fkColumn))
+            ->when($status === 'unmapped', fn ($q) => $q->whereNull($fkColumn))
             ->get();
 
         // Same PHP-side counting as index() — see that method's comment for
@@ -459,10 +560,10 @@ class BrandController extends Controller
             $options = $options->filter(fn (AttributeOption $o) => ($counts[$o->code] ?? 0) > 0)->values();
         }
 
-        $shopeeBrandsById = ShopeeBrand::whereIn('id', $options->pluck('shopee_brand_id')->filter())->get(['id', 'name'])->keyBy('id');
+        $marketplaceBrandsById = $marketplaceModel::whereIn('id', $options->pluck($fkColumn)->filter())->get(['id', 'name'])->keyBy('id');
 
-        $rows = $options->map(function (AttributeOption $option) use ($counts, $shopeeBrandsById) {
-            $current = $option->shopee_brand_id ? $shopeeBrandsById->get($option->shopee_brand_id) : null;
+        $rows = $options->map(function (AttributeOption $option) use ($counts, $marketplaceBrandsById, $fkColumn) {
+            $current = $option->{$fkColumn} ? $marketplaceBrandsById->get($option->{$fkColumn}) : null;
 
             return [
                 'id' => $option->id,
@@ -486,7 +587,7 @@ class BrandController extends Controller
             'brands' => $paginated,
             'stats' => [
                 'total' => $options->count(),
-                'mapped' => $options->whereNotNull('shopee_brand_id')->count(),
+                'mapped' => $options->whereNotNull($fkColumn)->count(),
             ],
         ];
     }

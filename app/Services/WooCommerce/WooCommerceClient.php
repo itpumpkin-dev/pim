@@ -110,6 +110,18 @@ class WooCommerceClient
     }
 
     /**
+     * GET /products/brands — WooCommerce's native Product Brands taxonomy
+     * (confirmed live, 2026-08-21: the real store has 4 brands returned in
+     * this exact shape — {id, name, slug, parent, description, image,
+     * count, ...}, identical to /products/categories). Same one-page-per-
+     * call split as getCategories(); pagination loop is the caller's job.
+     */
+    public function getBrands(int $page = 1, int $perPage = 100): array
+    {
+        return $this->request('GET', '/products/brands', ['page' => $page, 'per_page' => $perPage]);
+    }
+
+    /**
      * POST /wp-json/wp/v2/media — uploads image bytes to WordPress's own
      * Media Library, returning the created attachment (notably `id` and
      * `source_url`). Needed because sending a product's images[].src as a

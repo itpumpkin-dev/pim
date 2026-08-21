@@ -23,6 +23,7 @@ class AttributeOption extends Model
         'swatch_value',
         'sort_order',
         'shopee_brand_id',
+        'woocommerce_brand_id',
     ];
 
     protected function casts(): array
@@ -85,5 +86,10 @@ class AttributeOption extends Model
     public function shopeeBrand(): BelongsTo
     {
         return $this->belongsTo(ShopeeBrand::class, 'shopee_brand_id');
+    }
+
+    public function woocommerceBrand(): BelongsTo
+    {
+        return $this->belongsTo(WooCommerceBrand::class, 'woocommerce_brand_id');
     }
 }

@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { ShopeeBrandPicker, type ShopeeBrandOption } from '@/components/catalog/shopee-brand-picker';
+import { WooCommerceBrandPicker, type WooCommerceBrandOption } from '@/components/catalog/woocommerce-brand-picker';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -51,12 +51,12 @@ interface Props {
 }
 
 /**
- * Brand-specific version of categories/shopee-mapping.tsx — deliberately
- * simpler: no CategoryMatcher-style auto-suggestions (AttributeOption has no
- * hierarchical path to score against), just search-and-pick per row via
- * ShopeeBrandPicker plus a batch save, same pending-changes-chip pattern.
+ * WooCommerce sibling of shopee-mapping.tsx — identical shape, just a
+ * different picker/endpoint. Kept as its own file rather than a shared
+ * parameterized component, same as the Category mapping pages (each
+ * platform has its own file even though they're near-identical).
  */
-export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
+export default function WooCommerceBrandMapping({ brands, stats, filters }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
@@ -66,14 +66,14 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
         { title: tNav('management'), href: '/catalog/management' },
         { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
         { title: t('brandMarketplaceSyncTitle'), href: '/catalog/brands/marketplace-sync' },
-        { title: t('shopeeBrandMappingTitle'), href: '#' },
+        { title: t('woocommerceBrandMappingTitle'), href: '#' },
     ];
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? 'unmapped');
     const [onlyWithProducts, setOnlyWithProducts] = useState(filters.only_with_products ?? false);
     const [perPage, setPerPage] = useState<number>(brands.per_page ?? 25);
-    const [pending, setPending] = useState<Record<number, ShopeeBrandOption | null>>({});
+    const [pending, setPending] = useState<Record<number, WooCommerceBrandOption | null>>({});
     const [saving, setSaving] = useState(false);
     const firstRender = useRef(true);
 
@@ -91,7 +91,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/brands/shopee-mapping', { search, status, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true, replace: true });
+            router.get('/catalog/brands/woocommerce-mapping', { search, status, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
@@ -100,21 +100,21 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
 
     const applyStatus = (value: 'unmapped' | 'mapped' | 'all') => {
         setStatus(value);
-        router.get('/catalog/brands/shopee-mapping', { search, status: value, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/brands/woocommerce-mapping', { search, status: value, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const applyOnlyWithProducts = (value: boolean) => {
         setOnlyWithProducts(value);
-        router.get('/catalog/brands/shopee-mapping', { search, status, per_page: perPage, only_with_products: value }, { preserveState: true });
+        router.get('/catalog/brands/woocommerce-mapping', { search, status, per_page: perPage, only_with_products: value }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/brands/shopee-mapping', { search, status, per_page: value, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/brands/woocommerce-mapping', { search, status, per_page: value, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const goToPage = (page: number) => {
-        router.get('/catalog/brands/shopee-mapping', { search, status, per_page: perPage, page, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/brands/woocommerce-mapping', { search, status, per_page: perPage, page, only_with_products: onlyWithProducts }, { preserveState: true });
     };
 
     const currentPage = brands.current_page ?? 1;
@@ -145,7 +145,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
 
         setSaving(true);
         router.post(
-            '/catalog/brands/shopee-mapping',
+            '/catalog/brands/woocommerce-mapping',
             { mappings },
             { preserveScroll: true, onFinish: () => setSaving(false) },
         );
@@ -153,7 +153,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={t('shopeeBrandMappingTitle')} />
+            <Head title={t('woocommerceBrandMappingTitle')} />
             <Box sx={{ p: 4 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
                     <Box>
@@ -165,7 +165,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
                         >
                             {t('brandMarketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('shopeeBrandMappingTitle')}</Typography>
+                        <Typography variant="h4" fontWeight={700}>{t('woocommerceBrandMappingTitle')}</Typography>
                         <Typography color="text.secondary">
                             {t('brandsMapped', { mapped: stats.mapped, total: stats.total })}
                         </Typography>
@@ -285,7 +285,7 @@ export default function ShopeeBrandMapping({ brands, stats, filters }: Props) {
                                         </Stack>
 
                                         <Box sx={{ maxWidth: 360 }}>
-                                            <ShopeeBrandPicker
+                                            <WooCommerceBrandPicker
                                                 value={rowPending ?? null}
                                                 onChange={(val) => setPending((prev) => ({ ...prev, [row.id]: val }))}
                                                 placeholder={t('searchManually')}

@@ -10,15 +10,20 @@ import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, Grid,
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// Mirrors categories/marketplace-sync.tsx's card language exactly. Kept as
-// an array (like CATEGORY_SYNC_PLATFORMS) even with one entry today so a
-// second brand-sync platform later is just one more entry plus its own
-// backend routes.
+// Mirrors categories/marketplace-sync.tsx's card language exactly.
 const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
 const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
 
+// `mode` distinguishes how a platform's sync actually runs: Shopee's brand
+// list can be huge (one real mapped category alone has 10,000+ brands), so
+// it's a queued job polled via job_tracker_id ('queued'). WooCommerce's
+// Product Brands endpoint returns everything in a couple of pages
+// (confirmed live: 4 brands total) and runs synchronously in the request
+// like CategoryController::syncWoocommerceCategories() does ('sync') — no
+// polling, the result shows via the app-wide FlashToast success message.
 const BRAND_SYNC_PLATFORMS = [
-    { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/brands/shopee-mapping' },
+    { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/brands/shopee-mapping', mode: 'queued' },
+    { value: 'woocommerce', label: 'WooCommerce', route: '/catalog/brands/sync-woocommerce', mappingRoute: '/catalog/brands/woocommerce-mapping', mode: 'sync' },
 ] as const;
 
 function formatLocalDateTime(value: string | null): string {
@@ -63,6 +68,17 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
     const [syncPlatform, setSyncPlatform] = useState<string>(BRAND_SYNC_PLATFORMS[0].value);
     const [activeJobTrackerId, setActiveJobTrackerId] = useState<number | null>(null);
     const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // A 'sync'-mode platform (WooCommerce) finishes via a real Inertia
+    // redirect back to this same page, which hands back a fresh
+    // `lastSyncedAt` prop — but `lastSynced` state was only seeded from it
+    // once on mount, so without this it'd keep showing the pre-sync
+    // timestamp until a manual reload. The 'queued' (Shopee) flow updates
+    // `lastSynced` itself on job completion (no navigation happens for
+    // that flow), so this doesn't interfere with it.
+    useEffect(() => {
+        setLastSynced(lastSyncedAt);
+    }, [lastSyncedAt]);
 
     const selected = BRAND_SYNC_PLATFORMS.find((p) => p.value === syncPlatform) ?? BRAND_SYNC_PLATFORMS[0];
     const selectedIndex = BRAND_SYNC_PLATFORMS.findIndex((p) => p.value === syncPlatform);
@@ -122,6 +138,15 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
         setSyncResult(null);
         setSyncedCount(null);
         setActiveJobTrackerId(null);
+
+        if (selected.mode === 'sync') {
+            // Small, bounded platform (WooCommerce) — runs and finishes
+            // within this one request, no job to poll. router.post() is a
+            // normal Inertia visit, so the result shows via the app-wide
+            // success flash toast rather than the local Alert below.
+            router.post(selected.route, {}, { onFinish: () => setSyncing(false) });
+            return;
+        }
 
         fetch(selected.route, {
             method: 'POST',
