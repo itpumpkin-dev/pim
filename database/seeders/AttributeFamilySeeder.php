@@ -23,7 +23,7 @@ class AttributeFamilySeeder extends Seeder
         // consumers (WooCommerce export, ProductPresenter's fallback, Lazada
         // mapping) fed, and are intentionally hidden from manual editing.
         'pid' => 'general', 'pname' => 'general', 'pbaseunit' => 'general', 'pbrand' => 'general',
-        'producttype' => 'general', 'eol' => 'general', 'pgroupname' => 'general', 'pimage' => 'general',
+        'producttype' => 'general', 'eol' => 'general', 'pgroupname' => 'general', 'pimage' => 'general', 'pgallery' => 'general',
         'unitinfo' => 'general', 'pointtype' => 'general', 'search' => 'general', 'sales_channel' => 'general',
 
         // pricing_packaging (now "Pricing" — money only) and packaging

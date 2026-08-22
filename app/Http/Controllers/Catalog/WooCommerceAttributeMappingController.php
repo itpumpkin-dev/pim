@@ -32,7 +32,7 @@ class WooCommerceAttributeMappingController extends Controller
 {
     private const TARGET_FIELDS = [
         'description', 'short_description',
-        'name', 'price', 'image', 'qty', 'weight', 'length', 'width', 'height',
+        'name', 'price', 'image', 'qty', 'weight', 'length', 'width', 'height', 'video',
         'wc_attribute',
     ];
 

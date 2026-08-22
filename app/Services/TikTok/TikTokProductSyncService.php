@@ -36,6 +36,15 @@ use RuntimeException;
  * searchProducts() exists and is confirmed-shape (not confirmed live) if
  * one gets written, but nothing calls it yet.
  *
+ * 4. ADDED, 2026-08-22: product video push support (see $videoUrl in
+ *    buildPayload() and uploadVideoToTikTok() below), reading the same
+ *    PIM `attribute_6` uploaded-file attribute Lazada/Shopee's own video
+ *    support already reads — NOT `youtube_url` (a plain external link).
+ *    Uses TikTokClient::uploadFile(), which was already present but
+ *    unused by this class — NOT confirmed live (see that method's
+ *    docblock), so the first real push of a product with a video is a
+ *    test of this path, not a known-working feature the way images are.
+ *
  * push()/deactivate() and everything they call (createProduct(),
  * uploadImage()) are CONFIRMED LIVE, 2026-08-17 — a real product was
  * pushed end to end through push() itself, not just through TikTokClient
@@ -48,19 +57,6 @@ use RuntimeException;
 class TikTokProductSyncService
 {
     use ResolvesProductAttributeValues;
-
-    /**
-     * Same role as LazadaProductSyncService::SKU_FIELD_SOURCE/
-     * ShopeeProductSyncService::DIMENSION_FIELD_SOURCE — our attribute code
-     * for each TikTok package_dimensions field, when we have it. Keyed by
-     * TikTok's own field name (not prefixed like Shopee's package_length)
-     * since package_dimensions here is a single flat object, not per-SKU.
-     */
-    private const DIMENSION_FIELD_SOURCE = [
-        'length' => 'length_pcs',
-        'width' => 'width_pcs',
-        'height' => 'height_pcs',
-    ];
 
     public function __construct(private readonly TikTokClient $client) {}
 
@@ -95,43 +91,65 @@ class TikTokProductSyncService
             throw new RuntimeException("Product '{$product->sku}' has no category mapped to a TikTok category yet.");
         }
 
-        $name = $this->attributeValue($product, 'pname', $shop->channel_id, localeCode: 'th');
-        $price = $this->attributeValue($product, 'price_std', $shop->channel_id);
-        $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
-        $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
-        $weight = $this->attributeValue($product, 'weight_pcs', $shop->channel_id);
+        // Admin-configurable (TikTokAttributeMappingController) — replaces
+        // the old hardcoded pname/price_std/qty/weight_pcs/
+        // product_details_features/attribute_6/DIMENSION_FIELD_SOURCE
+        // lookups. Fetched once and reused by resolveProductAttributes()
+        // below for the `tiktok_attribute` group.
+        $mappings = TikTokAttributeMapping::with('attribute')->orderBy('sort_order')->get();
 
-        // TikTok's description is HTML, max 10,000 chars — product_details_features
-        // is this app's own HTML-formatted long-description field (see
-        // ProductPresenter::mapOne(), which renders it the same way for the
-        // storefront), a much better fit than Shopee's buildPayload() fallback
-        // of reusing the plain product name. Still falls back to $name for a
-        // product that has neither, rather than blocking the push outright.
-        $description = $this->attributeValue($product, 'product_details_features', $shop->channel_id) ?: $name;
+        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
+        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
+        // Full `pgallery` list when the product has one, falling back to
+        // the single legacy `pimage` — see ResolvesProductAttributeValues::
+        // resolveProductImageUrls(). TikTok's own main_images cap is 9 (its
+        // Create Product API docs), hence the slice below. Not part of the
+        // target_field mapping system — a different (multi-value) mechanism
+        // than the single-value fields below.
+        $imageUrls = array_slice($this->resolveProductImageUrls($product, $shop->channel_id), 0, 9);
+        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
+        $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id);
+
+        // PIM's own uploaded-file `video` attribute — NOT `youtube_url` (a
+        // plain external link, wrong shape for an upload-then-reference
+        // flow). TikTok's video field is optional (no `*` on the product
+        // form), so this stays null and gets filtered out of the payload
+        // entirely for any product with no mapped video attribute/value.
+        // TikTokAttributeMappingController only ever allows a PIM attribute
+        // of type `video` to be saved against this target — same guard
+        // Lazada's identical attribute_6-vs-youtube_url field has, after a
+        // real push broke there when the wrong attribute type got mapped.
+        $videoUrl = $this->resolveMappedField($mappings, 'video', $product, $shop->channel_id);
+
+        // TikTok's description is HTML, max 10,000 chars — falls back to
+        // $name for a product with no mapped description value, rather than
+        // blocking the push outright.
+        $description = $this->resolveMappedField($mappings, 'description', $product, $shop->channel_id, localeCode: 'th') ?: $name;
 
         if (! $name || ! $price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to TikTok.");
         }
 
-        if (! $imageUrl) {
+        if (empty($imageUrls)) {
             throw new RuntimeException("Product '{$product->sku}' has no image — TikTok requires at least one main image.");
         }
 
         $warehouseId = $this->resolveWarehouseId();
 
-        $attributes = $this->resolveProductAttributes($product, $shop->channel_id, (string) $category->tiktok_category_id);
+        $attributes = $this->resolveProductAttributes($mappings, $product, $shop->channel_id, (string) $category->tiktok_category_id);
         if (! empty($attributes['missing'])) {
             throw new RuntimeException(
                 'TikTok category requires product attribute(s) this app has no data for and cannot auto-fill: '
                 .implode(', ', $attributes['missing'])
-                .' — map these in TikTokProductSyncService::TIKTOK_ATTRIBUTE_SOURCE once a real value source is known.'
+                .' — map these on the "จับคู่เนื้อหา TikTok" mapping page.'
             );
         }
 
-        $dimension = array_filter(array_map(
-            fn (string $ourAttributeCode) => $this->attributeValue($product, $ourAttributeCode, $shop->channel_id),
-            self::DIMENSION_FIELD_SOURCE
-        ));
+        $dimension = array_filter([
+            'length' => $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id),
+            'width' => $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id),
+            'height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
+        ]);
 
         return array_filter([
             'title' => $name,
@@ -145,7 +163,7 @@ class TikTokProductSyncService
             // below — kept out of this method so buildPayload() stays
             // side-effect-free/safe to call anytime for inspection, same
             // reasoning as Lazada/Shopee's own buildPayload().
-            'main_images' => [['uri' => $imageUrl]],
+            'main_images' => array_map(fn (string $url) => ['uri' => $url], $imageUrls),
             'skus' => [array_filter([
                 'seller_sku' => $product->sku,
                 'price' => ['currency' => 'THB', 'amount' => (string) $price],
@@ -162,6 +180,14 @@ class TikTokProductSyncService
                 'unit' => 'CENTIMETER',
             ] : null,
             'product_attributes' => $attributes['product_attributes'] ?: null,
+            // Still our own storage URL at this point, same reasoning as
+            // `main_images` above — push()'s uploadVideoToTikTok() swaps it
+            // for the real TikTok file id (via TikTokClient::uploadFile())
+            // before this payload is sent. Shape per TikTok's shared
+            // Create/Edit Product docs: a flat `video.id` object — a
+            // different shape from Shopee's `video_upload_id` array or
+            // Lazada's nested `attributes.video`, each platform's own field.
+            'video' => $videoUrl ? ['id' => $videoUrl] : null,
         ], fn ($v) => $v !== null && $v !== []);
     }
 
@@ -178,6 +204,24 @@ class TikTokProductSyncService
                 fn (array $image) => ['uri' => $this->client->uploadImage($image['uri'])],
                 $payload['main_images']
             );
+        }
+
+        return $payload;
+    }
+
+    /**
+     * See TikTokClient::uploadFile()'s docblock — a real write (uploads to
+     * TikTok's media library) kept out of buildPayload() for the same reason
+     * uploadImagesToTikTok() above is. No-op if the product has no video.
+     *
+     * NOT confirmed live — uploadFile() itself hasn't been separately
+     * exercised against a real shop (see its docblock), so treat the first
+     * real push of a product with a video as a test of this path.
+     */
+    private function uploadVideoToTikTok(array $payload): array
+    {
+        if (! empty($payload['video']['id'])) {
+            $payload['video'] = ['id' => $this->client->uploadFile($payload['video']['id'])];
         }
 
         return $payload;
@@ -208,6 +252,7 @@ class TikTokProductSyncService
     {
         $payload = $this->buildPayload($product, $shop);
         $payload = $this->uploadImagesToTikTok($payload);
+        $payload = $this->uploadVideoToTikTok($payload);
 
         $cachedProductId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)
@@ -348,18 +393,15 @@ class TikTokProductSyncService
      * attribute with a value wins per tiktok_attribute_id (by sort_order),
      * same semantics as Lazada/Shopee's own resolvers.
      *
+     * @param \Illuminate\Support\Collection<int, TikTokAttributeMapping> $mappings same collection buildPayload() already fetched
      * @return array{product_attributes: list<array{id: string, values: list<array{name: string}>}>, missing: list<string>}
      */
-    private function resolveProductAttributes(Product $product, ?int $channelId, string $categoryId): array
+    private function resolveProductAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId, string $categoryId): array
     {
         $response = $this->client->getAttributes($categoryId);
         $schema = $response['data']['attributes'] ?? [];
 
-        $mappingsByTikTokAttributeId = TikTokAttributeMapping::whereNotNull('tiktok_attribute_id')
-            ->with('attribute')
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('tiktok_attribute_id');
+        $mappingsByTikTokAttributeId = $mappings->where('target_field', 'tiktok_attribute')->groupBy('tiktok_attribute_id');
 
         $productAttributes = [];
         $missing = [];

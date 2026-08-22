@@ -27,6 +27,25 @@ import { ContentTranslationCoverage, type ContentGroup } from '@/components/syst
 
 const CONTENT_NAMESPACE = 'content';
 
+// The tab strip used to show each i18n JSON file's raw filename
+// (auth/catalog/common/grid/...) verbatim — meaningless to anyone who
+// doesn't already know this app's own file layout. Maps each known
+// namespace to a translation key for a real display name instead; any
+// namespace not listed here (e.g. a new locale file added later) falls
+// back to showing its raw name rather than crashing.
+const NAMESPACE_LABEL_KEYS: Record<string, string> = {
+    auth: 'translationNamespaceAuth',
+    catalog: 'translationNamespaceCatalog',
+    common: 'translationNamespaceCommon',
+    dashboard: 'translationNamespaceDashboard',
+    grid: 'translationNamespaceGrid',
+    home: 'translationNamespaceHome',
+    import_export: 'translationNamespaceImportExport',
+    nav: 'translationNamespaceNav',
+    settings: 'translationNamespaceSettings',
+    system: 'translationNamespaceSystem',
+};
+
 interface LocaleModel {
     id: number;
     code: string;
@@ -63,6 +82,13 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    // Switching tabs here is a real server round-trip (router.get — the
+    // "Content" tab in particular runs a heavy DB scan across attributes/
+    // options/categories, worst at categories' 1000+ scale), not a client-
+    // side toggle — with no visual feedback the click looked like it did
+    // nothing until the new page finished loading. Tracks that gap so the
+    // Tabs can show a spinner and the content area can dim instead.
+    const [switchingTab, setSwitchingTab] = useState(false);
 
     useEffect(() => {
         setValues(original);
@@ -90,11 +116,24 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     }, [entries, search, values]);
 
     const switchNamespace = (namespace: string) => {
+        if (namespace === activeNamespace) {
+            return;
+        }
+
         if (dirtyCount > 0 && !window.confirm(tSystem('unsavedTranslationsCount', { count: dirtyCount }) + ' — discard?')) {
             return;
         }
 
-        router.get(`/system/locales/${localeModel.id}/translations`, { ns: namespace }, { preserveState: true, preserveScroll: true });
+        setSwitchingTab(true);
+        router.get(
+            `/system/locales/${localeModel.id}/translations`,
+            { ns: namespace },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => setSwitchingTab(false),
+            },
+        );
     };
 
     const save = () => {
@@ -115,6 +154,11 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     };
 
     const isContentTab = activeNamespace === CONTENT_NAMESPACE;
+
+    const namespaceLabel = (namespace: string): string => {
+        const key = NAMESPACE_LABEL_KEYS[namespace];
+        return key ? tSystem(key) : namespace;
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -152,16 +196,16 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                     </Stack>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
+                <Paper variant="outlined" sx={{ borderRadius: 2, mb: 2, display: 'flex', alignItems: 'center' }}>
                     <Tabs
                         value={activeNamespace ?? false}
                         onChange={(_, value: string) => switchNamespace(value)}
                         variant="scrollable"
                         scrollButtons="auto"
-                        sx={{ px: 1 }}
+                        sx={{ px: 1, flex: 1, opacity: switchingTab ? 0.6 : 1, pointerEvents: switchingTab ? 'none' : 'auto' }}
                     >
                         {namespaces.map((namespace) => (
-                            <Tab key={namespace} value={namespace} label={namespace} sx={{ textTransform: 'none' }} />
+                            <Tab key={namespace} value={namespace} label={namespaceLabel(namespace)} sx={{ textTransform: 'none' }} />
                         ))}
                         <Tab
                             key={CONTENT_NAMESPACE}
@@ -170,7 +214,30 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                             sx={{ textTransform: 'none', fontWeight: 700 }}
                         />
                     </Tabs>
+                    {switchingTab && <CircularProgress size={18} thickness={5} sx={{ mr: 2 }} />}
                 </Paper>
+
+                <Box sx={{ position: 'relative' }}>
+                    {switchingTab && (
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                zIndex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                pt: 8,
+                                bgcolor: 'rgba(255,255,255,0.7)',
+                            }}
+                        >
+                            <CircularProgress size={32} />
+                            <Typography variant="body2" color="text.secondary">
+                                {tSystem('translationsTabLoading')}
+                            </Typography>
+                        </Box>
+                    )}
 
                 {isContentTab ? (
                     contentGroups && <ContentTranslationCoverage localeId={localeModel.id} groups={contentGroups} />
@@ -236,6 +303,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                         </TableContainer>
                     </>
                 )}
+                </Box>
             </Box>
 
             <Snackbar

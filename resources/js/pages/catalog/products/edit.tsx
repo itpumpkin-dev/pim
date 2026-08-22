@@ -2018,6 +2018,7 @@ function RenderAttributeInput({
     const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
+    const [galleryError, setGalleryError] = useState<string | null>(null);
 
     useEffect(() => {
         if ((attr.type === 'image' || attr.type === 'video') && value instanceof File) {
@@ -2225,19 +2226,76 @@ function RenderAttributeInput({
     }
 
     if (attr.type === 'gallery') {
+        const MAX_GALLERY_IMAGES = 8;
+        const MIN_GALLERY_DIMENSION = 300;
+
         // Existing images arrive as a JSON-encoded array of paths (the raw
         // ProductValue string); once the user touches this field it becomes
         // a real (string | File)[] array mixing kept paths with newly picked
         // files, which the backend merges back together on save instead of
         // replacing the whole set (see ProductController::update()).
         const items = parseGalleryItems(value);
+        const atLimit = items.length >= MAX_GALLERY_IMAGES;
 
         const removeAt = (index: number) => {
+            setGalleryError(null);
             onChange(items.filter((_, i) => i !== index));
         };
 
+        // Mirrors the video field's handleVideoSelect() below — same "fast,
+        // no-round-trip" reasoning; ProductController::validateImageConstraints()
+        // is what a request made directly against the endpoint (bypassing
+        // this UI) can't get past.
+        const probeDimensions = (file: File) =>
+            new Promise<{ width: number; height: number }>((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('unreadable'));
+                };
+                img.src = url;
+            });
+
         const addFiles = (fileList: FileList) => {
-            onChange([...items, ...Array.from(fileList)]);
+            setGalleryError(null);
+
+            const incoming = Array.from(fileList);
+            const remainingSlots = MAX_GALLERY_IMAGES - items.length;
+
+            if (remainingSlots <= 0) {
+                setGalleryError(`You can upload up to ${MAX_GALLERY_IMAGES} images.`);
+                return;
+            }
+
+            const accepted = incoming.slice(0, remainingSlots);
+            const skippedByLimit = incoming.length - accepted.length;
+
+            Promise.all(
+                accepted.map((file) =>
+                    probeDimensions(file)
+                        .then((dim) => ({ file, ok: dim.width >= MIN_GALLERY_DIMENSION && dim.height >= MIN_GALLERY_DIMENSION }))
+                        .catch(() => ({ file, ok: false })),
+                ),
+            ).then((results) => {
+                const valid = results.filter((r) => r.ok).map((r) => r.file);
+                const rejectedByDimension = results.length - valid.length;
+
+                if (rejectedByDimension > 0 || skippedByLimit > 0) {
+                    const messages = [];
+                    if (skippedByLimit > 0) messages.push(`up to ${MAX_GALLERY_IMAGES} images allowed`);
+                    if (rejectedByDimension > 0) messages.push(`image must be at least ${MIN_GALLERY_DIMENSION}x${MIN_GALLERY_DIMENSION}px`);
+                    setGalleryError(messages.join(' — '));
+                }
+
+                if (valid.length > 0) {
+                    onChange([...items, ...valid]);
+                }
+            });
         };
 
         return (
@@ -2248,6 +2306,9 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    Up to {MAX_GALLERY_IMAGES} images ({items.length}/{MAX_GALLERY_IMAGES}) · Minimum size {MIN_GALLERY_DIMENSION}×{MIN_GALLERY_DIMENSION}px
+                </Typography>
                 {items.length > 0 && (
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
                         {items.map((item, index) => (
@@ -2264,7 +2325,7 @@ function RenderAttributeInput({
                     component="label"
                     variant="outlined"
                     size="small"
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || atLimit}
                     startIcon={<CloudUploadIcon fontSize="small" />}
                     sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
                 >
@@ -2272,7 +2333,7 @@ function RenderAttributeInput({
                     <input
                         type="file"
                         hidden
-                        disabled={isReadOnly}
+                        disabled={isReadOnly || atLimit}
                         multiple
                         accept="image/*"
                         onChange={(e) => {
@@ -2283,6 +2344,11 @@ function RenderAttributeInput({
                         }}
                     />
                 </Button>
+                {galleryError && (
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                        {galleryError}
+                    </Typography>
+                )}
             </Box>
         );
     }
@@ -2325,8 +2391,8 @@ function RenderAttributeInput({
             probe.preload = 'metadata';
             probe.onloadedmetadata = () => {
                 URL.revokeObjectURL(probeUrl);
-                if (probe.duration > 60) {
-                    setVideoError('Video must be 60 seconds or shorter.');
+                if (probe.duration > 300) {
+                    setVideoError('Video must be 5 minutes or shorter.');
                     return;
                 }
                 if (probe.videoWidth < 480 || probe.videoHeight < 480) {

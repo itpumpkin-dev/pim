@@ -251,6 +251,210 @@ class LazadaClient
     }
 
     /**
+     * Block size for UploadVideoBlock — confirmed live, 2026-08-22, that a
+     * whole ~9.98MB file sent as a single block is rejected
+     * (`ILLEGAL_PARAMETER: file size is illegal: 9979020`), disproving this
+     * method's original assumption that Lazada's per-file cap (<100M) meant
+     * splitting was never needed. Lazada's own docs never state an exact max
+     * block size, only an illustrative example (an 8MB file split into
+     * 3MB+3MB+2MB blocks) — 2MB is picked conservatively under that example's
+     * own largest block, not a confirmed exact limit. If a future real call
+     * still gets `file size is illegal`, tighten this further based on
+     * whatever byte count that error names next.
+     */
+    private const VIDEO_BLOCK_SIZE = 2_000_000;
+
+    /**
+     * Uploads one video to Lazada's Media Center and returns its video_id,
+     * for the `video` product attribute — added after a real push hit
+     * `BIZ_CHECK_EXTERNAL_VIDEO_IS_FORBIDDEN` (2026-08-22): Lazada rejects
+     * any video URL not already hosted on their own domain, the same rule
+     * uploadImage() above already works around for images. There was no
+     * equivalent upload path for video at all before this.
+     *
+     * Confirmed against real docs (open.lazada.com, Media Center API)
+     * 2026-08-22: 3 calls — InitCreateVideo (POST /media/video/block/create,
+     * {fileName, fileBytes} → upload_id) → UploadVideoBlock (POST
+     * /media/video/block/upload, {uploadId, blockNo, blockCount, file} →
+     * e_tag, repeated once per VIDEO_BLOCK_SIZE-byte chunk — see that
+     * constant's docblock for why a single block was wrong) →
+     * CompleteCreateVideo (POST /media/video/block/commit, {uploadId, parts,
+     * title, coverUrl} → video_id).
+     *
+     * NOT confirmed live end-to-end yet. Two specific unknowns the docs
+     * didn't spell out: (1) the exact key names inside `parts`' JSON string
+     * for each block's e_tag — guessed as partNumber/eTag (camelCase,
+     * matching the visible `partNumber` prefix in the docs' own truncated
+     * curl example) since the response field itself is `e_tag` (snake_case)
+     * and there's no full confirmed example; (2) whether the common signed
+     * params belong in the multipart body alongside the video bytes for
+     * UploadVideoBlock, assumed here the same way as uploadImage()'s own
+     * unconfirmed assumption for images. Expect to have to fix one of these
+     * against a real next response.
+     */
+    public function uploadVideo(string $videoUrl, string $coverUrl): string
+    {
+        $localPath = $this->resolveLocalPublicStoragePath($videoUrl);
+        $videoBytes = $localPath !== null
+            ? Storage::disk('public')->get($localPath)
+            : Http::timeout(60)->retry(2, 200)->get($videoUrl)->body();
+
+        if (! $videoBytes) {
+            throw new RuntimeException("Could not read video to upload to Lazada: {$videoUrl}");
+        }
+
+        $fileName = basename((string) parse_url($videoUrl, PHP_URL_PATH)) ?: 'video.mp4';
+        $fileBytes = strlen($videoBytes);
+
+        $uploadId = $this->initCreateVideo($fileName, $fileBytes);
+        $parts = $this->uploadVideoBlocks($uploadId, $videoBytes, $fileName);
+
+        return $this->completeCreateVideo($uploadId, $parts, $fileName, $coverUrl);
+    }
+
+    /** InitCreateVideo — POST /media/video/block/create. Declares the file up front so Lazada knows what to expect from the block(s) that follow. */
+    private function initCreateVideo(string $fileName, int $fileBytes): string
+    {
+        $apiPath = '/media/video/block/create';
+
+        $params = $this->signedParams($apiPath, [
+            'fileName' => $fileName,
+            'fileBytes' => (string) $fileBytes,
+        ], requiresAccessToken: true);
+
+        $response = Http::timeout(30)->asForm()->post($this->baseUrl.$apiPath, $params);
+        $data = $this->handleMediaResponse($response, $apiPath, $params);
+
+        $uploadId = $data['upload_id'] ?? null;
+        if (! $uploadId) {
+            throw new RuntimeException('Lazada InitCreateVideo succeeded but returned no upload_id: '.json_encode($data, JSON_UNESCAPED_UNICODE));
+        }
+
+        return $uploadId;
+    }
+
+    /**
+     * UploadVideoBlock — POST /media/video/block/upload, once per
+     * VIDEO_BLOCK_SIZE-byte chunk (the last chunk is whatever remains).
+     *
+     * @return list<array{partNumber: int, eTag: string}> for CompleteCreateVideo's `parts`
+     */
+    private function uploadVideoBlocks(string $uploadId, string $videoBytes, string $fileName): array
+    {
+        $apiPath = '/media/video/block/upload';
+        $chunks = str_split($videoBytes, self::VIDEO_BLOCK_SIZE);
+        $blockCount = count($chunks);
+        $parts = [];
+
+        foreach ($chunks as $blockNo => $chunk) {
+            $params = $this->signedParams($apiPath, [
+                'uploadId' => $uploadId,
+                'blockNo' => (string) $blockNo,
+                'blockCount' => (string) $blockCount,
+            ], requiresAccessToken: true);
+
+            $response = Http::timeout(60)->attach('file', $chunk, $fileName)
+                ->post($this->baseUrl.$apiPath, $params);
+
+            $data = $this->handleMediaResponse($response, $apiPath, "[binary video block {$blockNo}/{$blockCount}, ".strlen($chunk).' bytes]');
+
+            $eTag = $data['e_tag'] ?? null;
+            if (! $eTag) {
+                throw new RuntimeException("Lazada UploadVideoBlock (block {$blockNo}/{$blockCount}) succeeded but returned no e_tag: ".json_encode($data, JSON_UNESCAPED_UNICODE));
+            }
+
+            // Confirmed live, 2026-08-22: all 5 blocks uploaded fine (each
+            // returned a real e_tag) with 0-indexed blockNo, but
+            // CompleteCreateVideo then rejected the commit with
+            // `300100 InvalidPart` when `parts[].partNumber` was sent
+            // 0-indexed too. The underlying service is Alibaba-OSS-based
+            // (`com.alibaba...media.openplatform`, the same "blockComplete"
+            // vocabulary OSS/S3 multipart uploads use) — those APIs
+            // universally require PartNumber to start at 1 in the *complete*
+            // call, even though the *upload* step's own blockNo here is
+            // separately, explicitly documented as 0-indexed. blockNo itself
+            // stays 0-indexed (that part already works); only the value
+            // recorded into `parts` is offset by 1.
+            $parts[] = ['partNumber' => $blockNo + 1, 'eTag' => $eTag];
+        }
+
+        return $parts;
+    }
+
+    /**
+     * CompleteCreateVideo — POST /media/video/block/commit. $coverUrl must
+     * already be a Lazada-hosted URL (e.g. the product's own main image,
+     * already run through uploadImage()) — Lazada's external-URL rule almost
+     * certainly applies to this field too, the same as the video itself.
+     *
+     * @param  list<array{partNumber: int, eTag: string}>  $parts
+     */
+    private function completeCreateVideo(string $uploadId, array $parts, string $title, string $coverUrl): string
+    {
+        $apiPath = '/media/video/block/commit';
+
+        $params = $this->signedParams($apiPath, [
+            'uploadId' => $uploadId,
+            // See uploadVideo()'s docblock — key names here are a guess, not
+            // confirmed against a real response.
+            'parts' => json_encode($parts),
+            'title' => $title,
+            'coverUrl' => $coverUrl,
+        ], requiresAccessToken: true);
+
+        $response = Http::timeout(30)->asForm()->post($this->baseUrl.$apiPath, $params);
+        $data = $this->handleMediaResponse($response, $apiPath, $params);
+
+        $videoId = $data['video_id'] ?? null;
+        if (! $videoId) {
+            throw new RuntimeException('Lazada CompleteCreateVideo succeeded but returned no video_id: '.json_encode($data, JSON_UNESCAPED_UNICODE));
+        }
+
+        return (string) $videoId;
+    }
+
+    /**
+     * Media Center endpoints (InitCreateVideo/UploadVideoBlock/
+     * CompleteCreateVideo) signal success differently from the rest of this
+     * API: a `success` boolean plus `result_code`/`result_message`, with the
+     * standard `code` field staying "0" regardless of whether the call
+     * actually succeeded. Confirmed live, 2026-08-22: a real
+     * ILLEGAL_PARAMETER rejection ("file size is illegal: 9979020") came back
+     * with `code: "0"` — handleResponse()'s own success check — but
+     * `success: false`, so it silently passed through as "success" and only
+     * surfaced later as a confusing "no e_tag returned" error instead of the
+     * real cause. This checks `success` explicitly instead of reusing
+     * handleResponse(). filter_var(...FILTER_VALIDATE_BOOLEAN) tolerates
+     * either a real JSON boolean (confirmed for the real error response
+     * above) or a string "true"/"false" (as shown, possibly just a docs
+     * placeholder typo, in the docs' own success example) — either shape is
+     * accepted the same way.
+     */
+    private function handleMediaResponse(Response $response, string $apiPath, mixed $requestBodyForLogging): array
+    {
+        $data = $response->json();
+
+        if ($data === null) {
+            throw new RuntimeException("Lazada API returned a non-JSON response (HTTP {$response->status()}): ".$response->body());
+        }
+
+        if (! filter_var($data['success'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            Log::error('Lazada Media Center API error', [
+                'api_path' => $apiPath,
+                'request_body' => $requestBodyForLogging,
+                'response' => $data,
+            ]);
+
+            throw new RuntimeException(
+                "Lazada Media Center error [{$apiPath}] [".($data['result_code'] ?? '?').']: '.($data['result_message'] ?? 'unknown error')
+                .' | full response: '.json_encode($data, JSON_UNESCAPED_UNICODE)
+            );
+        }
+
+        return $data;
+    }
+
+    /**
      * Reverses Storage::disk('public')->url($path) — every image URL this
      * codebase builds (AttributeValueFormatter, etc.) goes through that same
      * call, so stripping its known prefix reliably recovers the original

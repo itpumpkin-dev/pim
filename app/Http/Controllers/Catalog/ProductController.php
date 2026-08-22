@@ -54,6 +54,17 @@ class ProductController extends Controller
 {
     use HasVersionHistory;
 
+    // Matches TikTok's own main_images cap (9, but 1 slot is implicitly the
+    // "main" image in most marketplace UIs) — enforced here at the PIM's own
+    // upload step so the limit is visible while editing instead of only
+    // surfacing later as a marketplace push failure.
+    private const MAX_GALLERY_IMAGES = 8;
+
+    // Marketplace image requirements (TikTok's Create Product API among
+    // them) specify a 300x300px minimum — enforced here for the same reason
+    // as MAX_GALLERY_IMAGES above.
+    private const MIN_IMAGE_DIMENSION = 300;
+
     public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
 
     public function index(Request $request): Response
@@ -1167,7 +1178,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Duration (≤60s) and dimension (≥480×480px) checks for the `video`
+     * Duration (≤5 min) and dimension (≥480×480px) checks for the `video`
      * attribute type — Laravel's validator has no built-in rule for either,
      * and reading them requires actually parsing the MP4's metadata, which
      * getID3 (james-heinrich/getid3, pure PHP, no ffmpeg binary needed) does
@@ -1184,14 +1195,34 @@ class ProductController extends Controller
         $info = (new \getID3)->analyze($file->getRealPath());
 
         $duration = $info['playtime_seconds'] ?? null;
-        if ($duration !== null && $duration > 60) {
-            return 'Video must be 60 seconds or shorter.';
+        if ($duration !== null && $duration > 300) {
+            return 'Video must be 5 minutes or shorter.';
         }
 
         $width = $info['video']['resolution_x'] ?? null;
         $height = $info['video']['resolution_y'] ?? null;
         if ($width !== null && $height !== null && ($width < 480 || $height < 480)) {
             return 'Video must be at least 480x480px.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Minimum-dimension check for the `image`/`gallery` attribute types —
+     * same reasoning and pattern as validateVideoConstraints() above, using
+     * getimagesize() (built into PHP, no extra dependency needed for a
+     * dimension-only check) instead of getID3. Only called once Laravel's
+     * own `image` rule has already passed, so $file is always a real,
+     * readable image here.
+     */
+    private function validateImageConstraints(UploadedFile $file): ?string
+    {
+        $size = @getimagesize($file->getRealPath());
+        [$width, $height] = $size !== false ? $size : [null, null];
+
+        if ($width !== null && $height !== null && ($width < self::MIN_IMAGE_DIMENSION || $height < self::MIN_IMAGE_DIMENSION)) {
+            return sprintf('Image must be at least %dx%dpx.', self::MIN_IMAGE_DIMENSION, self::MIN_IMAGE_DIMENSION);
         }
 
         return null;
@@ -2242,6 +2273,15 @@ class ProductController extends Controller
                     }
                 }
 
+                if (in_array($attribute->type, ['image', 'gallery'], true)) {
+                    $imageError = $this->validateImageConstraints($file);
+                    if ($imageError !== null) {
+                        $valueErrors["values.{$attribute->id}"] = "{$attribute->name}: {$imageError}";
+
+                        return null;
+                    }
+                }
+
                 return $file->store('product-attributes', 'public');
             };
 
@@ -2269,9 +2309,21 @@ class ProductController extends Controller
                                         (array) ($values[$attributeId][$channelKey][$localeKey] ?? []),
                                         fn ($v) => is_string($v) && $v !== ''
                                     ));
+                                    $incomingFiles = array_values(array_filter($file));
+
+                                    // Checked before storing any of the incoming files
+                                    // (rather than after), so a request over the limit
+                                    // never leaves orphaned files on disk that no
+                                    // product_values row ends up referencing.
+                                    if (count($keptPaths) + count($incomingFiles) > self::MAX_GALLERY_IMAGES) {
+                                        $valueErrors["values.{$attributeId}"] = "{$attribute->name}: You can upload up to ".self::MAX_GALLERY_IMAGES.' images.';
+
+                                        continue;
+                                    }
+
                                     $newPaths = array_values(array_filter(array_map(
                                         fn ($f) => $storeAttributeFile($attribute, $f),
-                                        array_filter($file)
+                                        $incomingFiles
                                     )));
                                     $values[$attributeId][$channelKey][$localeKey] = json_encode(array_merge($keptPaths, $newPaths));
                                 } elseif ($file) {

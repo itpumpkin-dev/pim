@@ -1,23 +1,8 @@
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    Grid,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { ListSubheader, MenuItem, Select } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { mappedChipSx, naChipSx, pendingRowSx, solidActionSx, UI_BORDER } from '@/lib/ui-style';
+import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
+import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
 
 // v1 supports free-value Lazada attributes (input_type text/numeric) and
 // richText fields (e.g. description/short_description, which accept real
@@ -27,6 +12,48 @@ import { mappedChipSx, naChipSx, pendingRowSx, solidActionSx, UI_BORDER } from '
 // disabled, since Lazada needs a specific predefined option for those
 // rather than an arbitrary value.
 const MAPPABLE_INPUT_TYPES = ['text', 'numeric', 'richText'];
+
+type TargetField =
+    | 'name'
+    | 'price'
+    | 'qty'
+    | 'weight'
+    | 'length'
+    | 'width'
+    | 'height'
+    | 'video'
+    | 'lazada_attribute'
+    | '';
+
+// Single-value, "first mapped attribute with a value wins" fields feeding
+// Lazada's own payload directly (SellerSku/quantity/price/package_*/
+// attributes.video) — see LazadaProductSyncService::resolveMappedField().
+// Distinct from `lazada_attribute` below, which feeds one Lazada category
+// attribute instead (payload.attributes or payload.skus[0], depending on
+// that attribute's own attribute_type) — a structurally different
+// destination, kept in its own dropdown group (and its own status caption).
+const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'video'];
+
+// The target Select's value is a plain TargetField string for every fixed
+// payload field, but a Lazada category-attribute mapping needs to also
+// carry *which* attribute — encoded as this prefix + its name (Lazada
+// attributes are identified by name, not a numeric id) — e.g.
+// "lazada_attribute:product_warranty".
+const LAZADA_ATTRIBUTE_PREFIX = 'lazada_attribute:';
+
+// Field identifiers are snake_case (matching the backend's target_field
+// values) but this app's i18n keys are camelCase — same keys
+// woocommerce-/shopee-attribute-mapping-panel.tsx use for the same fields.
+const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'lazada_attribute'>, string> = {
+    name: 'name',
+    price: 'price',
+    qty: 'qty',
+    weight: 'weight',
+    length: 'length',
+    width: 'width',
+    height: 'height',
+    video: 'video',
+};
 
 interface LazadaAttributeOption {
     name: string;
@@ -39,6 +66,7 @@ interface AttributeRow {
     code: string;
     label: string;
     type: string;
+    target_field: TargetField | null;
     lazada_attribute_name: string | null;
     sort_order: number;
 }
@@ -46,218 +74,103 @@ interface AttributeRow {
 export interface LazadaAttributeMappingPanelProps {
     attributes: AttributeRow[];
     lazadaAttributes: LazadaAttributeOption[];
+    coverage: { payloadFields: CoverageStat; platformAttributes: CoverageStat };
 }
 
-interface PendingEntry {
-    lazada_attribute_name: string | null;
-    sort_order: number;
-}
-
-export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes }: LazadaAttributeMappingPanelProps) {
+export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes, coverage }: LazadaAttributeMappingPanelProps) {
     const { t } = useTranslation('catalog');
 
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState<'all' | 'mapped' | 'unmapped'>('all');
-    const [pending, setPending] = useState<Record<number, PendingEntry>>({});
-    const [saving, setSaving] = useState(false);
-    const [syncing, setSyncing] = useState(false);
+    const rows: MappingAttributeRow[] = attributes.map((a) => ({
+        id: a.id,
+        code: a.code,
+        label: a.label,
+        type: a.type,
+        target_field: a.target_field,
+        custom_id: a.lazada_attribute_name,
+        sort_order: a.sort_order,
+    }));
 
-    const valueFor = (row: AttributeRow): PendingEntry =>
-        pending[row.id] ?? { lazada_attribute_name: row.lazada_attribute_name ?? null, sort_order: row.sort_order };
-
-    const isMapped = (row: AttributeRow) => valueFor(row).lazada_attribute_name !== null;
-
-    const filtered = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-
-        return attributes.filter((a) => {
-            if (needle && !a.code.toLowerCase().includes(needle) && !a.label.toLowerCase().includes(needle)) {
-                return false;
-            }
-
-            if (status === 'mapped' && !isMapped(a)) return false;
-            if (status === 'unmapped' && isMapped(a)) return false;
-
-            return true;
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [attributes, search, status, pending]);
-
-    const setLazadaAttribute = (row: AttributeRow, raw: string) => {
-        setPending((prev) => ({
-            ...prev,
-            [row.id]: { ...valueFor(row), lazada_attribute_name: raw === '' ? null : raw },
-        }));
-    };
-
-    const setSortOrder = (row: AttributeRow, sort_order: number) => {
-        setPending((prev) => ({ ...prev, [row.id]: { ...valueFor(row), sort_order } }));
-    };
-
-    const pendingCount = Object.keys(pending).length;
-
-    const saveChanges = () => {
-        const mappings = Object.entries(pending).map(([attributeId, entry]) => ({
-            attribute_id: Number(attributeId),
-            lazada_attribute_name: entry.lazada_attribute_name,
+    const mapping = useAttributeMapping({
+        attributes: rows,
+        saveUrl: '/catalog/attributes/lazada-mapping',
+        syncUrl: '/catalog/attributes/lazada-mapping/sync',
+        buildSavePayload: (entry) => ({
+            attribute_id: entry.attribute_id,
+            target_field: entry.target_field,
+            lazada_attribute_name: entry.custom_id,
             sort_order: entry.sort_order,
-        }));
+        }),
+    });
 
-        if (mappings.length === 0) {
-            return;
-        }
-
-        setSaving(true);
-        router.post(
-            '/catalog/attributes/lazada-mapping',
-            { mappings },
-            {
-                preserveScroll: true,
-                onSuccess: () => setPending({}),
-                onFinish: () => setSaving(false),
-            },
-        );
+    // Backend reports payloadFields.missing as raw target_field keys — same
+    // translation the picker's own dropdown uses, so the tooltip matches.
+    const payloadFieldsCoverage = {
+        ...coverage.payloadFields,
+        missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>])),
     };
 
-    const syncFromLazada = () => {
-        setSyncing(true);
-        router.post(
-            '/catalog/attributes/lazada-mapping/sync',
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setSyncing(false),
-            },
-        );
+    const buildTargetValue = (row: MappingAttributeRow): string => {
+        const entry = mapping.valueFor(row);
+        return entry.target_field === 'lazada_attribute' && entry.custom_id ? `${LAZADA_ATTRIBUTE_PREFIX}${entry.custom_id}` : entry.target_field;
+    };
+
+    const applySelectValue = (row: MappingAttributeRow, raw: string) => {
+        if (raw.startsWith(LAZADA_ATTRIBUTE_PREFIX)) {
+            mapping.setEntry(row, { target_field: 'lazada_attribute', custom_id: raw.slice(LAZADA_ATTRIBUTE_PREFIX.length) });
+        } else {
+            mapping.setEntry(row, { target_field: raw, custom_id: null });
+        }
     };
 
     return (
-        <Box>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2} sx={{ mb: 3 }}>
-                <Typography color="text.secondary" sx={{ maxWidth: 840 }}>
-                    {t('lazadaAttributeMappingHelp')}
-                </Typography>
-
-                <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-                    <Button
-                        variant="outlined"
-                        disabled={syncing}
-                        onClick={syncFromLazada}
-                        startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
-                    >
-                        {t('syncFromLazada')}
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        disabled={pendingCount === 0 || saving}
-                        onClick={saveChanges}
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={solidActionSx}
-                    >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                    </Button>
-                </Stack>
-            </Stack>
-
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-                <TextField
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={t('searchAttributes')}
-                    size="small"
-                    sx={{ minWidth: 320 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
-
-                <Select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as 'all' | 'mapped' | 'unmapped')}
-                    size="small"
-                    sx={{ minWidth: 160 }}
-                >
-                    <MenuItem value="all">{t('statusAll')}</MenuItem>
-                    <MenuItem value="mapped">{t('statusMapped')}</MenuItem>
-                    <MenuItem value="unmapped">{t('statusUnmapped')}</MenuItem>
+        <AttributeMappingTable
+            helpTextKey="lazadaAttributeMappingHelp"
+            syncLabelKey="syncFromLazada"
+            coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}
+            search={mapping.search}
+            onSearchChange={mapping.setSearch}
+            status={mapping.status}
+            onStatusChange={mapping.setStatus}
+            filtered={mapping.filtered}
+            isMapped={mapping.isMapped}
+            hasPendingChange={mapping.hasPendingChange}
+            statusCaption={(row) => (mapping.valueFor(row).target_field === 'lazada_attribute' ? t('mappedToLazadaAttribute') : t('mappedToPayload'))}
+            sortOrderFor={(row) => mapping.valueFor(row).sort_order}
+            onSortOrderChange={mapping.setSortOrder}
+            pendingCount={mapping.pendingCount}
+            saving={mapping.saving}
+            onSave={mapping.saveChanges}
+            syncing={mapping.syncing}
+            onSync={mapping.syncFromPlatform}
+            renderMapToCell={(row) => (
+                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
+                    <MenuItem value="">{t('notUsed')}</MenuItem>
+                    <ListSubheader>{t('lazadaPayloadFieldsGroup')}</ListSubheader>
+                    {STRUCTURED_FIELDS.map((field) => (
+                        <MenuItem
+                            key={field}
+                            value={field}
+                            // Lazada rejects external video URLs (see this field's
+                            // backend guard) — only a PIM attribute of type `video`
+                            // (an uploaded file) may ever target the Video field.
+                            disabled={field === 'video' && row.type !== 'video'}
+                        >
+                            {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>])}
+                        </MenuItem>
+                    ))}
+                    <ListSubheader>{t('lazadaAttributesGroup')}</ListSubheader>
+                    {lazadaAttributes.map((la) => (
+                        <MenuItem
+                            key={la.name}
+                            value={`${LAZADA_ATTRIBUTE_PREFIX}${la.name}`}
+                            disabled={!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type)}
+                        >
+                            {la.label ?? la.name}
+                            {!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type) ? ` ${t('lazadaSelectUnsupported')}` : ''}
+                        </MenuItem>
+                    ))}
                 </Select>
-            </Stack>
-
-            <Grid container spacing={2}>
-                {filtered.map((row) => {
-                    const value = valueFor(row);
-                    const hasPendingChange = row.id in pending;
-                    const mapped = isMapped(row);
-
-                    return (
-                        <Grid item xs={12} sm={6} md={4} key={row.id}>
-                            <Paper
-                                variant="outlined"
-                                sx={{ p: 2, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, ...pendingRowSx(hasPendingChange) }}
-                            >
-                                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography fontWeight={600} noWrap title={row.label}>{row.label}</Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                                            {row.code} · {row.type}
-                                        </Typography>
-                                    </Box>
-
-                                    <Chip
-                                        label={mapped ? t('statusMapped') : t('statusUnmapped')}
-                                        size="small"
-                                        sx={mapped ? mappedChipSx : naChipSx}
-                                    />
-                                </Stack>
-
-                                <Select
-                                    value={value.lazada_attribute_name ?? ''}
-                                    onChange={(e) => setLazadaAttribute(row, e.target.value)}
-                                    size="small"
-                                    fullWidth
-                                >
-                                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                                    {lazadaAttributes.map((la) => (
-                                        <MenuItem
-                                            key={la.name}
-                                            value={la.name}
-                                            disabled={!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type)}
-                                        >
-                                            {la.label ?? la.name}
-                                            {!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type) ? ` ${t('lazadaSelectUnsupported')}` : ''}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-
-                                {value.lazada_attribute_name !== null && (
-                                    <TextField
-                                        type="number"
-                                        size="small"
-                                        label={t('sortOrder')}
-                                        value={value.sort_order}
-                                        onChange={(e) => setSortOrder(row, Number(e.target.value) || 0)}
-                                        sx={{ width: 100 }}
-                                        slotProps={{ htmlInput: { min: 0 } }}
-                                    />
-                                )}
-                            </Paper>
-                        </Grid>
-                    );
-                })}
-
-                {filtered.length === 0 && (
-                    <Grid item xs={12}>
-                        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2, borderColor: UI_BORDER }}>
-                            <Typography color="text.secondary">{t('noAttributesFound')}</Typography>
-                        </Paper>
-                    </Grid>
-                )}
-            </Grid>
-        </Box>
+            )}
+        />
     );
 }

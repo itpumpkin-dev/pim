@@ -369,7 +369,9 @@ class TikTokClient
      * uploadImage() above. Used for certification PDFs and product videos
      * (certifications[].files[].id / video.id in createProduct()/
      * updateProduct()) — $filename must include the extension per the docs
-     * ("certification.pdf", not "certification").
+     * ("certification.pdf", not "certification"). Wired up for the video
+     * case, 2026-08-22, by TikTokProductSyncService::uploadVideoToTikTok() —
+     * still not itself confirmed live (that method's docblock).
      */
     public function uploadFile(string $fileUrl, ?string $filename = null, string $apiVersion = '202309'): string
     {

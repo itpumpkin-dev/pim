@@ -2,8 +2,8 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Box, Button, Divider, Tab, Tabs, Typography } from '@mui/material';
-import { useState } from 'react';
+import { Box, Button, CircularProgress, Divider, Tab, Tabs, Typography } from '@mui/material';
+import { useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { LazadaAttributeMappingPanel, type LazadaAttributeMappingPanelProps } from '@/components/catalog/lazada-attribute-mapping-panel';
 import { ShopeeAttributeMappingPanel, type ShopeeAttributeMappingPanelProps } from '@/components/catalog/shopee-attribute-mapping-panel';
@@ -35,6 +35,12 @@ interface Props {
  * mounting all four up front at once was making the page visibly stall on
  * first load for a render of ~400 cards nobody was looking at yet — this
  * defers each tab's cost to the moment it's actually opened.
+ *
+ * That first-open mount is still itself a synchronous render of ~100 rows'
+ * worth of Selects/TextFields, which can take long enough to feel like the
+ * click did nothing. The tab switch runs inside a transition (isPending)
+ * so React keeps the outgoing panel on screen — dimmed, under a spinner —
+ * instead of the whole area going blank while the new one is prepared.
  */
 export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazada, tiktok }: Props) {
     const { t } = useTranslation('catalog');
@@ -49,10 +55,13 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
 
     const [tabIndex, setTabIndex] = useState(0);
     const [openedTabs, setOpenedTabs] = useState<Set<number>>(new Set([0]));
+    const [isPending, startTransition] = useTransition();
 
     const handleTabChange = (index: number) => {
-        setTabIndex(index);
-        setOpenedTabs((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+        startTransition(() => {
+            setTabIndex(index);
+            setOpenedTabs((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+        });
     };
 
     return (
@@ -73,7 +82,7 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
                     {t('marketplaceAttributeMappingHelp')}
                 </Typography>
 
-                <Box sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
+                <Box sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => handleTabChange(v)}
@@ -88,28 +97,56 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
                         <Tab label="Lazada" />
                         <Tab label="TikTok" />
                     </Tabs>
+                    {isPending && <CircularProgress size={18} thickness={5} sx={{ ml: 2 }} />}
                 </Box>
 
-                {openedTabs.has(0) && (
-                    <Box sx={{ pt: 3, display: tabIndex === 0 ? 'block' : 'none' }}>
-                        <WooCommerceAttributeMappingPanel attributes={woocommerce.attributes} wooCommerceAttributes={woocommerce.wooCommerceAttributes} />
-                    </Box>
-                )}
-                {openedTabs.has(1) && (
-                    <Box sx={{ pt: 3, display: tabIndex === 1 ? 'block' : 'none' }}>
-                        <ShopeeAttributeMappingPanel attributes={shopee.attributes} shopeeAttributes={shopee.shopeeAttributes} />
-                    </Box>
-                )}
-                {openedTabs.has(2) && (
-                    <Box sx={{ pt: 3, display: tabIndex === 2 ? 'block' : 'none' }}>
-                        <LazadaAttributeMappingPanel attributes={lazada.attributes} lazadaAttributes={lazada.lazadaAttributes} />
-                    </Box>
-                )}
-                {openedTabs.has(3) && (
-                    <Box sx={{ pt: 3, display: tabIndex === 3 ? 'block' : 'none' }}>
-                        <TikTokAttributeMappingPanel attributes={tiktok.attributes} tiktokAttributes={tiktok.tiktokAttributes} />
-                    </Box>
-                )}
+                <Box sx={{ position: 'relative' }}>
+                    {isPending && (
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                zIndex: 1,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: 1.5,
+                                pt: 8,
+                                bgcolor: 'rgba(255,255,255,0.7)',
+                            }}
+                        >
+                            <CircularProgress size={32} />
+                            <Typography variant="body2" color="text.secondary">
+                                {t('marketplaceAttributeMappingTabLoading')}
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {openedTabs.has(0) && (
+                        <Box sx={{ pt: 3, display: tabIndex === 0 ? 'block' : 'none' }}>
+                            <WooCommerceAttributeMappingPanel
+                                attributes={woocommerce.attributes}
+                                wooCommerceAttributes={woocommerce.wooCommerceAttributes}
+                                coverage={woocommerce.coverage}
+                            />
+                        </Box>
+                    )}
+                    {openedTabs.has(1) && (
+                        <Box sx={{ pt: 3, display: tabIndex === 1 ? 'block' : 'none' }}>
+                            <ShopeeAttributeMappingPanel attributes={shopee.attributes} shopeeAttributes={shopee.shopeeAttributes} coverage={shopee.coverage} />
+                        </Box>
+                    )}
+                    {openedTabs.has(2) && (
+                        <Box sx={{ pt: 3, display: tabIndex === 2 ? 'block' : 'none' }}>
+                            <LazadaAttributeMappingPanel attributes={lazada.attributes} lazadaAttributes={lazada.lazadaAttributes} coverage={lazada.coverage} />
+                        </Box>
+                    )}
+                    {openedTabs.has(3) && (
+                        <Box sx={{ pt: 3, display: tabIndex === 3 ? 'block' : 'none' }}>
+                            <TikTokAttributeMappingPanel attributes={tiktok.attributes} tiktokAttributes={tiktok.tiktokAttributes} coverage={tiktok.coverage} />
+                        </Box>
+                    )}
+                </Box>
             </Box>
         </AppLayout>
     );

@@ -8,14 +8,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * One row per PIM attribute mapped into a specific Shopee attribute_list
- * entry — v1 only supports free-text Shopee attributes (input_type
- * FREE_TEXT_FILED = 3), so unlike WooCommerceAttributeMapping there is no
- * target_field: a mapping either has a shopee_attribute_id or doesn't exist.
- * First mapped PIM attribute with a value wins per shopee_attribute_id (by
- * sort_order) — see ShopeeProductSyncService::resolveAttributes(). Managed
- * from the "จับคู่เนื้อหา Shopee" mapping page
- * (ShopeeAttributeMappingController).
+ * One row per PIM attribute mapped into a Shopee push field — same
+ * `target_field` shape as WooCommerceAttributeMapping: either one of
+ * Shopee's structured payload fields (`name`/`price`/`qty`/`weight`/
+ * `length`/`width`/`height`/`description`/`video`, first mapped attribute
+ * with a value wins — see ShopeeProductSyncService::resolveMappedField())
+ * or `shopee_attribute` (feeds one specific `attribute_list` entry,
+ * identified by `shopee_attribute_id` — see resolveAttributes()). v1 only
+ * supports free-text Shopee attributes (input_type FREE_TEXT_FILED = 3) for
+ * the `shopee_attribute` case. `video` is further restricted server-side to
+ * PIM attributes of type `video` (see ShopeeAttributeMappingController) —
+ * same external-URL restriction Lazada/TikTok's video fields have. Managed
+ * from the "จับคู่เนื้อหา Shopee" mapping page (ShopeeAttributeMappingController).
  */
 class ShopeeAttributeMapping extends Model
 {
@@ -25,6 +29,7 @@ class ShopeeAttributeMapping extends Model
 
     protected $fillable = [
         'attribute_id',
+        'target_field',
         'shopee_attribute_id',
         'sort_order',
         'created_by',

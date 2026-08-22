@@ -14,10 +14,13 @@ use Illuminate\Support\Facades\Cache;
  * WooCommerceProductSyncService::buildContentFields()), a structured
  * field (`name`/`price`/`image`/`qty`/`weight`/`length`/`width`/`height`,
  * first mapped attribute with a value wins — see resolveMappedField()),
- * or `wc_attribute` (feeds one specific WooCommerce Product Attribute,
- * identified by `woocommerce_attribute_id` — see
- * buildWooCommerceAttributes()). Managed from the "PIM Attribute →
- * WooCommerce Content" mapping page (WooCommerceAttributeMappingController).
+ * `video` (pushed as `meta_data[key=youtube_url]`, same meta key
+ * WooCommerceExporter's CSV flow already uses for this — see
+ * WooCommerceProductSyncService::buildPayload()), or `wc_attribute` (feeds
+ * one specific WooCommerce Product Attribute, identified by
+ * `woocommerce_attribute_id` — see buildWooCommerceAttributes()). Managed
+ * from the "PIM Attribute → WooCommerce Content" mapping page
+ * (WooCommerceAttributeMappingController).
  */
 class WooCommerceAttributeMapping extends Model
 {

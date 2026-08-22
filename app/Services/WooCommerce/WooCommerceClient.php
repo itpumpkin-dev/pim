@@ -256,8 +256,10 @@ class WooCommerceClient
                 'response' => $data,
             ]);
 
-            throw new RuntimeException(
-                "WooCommerce API error [{$response->status()}] for {$method} {$path}: ".($data['message'] ?? 'unknown error')
+            throw new WooCommerceApiException(
+                "WooCommerce API error [{$response->status()}] for {$method} {$path}: ".($data['message'] ?? 'unknown error'),
+                apiErrorCode: $data['code'] ?? null,
+                errorData: $data['data'] ?? [],
             );
         }
 

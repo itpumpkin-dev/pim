@@ -29,6 +29,11 @@ class AttributeCatalogSeeder extends Seeder
         'eol' => ['boolean', false, false],
         'pgroupname' => ['select', false, false],
         'pimage' => ['image', false, false],
+        // Multi-image gallery (up to 8, enforced in ProductController) — feeds
+        // Lazada/Shopee/TikTok's multi-image push fields; falls back to
+        // `pimage` for any product that hasn't been given gallery images yet
+        // (see ResolvesProductAttributeValues::resolveProductImageUrls()).
+        'pgallery' => ['gallery', false, false],
         'unitinfo' => ['text', false, false],
         'pointtype' => ['select', false, false],
         'barcode_pcs' => ['text', false, false],

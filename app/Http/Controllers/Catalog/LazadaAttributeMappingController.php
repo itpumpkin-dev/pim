@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
@@ -11,16 +12,19 @@ use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each Lazada category
- * attribute, without a code change — see
- * LazadaProductSyncService::buildPayload(), which reads this table to fill
- * payload.attributes (attribute_type=normal) / the SKU fields
- * (attribute_type=sku) beyond the fixed name/short_description/brand set it
- * already sends. v1 only supports free-value attributes (input_type text/
- * numeric) — singleSelect/multiSelect need a specific predefined option, not
- * an arbitrary value, so they're synced for visibility but rejected as a
+ * Lets an admin pick which PIM attribute feeds each Lazada push field,
+ * without a code change — see LazadaProductSyncService::buildPayload()/
+ * resolveMappedField() (structured fields) and resolveMappedAttributes()
+ * (`lazada_attribute` — payload.attributes when attribute_type=normal / the
+ * SKU fields when attribute_type=sku, the old behavior), which read this
+ * table instead of the old hardcoded pname/price_std/qty/attribute_6/
+ * SKU_FIELD_SOURCE lookups. v1 only supports free-value attributes
+ * (input_type text/numeric) for the `lazada_attribute` target —
+ * singleSelect/multiSelect need a specific predefined option, not an
+ * arbitrary value, so they're synced for visibility but rejected as a
  * mapping target here (same scope decision already made for Shopee's
  * equivalent page).
  *
@@ -44,23 +48,63 @@ class LazadaAttributeMappingController extends Controller
     // support yet.
     private const MAPPABLE_INPUT_TYPES = ['text', 'numeric', 'richText'];
 
+    private const TARGET_FIELDS = [
+        'name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'video',
+        'lazada_attribute',
+    ];
+
     public function update(Request $request): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
             'mappings.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
+            'mappings.*.target_field' => ['nullable', Rule::in(self::TARGET_FIELDS)],
             'mappings.*.lazada_attribute_name' => ['nullable', 'string', 'exists:lazada_attributes,name'],
             'mappings.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $validator->after(function ($validator) use ($request) {
+            $entries = (array) $request->input('mappings', []);
+
             $lazadaAttributesByName = LazadaAttribute::whereIn(
                 'name',
-                collect($request->input('mappings', []))->pluck('lazada_attribute_name')->filter()
+                collect($entries)->pluck('lazada_attribute_name')->filter()
             )->get()->keyBy('name');
 
-            foreach ((array) $request->input('mappings', []) as $index => $entry) {
+            // Lazada rejects any external video URL (confirmed live,
+            // BIZ_CHECK_EXTERNAL_VIDEO_IS_FORBIDDEN) — only a PIM attribute
+            // of type `video` (an uploaded file, e.g. attribute_6) may ever
+            // be mapped to target_field='video', never a plain-text/URL
+            // attribute like youtube_url. See this controller's class
+            // docblock and the migration that reopened this field for why.
+            $attributesById = Attribute::whereIn(
+                'id',
+                collect($entries)->pluck('attribute_id')->filter()
+            )->get()->keyBy('id');
+
+            foreach ($entries as $index => $entry) {
+                $isLazadaAttribute = ($entry['target_field'] ?? null) === 'lazada_attribute';
                 $lazadaAttributeName = $entry['lazada_attribute_name'] ?? null;
+
+                if ($isLazadaAttribute && !$lazadaAttributeName) {
+                    $validator->errors()->add("mappings.{$index}.lazada_attribute_name", 'A Lazada attribute must be chosen for this mapping.');
+                    continue;
+                }
+                if (!$isLazadaAttribute && $lazadaAttributeName) {
+                    $validator->errors()->add("mappings.{$index}.lazada_attribute_name", 'Only valid when target_field is lazada_attribute.');
+                    continue;
+                }
+
+                if (($entry['target_field'] ?? null) === 'video') {
+                    $attribute = $attributesById->get($entry['attribute_id'] ?? null);
+                    if ($attribute && $attribute->type !== 'video') {
+                        $validator->errors()->add(
+                            "mappings.{$index}.target_field",
+                            'Lazada rejects external video URLs — only a video-type PIM attribute can be mapped here.'
+                        );
+                    }
+                }
+
                 if (!$lazadaAttributeName) {
                     continue;
                 }
@@ -78,7 +122,7 @@ class LazadaAttributeMappingController extends Controller
         $validated = $validator->validate();
 
         foreach ($validated['mappings'] as $entry) {
-            if (empty($entry['lazada_attribute_name'])) {
+            if (empty($entry['target_field'])) {
                 LazadaAttributeMapping::where('attribute_id', $entry['attribute_id'])->delete();
                 continue;
             }
@@ -87,7 +131,8 @@ class LazadaAttributeMappingController extends Controller
             if (!$mapping->exists) {
                 $mapping->created_by = $request->user()?->id;
             }
-            $mapping->lazada_attribute_name = $entry['lazada_attribute_name'];
+            $mapping->target_field = $entry['target_field'];
+            $mapping->lazada_attribute_name = $entry['lazada_attribute_name'] ?? null;
             $mapping->sort_order = $entry['sort_order'] ?? 0;
             $mapping->updated_by = $request->user()?->id;
             $mapping->save();

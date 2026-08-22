@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
@@ -11,17 +12,21 @@ use App\Services\TikTok\TikTokClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each TikTok product
- * attribute, without a code change — see TikTokProductSyncService::
- * resolveProductAttributes(), which reads this table instead of the
- * previously-empty hardcoded TIKTOK_ATTRIBUTE_SOURCE const. v1 only
- * supports attributes TikTok itself marks `is_customizable` (the seller may
- * type a free value) — attributes without that flag need a specific
- * predefined value from TikTok's own `values[]` list, not an arbitrary one,
- * so they're synced for visibility but rejected as a mapping target here
- * (same scope decision already made for Shopee/Lazada's equivalent pages).
+ * Lets an admin pick which PIM attribute feeds each TikTok push field,
+ * without a code change — see TikTokProductSyncService::buildPayload()/
+ * resolveMappedField() (structured fields) and resolveProductAttributes()
+ * (`tiktok_attribute`, the old behavior), which read this table instead of
+ * the old hardcoded pname/price_std/qty/weight_pcs/product_details_features/
+ * attribute_6/DIMENSION_FIELD_SOURCE lookups. v1 only supports attributes
+ * TikTok itself marks `is_customizable` (the seller may type a free value)
+ * for the `tiktok_attribute` target — attributes without that flag need a
+ * specific predefined value from TikTok's own `values[]` list, not an
+ * arbitrary one, so they're synced for visibility but rejected as a mapping
+ * target here (same scope decision already made for Shopee/Lazada's
+ * equivalent pages).
  *
  * The read-only index() this used to own now lives in
  * MarketplaceAttributeMappingController (bundled with WooCommerce/Shopee/
@@ -31,23 +36,61 @@ use Illuminate\Support\Facades\Validator;
  */
 class TikTokAttributeMappingController extends Controller
 {
+    private const TARGET_FIELDS = [
+        'name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video',
+        'tiktok_attribute',
+    ];
+
     public function update(Request $request): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
             'mappings.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
+            'mappings.*.target_field' => ['nullable', Rule::in(self::TARGET_FIELDS)],
             'mappings.*.tiktok_attribute_id' => ['nullable', 'string', 'exists:tiktok_attributes,id'],
             'mappings.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $validator->after(function ($validator) use ($request) {
+            $entries = (array) $request->input('mappings', []);
+
             $tiktokAttributesById = TikTokAttribute::whereIn(
                 'id',
-                collect($request->input('mappings', []))->pluck('tiktok_attribute_id')->filter()
+                collect($entries)->pluck('tiktok_attribute_id')->filter()
             )->get()->keyBy('id');
 
-            foreach ((array) $request->input('mappings', []) as $index => $entry) {
+            // Same external-video restriction as Lazada's video field (see
+            // LazadaAttributeMappingController's docblock for the live
+            // incident this prevents a repeat of) — only a PIM attribute of
+            // type `video` may ever be mapped to target_field='video'.
+            $attributesById = Attribute::whereIn(
+                'id',
+                collect($entries)->pluck('attribute_id')->filter()
+            )->get()->keyBy('id');
+
+            foreach ($entries as $index => $entry) {
+                $isTiktokAttribute = ($entry['target_field'] ?? null) === 'tiktok_attribute';
                 $tiktokAttributeId = $entry['tiktok_attribute_id'] ?? null;
+
+                if ($isTiktokAttribute && !$tiktokAttributeId) {
+                    $validator->errors()->add("mappings.{$index}.tiktok_attribute_id", 'A TikTok attribute must be chosen for this mapping.');
+                    continue;
+                }
+                if (!$isTiktokAttribute && $tiktokAttributeId) {
+                    $validator->errors()->add("mappings.{$index}.tiktok_attribute_id", 'Only valid when target_field is tiktok_attribute.');
+                    continue;
+                }
+
+                if (($entry['target_field'] ?? null) === 'video') {
+                    $attribute = $attributesById->get($entry['attribute_id'] ?? null);
+                    if ($attribute && $attribute->type !== 'video') {
+                        $validator->errors()->add(
+                            "mappings.{$index}.target_field",
+                            "TikTok's video field expects an uploaded file, not an external URL — only a video-type PIM attribute can be mapped here."
+                        );
+                    }
+                }
+
                 if (!$tiktokAttributeId) {
                     continue;
                 }
@@ -65,7 +108,7 @@ class TikTokAttributeMappingController extends Controller
         $validated = $validator->validate();
 
         foreach ($validated['mappings'] as $entry) {
-            if (empty($entry['tiktok_attribute_id'])) {
+            if (empty($entry['target_field'])) {
                 TikTokAttributeMapping::where('attribute_id', $entry['attribute_id'])->delete();
                 continue;
             }
@@ -74,7 +117,8 @@ class TikTokAttributeMappingController extends Controller
             if (!$mapping->exists) {
                 $mapping->created_by = $request->user()?->id;
             }
-            $mapping->tiktok_attribute_id = $entry['tiktok_attribute_id'];
+            $mapping->target_field = $entry['target_field'];
+            $mapping->tiktok_attribute_id = $entry['tiktok_attribute_id'] ?? null;
             $mapping->sort_order = $entry['sort_order'] ?? 0;
             $mapping->updated_by = $request->user()?->id;
             $mapping->save();

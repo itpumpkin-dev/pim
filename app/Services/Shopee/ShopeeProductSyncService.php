@@ -36,16 +36,6 @@ class ShopeeProductSyncService
 {
     use ResolvesProductAttributeValues;
 
-    /**
-     * Same role as LazadaProductSyncService::SKU_FIELD_SOURCE — our
-     * attribute code for each Shopee dimension field, when we have it.
-     */
-    private const DIMENSION_FIELD_SOURCE = [
-        'package_length' => 'length_pcs',
-        'package_width' => 'width_pcs',
-        'package_height' => 'height_pcs',
-    ];
-
     public function __construct(private readonly ShopeeClient $client)
     {
     }
@@ -80,30 +70,40 @@ class ShopeeProductSyncService
             throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Shopee category yet.");
         }
 
-        $name = $this->attributeValue($product, 'pname', $shop->channel_id, localeCode: 'th');
-        $price = $this->attributeValue($product, 'price_std', $shop->channel_id);
-        $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
-        $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
-        $weight = $this->attributeValue($product, 'weight_pcs', $shop->channel_id);
-        // `product_details_features` is the same attribute WooCommerce's
-        // buildContentFields() defaults `description` to — real product copy
-        // instead of the name repeated verbatim. Falls back to $name only
-        // when a product has no content there yet, since Shopee's
-        // `description` is a required field (confirmed live: add_item
-        // rejects a missing one) and this app doesn't pre-validate that the
-        // way Lazada's buildPayload() does for its own mandatory fields.
-        $description = $this->attributeValue($product, 'product_details_features', $shop->channel_id, localeCode: 'th') ?: $name;
-        // PIM's own `video` attribute type has only one attribute using it
-        // today (attribute_6) — Shopee's video_info is optional (per the
-        // product form: no `*`), so this stays null and gets filtered out of
-        // the payload entirely for any product that hasn't set one.
-        $videoUrl = $this->attributeValue($product, 'attribute_6', $shop->channel_id);
+        // Admin-configurable (ShopeeAttributeMappingController) — replaces
+        // the old hardcoded pname/price_std/qty/weight_pcs/
+        // product_details_features/attribute_6/length_pcs/width_pcs/
+        // height_pcs lookups. Fetched once and reused by resolveAttributes()
+        // below for the `shopee_attribute` group.
+        $mappings = ShopeeAttributeMapping::with('attribute')->orderBy('sort_order')->get();
+
+        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
+        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
+        // Full `pgallery` list when the product has one, falling back to
+        // the single legacy `pimage` — see ResolvesProductAttributeValues::
+        // resolveProductImageUrls(). Not part of the target_field mapping
+        // system (see ShopeeAttributeMappingController's docblock) — Shopee
+        // already pulls the whole gallery dynamically, a different
+        // (multi-value) mechanism than the single-value fields below.
+        $imageUrls = $this->resolveProductImageUrls($product, $shop->channel_id);
+        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
+        $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id);
+        // Falls back to $name only when a product has no mapped content yet,
+        // since Shopee's `description` is a required field (confirmed live:
+        // add_item rejects a missing one) and this app doesn't pre-validate
+        // that the way Lazada's buildPayload() does for its own mandatory
+        // fields.
+        $description = $this->resolveMappedField($mappings, 'description', $product, $shop->channel_id, localeCode: 'th') ?: $name;
+        // Shopee's video_upload_id is optional (per the product form: no
+        // `*`), so this stays null and gets filtered out of the payload
+        // entirely for any product with no mapped video attribute/value.
+        $videoUrl = $this->resolveMappedField($mappings, 'video', $product, $shop->channel_id);
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to Shopee.");
         }
 
-        if (!$imageUrl) {
+        if (empty($imageUrls)) {
             throw new RuntimeException("Product '{$product->sku}' has no image — Shopee requires at least one.");
         }
 
@@ -112,7 +112,7 @@ class ShopeeProductSyncService
             throw new RuntimeException("Shop '{$shop->name}' has no enabled Shopee logistics channel — cannot push.");
         }
 
-        $attributes = $this->resolveAttributes($product, $shop->channel_id, (int) $category->shopee_category_id);
+        $attributes = $this->resolveAttributes($mappings, $product, $shop->channel_id, (int) $category->shopee_category_id);
         if (!empty($attributes['missing'])) {
             throw new RuntimeException(
                 'Shopee category requires attribute(s) this app has no data for and cannot auto-fill: '
@@ -122,10 +122,11 @@ class ShopeeProductSyncService
             );
         }
 
-        $dimension = array_filter(array_map(
-            fn (string $ourAttributeCode) => $this->attributeValue($product, $ourAttributeCode, $shop->channel_id),
-            self::DIMENSION_FIELD_SOURCE
-        ));
+        $dimension = array_filter([
+            'package_length' => $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id),
+            'package_width' => $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id),
+            'package_height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
+        ]);
 
         $brand = $this->resolveBrand((int) $category->shopee_category_id);
 
@@ -150,12 +151,16 @@ class ShopeeProductSyncService
             // a real Shopee image_id via uploadImagesToShopee() below.
             // Kept out of this method so buildPayload() stays
             // side-effect-free/safe to call anytime for inspection.
-            'image' => ['image_id_list' => [$imageUrl]],
+            'image' => ['image_id_list' => $imageUrls],
             // Still our own storage URL at this point, same reasoning as
-            // `image` above — push()'s uploadVideoToShopee() swaps it for a
-            // real Shopee video_id (a multi-step upload-then-transcode flow,
-            // see ShopeeClient::uploadVideo()) before this payload is sent.
-            'video_info' => $videoUrl ? [['video_url' => $videoUrl]] : null,
+            // `image` above — push()'s uploadVideoToShopee() swaps it for
+            // the real Shopee video_upload_id (a multi-step upload-then-
+            // transcode flow, see ShopeeClient::uploadVideo()) before this
+            // payload is sent. v2.product.add_item's own docs (confirmed
+            // 2026-08-22) show this as a flat `video_upload_id` array of at
+            // most one string — not the nested `video_info`/`video_id`
+            // shape this used to guess.
+            'video_upload_id' => $videoUrl ? [$videoUrl] : null,
             'logistic_info' => array_map(
                 fn ($id) => ['logistic_id' => $id, 'enabled' => true],
                 $enabledChannelIds
@@ -191,9 +196,8 @@ class ShopeeProductSyncService
      */
     private function uploadVideoToShopee(array $payload): array
     {
-        if (!empty($payload['video_info'][0]['video_url'])) {
-            $videoId = $this->client->uploadVideo($payload['video_info'][0]['video_url']);
-            $payload['video_info'] = [['video_id' => $videoId]];
+        if (!empty($payload['video_upload_id'][0])) {
+            $payload['video_upload_id'] = [$this->client->uploadVideo($payload['video_upload_id'][0])];
         }
 
         return $payload;
@@ -433,18 +437,15 @@ class ShopeeProductSyncService
      * ShopeeAttributeMappingController::update() already refuses to let a
      * mapping target.
      *
+     * @param \Illuminate\Support\Collection<int, ShopeeAttributeMapping> $mappings same collection buildPayload() already fetched
      * @return array{attribute_list: list<array{attribute_id: int, attribute_value_list: list<array{original_value_name: string}>}>, missing: list<string>}
      */
-    private function resolveAttributes(Product $product, ?int $channelId, int $categoryId): array
+    private function resolveAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId, int $categoryId): array
     {
         $response = $this->client->getAttributeTree([$categoryId]);
         $schema = $response['response']['list'][0]['attribute_tree'] ?? [];
 
-        $mappingsByShopeeAttributeId = ShopeeAttributeMapping::whereNotNull('shopee_attribute_id')
-            ->with('attribute')
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('shopee_attribute_id');
+        $mappingsByShopeeAttributeId = $mappings->where('target_field', 'shopee_attribute')->groupBy('shopee_attribute_id');
 
         $attributeList = [];
         $missing = [];

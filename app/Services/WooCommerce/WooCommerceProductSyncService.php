@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\WooCommerceAttributeMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
+use App\Services\WooCommerce\WooCommerceApiException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -30,6 +31,13 @@ use RuntimeException;
  *    so there's no reason to prefer a cache that could go stale.
  *
  * No per-shop WooCommerceSellerAccount model exists — see forShop() below.
+ *
+ * Video, ADDED 2026-08-22: unlike TikTok/Lazada/Shopee (which each have a
+ * real video-upload API), WooCommerce's REST product resource has no native
+ * video field at all — pushed instead as `meta_data[key=youtube_url]` (see
+ * buildPayload()), the same meta key WooCommerceExporter's separate CSV
+ * export flow already uses for this attribute, so a theme/plugin already
+ * reading that key works the same regardless of which flow wrote it.
  */
 class WooCommerceProductSyncService
 {
@@ -65,16 +73,25 @@ class WooCommerceProductSyncService
     {
         $mappings = WooCommerceAttributeMapping::with('attribute')->orderBy('sort_order')->get();
 
-        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id);
-        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
-        $imageUrl = $this->resolveMappedField($mappings, 'image', $product, $shop->channel_id);
-        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
-        $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id);
-        $length = $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id);
-        $width = $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id);
-        $height = $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id);
+        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
+        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id, localeCode: 'th');
+        $imageUrl = $this->resolveMappedField($mappings, 'image', $product, $shop->channel_id, localeCode: 'th');
+        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id, localeCode: 'th');
+        $weight = $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id, localeCode: 'th');
+        $length = $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id, localeCode: 'th');
+        $width = $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id, localeCode: 'th');
+        $height = $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id, localeCode: 'th');
         $content = $this->buildContentFields($mappings, $product, $shop->channel_id);
         $wcAttributes = $this->buildWooCommerceAttributes($mappings, $product, $shop->channel_id);
+        // Pushed as meta_data[key=youtube_url] below, not a native WooCommerce
+        // REST field (the product resource has none) — same meta key
+        // WooCommerceExporter's CSV export flow already uses for this exact
+        // attribute, so a theme/plugin already reading that key from a
+        // CSV-imported product picks this up the same way. Source attribute
+        // is admin-configurable like every other mapped field here (added
+        // 2026-08-22 expecting `youtube_url` to be mapped, but not hardcoded
+        // to it — any mapped attribute with a value works).
+        $videoUrl = $this->resolveMappedField($mappings, 'video', $product, $shop->channel_id, localeCode: 'th');
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to WooCommerce.");
@@ -105,33 +122,8 @@ class WooCommerceProductSyncService
             'images' => $imageUrl ? [['src' => $imageUrl]] : null,
             'categories' => count($categoryIds) ? $categoryIds : null,
             'attributes' => count($wcAttributes) ? $wcAttributes : null,
+            'meta_data' => $videoUrl ? [['key' => 'youtube_url', 'value' => $videoUrl]] : null,
         ], fn ($v) => $v !== null && $v !== []);
-    }
-
-    /**
-     * Single-value WooCommerce fields (name/price/image/qty/weight/length/
-     * width/height) — "first match wins": walks every attribute an admin
-     * has mapped to this target, in sort_order, and returns the first one
-     * with an actual value for this product. Mapping both price_std (order
-     * 0) and price_recommend (order 1) to 'price' reproduces the old
-     * `price_std ?? price_recommend` fallback this replaced, for any target,
-     * not just price. Always passes `localeCode: 'th'` — see
-     * buildContentFields()'s docblock for why that's safe unconditionally.
-     */
-    private function resolveMappedField(\Illuminate\Support\Collection $mappings, string $targetField, Product $product, ?int $channelId): ?string
-    {
-        foreach ($mappings->where('target_field', $targetField) as $mapping) {
-            if (!$mapping->attribute) {
-                continue;
-            }
-
-            $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
-            if ($value) {
-                return $value;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -237,11 +229,39 @@ class WooCommerceProductSyncService
 
         $result = $existing
             ? $this->client->updateProduct((int) $existing['id'], $payload)
-            : $this->client->createProduct($payload);
+            : $this->createOrRecoverProduct($payload);
 
         $this->cacheStatus($product, $shop, $result);
 
         return $result;
+    }
+
+    /**
+     * Falls back to updating the product WooCommerce itself names
+     * (error `data.resource_id`) when createProduct() rejects with
+     * `product_invalid_sku` — confirmed live, 2026-08-22: findProductBySku()
+     * came back empty for a product this exact push() had created under the
+     * same SKU only ~30s earlier, most likely a brief read-after-write lag
+     * somewhere between WooCommerce's REST product list (what
+     * findProductBySku() queries) and wc_get_product_id_by_sku()'s own
+     * direct-from-postmeta lookup (what surfaces resource_id in this error,
+     * per WooCommerce core) — not something re-querying findProductBySku()
+     * immediately would reliably fix. Any other create failure (including a
+     * product_invalid_sku with no resolvable resource_id) still propagates
+     * normally rather than being silently swallowed.
+     */
+    private function createOrRecoverProduct(array $payload): array
+    {
+        try {
+            return $this->client->createProduct($payload);
+        } catch (WooCommerceApiException $e) {
+            $resourceId = $e->errorData['resource_id'] ?? null;
+            if ($e->apiErrorCode !== 'product_invalid_sku' || !$resourceId) {
+                throw $e;
+            }
+
+            return $this->client->updateProduct((int) $resourceId, $payload);
+        }
     }
 
     /**

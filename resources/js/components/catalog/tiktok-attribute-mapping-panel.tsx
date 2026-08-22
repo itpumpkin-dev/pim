@@ -1,23 +1,8 @@
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    Grid,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { ListSubheader, MenuItem, Select } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { mappedChipSx, naChipSx, pendingRowSx, solidActionSx, UI_BORDER } from '@/lib/ui-style';
+import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
+import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
 
 // v1 only supports TikTok attributes marked is_customizable (the seller may
 // type a free value) — see TikTokAttributeMappingController::update(),
@@ -26,6 +11,50 @@ import { mappedChipSx, naChipSx, pendingRowSx, solidActionSx, UI_BORDER } from '
 // exist) but disabled, since TikTok needs a specific predefined value for
 // those rather than an arbitrary one — same scope decision already made
 // for the Shopee/Lazada mapping pages.
+
+type TargetField =
+    | 'name'
+    | 'price'
+    | 'qty'
+    | 'weight'
+    | 'length'
+    | 'width'
+    | 'height'
+    | 'description'
+    | 'video'
+    | 'tiktok_attribute'
+    | '';
+
+// Single-value, "first mapped attribute with a value wins" fields feeding
+// TikTok's own create/update product payload directly (title/price/
+// inventory/package_*/description/video) — see
+// TikTokProductSyncService::resolveMappedField(). Distinct from
+// `tiktok_attribute` below, which feeds one entry of TikTok's own
+// `product_attributes[]` instead — a structurally different destination,
+// kept in its own dropdown group (and its own status caption).
+const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video'];
+
+// The target Select's value is a plain TargetField string for every fixed
+// payload field, but a TikTok product-attribute mapping needs to also carry
+// *which* one — encoded as this prefix + its id (e.g. "tiktok_attribute:100335")
+// so one MUI Select can represent both without a second control.
+const TIKTOK_ATTRIBUTE_PREFIX = 'tiktok_attribute:';
+
+// Field identifiers are snake_case (matching the backend's target_field
+// values) but this app's i18n keys are camelCase — same keys
+// woocommerce-/shopee-/lazada-attribute-mapping-panel.tsx use for the same
+// fields.
+const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'tiktok_attribute'>, string> = {
+    name: 'name',
+    price: 'price',
+    qty: 'qty',
+    weight: 'weight',
+    length: 'length',
+    width: 'width',
+    height: 'height',
+    description: 'description',
+    video: 'video',
+};
 
 interface TikTokAttributeOption {
     id: string;
@@ -38,6 +67,7 @@ interface AttributeRow {
     code: string;
     label: string;
     type: string;
+    target_field: TargetField | null;
     tiktok_attribute_id: string | null;
     sort_order: number;
 }
@@ -45,214 +75,99 @@ interface AttributeRow {
 export interface TikTokAttributeMappingPanelProps {
     attributes: AttributeRow[];
     tiktokAttributes: TikTokAttributeOption[];
+    coverage: { payloadFields: CoverageStat; platformAttributes: CoverageStat };
 }
 
-interface PendingEntry {
-    tiktok_attribute_id: string | null;
-    sort_order: number;
-}
-
-export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes }: TikTokAttributeMappingPanelProps) {
+export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes, coverage }: TikTokAttributeMappingPanelProps) {
     const { t } = useTranslation('catalog');
 
-    const [search, setSearch] = useState('');
-    const [status, setStatus] = useState<'all' | 'mapped' | 'unmapped'>('all');
-    const [pending, setPending] = useState<Record<number, PendingEntry>>({});
-    const [saving, setSaving] = useState(false);
-    const [syncing, setSyncing] = useState(false);
+    const rows: MappingAttributeRow[] = attributes.map((a) => ({
+        id: a.id,
+        code: a.code,
+        label: a.label,
+        type: a.type,
+        target_field: a.target_field,
+        custom_id: a.tiktok_attribute_id,
+        sort_order: a.sort_order,
+    }));
 
-    const valueFor = (row: AttributeRow): PendingEntry =>
-        pending[row.id] ?? { tiktok_attribute_id: row.tiktok_attribute_id ?? null, sort_order: row.sort_order };
-
-    const isMapped = (row: AttributeRow) => valueFor(row).tiktok_attribute_id !== null;
-
-    const filtered = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-
-        return attributes.filter((a) => {
-            if (needle && !a.code.toLowerCase().includes(needle) && !a.label.toLowerCase().includes(needle)) {
-                return false;
-            }
-
-            if (status === 'mapped' && !isMapped(a)) return false;
-            if (status === 'unmapped' && isMapped(a)) return false;
-
-            return true;
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [attributes, search, status, pending]);
-
-    const setTikTokAttribute = (row: AttributeRow, raw: string) => {
-        setPending((prev) => ({
-            ...prev,
-            [row.id]: { ...valueFor(row), tiktok_attribute_id: raw === '' ? null : raw },
-        }));
-    };
-
-    const setSortOrder = (row: AttributeRow, sort_order: number) => {
-        setPending((prev) => ({ ...prev, [row.id]: { ...valueFor(row), sort_order } }));
-    };
-
-    const pendingCount = Object.keys(pending).length;
-
-    const saveChanges = () => {
-        const mappings = Object.entries(pending).map(([attributeId, entry]) => ({
-            attribute_id: Number(attributeId),
-            tiktok_attribute_id: entry.tiktok_attribute_id,
+    const mapping = useAttributeMapping({
+        attributes: rows,
+        saveUrl: '/catalog/attributes/tiktok-mapping',
+        syncUrl: '/catalog/attributes/tiktok-mapping/sync',
+        buildSavePayload: (entry) => ({
+            attribute_id: entry.attribute_id,
+            target_field: entry.target_field,
+            tiktok_attribute_id: entry.custom_id,
             sort_order: entry.sort_order,
-        }));
+        }),
+    });
 
-        if (mappings.length === 0) {
-            return;
-        }
-
-        setSaving(true);
-        router.post(
-            '/catalog/attributes/tiktok-mapping',
-            { mappings },
-            {
-                preserveScroll: true,
-                onSuccess: () => setPending({}),
-                onFinish: () => setSaving(false),
-            },
-        );
+    // Backend reports payloadFields.missing as raw target_field keys — same
+    // translation the picker's own dropdown uses, so the tooltip matches.
+    const payloadFieldsCoverage = {
+        ...coverage.payloadFields,
+        missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>])),
     };
 
-    const syncFromTikTok = () => {
-        setSyncing(true);
-        router.post(
-            '/catalog/attributes/tiktok-mapping/sync',
-            {},
-            {
-                preserveScroll: true,
-                onFinish: () => setSyncing(false),
-            },
-        );
+    const buildTargetValue = (row: MappingAttributeRow): string => {
+        const entry = mapping.valueFor(row);
+        return entry.target_field === 'tiktok_attribute' && entry.custom_id ? `${TIKTOK_ATTRIBUTE_PREFIX}${entry.custom_id}` : entry.target_field;
+    };
+
+    const applySelectValue = (row: MappingAttributeRow, raw: string) => {
+        if (raw.startsWith(TIKTOK_ATTRIBUTE_PREFIX)) {
+            mapping.setEntry(row, { target_field: 'tiktok_attribute', custom_id: raw.slice(TIKTOK_ATTRIBUTE_PREFIX.length) });
+        } else {
+            mapping.setEntry(row, { target_field: raw, custom_id: null });
+        }
     };
 
     return (
-        <Box>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2} sx={{ mb: 3 }}>
-                <Typography color="text.secondary" sx={{ maxWidth: 840 }}>
-                    {t('tiktokAttributeMappingHelp')}
-                </Typography>
-
-                <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
-                    <Button
-                        variant="outlined"
-                        disabled={syncing}
-                        onClick={syncFromTikTok}
-                        startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
-                    >
-                        {t('syncFromTiktok')}
-                    </Button>
-
-                    <Button
-                        variant="contained"
-                        disabled={pendingCount === 0 || saving}
-                        onClick={saveChanges}
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={solidActionSx}
-                    >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                    </Button>
-                </Stack>
-            </Stack>
-
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2 }}>
-                <TextField
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={t('searchAttributes')}
-                    size="small"
-                    sx={{ minWidth: 320 }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
-
-                <Select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as 'all' | 'mapped' | 'unmapped')}
-                    size="small"
-                    sx={{ minWidth: 160 }}
-                >
-                    <MenuItem value="all">{t('statusAll')}</MenuItem>
-                    <MenuItem value="mapped">{t('statusMapped')}</MenuItem>
-                    <MenuItem value="unmapped">{t('statusUnmapped')}</MenuItem>
+        <AttributeMappingTable
+            helpTextKey="tiktokAttributeMappingHelp"
+            syncLabelKey="syncFromTiktok"
+            coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}
+            search={mapping.search}
+            onSearchChange={mapping.setSearch}
+            status={mapping.status}
+            onStatusChange={mapping.setStatus}
+            filtered={mapping.filtered}
+            isMapped={mapping.isMapped}
+            hasPendingChange={mapping.hasPendingChange}
+            statusCaption={(row) => (mapping.valueFor(row).target_field === 'tiktok_attribute' ? t('mappedToTiktokAttribute') : t('mappedToPayload'))}
+            sortOrderFor={(row) => mapping.valueFor(row).sort_order}
+            onSortOrderChange={mapping.setSortOrder}
+            pendingCount={mapping.pendingCount}
+            saving={mapping.saving}
+            onSave={mapping.saveChanges}
+            syncing={mapping.syncing}
+            onSync={mapping.syncFromPlatform}
+            renderMapToCell={(row) => (
+                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
+                    <MenuItem value="">{t('notUsed')}</MenuItem>
+                    <ListSubheader>{t('tiktokPayloadFieldsGroup')}</ListSubheader>
+                    {STRUCTURED_FIELDS.map((field) => (
+                        <MenuItem
+                            key={field}
+                            value={field}
+                            // TikTok's video field expects an uploaded file, not an
+                            // external URL (see this field's backend guard) — only a
+                            // PIM attribute of type `video` may ever target it.
+                            disabled={field === 'video' && row.type !== 'video'}
+                        >
+                            {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>])}
+                        </MenuItem>
+                    ))}
+                    <ListSubheader>{t('tiktokAttributesGroup')}</ListSubheader>
+                    {tiktokAttributes.map((ta) => (
+                        <MenuItem key={ta.id} value={`${TIKTOK_ATTRIBUTE_PREFIX}${ta.id}`} disabled={!ta.is_customizable}>
+                            {ta.name}
+                            {!ta.is_customizable ? ` ${t('tiktokSelectUnsupported')}` : ''}
+                        </MenuItem>
+                    ))}
                 </Select>
-            </Stack>
-
-            <Grid container spacing={2}>
-                {filtered.map((row) => {
-                    const value = valueFor(row);
-                    const hasPendingChange = row.id in pending;
-                    const mapped = isMapped(row);
-
-                    return (
-                        <Grid item xs={12} sm={6} md={4} key={row.id}>
-                            <Paper
-                                variant="outlined"
-                                sx={{ p: 2, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column', gap: 1.5, ...pendingRowSx(hasPendingChange) }}
-                            >
-                                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography fontWeight={600} noWrap title={row.label}>{row.label}</Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                                            {row.code} · {row.type}
-                                        </Typography>
-                                    </Box>
-
-                                    <Chip
-                                        label={mapped ? t('statusMapped') : t('statusUnmapped')}
-                                        size="small"
-                                        sx={mapped ? mappedChipSx : naChipSx}
-                                    />
-                                </Stack>
-
-                                <Select
-                                    value={value.tiktok_attribute_id ?? ''}
-                                    onChange={(e) => setTikTokAttribute(row, e.target.value)}
-                                    size="small"
-                                    fullWidth
-                                >
-                                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                                    {tiktokAttributes.map((ta) => (
-                                        <MenuItem key={ta.id} value={ta.id} disabled={!ta.is_customizable}>
-                                            {ta.name}
-                                            {!ta.is_customizable ? ` ${t('tiktokSelectUnsupported')}` : ''}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-
-                                {value.tiktok_attribute_id !== null && (
-                                    <TextField
-                                        type="number"
-                                        size="small"
-                                        label={t('sortOrder')}
-                                        value={value.sort_order}
-                                        onChange={(e) => setSortOrder(row, Number(e.target.value) || 0)}
-                                        sx={{ width: 100 }}
-                                        slotProps={{ htmlInput: { min: 0 } }}
-                                    />
-                                )}
-                            </Paper>
-                        </Grid>
-                    );
-                })}
-
-                {filtered.length === 0 && (
-                    <Grid item xs={12}>
-                        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2, borderColor: UI_BORDER }}>
-                            <Typography color="text.secondary">{t('noAttributesFound')}</Typography>
-                        </Paper>
-                    </Grid>
-                )}
-            </Grid>
-        </Box>
+            )}
+        />
     );
 }

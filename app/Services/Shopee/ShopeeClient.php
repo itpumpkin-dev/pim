@@ -146,24 +146,29 @@ class ShopeeClient
     }
 
     /**
-     * v2.media_space video upload — unlike uploadImage()'s single call, a
-     * video goes through Shopee's documented 4-step flow: init (declare the
-     * whole file's md5+size, get a video_upload_id) → upload_video_part (the
-     * file split into fixed ~4MB chunks, each with its own part md5) →
-     * complete (hand back every part_seq uploaded) → poll
-     * get_video_upload_result until Shopee's own transcoding finishes and
-     * hands back a video_id. Orchestrated here as one call so
-     * ShopeeProductSyncService can treat it exactly like uploadImage() — read
-     * a URL in, get back the id add_item's video_info needs.
+     * v2.media.init_video_upload / upload_video_part / complete_video_upload /
+     * get_video_upload_result — confirmed against Shopee's real current docs
+     * (open.shopee.com, "Media" section) 2026-08-22, replacing this method's
+     * previous guess against the older/deprecated `media_space` endpoint
+     * family (wrong path prefix, wrong param names, and a hardcoded 4MB
+     * chunk size instead of the server-declared `part_size`).
      *
-     * NOT confirmed live — endpoint paths/field names/chunk size follow
-     * Shopee's generally documented v2 media_space video shape, same
-     * "needs live verification before it's settled fact" caveat as
-     * addItem()/updateItem() below (see this class's docblock). The product
-     * video attribute this feeds (PIM's `attribute_6`) has never had a real
-     * value pushed through this path yet — treat the very first live call as
-     * a test, not a known-working feature, and expect to have to fix a
-     * field name or two against Shopee's actual response.
+     * Flow: init (declare business/scene/file_name/file_size/duration, get
+     * back a video_upload_id + the exact part_size to chunk by) →
+     * upload_video_part (repeat per chunk, each with its own MD5) → complete
+     * (video_upload_id only) → poll get_video_upload_result until Shopee's
+     * own transcoding finishes. v2.product.add_item's own docs (confirmed
+     * 2026-08-22) show its `video_upload_id` field wants exactly that same
+     * ID back — there is no separate "video_id" to extract, that was this
+     * method's previous, wrong guess. Orchestrated here as one call so
+     * ShopeeProductSyncService can treat it exactly like uploadImage() —
+     * read a URL in, get back the id add_item's video_upload_id needs.
+     *
+     * STILL NOT confirmed live — the docs are real, but this method itself
+     * has never been called against Shopee. The product video attribute this
+     * feeds (PIM's `attribute_6`) has never had a real value pushed through
+     * this path yet — treat the very first live call as a test, not a
+     * known-working feature.
      */
     public function uploadVideo(string $videoUrl): string
     {
@@ -176,46 +181,77 @@ class ShopeeClient
             throw new RuntimeException("Could not read video to upload to Shopee: {$videoUrl}");
         }
 
-        $videoUploadId = $this->initVideoUpload($videoBytes);
-        $partSeqList = $this->uploadVideoParts($videoUploadId, $videoBytes);
-        $this->completeVideoUpload($videoUploadId, $partSeqList);
+        $fileName = basename((string) parse_url($videoUrl, PHP_URL_PATH)) ?: 'video.mp4';
+        $duration = $this->videoDurationSeconds($videoBytes);
+
+        [$videoUploadId, $partSize] = $this->initVideoUpload($fileName, strlen($videoBytes), $duration);
+        $this->uploadVideoParts($videoUploadId, $videoBytes, $partSize);
+        $this->completeVideoUpload($videoUploadId);
 
         return $this->pollVideoUploadResult($videoUploadId);
     }
 
-    /** v2.media_space.init_video_upload — declares the whole file up front so Shopee knows what to expect across the parts that follow. */
-    private function initVideoUpload(string $videoBytes): string
+    /**
+     * getID3 needs a real file path (same library ProductController::
+     * validateVideoConstraints() already uses for the PIM's own ≤60s
+     * server-side check on upload) — that check happens at save time and
+     * doesn't persist the duration anywhere, so it's re-derived here from
+     * the downloaded bytes via a throwaway temp file.
+     */
+    private function videoDurationSeconds(string $videoBytes): int
     {
-        $apiPath = '/api/v2/media_space/init_video_upload';
+        $tmpPath = tempnam(sys_get_temp_dir(), 'shopee_video_');
+        file_put_contents($tmpPath, $videoBytes);
 
-        $response = $this->request($apiPath, [
-            'file_md5' => md5($videoBytes),
-            'file_size' => strlen($videoBytes),
-        ], method: 'POST', jsonBody: true);
+        try {
+            $info = (new \getID3)->analyze($tmpPath);
 
-        $videoUploadId = $response['response']['video_upload_id'] ?? null;
-        if (! $videoUploadId) {
-            throw new RuntimeException('Shopee init_video_upload succeeded but returned no video_upload_id: '.json_encode($response, JSON_UNESCAPED_UNICODE));
+            return max(1, (int) round($info['playtime_seconds'] ?? 1));
+        } finally {
+            @unlink($tmpPath);
         }
-
-        return $videoUploadId;
     }
 
     /**
-     * v2.media_space.upload_video_part — Shopee's documented fixed part size
-     * for this endpoint is 4,000,000 bytes per chunk (the last chunk is
-     * whatever remains). The product video attribute's own PIM-side limit
-     * (30MB, per the product edit form) keeps this to at most ~8 parts, so a
-     * plain sequential loop is fine — no need for the concurrency a larger
-     * file might warrant.
+     * v2.media.init_video_upload — business=3 (Video) / scene=1 (Shopee
+     * Video) is the only combination this app needs (the product video
+     * attribute). That combination's own documented limits: file_size max
+     * 1GB, duration 1-180s — both comfortably above the PIM's own upload-time
+     * cap (100MB / 60s, see ProductController::validateVideoConstraints()),
+     * so neither is separately enforced here.
      *
-     * @return list<int> every part_seq uploaded, for completeVideoUpload()
+     * @return array{0: string, 1: int} [video_upload_id, part_size]
      */
-    private function uploadVideoParts(string $videoUploadId, string $videoBytes): array
+    private function initVideoUpload(string $fileName, int $fileSize, int $duration): array
     {
-        $chunkSize = 4_000_000;
-        $chunks = str_split($videoBytes, $chunkSize);
-        $apiPath = '/api/v2/media_space/upload_video_part';
+        $apiPath = '/api/v2/media/init_video_upload';
+
+        $response = $this->request($apiPath, [
+            'business' => 3,
+            'scene' => 1,
+            'file_name' => $fileName,
+            'file_size' => $fileSize,
+            'duration' => $duration,
+        ], method: 'POST', jsonBody: true);
+
+        $videoUploadId = $response['response']['video_upload_id'] ?? null;
+        $partSize = $response['response']['part_size'] ?? null;
+        if (! $videoUploadId || ! $partSize) {
+            throw new RuntimeException('Shopee init_video_upload succeeded but returned no video_upload_id/part_size: '.json_encode($response, JSON_UNESCAPED_UNICODE));
+        }
+
+        return [$videoUploadId, (int) $partSize];
+    }
+
+    /**
+     * v2.media.upload_video_part — must be split into exactly $partSize-byte
+     * chunks (the last chunk is whatever remains) per init_video_upload's own
+     * returned part_size, not a fixed guessed constant.
+     */
+    private function uploadVideoParts(string $videoUploadId, string $videoBytes, int $partSize): void
+    {
+        $chunks = str_split($videoBytes, $partSize);
+        $apiPath = '/api/v2/media/upload_video_part';
 
         foreach ($chunks as $partSeq => $chunk) {
             $response = Http::timeout(60)->attach('part_content', $chunk, "part_{$partSeq}")
@@ -223,36 +259,38 @@ class ShopeeClient
                     ...$this->signedParams($apiPath),
                     'video_upload_id' => $videoUploadId,
                     'part_seq' => $partSeq,
-                    'content_md5' => md5($chunk),
+                    'part_md5' => md5($chunk),
                 ])
                 ->post($this->baseUrl.$apiPath);
 
             $this->handleResponse($response, $apiPath);
         }
-
-        return array_keys($chunks);
     }
 
-    /** v2.media_space.complete_video_upload — hands back every part_seq actually uploaded so Shopee can verify nothing's missing before it starts transcoding. */
-    private function completeVideoUpload(string $videoUploadId, array $partSeqList): void
+    /** v2.media.complete_video_upload — video_upload_id only, per the documented params (no part_seq_list — that was this method's previous, wrong media_space-era guess). */
+    private function completeVideoUpload(string $videoUploadId): void
     {
-        $this->request('/api/v2/media_space/complete_video_upload', [
+        $this->request('/api/v2/media/complete_video_upload', [
             'video_upload_id' => $videoUploadId,
-            'part_seq_list' => $partSeqList,
         ], method: 'POST', jsonBody: true);
     }
 
     /**
-     * v2.media_space.get_video_upload_result — transcoding isn't instant, so
-     * this polls until Shopee reports SUCCEEDED/FAILED rather than assuming
-     * completeVideoUpload() alone means the video_id is ready to use. Paced
+     * v2.media.get_video_upload_result — transcoding isn't instant, so this
+     * polls until Shopee reports SUCCEEDED/FAILED rather than assuming
+     * completeVideoUpload() alone means the video is ready to use. Paced
      * the same defensive way as LazadaProductSyncService::syncLiveStatus()'s
      * usleep() between calls, for the same reason (avoid tripping a
      * per-account rate limit with tight back-to-back polling).
+     *
+     * Once SUCCEEDED, this just hands back the same $videoUploadId it was
+     * given — v2.product.add_item's `video_upload_id` field (confirmed live
+     * in its own docs, 2026-08-22) wants that exact ID, not a distinct
+     * "video_id" pulled out of this response.
      */
     private function pollVideoUploadResult(string $videoUploadId): string
     {
-        $apiPath = '/api/v2/media_space/get_video_upload_result';
+        $apiPath = '/api/v2/media/get_video_upload_result';
         $maxAttempts = 20;
 
         for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
@@ -260,12 +298,7 @@ class ShopeeClient
             $status = $response['response']['status'] ?? null;
 
             if ($status === 'SUCCEEDED') {
-                $videoId = $response['response']['video_info']['video_id'] ?? null;
-                if (! $videoId) {
-                    throw new RuntimeException('Shopee reported video transcoding SUCCEEDED but returned no video_id: '.json_encode($response, JSON_UNESCAPED_UNICODE));
-                }
-
-                return $videoId;
+                return $videoUploadId;
             }
 
             if ($status === 'FAILED') {

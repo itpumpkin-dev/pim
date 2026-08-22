@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
@@ -11,15 +12,19 @@ use App\Services\Shopee\ShopeeClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each Shopee attribute_list
- * entry, without a code change — see ShopeeProductSyncService::
- * resolveAttributes(), which reads this table instead of the old hardcoded
- * SHOPEE_ATTRIBUTE_SOURCE const. v1 only supports free-text Shopee
- * attributes (input_type FREE_TEXT_FILED = 3) — select/dropdown attributes
- * need a specific value_id, not free text, so they're synced for visibility
- * but rejected as a mapping target here.
+ * Lets an admin pick which PIM attribute feeds each Shopee push field,
+ * without a code change — see ShopeeProductSyncService::buildPayload()/
+ * resolveMappedField() (structured fields) and resolveAttributes()
+ * (`shopee_attribute`, the old attribute_list-only behavior), which read
+ * this table instead of the old hardcoded pname/price_std/qty/weight_pcs/
+ * product_details_features/attribute_6/length_pcs/width_pcs/height_pcs
+ * lookups. v1 only supports free-text Shopee attributes (input_type
+ * FREE_TEXT_FILED = 3) for the `shopee_attribute` target — select/dropdown
+ * attributes need a specific value_id, not free text, so they're synced for
+ * visibility but rejected as a mapping target here.
  *
  * The read-only index() this used to own now lives in
  * MarketplaceAttributeMappingController (bundled with WooCommerce/Lazada/
@@ -31,23 +36,63 @@ class ShopeeAttributeMappingController extends Controller
 {
     private const MAPPABLE_INPUT_TYPE = 3; // FREE_TEXT_FILED
 
+    private const TARGET_FIELDS = [
+        'name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video',
+        'shopee_attribute',
+    ];
+
     public function update(Request $request): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
             'mappings.*.attribute_id' => ['required', 'integer', 'exists:attributes,id'],
+            'mappings.*.target_field' => ['nullable', Rule::in(self::TARGET_FIELDS)],
             'mappings.*.shopee_attribute_id' => ['nullable', 'integer', 'exists:shopee_attributes,id'],
             'mappings.*.sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $validator->after(function ($validator) use ($request) {
+            $entries = (array) $request->input('mappings', []);
+
             $shopeeAttributesById = ShopeeAttribute::whereIn(
                 'id',
-                collect($request->input('mappings', []))->pluck('shopee_attribute_id')->filter()
+                collect($entries)->pluck('shopee_attribute_id')->filter()
             )->get()->keyBy('id');
 
-            foreach ((array) $request->input('mappings', []) as $index => $entry) {
+            // Shopee's video_upload_id expects a real uploaded video file
+            // (see ShopeeClient::uploadVideo(), which downloads whatever URL
+            // is mapped here and re-uploads it as video bytes) — same
+            // restriction Lazada/TikTok's video fields both enforce after a
+            // real push broke there when a plain-text/URL attribute (e.g.
+            // youtube_url) got mapped instead of an uploaded-file one.
+            $attributesById = Attribute::whereIn(
+                'id',
+                collect($entries)->pluck('attribute_id')->filter()
+            )->get()->keyBy('id');
+
+            foreach ($entries as $index => $entry) {
+                $isShopeeAttribute = ($entry['target_field'] ?? null) === 'shopee_attribute';
                 $shopeeAttributeId = $entry['shopee_attribute_id'] ?? null;
+
+                if ($isShopeeAttribute && !$shopeeAttributeId) {
+                    $validator->errors()->add("mappings.{$index}.shopee_attribute_id", 'A Shopee attribute must be chosen for this mapping.');
+                    continue;
+                }
+                if (!$isShopeeAttribute && $shopeeAttributeId) {
+                    $validator->errors()->add("mappings.{$index}.shopee_attribute_id", 'Only valid when target_field is shopee_attribute.');
+                    continue;
+                }
+
+                if (($entry['target_field'] ?? null) === 'video') {
+                    $attribute = $attributesById->get($entry['attribute_id'] ?? null);
+                    if ($attribute && $attribute->type !== 'video') {
+                        $validator->errors()->add(
+                            "mappings.{$index}.target_field",
+                            "Shopee's video field expects an uploaded file, not an external URL — only a video-type PIM attribute can be mapped here."
+                        );
+                    }
+                }
+
                 if (!$shopeeAttributeId) {
                     continue;
                 }
@@ -65,7 +110,7 @@ class ShopeeAttributeMappingController extends Controller
         $validated = $validator->validate();
 
         foreach ($validated['mappings'] as $entry) {
-            if (empty($entry['shopee_attribute_id'])) {
+            if (empty($entry['target_field'])) {
                 ShopeeAttributeMapping::where('attribute_id', $entry['attribute_id'])->delete();
                 continue;
             }
@@ -74,7 +119,8 @@ class ShopeeAttributeMappingController extends Controller
             if (!$mapping->exists) {
                 $mapping->created_by = $request->user()?->id;
             }
-            $mapping->shopee_attribute_id = $entry['shopee_attribute_id'];
+            $mapping->target_field = $entry['target_field'];
+            $mapping->shopee_attribute_id = $entry['shopee_attribute_id'] ?? null;
             $mapping->sort_order = $entry['sort_order'] ?? 0;
             $mapping->updated_by = $request->user()?->id;
             $mapping->save();

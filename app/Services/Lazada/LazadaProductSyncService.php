@@ -19,19 +19,6 @@ class LazadaProductSyncService
 {
     use ResolvesProductAttributeValues;
 
-    /**
-     * Our attribute code for each Lazada SKU-level field this category
-     * might require — anything mandatory but not in this map (e.g. a
-     * category-specific option like "Input Voltage") can't be auto-filled
-     * and will surface as a validation error instead.
-     */
-    private const SKU_FIELD_SOURCE = [
-        'package_weight' => 'weight_pcs',
-        'package_length' => 'length_pcs',
-        'package_width' => 'width_pcs',
-        'package_height' => 'height_pcs',
-    ];
-
     public function __construct(private readonly LazadaClient $client)
     {
     }
@@ -59,10 +46,33 @@ class LazadaProductSyncService
             throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Lazada category yet.");
         }
 
-        $name = $this->attributeValue($product, 'pname', $shop->channel_id, localeCode: 'th');
-        $price = $this->attributeValue($product, 'price_std', $shop->channel_id);
-        $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
-        $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
+        // Admin-configurable (LazadaAttributeMappingController) — replaces
+        // the old hardcoded pname/price_std/qty/attribute_6/SKU_FIELD_SOURCE
+        // lookups. Fetched once and reused by resolveMappedAttributes()
+        // below for the `lazada_attribute` group.
+        $mappings = LazadaAttributeMapping::with(['attribute', 'lazadaAttribute'])->orderBy('sort_order')->get();
+
+        $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
+        $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
+        // Full `pgallery` list when the product has one, falling back to
+        // the single legacy `pimage` — see ResolvesProductAttributeValues::
+        // resolveProductImageUrls(). Not part of the target_field mapping
+        // system — Lazada already pulls the whole gallery dynamically, a
+        // different (multi-value) mechanism than the single-value fields
+        // below.
+        $imageUrls = $this->resolveProductImageUrls($product, $shop->channel_id);
+        $qty = $this->resolveMappedField($mappings, 'qty', $product, $shop->channel_id);
+        // PIM's own uploaded-file `video` attribute — NOT `youtube_url` (a
+        // plain external link): a real push once hit Lazada's
+        // BIZ_CHECK_EXTERNAL_VIDEO_IS_FORBIDDEN when this was mapped to the
+        // wrong kind of attribute via the general mechanism. Reopened as an
+        // admin-configurable target_field, but LazadaAttributeMappingController
+        // only ever allows a PIM attribute of type `video` to be saved
+        // against it, so this can't silently regress into that bug again.
+        // Still our own storage URL at this point — swapped for a real
+        // Lazada video_id by uploadVideoToLazada() in push(), same
+        // reasoning as $imageUrls/uploadImagesToLazada().
+        $videoUrl = $this->resolveMappedField($mappings, 'video', $product, $shop->channel_id);
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to Lazada.");
@@ -72,11 +82,12 @@ class LazadaProductSyncService
             'SellerSku' => $product->sku,
             'quantity' => (int) ($qty ?? 0),
             'price' => $price,
-            'images' => $imageUrl ? [$imageUrl] : null,
+            'images' => !empty($imageUrls) ? $imageUrls : null,
+            'package_weight' => $this->resolveMappedField($mappings, 'weight', $product, $shop->channel_id),
+            'package_length' => $this->resolveMappedField($mappings, 'length', $product, $shop->channel_id),
+            'package_width' => $this->resolveMappedField($mappings, 'width', $product, $shop->channel_id),
+            'package_height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
         ];
-        foreach (self::SKU_FIELD_SOURCE as $lazadaField => $ourAttributeCode) {
-            $skuFields[$lazadaField] = $this->attributeValue($product, $ourAttributeCode, $shop->channel_id);
-        }
 
         $normalAttributes = [
             'name' => $name,
@@ -94,14 +105,16 @@ class LazadaProductSyncService
             // /product/create example payload) for exactly this case.
             'brand' => 'No Brand',
         ];
+        if ($videoUrl) {
+            $normalAttributes['video'] = $videoUrl;
+        }
 
         // Admin-configurable, on top of the fixed fields above — see
-        // LazadaAttributeMappingController, which replaces a hardcoded
-        // field-source const the way the WooCommerce/Shopee equivalents
-        // already do. attribute_type decides whether a mapped value belongs
-        // in payload.attributes (normal) or the SKU-level fields (sku) —
-        // same distinction assertMandatoryFieldsPresent() already checks.
-        foreach ($this->resolveMappedAttributes($product, $shop->channel_id) as $lazadaName => $result) {
+        // LazadaAttributeMappingController. attribute_type decides whether
+        // a mapped value belongs in payload.attributes (normal) or the
+        // SKU-level fields (sku) — same distinction
+        // assertMandatoryFieldsPresent() already checks.
+        foreach ($this->resolveMappedAttributes($mappings, $product, $shop->channel_id) as $lazadaName => $result) {
             if ($result['attribute_type'] === 'sku') {
                 $skuFields[$lazadaName] = $result['value'];
             } else {
@@ -114,9 +127,9 @@ class LazadaProductSyncService
             'attributes' => array_filter($normalAttributes),
             // Confirmed via a real official /product/create example: Product
             // carries its own main-image list separate from each Sku's own
-            // Images (which the same $imageUrl also feeds into via
+            // Images (which the same $imageUrls also feeds into via
             // $skuFields['images'] above) — both exist in the real payload.
-            'images' => $imageUrl ? [$imageUrl] : [],
+            'images' => $imageUrls,
             'skus' => [
                 array_filter($skuFields, fn ($v) => $v !== null && $v !== ''),
             ],
@@ -128,34 +141,52 @@ class LazadaProductSyncService
     }
 
     /**
+     * Lazada's own schema pairs a handful of its category attributes as
+     * `_en` variants of a primary one (name/name_en, description/
+     * description_en, short_description/short_description_en,
+     * product_warranty/product_warranty_en, package_content/
+     * package_contents_en — confirmed live via syncLazadaAttributes()) —
+     * the base name wants Thai (this shop's primary storefront language,
+     * matching every other attributeValue() call in this class), the `_en`
+     * one wants English specifically. Without this, mapping any PIM
+     * attribute to an `_en` target still resolved 'th' unconditionally,
+     * so an admin mapping (say) product_details_features to
+     * description_en would have pushed Thai text into an English-labelled
+     * field — added once this was flagged, before any real `_en` mapping
+     * had been made.
+     */
+    private function localeCodeForLazadaAttribute(string $lazadaName): string
+    {
+        return str_ends_with($lazadaName, '_en') ? 'en' : 'th';
+    }
+
+    /**
      * First mapped PIM attribute with a value wins per lazada_attribute_name
      * (by sort_order) — same semantics as WooCommerceProductSyncService::
      * resolveMappedField() / ShopeeProductSyncService::resolveAttributes().
      *
+     * @param \Illuminate\Support\Collection<int, LazadaAttributeMapping> $mappings same collection buildPayload() already fetched
      * @return array<string, array{value: string, attribute_type: ?string}>
      */
-    private function resolveMappedAttributes(Product $product, ?int $channelId): array
+    private function resolveMappedAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId): array
     {
-        $mappings = LazadaAttributeMapping::whereNotNull('lazada_attribute_name')
-            ->with(['attribute', 'lazadaAttribute'])
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('lazada_attribute_name');
+        $mappings = $mappings->where('target_field', 'lazada_attribute')->groupBy('lazada_attribute_name');
 
         $resolved = [];
 
         foreach ($mappings as $lazadaName => $group) {
+            $localeCode = $this->localeCodeForLazadaAttribute($lazadaName);
+
             foreach ($group as $mapping) {
                 if (!$mapping->attribute) {
                     continue;
                 }
 
-                // localeCode: 'th' matches every other attributeValue() call
-                // in buildPayload() above (e.g. pname) — a locale-based PIM
-                // attribute mapped here would otherwise silently resolve to
+                // A locale-based PIM attribute mapped here without a
+                // matching localeCode would otherwise silently resolve to
                 // null forever, the same bug already found and fixed once
                 // this session for WooCommerceProductSyncService::buildPayload().
-                $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: $localeCode);
                 if ($value !== null && $value !== '') {
                     $resolved[$lazadaName] = [
                         'value' => $value,
@@ -189,7 +220,10 @@ class LazadaProductSyncService
     public function push(Product $product, SalesPlatformShop $shop): array
     {
         $payload = $this->buildPayload($product, $shop);
+        // Images first — uploadVideoToLazada() reuses the now-Lazada-hosted
+        // main image as the video's required coverUrl.
         $payload = $this->uploadImagesToLazada($payload);
+        $payload = $this->uploadVideoToLazada($payload);
 
         $existing = $this->findProductMatch($product->sku);
 
@@ -238,6 +272,37 @@ class LazadaProductSyncService
             }
         }
         unset($sku);
+
+        return $payload;
+    }
+
+    /**
+     * Swaps `attributes.video` (still our own storage URL at this point,
+     * from buildPayload()) for a real Lazada video_id via
+     * LazadaClient::uploadVideo() — kept out of buildPayload() for the same
+     * side-effect-free/safe-to-inspect reasoning as uploadImagesToLazada()
+     * above. No-op if the product has no video.
+     *
+     * Requires `payload.images` to already be Lazada-hosted URLs (i.e. must
+     * run after uploadImagesToLazada()) — the first one is reused as the
+     * video's required coverUrl. Drops the video entirely (rather than
+     * failing the whole push over it) if there's no image to use as a cover.
+     */
+    private function uploadVideoToLazada(array $payload): array
+    {
+        $videoUrl = $payload['attributes']['video'] ?? null;
+        if (!$videoUrl) {
+            return $payload;
+        }
+
+        $coverUrl = $payload['images'][0] ?? null;
+        if (!$coverUrl) {
+            unset($payload['attributes']['video']);
+
+            return $payload;
+        }
+
+        $payload['attributes']['video'] = $this->client->uploadVideo($videoUrl, $coverUrl);
 
         return $payload;
     }

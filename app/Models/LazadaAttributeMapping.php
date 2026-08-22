@@ -8,13 +8,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * One row per PIM attribute mapped into a specific Lazada category
- * attribute — v1 only supports free-value attributes (input_type text/
- * numeric), so like ShopeeAttributeMapping there is no target_field: a
- * mapping either has a lazada_attribute_name or doesn't exist. First mapped
- * PIM attribute with a value wins per lazada_attribute_name (by sort_order)
- * — see LazadaProductSyncService::buildPayload(). Managed from the
- * "จับคู่เนื้อหา Lazada" mapping page (LazadaAttributeMappingController).
+ * One row per PIM attribute mapped into a Lazada push field — same
+ * `target_field` shape as WooCommerceAttributeMapping/ShopeeAttributeMapping:
+ * either one of Lazada's structured payload fields (`name`/`price`/`qty`/
+ * `weight`/`length`/`width`/`height`/`video`, first mapped attribute with a
+ * value wins — see LazadaProductSyncService::resolveMappedField()) or
+ * `lazada_attribute` (feeds one specific category attribute, identified by
+ * `lazada_attribute_name` — see resolveMappedAttributes()). v1 only
+ * supports free-value attributes (input_type text/numeric) for the
+ * `lazada_attribute` case. `video` is further restricted server-side to PIM
+ * attributes of type `video` (see LazadaAttributeMappingController) — Lazada
+ * rejects external video URLs. Managed from the "จับคู่เนื้อหา Lazada"
+ * mapping page (LazadaAttributeMappingController).
  */
 class LazadaAttributeMapping extends Model
 {
@@ -24,6 +29,7 @@ class LazadaAttributeMapping extends Model
 
     protected $fillable = [
         'attribute_id',
+        'target_field',
         'lazada_attribute_name',
         'sort_order',
         'created_by',
