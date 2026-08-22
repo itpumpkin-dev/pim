@@ -423,7 +423,12 @@ class ShopeeProductSyncService
                     continue;
                 }
 
-                $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId);
+                // localeCode: 'th' matches every other attributeValue() call
+                // in this class (e.g. pname) — a locale-based PIM attribute
+                // mapped here would otherwise silently resolve to null
+                // forever, the same class of bug already found and fixed
+                // this session for WooCommerceProductSyncService::buildPayload().
+                $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
                 if ($candidate !== null && $candidate !== '') {
                     $value = $candidate;
                     break;

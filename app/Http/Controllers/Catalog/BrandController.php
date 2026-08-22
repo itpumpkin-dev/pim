@@ -308,6 +308,20 @@ class BrandController extends Controller
     {
         $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
+        // A queued brand sync (Shopee/Lazada/TikTok) can run for minutes —
+        // long enough that a user can easily navigate away and back before
+        // it finishes. Without this, the page had no way to tell that a job
+        // is still processing: the frontend's `syncing` flag is local React
+        // state seeded only right after a fresh dispatch, so a remount
+        // always started blank even though job_trackers still said
+        // 'processing' and the queue worker was still actively running it.
+        // Keyed by config_code so the page can resume polling the right
+        // platform's job without the frontend needing to guess an id.
+        $activeSyncJobs = JobTracker::where('job_type', 'brand_sync')
+            ->whereIn('status', ['pending', 'processing'])
+            ->get(['id', 'config_code'])
+            ->mapWithKeys(fn (JobTracker $tracker) => [$tracker->config_code => $tracker->id]);
+
         return Inertia::render('catalog/brands/marketplace-sync', [
             'lastSyncedAt' => [
                 'shopee' => $toIso(ShopeeBrand::max('updated_at')),
@@ -315,6 +329,7 @@ class BrandController extends Controller
                 'lazada' => $toIso(LazadaBrand::max('updated_at')),
                 'tiktok' => $toIso(TikTokBrand::max('updated_at')),
             ],
+            'activeSyncJobs' => $activeSyncJobs,
         ]);
     }
 

@@ -1234,7 +1234,12 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                 onApply={applyFilters}
             />
 
-            <Snackbar open={!!liveStatusError} autoHideDuration={8000} onClose={() => setLiveStatusError(null)}>
+            <Snackbar
+                open={!!liveStatusError}
+                autoHideDuration={10000}
+                onClose={() => setLiveStatusError(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
                 <Alert severity="error" variant="filled" onClose={() => setLiveStatusError(null)} sx={{ maxWidth: 480 }}>
                     {liveStatusError}
                 </Alert>

@@ -4,6 +4,7 @@ namespace App\Services\TikTok;
 
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
+use App\Models\TikTokAttributeMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -15,14 +16,13 @@ use RuntimeException;
  *
  * 1. RESOLVED, 2026-08-17: warehouse_id comes from a live
  *    TikTokClient::getWarehouseList() call (see resolveWarehouseId()).
- * 2. Still open: no product-attribute source mapping exists yet
- *    (TIKTOK_ATTRIBUTE_SOURCE is empty) — same starting position
- *    ShopeeProductSyncService's SHOPEE_ATTRIBUTE_SOURCE was in before a
- *    live rejection revealed which Thai TIS fields actually blocked a
- *    real category. The one category pushed live so far (2026-08-17)
- *    happened to have none marked `is_requried`, so this gap hasn't
- *    surfaced yet in practice — expect the same discovery path Shopee had
- *    the first time a category that does require one gets pushed.
+ * 2. RESOLVED, 2026-08-21: product-attribute source mapping is now
+ *    admin-configurable via TikTokAttributeMapping (see
+ *    resolveProductAttributes()), replacing the previously-empty hardcoded
+ *    TIKTOK_ATTRIBUTE_SOURCE const — same fix already made for Shopee/
+ *    Lazada's equivalent gaps. Only attributes TikTok marks
+ *    `is_customizable` are mappable; select-only attributes still aren't
+ *    (see TikTokAttributeMappingController).
  * 3. RESOLVED, 2026-08-17: checkLiveStatus() below now asks TikTok
  *    directly via TikTokClient::getProduct(), confirmed live — see that
  *    method's docblock for a real, informative finding from the first
@@ -60,18 +60,6 @@ class TikTokProductSyncService
         'length' => 'length_pcs',
         'width' => 'width_pcs',
         'height' => 'height_pcs',
-    ];
-
-    /**
-     * TikTok attribute id (from getAttributes(), category-specific — unlike
-     * Shopee's attribute ids, which are global) => our own attribute code.
-     * Empty until a real category's live getAttributes() call and a real
-     * required field are both confirmed — see class docblock and
-     * ShopeeProductSyncService::SHOPEE_ATTRIBUTE_SOURCE for how that one
-     * filled in after a live rejection; same expected path here.
-     */
-    private const TIKTOK_ATTRIBUTE_SOURCE = [
-        //
     ];
 
     public function __construct(private readonly TikTokClient $client) {}
@@ -348,13 +336,17 @@ class TikTokProductSyncService
 
     /**
      * Checks the category's live attribute schema (getAttributes()) and
-     * builds product_attributes from whatever this app has mapped in
-     * TIKTOK_ATTRIBUTE_SOURCE, collecting the rest — genuinely required
-     * (`is_requried` — TikTok's own typo, see TikTokClient::getAttributes())
-     * and still unfillable — into $missing. Only PRODUCT_PROPERTY-type
-     * attributes are considered; SKU_PROPERTY-type ones are per-variant
-     * sales attributes (skus[].sales_attributes), out of scope for this
-     * single-SKU-only implementation.
+     * builds product_attributes from whatever this app has mapped via
+     * TikTokAttributeMapping (admin-configurable — see
+     * TikTokAttributeMappingController, which replaces the previously-empty
+     * hardcoded TIKTOK_ATTRIBUTE_SOURCE const), collecting the rest —
+     * genuinely required (`is_requried` — TikTok's own typo, see
+     * TikTokClient::getAttributes()) and still unfillable — into $missing.
+     * Only PRODUCT_PROPERTY-type attributes are considered; SKU_PROPERTY-type
+     * ones are per-variant sales attributes (skus[].sales_attributes), out
+     * of scope for this single-SKU-only implementation. First mapped PIM
+     * attribute with a value wins per tiktok_attribute_id (by sort_order),
+     * same semantics as Lazada/Shopee's own resolvers.
      *
      * @return array{product_attributes: list<array{id: string, values: list<array{name: string}>}>, missing: list<string>}
      */
@@ -362,6 +354,12 @@ class TikTokProductSyncService
     {
         $response = $this->client->getAttributes($categoryId);
         $schema = $response['data']['attributes'] ?? [];
+
+        $mappingsByTikTokAttributeId = TikTokAttributeMapping::whereNotNull('tiktok_attribute_id')
+            ->with('attribute')
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('tiktok_attribute_id');
 
         $productAttributes = [];
         $missing = [];
@@ -371,10 +369,26 @@ class TikTokProductSyncService
                 continue;
             }
 
-            $ourCode = self::TIKTOK_ATTRIBUTE_SOURCE[$attr['id']] ?? null;
-            $value = $ourCode ? $this->attributeValue($product, $ourCode, $channelId) : null;
+            $value = null;
 
-            if ($value !== null && $value !== '') {
+            foreach ($mappingsByTikTokAttributeId->get($attr['id'], collect()) as $mapping) {
+                if (!$mapping->attribute) {
+                    continue;
+                }
+
+                // localeCode: 'th' matches every other attributeValue() call
+                // in this class (e.g. pname) — a locale-based PIM attribute
+                // mapped here would otherwise silently resolve to null
+                // forever, the same class of bug already found and fixed
+                // this session for the WooCommerce/Shopee/Lazada equivalents.
+                $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                if ($candidate !== null && $candidate !== '') {
+                    $value = $candidate;
+                    break;
+                }
+            }
+
+            if ($value !== null) {
                 $productAttributes[] = [
                     'id' => $attr['id'],
                     'values' => [['name' => $value]],

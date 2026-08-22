@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
@@ -12,8 +11,6 @@ use App\Services\Shopee\ShopeeClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Inertia\Inertia;
-use Inertia\Response;
 
 /**
  * Lets an admin pick which PIM attribute feeds each Shopee attribute_list
@@ -23,33 +20,16 @@ use Inertia\Response;
  * attributes (input_type FREE_TEXT_FILED = 3) — select/dropdown attributes
  * need a specific value_id, not free text, so they're synced for visibility
  * but rejected as a mapping target here.
+ *
+ * The read-only index() this used to own now lives in
+ * MarketplaceAttributeMappingController (bundled with WooCommerce/Lazada/
+ * TikTok's equivalents into one Inertia response for the combined
+ * "จับคู่เนื้อหา Marketplace" tabbed page) — this controller keeps only the
+ * write actions.
  */
 class ShopeeAttributeMappingController extends Controller
 {
     private const MAPPABLE_INPUT_TYPE = 3; // FREE_TEXT_FILED
-
-    public function index(): Response
-    {
-        $mappingsByAttributeId = ShopeeAttributeMapping::all()->keyBy('attribute_id');
-
-        $attributes = Attribute::cachedList()->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
-            $mapping = $mappingsByAttributeId->get($attribute->id);
-
-            return [
-                'id' => $attribute->id,
-                'code' => $attribute->code,
-                'label' => $attribute->name,
-                'type' => $attribute->type,
-                'shopee_attribute_id' => $mapping->shopee_attribute_id ?? null,
-                'sort_order' => $mapping->sort_order ?? 0,
-            ];
-        })->values();
-
-        return Inertia::render('catalog/attributes/shopee-mapping', [
-            'attributes' => $attributes,
-            'shopeeAttributes' => ShopeeAttribute::orderBy('name')->get(['id', 'name', 'input_type']),
-        ]);
-    }
 
     public function update(Request $request): RedirectResponse
     {

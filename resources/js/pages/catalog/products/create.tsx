@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { type FormDataConvertible } from '@inertiajs/core';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -66,6 +67,7 @@ interface Props {
 }
 
 interface ProductForm {
+    [key: string]: FormDataConvertible;
     enabled: boolean;
     family_id: string | number;
     type: string;

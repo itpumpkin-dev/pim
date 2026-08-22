@@ -589,9 +589,9 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
 
             <Snackbar
                 open={noGroupWarningOpen}
-                autoHideDuration={5000}
+                autoHideDuration={7000}
                 onClose={() => setNoGroupWarningOpen(false)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
                 <Alert
                     severity="warning"

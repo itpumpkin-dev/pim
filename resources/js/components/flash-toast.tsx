@@ -28,9 +28,9 @@ export function FlashToast() {
     return (
         <Snackbar
             open={open}
-            autoHideDuration={severity === 'error' ? 8000 : 4000}
+            autoHideDuration={severity === 'error' ? 10000 : 6000}
             onClose={() => setOpen(false)}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
             <Alert onClose={() => setOpen(false)} severity={severity} sx={{ width: '100%' }}>
                 {message}

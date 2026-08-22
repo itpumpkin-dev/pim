@@ -1806,9 +1806,9 @@ export default function ProductEdit({
 
             <Snackbar
                 open={pushResult !== null}
-                autoHideDuration={6000}
+                autoHideDuration={20000}
                 onClose={() => setPushResult(null)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
                 <Alert onClose={() => setPushResult(null)} severity={pushResult?.severity ?? 'success'} sx={{ width: '100%' }}>
                     {pushResult?.message}

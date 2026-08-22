@@ -48,9 +48,10 @@ function readXsrfToken(): string {
 
 interface Props {
     lastSyncedAt: Record<string, string | null>;
+    activeSyncJobs: Record<string, number>;
 }
 
-export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
+export default function BrandMarketplaceSync({ lastSyncedAt, activeSyncJobs }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -99,7 +100,11 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
     // the expected state for most of a sync's lifetime, not a failure.
     // The status/cancel endpoints below are generic on job_tracker_id, not
     // tied to any one platform (see BrandController::brandSyncStatus()).
-    const pollJobStatus = (jobTrackerId: number) => {
+    // Takes platformValue explicitly (not read from `selected.value`) so
+    // the mount-time resume effect below can start polling for whichever
+    // platform actually has an active job without waiting on a re-render to
+    // update `syncPlatform`/`selected` first.
+    const pollJobStatus = (jobTrackerId: number, platformValue: string) => {
         fetch(`/catalog/brands/sync-jobs/${jobTrackerId}/status`, { headers: { Accept: 'application/json' } })
             .then(async (res) => {
                 const body = await res.json();
@@ -116,7 +121,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                     setSyncResult({ severity: 'success', message: t('brandsSyncedCount', { count: body.total_records_created ?? 0 }) });
                     setSyncing(false);
                     setActiveJobTrackerId(null);
-                    setLastSynced((prev) => ({ ...prev, [selected.value]: body.completed_at ?? new Date().toISOString() }));
+                    setLastSynced((prev) => ({ ...prev, [platformValue]: body.completed_at ?? new Date().toISOString() }));
                     return;
                 }
 
@@ -128,7 +133,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                     return;
                 }
 
-                pollTimer.current = setTimeout(() => pollJobStatus(jobTrackerId), 2000);
+                pollTimer.current = setTimeout(() => pollJobStatus(jobTrackerId, platformValue), 2000);
             })
             .catch(() => {
                 setSyncResult({ severity: 'error', message: 'Network error while checking sync status.' });
@@ -136,6 +141,26 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                 setActiveJobTrackerId(null);
             });
     };
+
+    // Restores the "syncing" indicator on mount (including every time this
+    // page is navigated back to) if a brand sync is still genuinely running
+    // server-side — job_trackers/the queue worker don't stop just because
+    // this component unmounted. Prefers the currently-selected platform's
+    // job if one exists, otherwise switches selection to whichever platform
+    // actually has one, so the indicator lands on the right card. Runs once
+    // per mount; `activeSyncJobs` is only ever fresh right after an Inertia
+    // visit to this page, same as `lastSyncedAt`.
+    useEffect(() => {
+        const platformValue = syncPlatform in activeSyncJobs ? syncPlatform : Object.keys(activeSyncJobs)[0];
+        const jobTrackerId = platformValue ? activeSyncJobs[platformValue] : undefined;
+        if (!jobTrackerId) return;
+
+        if (platformValue !== syncPlatform) setSyncPlatform(platformValue);
+        setSyncing(true);
+        setActiveJobTrackerId(jobTrackerId);
+        pollJobStatus(jobTrackerId, platformValue);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const runSync = () => {
         setSyncing(true);
@@ -166,7 +191,7 @@ export default function BrandMarketplaceSync({ lastSyncedAt }: Props) {
                 }
 
                 setActiveJobTrackerId(body.job_tracker_id);
-                pollJobStatus(body.job_tracker_id);
+                pollJobStatus(body.job_tracker_id, selected.value);
             })
             .catch(() => {
                 setSyncResult({ severity: 'error', message: 'Network error while starting sync.' });

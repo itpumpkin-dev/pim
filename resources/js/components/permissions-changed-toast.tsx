@@ -7,7 +7,7 @@ export function PermissionsChangedToast() {
     const noticeVisible = usePermissionsWatcher();
 
     return (
-        <Snackbar open={noticeVisible} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Snackbar open={noticeVisible} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
             <Alert severity="warning" variant="filled" sx={{ width: '100%' }}>
                 {t('permissionsChangedLoggingOut')}
             </Alert>

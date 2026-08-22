@@ -2,6 +2,7 @@
 
 namespace App\Services\Lazada;
 
+use App\Models\LazadaAttributeMapping;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
@@ -77,24 +78,40 @@ class LazadaProductSyncService
             $skuFields[$lazadaField] = $this->attributeValue($product, $ourAttributeCode, $shop->channel_id);
         }
 
+        $normalAttributes = [
+            'name' => $name,
+            'short_description' => $name,
+            // Confirmed live, 2026-08-13: Lazada's `brand` field must
+            // match its own controlled brand catalog exactly
+            // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — our local pbrand
+            // select-option value (e.g. "option_1"/"พัมคิน") was never
+            // going to match that. The catalog has 153,482 entries via
+            // /category/brands/query with no confirmed name-search
+            // parameter (tried name/keyword/brand_name/search — none
+            // filtered), so matching our brand to a real Lazada brand_id
+            // isn't currently feasible. "No Brand" is Lazada's own
+            // documented universal fallback (present in their official
+            // /product/create example payload) for exactly this case.
+            'brand' => 'No Brand',
+        ];
+
+        // Admin-configurable, on top of the fixed fields above — see
+        // LazadaAttributeMappingController, which replaces a hardcoded
+        // field-source const the way the WooCommerce/Shopee equivalents
+        // already do. attribute_type decides whether a mapped value belongs
+        // in payload.attributes (normal) or the SKU-level fields (sku) —
+        // same distinction assertMandatoryFieldsPresent() already checks.
+        foreach ($this->resolveMappedAttributes($product, $shop->channel_id) as $lazadaName => $result) {
+            if ($result['attribute_type'] === 'sku') {
+                $skuFields[$lazadaName] = $result['value'];
+            } else {
+                $normalAttributes[$lazadaName] = $result['value'];
+            }
+        }
+
         $payload = [
             'primary_category_id' => $category->lazada_category_id,
-            'attributes' => array_filter([
-                'name' => $name,
-                'short_description' => $name,
-                // Confirmed live, 2026-08-13: Lazada's `brand` field must
-                // match its own controlled brand catalog exactly
-                // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — our local pbrand
-                // select-option value (e.g. "option_1"/"พัมคิน") was never
-                // going to match that. The catalog has 153,482 entries via
-                // /category/brands/query with no confirmed name-search
-                // parameter (tried name/keyword/brand_name/search — none
-                // filtered), so matching our brand to a real Lazada brand_id
-                // isn't currently feasible. "No Brand" is Lazada's own
-                // documented universal fallback (present in their official
-                // /product/create example payload) for exactly this case.
-                'brand' => 'No Brand',
-            ]),
+            'attributes' => array_filter($normalAttributes),
             // Confirmed via a real official /product/create example: Product
             // carries its own main-image list separate from each Sku's own
             // Images (which the same $imageUrl also feeds into via
@@ -108,6 +125,48 @@ class LazadaProductSyncService
         $this->assertMandatoryFieldsPresent($category->lazada_category_id, $payload);
 
         return $payload;
+    }
+
+    /**
+     * First mapped PIM attribute with a value wins per lazada_attribute_name
+     * (by sort_order) — same semantics as WooCommerceProductSyncService::
+     * resolveMappedField() / ShopeeProductSyncService::resolveAttributes().
+     *
+     * @return array<string, array{value: string, attribute_type: ?string}>
+     */
+    private function resolveMappedAttributes(Product $product, ?int $channelId): array
+    {
+        $mappings = LazadaAttributeMapping::whereNotNull('lazada_attribute_name')
+            ->with(['attribute', 'lazadaAttribute'])
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('lazada_attribute_name');
+
+        $resolved = [];
+
+        foreach ($mappings as $lazadaName => $group) {
+            foreach ($group as $mapping) {
+                if (!$mapping->attribute) {
+                    continue;
+                }
+
+                // localeCode: 'th' matches every other attributeValue() call
+                // in buildPayload() above (e.g. pname) — a locale-based PIM
+                // attribute mapped here would otherwise silently resolve to
+                // null forever, the same bug already found and fixed once
+                // this session for WooCommerceProductSyncService::buildPayload().
+                $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                if ($value !== null && $value !== '') {
+                    $resolved[$lazadaName] = [
+                        'value' => $value,
+                        'attribute_type' => $mapping->lazadaAttribute->attribute_type ?? null,
+                    ];
+                    break;
+                }
+            }
+        }
+
+        return $resolved;
     }
 
     /**

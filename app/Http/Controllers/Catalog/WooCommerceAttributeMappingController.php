@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attribute;
 use App\Models\WooCommerceAttribute;
 use App\Models\WooCommerceAttributeMapping;
 use App\Services\WooCommerce\WooCommerceClient;
@@ -11,8 +10,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
-use Inertia\Response;
 use RuntimeException;
 
 /**
@@ -25,6 +22,11 @@ use RuntimeException;
  * value wins), and WooCommerce's own Product Attributes (`wc_attribute`,
  * targeting a specific woocommerce_attributes row — see
  * syncWoocommerceAttributes() below for how that list gets populated).
+ *
+ * The read-only index() this used to own now lives in
+ * MarketplaceAttributeMappingController (bundled with Shopee/Lazada/TikTok's
+ * equivalents into one Inertia response for the combined "จับคู่เนื้อหา
+ * Marketplace" tabbed page) — this controller keeps only the write actions.
  */
 class WooCommerceAttributeMappingController extends Controller
 {
@@ -33,30 +35,6 @@ class WooCommerceAttributeMappingController extends Controller
         'name', 'price', 'image', 'qty', 'weight', 'length', 'width', 'height',
         'wc_attribute',
     ];
-
-    public function index(): Response
-    {
-        $mappingsByAttributeId = WooCommerceAttributeMapping::all()->keyBy('attribute_id');
-
-        $attributes = Attribute::cachedList()->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
-            $mapping = $mappingsByAttributeId->get($attribute->id);
-
-            return [
-                'id' => $attribute->id,
-                'code' => $attribute->code,
-                'label' => $attribute->name,
-                'type' => $attribute->type,
-                'target_field' => $mapping->target_field ?? null,
-                'woocommerce_attribute_id' => $mapping->woocommerce_attribute_id ?? null,
-                'sort_order' => $mapping->sort_order ?? 0,
-            ];
-        })->values();
-
-        return Inertia::render('catalog/attributes/woocommerce-mapping', [
-            'attributes' => $attributes,
-            'wooCommerceAttributes' => WooCommerceAttribute::orderBy('name')->get(['id', 'name', 'slug']),
-        ]);
-    }
 
     public function update(Request $request): RedirectResponse
     {

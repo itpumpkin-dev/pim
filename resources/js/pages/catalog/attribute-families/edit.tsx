@@ -730,9 +730,9 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
 
             <Snackbar
                 open={noGroupWarningOpen}
-                autoHideDuration={5000}
+                autoHideDuration={7000}
                 onClose={() => setNoGroupWarningOpen(false)}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
                 <Alert
                     severity="warning"

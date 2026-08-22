@@ -10,6 +10,9 @@ use App\Http\Controllers\Catalog\CategoryFieldController;
 use App\Http\Controllers\Catalog\ChannelController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
+use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
+use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
+use App\Http\Controllers\Catalog\TikTokAttributeMappingController;
 use App\Http\Controllers\Catalog\ShopeeAttributeMappingController;
 use App\Http\Controllers\Catalog\WooCommerceAttributeMappingController;
 use Illuminate\Support\Facades\Route;
@@ -58,12 +61,15 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
-    Route::get('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'index'])->name('attributes.woocommerceMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/marketplace-mapping', [MarketplaceAttributeMappingController::class, 'index'])->name('attributes.marketplaceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'index'])->name('attributes.shopeeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/{attribute}/edit', [AttributeController::class, 'edit'])->name('attributes.edit')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}', [AttributeController::class, 'update'])->name('attributes.update')->middleware('permission:attributes,edit_attributes');

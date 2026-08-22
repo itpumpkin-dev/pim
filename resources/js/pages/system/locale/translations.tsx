@@ -240,10 +240,10 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
 
             <Snackbar
                 open={saved}
-                autoHideDuration={2500}
+                autoHideDuration={5000}
                 onClose={() => setSaved(false)}
                 message={tSystem('saveTranslations')}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             />
         </AppLayout>
     );
