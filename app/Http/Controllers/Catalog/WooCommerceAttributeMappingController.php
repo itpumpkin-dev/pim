@@ -79,6 +79,8 @@ class WooCommerceAttributeMappingController extends Controller
             $mapping->save();
         }
 
+        WooCommerceAttributeMapping::bumpListVersion();
+
         return back()->with('success', 'WooCommerce content mapping saved.');
     }
 
@@ -120,6 +122,8 @@ class WooCommerceAttributeMappingController extends Controller
                 ['name', 'slug', 'type', 'updated_at']
             );
         }
+
+        WooCommerceAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rows).' WooCommerce attributes.');
     }

@@ -80,6 +80,8 @@ class ShopeeAttributeMappingController extends Controller
             $mapping->save();
         }
 
+        ShopeeAttributeMapping::bumpListVersion();
+
         return back()->with('success', 'Shopee attribute mapping saved.');
     }
 
@@ -132,6 +134,8 @@ class ShopeeAttributeMappingController extends Controller
                 ['name', 'input_type', 'updated_at']
             );
         }
+
+        ShopeeAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsById).' Shopee attributes.');
     }

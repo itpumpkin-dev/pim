@@ -93,6 +93,8 @@ class LazadaAttributeMappingController extends Controller
             $mapping->save();
         }
 
+        LazadaAttributeMapping::bumpListVersion();
+
         return back()->with('success', 'Lazada attribute mapping saved.');
     }
 
@@ -152,6 +154,8 @@ class LazadaAttributeMappingController extends Controller
                 ['label', 'input_type', 'attribute_type', 'updated_at']
             );
         }
+
+        LazadaAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsByName).' Lazada attributes across '.count($categoryIds).' categories.');
     }

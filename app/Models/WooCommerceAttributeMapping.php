@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * One row per PIM attribute chosen to feed into a WooCommerce push
@@ -56,5 +57,32 @@ class WooCommerceAttributeMapping extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    private const LIST_VERSION_KEY = 'woocommerce_attribute_mappings:list:version';
+
+    /**
+     * All mapping rows, keyed the same way MarketplaceAttributeMappingController
+     * needs them (by attribute_id) — was a fresh ::all() query on every visit
+     * to the "จับคู่เนื้อหา Marketplace" page; same versioned-cache shape as
+     * Attribute::cachedList(). Call bumpListVersion() after any write here
+     * (see WooCommerceAttributeMappingController::update()).
+     */
+    public static function cachedList(): \Illuminate\Support\Collection
+    {
+        return Cache::rememberForever(
+            'woocommerce_attribute_mappings.list:v'.static::listVersion(),
+            fn () => static::all()
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
     }
 }

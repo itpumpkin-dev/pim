@@ -85,6 +85,19 @@ class ShopeeProductSyncService
         $imageUrl = $this->attributeValue($product, 'pimage', $shop->channel_id);
         $qty = $this->attributeValue($product, 'qty', $shop->channel_id);
         $weight = $this->attributeValue($product, 'weight_pcs', $shop->channel_id);
+        // `product_details_features` is the same attribute WooCommerce's
+        // buildContentFields() defaults `description` to — real product copy
+        // instead of the name repeated verbatim. Falls back to $name only
+        // when a product has no content there yet, since Shopee's
+        // `description` is a required field (confirmed live: add_item
+        // rejects a missing one) and this app doesn't pre-validate that the
+        // way Lazada's buildPayload() does for its own mandatory fields.
+        $description = $this->attributeValue($product, 'product_details_features', $shop->channel_id, localeCode: 'th') ?: $name;
+        // PIM's own `video` attribute type has only one attribute using it
+        // today (attribute_6) — Shopee's video_info is optional (per the
+        // product form: no `*`), so this stays null and gets filtered out of
+        // the payload entirely for any product that hasn't set one.
+        $videoUrl = $this->attributeValue($product, 'attribute_6', $shop->channel_id);
 
         if (!$name || !$price) {
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to Shopee.");
@@ -118,10 +131,7 @@ class ShopeeProductSyncService
 
         return array_filter([
             'item_name' => $name,
-            // Shopee has no separate short-description concept in our own
-            // data — same fallback Lazada's buildPayload() uses for its
-            // short_description.
-            'description' => $name,
+            'description' => $description,
             'category_id' => (int) $category->shopee_category_id,
             'item_sku' => $product->sku,
             'weight' => (float) ($weight ?: 0.1),
@@ -141,6 +151,11 @@ class ShopeeProductSyncService
             // Kept out of this method so buildPayload() stays
             // side-effect-free/safe to call anytime for inspection.
             'image' => ['image_id_list' => [$imageUrl]],
+            // Still our own storage URL at this point, same reasoning as
+            // `image` above — push()'s uploadVideoToShopee() swaps it for a
+            // real Shopee video_id (a multi-step upload-then-transcode flow,
+            // see ShopeeClient::uploadVideo()) before this payload is sent.
+            'video_info' => $videoUrl ? [['video_url' => $videoUrl]] : null,
             'logistic_info' => array_map(
                 fn ($id) => ['logistic_id' => $id, 'enabled' => true],
                 $enabledChannelIds
@@ -167,6 +182,24 @@ class ShopeeProductSyncService
     }
 
     /**
+     * See ShopeeClient::uploadVideo()'s docblock — a real write (uploads to
+     * Shopee's media space, then waits on their own transcoding) kept out of
+     * buildPayload() for the same reason uploadImagesToShopee() above is.
+     * Slower than an image upload (transcoding isn't instant) — expect this
+     * step alone to add real seconds to push() for any product carrying a
+     * video, not just the usual HTTP round-trip.
+     */
+    private function uploadVideoToShopee(array $payload): array
+    {
+        if (!empty($payload['video_info'][0]['video_url'])) {
+            $videoId = $this->client->uploadVideo($payload['video_info'][0]['video_url']);
+            $payload['video_info'] = [['video_id' => $videoId]];
+        }
+
+        return $payload;
+    }
+
+    /**
      * FIRES A REAL, LIVE WRITE TO SHOPEE — creates or edits an actual
      * listing on the seller's storefront, visible to real customers. Only
      * call this with the user's explicit, specific go-ahead on a real
@@ -183,6 +216,7 @@ class ShopeeProductSyncService
     {
         $payload = $this->buildPayload($product, $shop);
         $payload = $this->uploadImagesToShopee($payload);
+        $payload = $this->uploadVideoToShopee($payload);
 
         $cachedItemId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)

@@ -35,26 +35,26 @@ class MarketplaceAttributeMappingController extends Controller
         return Inertia::render('catalog/attributes/marketplace-mapping', [
             'woocommerce' => [
                 'attributes' => $this->woocommerceAttributeRows($pimAttributes),
-                'wooCommerceAttributes' => WooCommerceAttribute::orderBy('name')->get(['id', 'name', 'slug']),
+                'wooCommerceAttributes' => WooCommerceAttribute::cachedList(),
             ],
             'shopee' => [
                 'attributes' => $this->shopeeAttributeRows($pimAttributes),
-                'shopeeAttributes' => ShopeeAttribute::orderBy('name')->get(['id', 'name', 'input_type']),
+                'shopeeAttributes' => ShopeeAttribute::cachedList(),
             ],
             'lazada' => [
                 'attributes' => $this->lazadaAttributeRows($pimAttributes),
-                'lazadaAttributes' => LazadaAttribute::orderBy('label')->get(['name', 'label', 'input_type']),
+                'lazadaAttributes' => LazadaAttribute::cachedList(),
             ],
             'tiktok' => [
                 'attributes' => $this->tiktokAttributeRows($pimAttributes),
-                'tiktokAttributes' => TikTokAttribute::orderBy('name')->get(['id', 'name', 'is_customizable']),
+                'tiktokAttributes' => TikTokAttribute::cachedList(),
             ],
         ]);
     }
 
     private function woocommerceAttributeRows($pimAttributes)
     {
-        $mappingsByAttributeId = WooCommerceAttributeMapping::all()->keyBy('attribute_id');
+        $mappingsByAttributeId = WooCommerceAttributeMapping::cachedList()->keyBy('attribute_id');
 
         return $pimAttributes->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
             $mapping = $mappingsByAttributeId->get($attribute->id);
@@ -73,7 +73,7 @@ class MarketplaceAttributeMappingController extends Controller
 
     private function shopeeAttributeRows($pimAttributes)
     {
-        $mappingsByAttributeId = ShopeeAttributeMapping::all()->keyBy('attribute_id');
+        $mappingsByAttributeId = ShopeeAttributeMapping::cachedList()->keyBy('attribute_id');
 
         return $pimAttributes->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
             $mapping = $mappingsByAttributeId->get($attribute->id);
@@ -91,7 +91,7 @@ class MarketplaceAttributeMappingController extends Controller
 
     private function lazadaAttributeRows($pimAttributes)
     {
-        $mappingsByAttributeId = LazadaAttributeMapping::all()->keyBy('attribute_id');
+        $mappingsByAttributeId = LazadaAttributeMapping::cachedList()->keyBy('attribute_id');
 
         return $pimAttributes->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
             $mapping = $mappingsByAttributeId->get($attribute->id);
@@ -109,7 +109,7 @@ class MarketplaceAttributeMappingController extends Controller
 
     private function tiktokAttributeRows($pimAttributes)
     {
-        $mappingsByAttributeId = TikTokAttributeMapping::all()->keyBy('attribute_id');
+        $mappingsByAttributeId = TikTokAttributeMapping::cachedList()->keyBy('attribute_id');
 
         return $pimAttributes->map(function (Attribute $attribute) use ($mappingsByAttributeId) {
             $mapping = $mappingsByAttributeId->get($attribute->id);

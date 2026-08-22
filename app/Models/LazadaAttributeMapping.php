@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * One row per PIM attribute mapped into a specific Lazada category
@@ -51,5 +52,30 @@ class LazadaAttributeMapping extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    private const LIST_VERSION_KEY = 'lazada_attribute_mappings:list:version';
+
+    /**
+     * Same versioned-cache shape as WooCommerceAttributeMapping::cachedList()
+     * — see that docblock. Call bumpListVersion() after any write here (see
+     * LazadaAttributeMappingController::update()).
+     */
+    public static function cachedList(): \Illuminate\Support\Collection
+    {
+        return Cache::rememberForever(
+            'lazada_attribute_mappings.list:v'.static::listVersion(),
+            fn () => static::all()
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
     }
 }

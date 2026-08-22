@@ -80,6 +80,8 @@ class TikTokAttributeMappingController extends Controller
             $mapping->save();
         }
 
+        TikTokAttributeMapping::bumpListVersion();
+
         return back()->with('success', 'TikTok attribute mapping saved.');
     }
 
@@ -141,6 +143,8 @@ class TikTokAttributeMappingController extends Controller
                 ['name', 'is_customizable', 'is_multiple_selection', 'updated_at']
             );
         }
+
+        TikTokAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsById).' TikTok attributes across '.count($categoryIds).' categories.');
     }

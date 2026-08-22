@@ -26,11 +26,15 @@ interface Props {
  * (identical behavior to the old standalone pages, just without their own
  * AppLayout/breadcrumb/header) — this page only owns the Tabs shell.
  *
- * All four panels stay mounted at once (toggled with `display`, not
- * conditionally rendered) so switching tabs never discards a panel's
- * unsaved pending edits/search/filter state — same reasoning
- * products/edit.tsx's General/History tabs don't need, since only this
- * page's tabs carry editable state.
+ * Once a tab has been opened it stays mounted (toggled with `display`, not
+ * unmounted) so switching back to it never discards a panel's unsaved
+ * pending edits/search/filter state — same reasoning products/edit.tsx's
+ * General/History tabs don't need, since only this page's tabs carry
+ * editable state. A tab never opened yet, though, isn't mounted at all: with
+ * ~100 PIM attributes each rendering a full MUI card (Select + TextField),
+ * mounting all four up front at once was making the page visibly stall on
+ * first load for a render of ~400 cards nobody was looking at yet — this
+ * defers each tab's cost to the moment it's actually opened.
  */
 export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazada, tiktok }: Props) {
     const { t } = useTranslation('catalog');
@@ -44,6 +48,12 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
     ];
 
     const [tabIndex, setTabIndex] = useState(0);
+    const [openedTabs, setOpenedTabs] = useState<Set<number>>(new Set([0]));
+
+    const handleTabChange = (index: number) => {
+        setTabIndex(index);
+        setOpenedTabs((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -66,7 +76,7 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
                 <Box sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs
                         value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
+                        onChange={(_, v) => handleTabChange(v)}
                         sx={{
                             '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: '0.95rem', minWidth: 100 },
                             '& .Mui-selected': { color: 'text.primary' },
@@ -80,18 +90,26 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
                     </Tabs>
                 </Box>
 
-                <Box sx={{ pt: 3, display: tabIndex === 0 ? 'block' : 'none' }}>
-                    <WooCommerceAttributeMappingPanel attributes={woocommerce.attributes} wooCommerceAttributes={woocommerce.wooCommerceAttributes} />
-                </Box>
-                <Box sx={{ pt: 3, display: tabIndex === 1 ? 'block' : 'none' }}>
-                    <ShopeeAttributeMappingPanel attributes={shopee.attributes} shopeeAttributes={shopee.shopeeAttributes} />
-                </Box>
-                <Box sx={{ pt: 3, display: tabIndex === 2 ? 'block' : 'none' }}>
-                    <LazadaAttributeMappingPanel attributes={lazada.attributes} lazadaAttributes={lazada.lazadaAttributes} />
-                </Box>
-                <Box sx={{ pt: 3, display: tabIndex === 3 ? 'block' : 'none' }}>
-                    <TikTokAttributeMappingPanel attributes={tiktok.attributes} tiktokAttributes={tiktok.tiktokAttributes} />
-                </Box>
+                {openedTabs.has(0) && (
+                    <Box sx={{ pt: 3, display: tabIndex === 0 ? 'block' : 'none' }}>
+                        <WooCommerceAttributeMappingPanel attributes={woocommerce.attributes} wooCommerceAttributes={woocommerce.wooCommerceAttributes} />
+                    </Box>
+                )}
+                {openedTabs.has(1) && (
+                    <Box sx={{ pt: 3, display: tabIndex === 1 ? 'block' : 'none' }}>
+                        <ShopeeAttributeMappingPanel attributes={shopee.attributes} shopeeAttributes={shopee.shopeeAttributes} />
+                    </Box>
+                )}
+                {openedTabs.has(2) && (
+                    <Box sx={{ pt: 3, display: tabIndex === 2 ? 'block' : 'none' }}>
+                        <LazadaAttributeMappingPanel attributes={lazada.attributes} lazadaAttributes={lazada.lazadaAttributes} />
+                    </Box>
+                )}
+                {openedTabs.has(3) && (
+                    <Box sx={{ pt: 3, display: tabIndex === 3 ? 'block' : 'none' }}>
+                        <TikTokAttributeMappingPanel attributes={tiktok.attributes} tiktokAttributes={tiktok.tiktokAttributes} />
+                    </Box>
+                )}
             </Box>
         </AppLayout>
     );

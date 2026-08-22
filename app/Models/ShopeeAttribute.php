@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Local cache of Shopee's attribute schema (attribute_id, name, input_type),
@@ -27,4 +28,29 @@ class ShopeeAttribute extends Model
     protected $casts = [
         'input_type' => 'integer',
     ];
+
+    private const LIST_VERSION_KEY = 'shopee_attributes:list:version';
+
+    /**
+     * Same versioned-cache shape as WooCommerceAttribute::cachedList() — see
+     * that docblock. Call bumpListVersion() after any write here (see
+     * ShopeeAttributeMappingController::syncShopeeAttributes()).
+     */
+    public static function cachedList(): \Illuminate\Support\Collection
+    {
+        return Cache::rememberForever(
+            'shopee_attributes.list:v'.static::listVersion(),
+            fn () => static::orderBy('name')->get(['id', 'name', 'input_type'])
+        );
+    }
+
+    public static function listVersion(): int
+    {
+        return (int) Cache::get(self::LIST_VERSION_KEY, 1);
+    }
+
+    public static function bumpListVersion(): void
+    {
+        Cache::forever(self::LIST_VERSION_KEY, self::listVersion() + 1);
+    }
 }
