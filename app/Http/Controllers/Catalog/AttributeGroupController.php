@@ -38,7 +38,9 @@ class AttributeGroupController extends Controller
         // filters input before GridManager sees it, then both are handled
         // below against the fallback column and the translations table.
         $search = $request->input('search');
-        $originalFilters = $request->input('filters', []);
+        // (array) cast — see GridManager::getData()'s comment: an empty
+        // `?filters=` query param arrives here as a literal null.
+        $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
 
         if ($nameFilter !== null && $nameFilter !== '') {

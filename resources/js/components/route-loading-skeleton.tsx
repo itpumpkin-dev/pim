@@ -2,22 +2,25 @@ import { router } from '@inertiajs/react';
 import { Box, keyframes } from '@mui/material';
 import { useEffect, useState } from 'react';
 
-// From Uiverse.io by adamgiebl
+// Originally from Uiverse.io by adamgiebl; recolored from its stock
+// orange to the Fiori brand blue tokens so it matches the rest of the
+// Fiori-themed UI (and picks up dark mode along with it, since these
+// resolve through var(--fiori-*) — see fiori-style.tsx).
 const pulse = keyframes`
     0% {
         transform: scale(0.8);
-        background-color: #ffcc99;
-        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+        background-color: rgba(0, 112, 242, 0.35);
+        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
     }
     50% {
         transform: scale(1.2);
-        background-color: #ff8c1a;
-        box-shadow: 0 0 0 10px rgba(255, 204, 153, 0);
+        background-color: var(--fiori-brand);
+        box-shadow: 0 0 0 10px rgba(0, 112, 242, 0);
     }
     100% {
         transform: scale(0.8);
-        background-color: #ffcc99;
-        box-shadow: 0 0 0 0 rgba(255, 204, 153, 0.7);
+        background-color: rgba(0, 112, 242, 0.35);
+        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
     }
 `;
 
@@ -89,7 +92,7 @@ export function RouteLoadingSkeleton() {
                             width: 12,
                             mr: delay === 0.1 ? 0 : '6px',
                             borderRadius: '6px',
-                            bgcolor: '#ffcc99',
+                            bgcolor: 'rgba(0, 112, 242, 0.35)',
                             animation: `${pulse} 1.5s infinite ease-in-out`,
                             animationDelay: `${delay}s`,
                         }}

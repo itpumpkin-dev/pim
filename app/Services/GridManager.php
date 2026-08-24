@@ -78,7 +78,13 @@ class GridManager
         }
 
         // Handle per-field Filters (only columns explicitly marked filterable: true)
-        self::applyFilters($query, $this->config['columns'], $request->input('filters', []));
+        // Cast, not just a `, []` default — Laravel's ConvertEmptyStringsToNull
+        // middleware turns an empty `filters` query param (`?filters=`) into a
+        // literal null, and Request::input()'s default only applies when the
+        // key is missing entirely, not when it's present-but-null. `(array)`
+        // normalizes both that case and null to [] without changing the
+        // already-correct array case.
+        self::applyFilters($query, $this->config['columns'], (array) $request->input('filters', []));
 
         if ($extra) {
             $extra($query);

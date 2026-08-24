@@ -78,7 +78,11 @@ class CategoryController extends Controller
         // against the translations table; `name` is stripped from the
         // generic per-column filter pass below so it doesn't additionally
         // (and wrongly) narrow results by the raw column too.
-        $originalFilters = $request->input('filters', []);
+        // Cast, not just a `, []` default — see GridManager::getData()'s
+        // comment: an empty `?filters=` query param arrives here as a
+        // literal null (Laravel's ConvertEmptyStringsToNull middleware),
+        // which the array_key_exists() call below would otherwise fatal on.
+        $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
 
         // Defaults the list to active categories only — the ~1,086 legacy

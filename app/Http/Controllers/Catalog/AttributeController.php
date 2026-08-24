@@ -13,12 +13,16 @@ use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
+use App\Services\ImportExport\SpreadsheetWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AttributeController extends Controller
 {
@@ -42,30 +46,16 @@ class AttributeController extends Controller
         // before GridManager sees it, then both are handled below against
         // the fallback column and the translations table.
         $search = $request->input('search');
-        $originalFilters = $request->input('filters', []);
+        // (array) cast — see GridManager::getData()'s comment: an empty
+        // `?filters=` query param arrives here as a literal null.
+        $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
 
         if ($nameFilter !== null && $nameFilter !== '') {
             $request->merge(['filters' => collect($originalFilters)->except('name')->all()]);
         }
 
-        $gridData = $grid->getData($request, function ($query) use ($search, $nameFilter) {
-            if ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                        ->orWhere('type', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
-                });
-            }
-
-            if ($nameFilter) {
-                $query->where(function ($q) use ($nameFilter) {
-                    $q->where('name', 'like', "%{$nameFilter}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
-                });
-            }
-        });
+        $gridData = $grid->getData($request, fn ($query) => $this->applyNameAwareSearch($query, $search, $nameFilter));
 
         return Inertia::render('catalog/attributes/index', [
             'gridConfig' => $grid->getConfig(),
@@ -79,6 +69,99 @@ class AttributeController extends Controller
                 'filters' => $originalFilters,
             ],
         ]);
+    }
+
+    /**
+     * Shared by index() and export() — see index()'s comment on why `name`
+     * (a fallback column that stands in for the attribute's translated
+     * label) needs this bespoke handling instead of GridManager's generic
+     * per-column filtering.
+     */
+    private function applyNameAwareSearch($query, ?string $search, mixed $nameFilter): void
+    {
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+            });
+        }
+
+        if ($nameFilter) {
+            $query->where(function ($q) use ($nameFilter) {
+                $q->where('name', 'like', "%{$nameFilter}%")
+                    ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
+            });
+        }
+    }
+
+    /**
+     * Exports the attribute list as CSV/XLS/XLSX, honoring whatever
+     * search/column-filters are currently applied on the list page (same
+     * query-building as index(), just unpaginated) — mirrors
+     * ProductController::quickExport()'s shape.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'format' => ['required', 'in:csv,xls,xlsx'],
+            'locale' => ['nullable', 'string', Rule::exists('locales', 'code')->where('enabled', true)],
+        ]);
+        $format = $validated['format'];
+
+        // Forced explicitly from what the list page is actually showing,
+        // rather than left to resolve from the session/cookie the way
+        // SetLocale normally does — a user whose profile has no saved UI
+        // locale and whose `locale` cookie doesn't ride along on this
+        // particular request would otherwise silently export in whatever
+        // the app's default locale is instead of matching their screen.
+        if (! empty($validated['locale'])) {
+            app()->setLocale($validated['locale']);
+        }
+
+        $grid = new GridManager('attribute_grid');
+        $columns = array_keys($grid->getConfig()['columns']);
+
+        $search = $request->input('search');
+        // (array) cast — see GridManager::getData()'s comment: an empty
+        // `?filters=` query param arrives here as a literal null.
+        $originalFilters = (array) $request->input('filters', []);
+        $nameFilter = $originalFilters['name'] ?? null;
+        $columnFilters = ($nameFilter !== null && $nameFilter !== '')
+            ? collect($originalFilters)->except('name')->all()
+            : $originalFilters;
+
+        $query = Attribute::query();
+        $this->applyNameAwareSearch($query, $search, $nameFilter);
+        GridManager::applyFilters($query, $grid->getConfig()['columns'], $columnFilters);
+
+        $rows = (function () use ($query, $columns) {
+            foreach ($query->orderBy('id')->cursor() as $attribute) {
+                $row = [];
+                foreach ($columns as $column) {
+                    $value = $attribute->{$column};
+                    if (is_bool($value)) {
+                        $value = $value ? '1' : '0';
+                    } elseif ($value instanceof \Illuminate\Support\Carbon) {
+                        $value = $value->toDateTimeString();
+                    }
+                    $row[$column] = $value;
+                }
+
+                yield $row;
+            }
+        })();
+
+        Storage::disk('local')->makeDirectory('tmp-exports');
+        $tempRelativePath = 'tmp-exports/'.Str::uuid().'.'.$format;
+        $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
+
+        SpreadsheetWriter::write($tempAbsolutePath, $format, $columns, $rows, ',');
+
+        $downloadName = 'attributes_'.now()->format('Ymd_His').'.'.$format;
+
+        return response()->download($tempAbsolutePath, $downloadName)->deleteFileAfterSend(true);
     }
 
     public function summary(): JsonResponse

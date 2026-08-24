@@ -60,6 +60,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/check-live-status', [ProductController::class, 'checkLiveStatus'])->name('products.checkLiveStatus')->middleware('permission:products,edit_products');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
+    Route::get('attributes/export', [AttributeController::class, 'export'])->name('attributes.export')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/marketplace-mapping', [MarketplaceAttributeMappingController::class, 'index'])->name('attributes.marketplaceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');

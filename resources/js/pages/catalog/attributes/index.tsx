@@ -6,6 +6,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DownloadIcon from '@mui/icons-material/Download';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -22,6 +24,7 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    Menu,
     MenuItem,
     Paper,
     Select,
@@ -37,9 +40,11 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocale } from '@/hooks/use-locale';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
 import {
     FIORI,
+    FioriBusyOverlay,
     FioriStatus,
     fioriBodyCellSx,
     fioriCardSx,
@@ -58,6 +63,28 @@ interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<str
 interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; current_page: number; last_page: number; per_page: number; }
 interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> }; }
 
+/**
+ * Bracket-notation query string encoder (`filters[created_at][from]=...`) —
+ * PHP parses this natively into nested arrays, which is what
+ * AttributeController::export() expects for `search`/`filters`. Needed
+ * because the export link is a plain browser navigation (so the server's
+ * BinaryFileResponse triggers a real download) rather than an Inertia
+ * `router.get()` visit, which would otherwise handle the nesting for us.
+ */
+function encodeQueryParams(params: Record<string, unknown>, prefix = ''): string[] {
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null || value === '') continue;
+        const paramKey = prefix ? `${prefix}[${key}]` : key;
+        if (typeof value === 'object' && !Array.isArray(value)) {
+            parts.push(...encodeQueryParams(value as Record<string, unknown>, paramKey));
+        } else {
+            parts.push(`${encodeURIComponent(paramKey)}=${encodeURIComponent(String(value))}`);
+        }
+    }
+    return parts;
+}
+
 function cellValue(value: unknown, type: string, t: (key: string) => string) {
     if (type === 'boolean') return <FioriStatus label={value ? t('yes') : t('no')} tone={value ? 'success' : 'neutral'} />;
     if (type === 'datetime' && typeof value === 'string') return new Date(value).toLocaleDateString();
@@ -68,6 +95,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const { t } = useTranslation('grid');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
+    const { locale } = useLocale();
     const breadcrumbs: BreadcrumbItem[] = [{ title: tNav('catalog'), href: '#' }, { title: tNav('attributes'), href: '/catalog/attributes' }];
 
     const { auth } = usePage<SharedData>().props;
@@ -82,7 +110,27 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+    const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+    // Drives the table's Busy State (FioriBusyOverlay) while a search/sort/
+    // filter/pagination request is in flight — these are `preserveState`
+    // visits, which RouteLoadingSkeleton (the app's full-page loading
+    // placeholder) deliberately ignores, so without this the table gave no
+    // feedback at all for a slow request.
+    const [isFetching, setIsFetching] = useState(false);
+    const visitOptions = { onStart: () => setIsFetching(true), onFinish: () => setIsFetching(false) };
     const firstRender = useRef(true);
+
+    const handleExport = (format: 'csv' | 'xlsx') => {
+        // Passed explicitly rather than left for the server to guess from
+        // the session/cookie — a user whose profile has no saved UI locale
+        // and whose `locale` cookie doesn't ride along on this particular
+        // request (observed happening in practice) would otherwise silently
+        // fall back to the app's default locale instead of matching what's
+        // actually on screen.
+        const params = encodeQueryParams({ format, search, filters: activeFilters, locale });
+        window.location.href = `/catalog/attributes/export?${params.join('&')}`;
+        setExportAnchor(null);
+    };
 
     const visibleActions = Object.entries(gridConfig.actions ?? {}).filter(([actionKey]) => {
         if (actionKey === 'update') return canEdit;
@@ -97,7 +145,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
         }
 
         const timeout = setTimeout(
-            () => router.get('/catalog/attributes', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true }),
+            () => router.get('/catalog/attributes', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true, ...visitOptions }),
             300,
         );
         return () => clearTimeout(timeout);
@@ -107,12 +155,12 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const lastPage = gridData.last_page ?? 1;
 
     const goToPage = (page: number) => {
-        router.get('/catalog/attributes', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true });
+        router.get('/catalog/attributes', { search, page, per_page: perPage, filters: activeFilters }, { preserveState: true, ...visitOptions });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/attributes', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true });
+        router.get('/catalog/attributes', { search, page: 1, per_page: value, filters: activeFilters }, { preserveState: true, ...visitOptions });
     };
 
     const applyFilters = (next: Record<string, FilterValue>) => {
@@ -134,11 +182,24 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                         </Typography>
                     </Box>
                     <Stack direction="row" spacing={1.5}>
-                        {canEdit && (
+                        {/* {canEdit && (
                             <Button variant="outlined" onClick={() => router.visit('/catalog/attributes/woocommerce-mapping')} sx={fioriDefaultSx}>
                                 {tCatalog('woocommerceContentMapping')}
                             </Button>
-                        )}
+                        )} */}
+                        <Button
+                            variant="outlined"
+                            startIcon={<DownloadIcon />}
+                            endIcon={<ArrowDropDownIcon />}
+                            onClick={(e) => setExportAnchor(e.currentTarget)}
+                            sx={fioriDefaultSx}
+                        >
+                            {tCatalog('quickExport')}
+                        </Button>
+                        <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}>
+                            <MenuItem onClick={() => handleExport('csv')}>CSV</MenuItem>
+                            <MenuItem onClick={() => handleExport('xlsx')}>XLSX</MenuItem>
+                        </Menu>
                         {canCreate && (
                             <Button
                                 variant="contained"
@@ -231,6 +292,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
+                    <FioriBusyOverlay busy={isFetching}>
                     <TableContainer>
                         <Table>
                             <TableHead sx={fioriTableHeadSx}>
@@ -284,6 +346,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    </FioriBusyOverlay>
                 </Paper>
             </Box>
             <Dialog open={deleteAttributeId !== null} onClose={() => setDeleteAttributeId(null)}>

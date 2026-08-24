@@ -41,7 +41,7 @@ class ChannelController extends Controller
             })
             ->orderBy('id', 'desc');
 
-        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+        GridManager::applyFilters($query, $filterColumns, (array) $request->input('filters', []));
 
         $channels = $query->paginate(15)->withQueryString();
 

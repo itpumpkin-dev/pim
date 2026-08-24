@@ -14,7 +14,8 @@
  * (see `app.tsx`'s `ThemedPage`) — no call site needs to change.
  */
 
-import { Box, Stack, Typography, type SxProps, type Theme } from '@mui/material';
+import { Box, CircularProgress, Stack, Typography, type SxProps, type Theme } from '@mui/material';
+import { useEffect, useState, type ReactNode } from 'react';
 
 /** CSS-variable-backed tokens, approximating SAP's Horizon theme (light + dark). */
 export const FIORI = {
@@ -41,6 +42,8 @@ export const FIORI = {
     errorBg: 'var(--fiori-error-bg)',
     neutralBg: 'var(--fiori-neutral-bg)',
     brandBg: 'var(--fiori-brand-bg)',
+    /** Translucent cover for a Busy State overlay — see FioriBusyOverlay. */
+    scrim: 'var(--fiori-scrim)',
 } as const;
 
 /**
@@ -165,4 +168,68 @@ export function percentToneFiori(percent: number, thresholds: { high: number; mi
     if (percent >= thresholds.high) return 'success';
     if (percent >= thresholds.mid) return 'warning';
     return 'error';
+}
+
+/**
+ * Delay-gates a boolean so it only flips true once `active` has stayed true
+ * for `delayMs` — the mechanism behind Fiori's Busy Indicator rule "don't use
+ * it for an operation under 1 second": a request that resolves before the
+ * delay elapses never shows anything, so fast responses don't flash a
+ * spinner. Used by `FioriBusyOverlay`; exported directly for callers that
+ * need the delayed boolean without the overlay markup (e.g. to disable a
+ * control instead of dimming it).
+ */
+export function useFioriBusy(active: boolean, delayMs = 700): boolean {
+    const [show, setShow] = useState(false);
+
+    useEffect(() => {
+        if (!active) {
+            setShow(false);
+            return;
+        }
+
+        const timer = setTimeout(() => setShow(true), delayMs);
+        return () => clearTimeout(timer);
+    }, [active, delayMs]);
+
+    return show;
+}
+
+/** Fiori "Busy Indicator" — small brand-colored spinner, sized for a component/section, not a full page. */
+export function FioriBusyIndicator({ size = 28 }: { size?: number }) {
+    return <CircularProgress size={size} thickness={4} sx={{ color: FIORI.brand }} />;
+}
+
+/**
+ * Fiori "Busy State" — dims one section/component while it's fetching,
+ * instead of blocking the whole page. Per the Fiori guidance this wraps:
+ * only for unspecified waits over ~1s (gated by `useFioriBusy`'s delay, so a
+ * fast fetch never flashes it), only over the affected component (content
+ * underneath stays visible, just dimmed + non-interactive), never a stand-in
+ * for full-page/navigation loading (that's `RouteLoadingSkeleton`'s job).
+ */
+export function FioriBusyOverlay({ busy, delayMs = 700, children }: { busy: boolean; delayMs?: number; children: ReactNode }) {
+    const show = useFioriBusy(busy, delayMs);
+
+    return (
+        <Box sx={{ position: 'relative' }} aria-busy={busy}>
+            {children}
+            {show && (
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: FIORI.scrim,
+                        pointerEvents: 'all',
+                        zIndex: 1,
+                    }}
+                >
+                    <FioriBusyIndicator />
+                </Box>
+            )}
+        </Box>
+    );
 }

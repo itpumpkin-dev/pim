@@ -48,7 +48,7 @@ class CategoryFieldController extends Controller
             ->orderBy('position')
             ->orderBy('id', 'desc');
 
-        GridManager::applyFilters($query, $filterColumns, $request->input('filters', []));
+        GridManager::applyFilters($query, $filterColumns, (array) $request->input('filters', []));
 
         $fields = $query->paginate($perPage)->withQueryString();
 

@@ -48,6 +48,7 @@ body {
     --fiori-error-bg: #fbeaea;
     --fiori-neutral-bg: #f2f2f2;
     --fiori-brand-bg: rgba(0, 112, 242, 0.08);
+    --fiori-scrim: rgba(255, 255, 255, 0.65);
 }
 
 [data-fiori-mode='dark'] {
@@ -72,4 +73,5 @@ body {
     --fiori-error-bg: rgba(241, 104, 95, 0.16);
     --fiori-neutral-bg: rgba(154, 164, 174, 0.14);
     --fiori-brand-bg: rgba(77, 163, 255, 0.16);
+    --fiori-scrim: rgba(23, 25, 27, 0.65);
 }
