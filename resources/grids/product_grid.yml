@@ -3,6 +3,9 @@ datagrid:
     source:
       type: eloquent
       class: App\Models\Product
+    default_sort:
+      field: updated_at
+      dir: desc
     columns:
       sku:
         label: SKU

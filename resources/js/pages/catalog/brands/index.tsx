@@ -11,7 +11,6 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SaveIcon from '@mui/icons-material/Save';
-import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import {
     Alert,
@@ -46,6 +45,19 @@ import {
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import {
+    FIORI,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface BrandItem {
     id: number;
@@ -176,25 +188,11 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('brandsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
-                    <Box
-                        sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            bgcolor: '#fff7ed',
-                            color: 'primary.main',
-                        }}
-                    >
-                        <LocalOfferOutlinedIcon />
-                    </Box>
-                    <Typography variant="h4" fontWeight={700} color="text.primary">{t('brandsTitle')}</Typography>
-                </Stack>
-                <Typography color="text.secondary" sx={{ mb: 3, maxWidth: 720 }}>{t('brandsIntro')}</Typography>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('brandsTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25, maxWidth: 720 }}>{t('brandsIntro')}</Typography>
+                </Box>
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: canEdit ? '340px 1fr' : '1fr' }, gap: 3, alignItems: 'start' }}>
                     {canEdit && (
@@ -202,10 +200,8 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                         component="form"
                         onSubmit={submit}
                         sx={{
+                            ...fioriCardSx,
                             p: 3,
-                            borderRadius: 2,
-                            border: '1px solid #e2e8f0',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                             position: { md: 'sticky' },
                             top: { md: 24 },
                         }}
@@ -263,7 +259,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                             component="img"
                                             src={thumbnailPreview}
                                             alt=""
-                                            sx={{ height: 44, width: 44, objectFit: 'cover', borderRadius: 1.5, border: '1px solid #e2e8f0' }}
+                                            sx={{ height: 44, width: 44, objectFit: 'cover', borderRadius: 1.5, border: `1px solid ${FIORI.border}` }}
                                         />
                                     ) : (
                                         <Box
@@ -271,18 +267,18 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                 height: 44,
                                                 width: 44,
                                                 borderRadius: 1.5,
-                                                border: '1px dashed #cbd5e1',
+                                                border: `1px dashed ${FIORI.borderStrong}`,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
-                                                color: '#94a3b8',
+                                                color: FIORI.textSecondary,
                                                 flexShrink: 0,
                                             }}
                                         >
                                             <ImageOutlinedIcon fontSize="small" />
                                         </Box>
                                     )}
-                                    <Button component="label" variant="outlined" size="small" startIcon={<UploadIcon />} sx={{ textTransform: 'none', borderRadius: 1.5 }}>
+                                    <Button component="label" variant="outlined" size="small" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
                                         {t('chooseFile')}
                                         <input
                                             type="file"
@@ -301,15 +297,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                 type="submit"
                                 variant="contained"
                                 fullWidth
-                                sx={{
-                                    color: '#fff',
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    borderRadius: 1.5,
-                                    py: 1,
-                                    bgcolor: 'primary.main',
-                                    '&:hover': { bgcolor: 'primary.dark' },
-                                }}
+                                sx={{ ...fioriEmphasizedSx, py: 1 }}
                                 disabled={processing}
                                 startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
                             >
@@ -321,7 +309,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
 
                     <Box>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                 {tGrid('results', { count: brands.total })}
                             </Typography>
                             <Stack direction="row" spacing={1.5}>
@@ -330,7 +318,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                     onChange={(e) => applyPlatformFilter(e.target.value)}
                                     displayEmpty
                                     size="small"
-                                    sx={{ minWidth: 180, bgcolor: '#fff' }}
+                                    sx={{ ...fioriSearchFieldSx, minWidth: 180 }}
                                 >
                                     <MenuItem value="">{t('allPlatforms')}</MenuItem>
                                     {MAPPED_PLATFORMS.map((platform) => (
@@ -344,16 +332,11 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder={t('searchBrands')}
                                     size="small"
-                                    sx={{
-                                        minWidth: 260,
-                                        bgcolor: '#fff',
-                                        borderRadius: 5,
-                                        '& .MuiOutlinedInput-root': { borderRadius: 5 },
-                                    }}
+                                    sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                                <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
                                             </InputAdornment>
                                         ),
                                     }}
@@ -361,67 +344,67 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                             </Stack>
                         </Stack>
 
-                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                        <TableContainer sx={fioriCardSx}>
                             <Table>
-                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                <TableHead sx={fioriTableHeadSx}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('imageLabel')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('imageLabel')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>
                                             <TableSortLabel active={sortField === 'admin_label'} direction={sortField === 'admin_label' ? sortDir : 'asc'} onClick={() => handleSort('admin_label')}>
                                                 {t('name')}
                                             </TableSortLabel>
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
+                                        <TableCell sx={fioriTableHeadCellSx}>
                                             <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
                                                 {t('description')}
                                             </TableSortLabel>
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
+                                        <TableCell sx={fioriTableHeadCellSx}>
                                             <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
                                                 {t('slug')}
                                             </TableSortLabel>
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }} align="right">
+                                        <TableCell sx={fioriTableHeadCellSx} align="right">
                                             <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
                                                 {t('productsCount')}
                                             </TableSortLabel>
                                         </TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('mappedPlatforms')}</TableCell>
-                                        {canEdit && <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }} align="right">{tGrid('actionsHeader')}</TableCell>}
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('mappedPlatforms')}</TableCell>
+                                        {canEdit && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {brands.data.map((row) => (
-                                        <TableRow key={row.id} hover>
-                                            <TableCell>
+                                        <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                            <TableCell sx={fioriBodyCellSx}>
                                                 {row.thumbnail_url ? (
-                                                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 1.5, border: '1px solid #e2e8f0' }} />
+                                                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 1.5, border: `1px solid ${FIORI.border}` }} />
                                                 ) : (
                                                     <Box
                                                         sx={{
                                                             height: 38,
                                                             width: 38,
                                                             borderRadius: 1.5,
-                                                            bgcolor: '#f5f3ff',
-                                                            border: '1px solid #ede9fe',
+                                                            bgcolor: 'grey.100',
+                                                            border: `1px solid ${FIORI.border}`,
                                                             display: 'flex',
                                                             alignItems: 'center',
                                                             justifyContent: 'center',
-                                                            color: '#c4b5fd',
+                                                            color: 'grey.500',
                                                         }}
                                                     >
                                                         <ImageOutlinedIcon fontSize="small" />
                                                     </Box>
                                                 )}
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 600, color: '#1e293b' }}>{row.admin_label || row.code}</TableCell>
-                                            <TableCell sx={{ color: 'text.secondary', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.admin_label || row.code}</TableCell>
+                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                 {row.description || <Typography component="span" color="text.disabled">—</Typography>}
                                             </TableCell>
-                                            <TableCell sx={{ color: 'text.secondary' }}>
+                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary }}>
                                                 {row.slug || <Typography component="span" color="text.disabled">—</Typography>}
                                             </TableCell>
-                                            <TableCell align="right">
+                                            <TableCell sx={fioriBodyCellSx} align="right">
                                                 {row.products_count ? (
                                                     <Tooltip title={t('viewBrandProducts')}>
                                                         <Chip
@@ -429,11 +412,11 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                             size="small"
                                                             onClick={() => goToProducts(row)}
                                                             sx={{
-                                                                bgcolor: '#f5f3ff',
-                                                                color: 'primary.main',
+                                                                bgcolor: 'rgba(0,112,242,0.08)',
+                                                                color: FIORI.brand,
                                                                 fontWeight: 700,
                                                                 cursor: 'pointer',
-                                                                '&:hover': { bgcolor: '#ede9fe' },
+                                                                '&:hover': { bgcolor: 'rgba(0,112,242,0.16)' },
                                                             }}
                                                         />
                                                     </Tooltip>
@@ -441,7 +424,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                     <Typography color="text.disabled">0</Typography>
                                                 )}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>
                                                 {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
                                                     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                                                         {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
@@ -460,12 +443,12 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                                 )}
                                             </TableCell>
                                             {canEdit && (
-                                                <TableCell align="right">
+                                                <TableCell sx={fioriBodyCellSx} align="right">
                                                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                        <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
+                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
                                                             <EditIcon fontSize="small" />
                                                         </IconButton>
-                                                        <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteBrandId(row.id)}>
+                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
                                                             <DeleteIcon fontSize="small" />
                                                         </IconButton>
                                                     </Stack>
@@ -475,7 +458,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                                     ))}
                                     {brands.data.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={canEdit ? 7 : 6} align="center" sx={{ py: 5, color: 'text.secondary' }}>
+                                            <TableCell colSpan={canEdit ? 7 : 6} align="center" sx={{ py: 5, color: FIORI.textSecondary }}>
                                                 {t('noBrandsFound')}
                                             </TableCell>
                                         </TableRow>
@@ -485,21 +468,21 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                         </TableContainer>
 
                         <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                            <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage })}</Typography>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
                             <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
                                     <FirstPageIcon fontSize="small" />
                                 </IconButton>
-                                <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
                                     <ChevronLeftIcon fontSize="small" />
                                 </IconButton>
-                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
-                                    <Typography variant="body2">{currentPage}</Typography>
+                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
+                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
                                 </Paper>
-                                <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
                                     <ChevronRightIcon fontSize="small" />
                                 </IconButton>
-                                <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
                                     <LastPageIcon fontSize="small" />
                                 </IconButton>
                             </Stack>
@@ -524,7 +507,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                     })()}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteBrandId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
+                    <Button onClick={() => setDeleteBrandId(null)} sx={fioriGhostSx} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
@@ -540,6 +523,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                         color="error"
                         variant="contained"
                         disabled={deleting}
+                        sx={{ textTransform: 'none', borderRadius: '8px' }}
                     >
                         {deleting ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
                     </Button>

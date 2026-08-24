@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface LocaleOption {
     code: string;
@@ -82,10 +83,10 @@ export default function WooExport({ locales, families, shops }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooExportTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('wooExportTitle')}</Typography>
-                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooExportTitle')}</Typography>
+                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                         {tCatalog('back')}
                     </Button>
                 </Stack>
@@ -95,8 +96,8 @@ export default function WooExport({ locales, families, shops }: Props) {
                 </Alert>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooExportLanguageSectionTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportLanguageSectionTitle')}</Typography>
                         <Stack spacing={3}>
                             <FormControl fullWidth required>
                                 <InputLabel id="woo-export-locale-label">{t('wooExportLocale')}</InputLabel>
@@ -137,16 +138,16 @@ export default function WooExport({ locales, families, shops }: Props) {
                         </Stack>
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooExportProductsSectionTitle')}</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportProductsSectionTitle')}</Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 1.5 }}>
                             {t('wooExportProductsHelp')}
                         </Typography>
                         <ProductPicker value={products} onChange={setProducts} />
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3, opacity: hasProductSelection ? 0.5 : 1 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooExportFilterSectionTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3, opacity: hasProductSelection ? 0.5 : 1 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportFilterSectionTitle')}</Typography>
                         {hasProductSelection && (
                             <Alert severity="info" sx={{ mb: 2 }}>{t('wooExportFiltersIgnored')}</Alert>
                         )}
@@ -178,8 +179,8 @@ export default function WooExport({ locales, families, shops }: Props) {
                         </Stack>
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooExportFormatSectionTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportFormatSectionTitle')}</Typography>
                         <FormControl fullWidth>
                             <InputLabel id="woo-export-format-label">{t('fileFormat')}</InputLabel>
                             <Select
@@ -199,10 +200,9 @@ export default function WooExport({ locales, families, shops }: Props) {
                     type="submit"
                     fullWidth
                     size="large"
-                    sx={{ color: 'white', mt: 3 }}
-                    variant="contained"
                     disabled={!locale}
                     startIcon={<DownloadIcon />}
+                    sx={{ ...fioriEmphasizedSx, mt: 3, py: 1.25 }}
                 >
                     {t('wooExportSubmit')}
                 </Button>

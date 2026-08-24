@@ -10,7 +10,6 @@ import {
     Typography,
     Button,
     IconButton,
-    useTheme,
     Stack,
     FormControl,
     InputLabel,
@@ -39,9 +38,9 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { PieChart } from '@mui/x-charts/PieChart';
-import { PALETTE } from '@/theme';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
+import { FIORI, FIORI_RAW, FioriStatus, type FioriTone, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx, fioriTableHeadSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -118,17 +117,12 @@ interface DashboardProps {
 
 const EMPTY_FILTERS: DashboardFilters = { category_id: null, date_from: null, date_to: null };
 
-// AdminLTE "card" widget shadow — a floating box with no full border, just a
-// hairline + soft drop shadow (see AdminLTE's `.card` class).
-const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
-
-const TH_SX = { padding: '12px 20px', fontWeight: 600, fontSize: '0.8rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.03em' };
-const TD_SX = { padding: '12px 20px', fontSize: '0.875rem' };
+const TH_SX = { padding: '12px 20px', fontWeight: 600, fontSize: '0.8rem', color: FIORI.textSecondary, textTransform: 'uppercase', letterSpacing: '0.03em' };
+const TD_SX = { padding: '12px 20px', fontSize: '0.875rem', color: FIORI.textPrimary };
 const TR_SX = {
-    borderBottom: '1px solid',
-    borderColor: 'divider',
+    borderBottom: `1px solid ${FIORI.border}`,
     transition: 'background-color 0.15s',
-    '&:hover': { bgcolor: 'action.hover' },
+    '&:hover': { bgcolor: FIORI.hover },
     '&:last-of-type': { borderBottom: 'none' },
 };
 
@@ -137,7 +131,7 @@ function TrendBadge({ trend, onColoredBg = false }: { trend?: number | null; onC
         return null;
     }
     const isUp = trend >= 0;
-    const color = onColoredBg ? 'rgba(255,255,255,0.95)' : isUp ? '#22c55e' : '#ef4444';
+    const color = onColoredBg ? 'rgba(255,255,255,0.95)' : isUp ? FIORI.success : FIORI.error;
     const Icon = isUp ? TrendingUpIcon : TrendingDownIcon;
 
     return (
@@ -177,7 +171,6 @@ export default function Dashboard({
     categoryPieChart = [],
     filters = EMPTY_FILTERS,
 }: DashboardProps) {
-    const theme = useTheme();
     const { t } = useTranslation('dashboard');
     const { auth } = usePage<SharedData>().props;
     const permissions = auth?.permissions || [];
@@ -220,16 +213,15 @@ export default function Dashboard({
         downloadCsv(`recent-activity-${filters.date_from ?? 'all'}_${filters.date_to ?? 'all'}.csv`, headers, rows);
     };
 
-    // Map AdminLTE UI components using the customized PALETTE from theme.ts
-    // Accent (Orange #EA580C) / Highlight (Cyan #06B6D4) / Primary (Slate Blue #334155) / Secondary (Mid Gray #9CA3AF)
+    // KPI tiles — all use the Fiori brand blue as the single accent color;
+    // only the "low stock" tile switches to the warning tone when it's
+    // actually non-zero, since that one is semantically an alert.
     const smallBoxes = [
         {
             title: t('products'),
             value: totalProduct,
             trend: totalProductTrend,
-            icon: <Inventory2Icon sx={{ fontSize: 75, opacity: 0.15, position: 'absolute', right: 12, top: 12 }} />,
-            bg: PALETTE.accent, // Signal Orange #EA580C
-            color: '#fff',
+            icon: <Inventory2Icon sx={{ fontSize: 75, opacity: 0.12, position: 'absolute', right: 12, top: 12, color: FIORI.brand }} />,
             link: '/catalog/products',
             permission: 'products.list_products',
         },
@@ -237,9 +229,7 @@ export default function Dashboard({
             title: t('categories'),
             value: totalCategory,
             trend: totalCategoryTrend,
-            icon: <CategoryIcon sx={{ fontSize: 75, opacity: 0.15, position: 'absolute', right: 12, top: 12 }} />,
-            bg: PALETTE.highlight, // Data Cyan #06B6D4
-            color: '#fff',
+            icon: <CategoryIcon sx={{ fontSize: 75, opacity: 0.12, position: 'absolute', right: 12, top: 12, color: FIORI.brand }} />,
             link: '/catalog/categories',
             permission: 'categories.list_categories',
         },
@@ -247,9 +237,7 @@ export default function Dashboard({
             title: t('attributes'),
             value: totalAttribute,
             trend: totalAttributeTrend,
-            icon: <AssignmentIcon sx={{ fontSize: 75, opacity: 0.15, position: 'absolute', right: 12, top: 12 }} />,
-            bg: PALETTE.primary, // Slate Blue #334155
-            color: '#fff',
+            icon: <AssignmentIcon sx={{ fontSize: 75, opacity: 0.12, position: 'absolute', right: 12, top: 12, color: FIORI.brand }} />,
             link: '/catalog/attributes',
             permission: 'attributes.list_attributes',
         },
@@ -257,9 +245,7 @@ export default function Dashboard({
             title: t('attributeGroups'),
             value: totalGroup,
             trend: totalGroupTrend,
-            icon: <FolderIcon sx={{ fontSize: 75, opacity: 0.15, position: 'absolute', right: 12, top: 12 }} />,
-            bg: PALETTE.secondary, // Mid Gray #9CA3AF
-            color: '#fff',
+            icon: <FolderIcon sx={{ fontSize: 75, opacity: 0.12, position: 'absolute', right: 12, top: 12, color: FIORI.brand }} />,
             link: '/catalog/attributeGroups',
             permission: 'attribute_groups.list_attribute_groups',
         },
@@ -271,8 +257,7 @@ export default function Dashboard({
             value: totalFamilies,
             trend: totalFamiliesTrend,
             icon: <SchemaIcon sx={{ fontSize: 28, color: '#fff' }} />,
-            iconBg: PALETTE.accent, // Signal Orange
-            bg: theme.palette.background.paper,
+            iconBg: FIORI.brand,
             link: '/catalog/attributeFamilies',
             permission: 'attribute_families.list_attribute_families',
         },
@@ -281,8 +266,7 @@ export default function Dashboard({
             value: totalLocale,
             trend: totalLocaleTrend,
             icon: <TranslateIcon sx={{ fontSize: 28, color: '#fff' }} />,
-            iconBg: PALETTE.highlight, // Data Cyan
-            bg: theme.palette.background.paper,
+            iconBg: FIORI.brand,
             link: '/system/locales',
             permission: 'locales.list_locales',
         },
@@ -291,8 +275,7 @@ export default function Dashboard({
             value: totalCurrencies,
             trend: totalCurrenciesTrend,
             icon: <PaidIcon sx={{ fontSize: 28, color: '#fff' }} />,
-            iconBg: PALETTE.primary, // Slate Blue
-            bg: theme.palette.background.paper,
+            iconBg: FIORI.neutral,
             // No currency management page (or permission) exists yet in this
             // app, so this card intentionally stays non-clickable (no `link`)
             // and visible to anyone who can reach the dashboard.
@@ -302,8 +285,7 @@ export default function Dashboard({
             value: totalChannels,
             trend: totalChannelsTrend,
             icon: <SettingsInputAntennaIcon sx={{ fontSize: 28, color: '#fff' }} />,
-            iconBg: PALETTE.secondary, // Mid Gray
-            bg: theme.palette.background.paper,
+            iconBg: FIORI.brand,
             link: '/catalog/channels',
             permission: 'channels.list_channels',
         },
@@ -312,8 +294,7 @@ export default function Dashboard({
             value: lowStockCount,
             trend: null as number | null,
             icon: <WarningAmberIcon sx={{ fontSize: 28, color: '#fff' }} />,
-            iconBg: lowStockCount > 0 ? '#DC2626' : PALETTE.secondary,
-            bg: theme.palette.background.paper,
+            iconBg: lowStockCount > 0 ? FIORI.warning : FIORI.neutral,
             link: '/catalog/products',
             caption: t('lowStockCaption'),
             permission: 'products.list_products',
@@ -330,20 +311,20 @@ export default function Dashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('dashboard')} />
-            <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.default', minHeight: '100%', color: 'text.primary', fontFamily: '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+            <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: FIORI.pageBg, minHeight: '100%', color: FIORI.textPrimary, fontFamily: '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
 
                 {/* Content Header */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>
-                    <Typography variant="h5" fontWeight={400} sx={{ fontSize: '1rem', color: 'text.secondary' }}>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                         {t('overview')}
                     </Typography>
-                    <Typography variant="h5" fontWeight={700} sx={{ fontSize: '1.8rem', color: 'text.primary' }}>
+                    <Typography variant="h5" fontWeight={600} sx={{ fontSize: '1.8rem', color: FIORI.textPrimary }}>
                         {t('dashboard')}
                     </Typography>
                 </Box>
 
                 {/* Toolbar: filters, export, notifications */}
-                <Card elevation={0} sx={{ mb: 3, p: 2, borderRadius: '0.25rem', bgcolor: 'background.paper', boxShadow: CARD_SHADOW }}>
+                <Card elevation={0} sx={{ mb: 3, p: 2, ...fioriCardSx }}>
                     <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
                         {canViewProducts && categoryOptions.length > 0 && (
                             <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -382,7 +363,7 @@ export default function Dashboard({
                         />
 
                         {hasActiveFilters && (
-                            <Button size="small" onClick={clearFilters}>
+                            <Button size="small" onClick={clearFilters} sx={fioriGhostSx}>
                                 {t('clearFilters')}
                             </Button>
                         )}
@@ -395,13 +376,14 @@ export default function Dashboard({
                             startIcon={<FileDownloadOutlinedIcon />}
                             onClick={handleExportActivity}
                             disabled={recentActivities.length === 0}
+                            sx={fioriDefaultSx}
                         >
                             {t('exportActivity')}
                         </Button>
 
                         {permissions.includes('job_trackers.list_job_trackers') && (
                             <Tooltip title={t('failedJobsTooltip', { count: failedJobsCount })}>
-                                <IconButton component={Link} href="/import-export/jobs">
+                                <IconButton component={Link} href="/import-export/jobs" sx={fioriIconButtonSx}>
                                     <Badge badgeContent={failedJobsCount} color="error">
                                         <NotificationsIcon />
                                     </Badge>
@@ -417,17 +399,15 @@ export default function Dashboard({
                         <Grid item xs={12} sm={6} md={3} key={i} sx={{ display: 'flex' }}>
                             <Box
                                 sx={{
+                                    ...fioriCardSx,
                                     position: 'relative',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     width: '100%',
-                                    borderRadius: '0.25rem',
-                                    bgcolor: box.bg,
-                                    color: box.color,
-                                    boxShadow: CARD_SHADOW,
-                                    overflow: 'hidden',
+                                    color: FIORI.textPrimary,
                                     '&:hover': {
                                         textDecoration: 'none',
+                                        borderColor: FIORI.borderStrong,
                                         '& svg': {
                                             transform: 'scale(1.1)',
                                             transition: 'transform 0.3s linear',
@@ -436,13 +416,13 @@ export default function Dashboard({
                                 }}
                             >
                                 <Box sx={{ p: 2, pb: 2, flex: 1 }}>
-                                    <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.2rem', mb: 1, zIndex: 5, position: 'relative' }}>
+                                    <Typography variant="h3" fontWeight={700} sx={{ fontSize: '2.2rem', mb: 1, zIndex: 5, position: 'relative', color: FIORI.textPrimary }}>
                                         {box.value}
                                     </Typography>
-                                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.02em', opacity: 0.9, zIndex: 5, position: 'relative' }}>
+                                    <Typography variant="body2" fontWeight={700} sx={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.02em', color: FIORI.textSecondary, zIndex: 5, position: 'relative' }}>
                                         {box.title}
                                     </Typography>
-                                    <TrendBadge trend={box.trend} onColoredBg />
+                                    <TrendBadge trend={box.trend} />
                                     {box.icon}
                                 </Box>
                                 <Box
@@ -453,8 +433,9 @@ export default function Dashboard({
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        bgcolor: 'rgba(0,0,0,.1)',
-                                        color: box.color,
+                                        bgcolor: FIORI.headerBg,
+                                        borderTop: `1px solid ${FIORI.border}`,
+                                        color: FIORI.brand,
                                         py: 0.75,
                                         zIndex: 10,
                                         textDecoration: 'none',
@@ -462,8 +443,8 @@ export default function Dashboard({
                                         fontWeight: 600,
                                         transition: 'background-color 0.2s',
                                         '&:hover': {
-                                            bgcolor: 'rgba(0,0,0,.15)',
-                                            color: box.color,
+                                            bgcolor: FIORI.hover,
+                                            color: FIORI.brandDark,
                                         }
                                     }}
                                 >
@@ -482,18 +463,15 @@ export default function Dashboard({
                                 component={box.link ? Link : 'div'}
                                 {...(box.link ? { href: box.link } : {})}
                                 sx={{
+                                    ...fioriCardSx,
                                     display: 'flex',
                                     width: '100%',
-                                    borderRadius: '0.25rem',
-                                    bgcolor: box.bg,
-                                    boxShadow: CARD_SHADOW,
                                     mb: { xs: 2, md: 0 },
-                                    overflow: 'hidden',
                                     textDecoration: 'none',
                                     color: 'inherit',
                                     cursor: box.link ? 'pointer' : 'default',
-                                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                    '&:hover': box.link ? { transform: 'translateY(-2px)', boxShadow: 3 } : {},
+                                    transition: 'border-color 0.15s ease',
+                                    '&:hover': box.link ? { borderColor: FIORI.borderStrong } : {},
                                 }}
                             >
                                 <Box
@@ -509,15 +487,15 @@ export default function Dashboard({
                                     {box.icon}
                                 </Box>
                                 <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
+                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
                                         {box.title}
                                     </Typography>
-                                    <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.25rem', color: 'text.primary', mt: 0.25 }}>
+                                    <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.25rem', color: FIORI.textPrimary, mt: 0.25 }}>
                                         {box.value}
                                     </Typography>
                                     <TrendBadge trend={box.trend} />
                                     {box.caption && (
-                                        <Typography variant="caption" sx={{ color: 'text.disabled', fontStyle: 'italic', mt: 0.25 }}>
+                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, fontStyle: 'italic', mt: 0.25 }}>
                                             {box.caption}
                                         </Typography>
                                     )}
@@ -529,32 +507,22 @@ export default function Dashboard({
 
                 {/* Row 2.5 - Top Viewed Products */}
                 {canViewProducts && (
-                    <Card
-                        elevation={0}
-                        sx={{
-                            mb: 3,
-                            borderRadius: '0.25rem',
-                            borderTop: `3px solid ${PALETTE.accent}`,
-                            bgcolor: 'background.paper',
-                            boxShadow: CARD_SHADOW,
-                        }}
-                    >
+                    <Card elevation={0} sx={{ mb: 3, ...fioriCardSx }}>
                         <Box
                             sx={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                borderBottom: '1px solid',
-                                borderColor: 'divider',
+                                borderBottom: `1px solid ${FIORI.border}`,
                                 px: 2.5,
                                 py: 1.5,
                             }}
                         >
                             <Box>
-                                <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'text.primary' }}>
+                                <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: FIORI.textPrimary }}>
                                     {t('topViewedProducts')}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
                                     {t('topViewedSubtitle')}
                                 </Typography>
                             </Box>
@@ -562,7 +530,7 @@ export default function Dashboard({
                         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
                             <Box sx={{ overflowX: 'auto' }}>
                                 <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                    <Box component="thead" sx={{ bgcolor: 'action.hover' }}>
+                                    <Box component="thead" sx={fioriTableHeadSx}>
                                         <Box component="tr">
                                             <Box component="th" sx={TH_SX}>{t('rank')}</Box>
                                             <Box component="th" sx={TH_SX}>{t('product')}</Box>
@@ -573,7 +541,7 @@ export default function Dashboard({
                                     <Box component="tbody">
                                         {topViewedProducts.map((product, index) => (
                                             <Box component="tr" key={product.id} sx={TR_SX}>
-                                                <Box component="td" sx={{ ...TD_SX, fontWeight: 700, color: index < 3 ? PALETTE.accent : undefined }}>
+                                                <Box component="td" sx={{ ...TD_SX, fontWeight: 700, color: index < 3 ? FIORI.brand : undefined }}>
                                                     #{index + 1}
                                                 </Box>
                                                 <Box component="td" sx={TD_SX}>
@@ -590,9 +558,8 @@ export default function Dashboard({
                                                                 height: 36,
                                                                 objectFit: 'contain',
                                                                 borderRadius: 1,
-                                                                border: '1px solid',
-                                                                borderColor: 'divider',
-                                                                bgcolor: 'action.hover',
+                                                                border: `1px solid ${FIORI.border}`,
+                                                                bgcolor: FIORI.headerBg,
                                                                 flexShrink: 0,
                                                             }}
                                                         />
@@ -601,13 +568,13 @@ export default function Dashboard({
                                                         </Typography>
                                                     </Stack>
                                                 </Box>
-                                                <Box component="td" sx={{ ...TD_SX, color: 'text.secondary' }}>{product.category}</Box>
+                                                <Box component="td" sx={{ ...TD_SX, color: FIORI.textSecondary }}>{product.category}</Box>
                                                 <Box component="td" sx={{ ...TD_SX, fontWeight: 700 }}>{product.views}</Box>
                                             </Box>
                                         ))}
                                         {topViewedProducts.length === 0 && (
                                             <Box component="tr">
-                                                <Box component="td" colSpan={4} sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
+                                                <Box component="td" colSpan={4} sx={{ p: 3, textAlign: 'center', color: FIORI.textSecondary }}>
                                                     {t('noViewData')}
                                                 </Box>
                                             </Box>
@@ -624,12 +591,9 @@ export default function Dashboard({
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {canViewActivity && (
                             <Grid item xs={12} md={6}>
-                                <Card
-                                    elevation={0}
-                                    sx={{ borderRadius: '0.25rem', borderTop: `3px solid ${PALETTE.highlight}`, bgcolor: 'background.paper', boxShadow: CARD_SHADOW, height: '100%' }}
-                                >
-                                    <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 2.5, py: 1.5 }}>
-                                        <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'text.primary' }}>
+                                <Card elevation={0} sx={{ ...fioriCardSx, height: '100%' }}>
+                                    <Box sx={{ borderBottom: `1px solid ${FIORI.border}`, px: 2.5, py: 1.5 }}>
+                                        <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: FIORI.textPrimary }}>
                                             {t('activityTrendChartTitle')}
                                         </Typography>
                                     </Box>
@@ -640,7 +604,7 @@ export default function Dashboard({
                                                 {
                                                     data: activityTrendChart.map((point) => point.count),
                                                     label: t('activityCount'),
-                                                    color: PALETTE.highlight,
+                                                    color: FIORI_RAW.brand,
                                                     area: true,
                                                 },
                                             ]}
@@ -653,12 +617,9 @@ export default function Dashboard({
                         )}
                         {canViewProducts && (
                             <Grid item xs={12} md={6}>
-                                <Card
-                                    elevation={0}
-                                    sx={{ borderRadius: '0.25rem', borderTop: `3px solid ${PALETTE.accent}`, bgcolor: 'background.paper', boxShadow: CARD_SHADOW, height: '100%' }}
-                                >
-                                    <Box sx={{ borderBottom: '1px solid', borderColor: 'divider', px: 2.5, py: 1.5 }}>
-                                        <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'text.primary' }}>
+                                <Card elevation={0} sx={{ ...fioriCardSx, height: '100%' }}>
+                                    <Box sx={{ borderBottom: `1px solid ${FIORI.border}`, px: 2.5, py: 1.5 }}>
+                                        <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: FIORI.textPrimary }}>
                                             {t('categoryPieChartTitle')}
                                         </Typography>
                                     </Box>
@@ -674,7 +635,7 @@ export default function Dashboard({
                                             ]}
                                         />
                                     ) : (
-                                        <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, py: 4, textAlign: 'center' }}>
                                             {t('noChartData')}
                                         </Typography>
                                     )}
@@ -689,36 +650,27 @@ export default function Dashboard({
                 {canViewSystemConsole && (
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
-                            <Card
-                                elevation={0}
-                                sx={{
-                                    borderRadius: '0.25rem',
-                                    borderTop: `3px solid ${PALETTE.accent}`,
-                                    bgcolor: 'background.paper',
-                                    boxShadow: CARD_SHADOW,
-                                }}
-                            >
+                            <Card elevation={0} sx={fioriCardSx}>
                                 <Box
                                     sx={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
-                                        borderBottom: '1px solid',
-                                        borderColor: 'divider',
+                                        borderBottom: `1px solid ${FIORI.border}`,
                                         px: 2.5,
                                         py: 1.5,
                                     }}
                                 >
-                                    <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'text.primary' }}>
+                                    <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: FIORI.textPrimary }}>
                                         {t('systemConsole')}
                                     </Typography>
                                     <Box>
                                         <Tooltip title={t('refresh')}>
-                                            <IconButton size="small" sx={{ mr: 0.5 }} onClick={handleRefresh}>
+                                            <IconButton size="small" sx={{ ...fioriIconButtonSx, mr: 0.5 }} onClick={handleRefresh}>
                                                 <RefreshIcon sx={{ fontSize: 18 }} />
                                             </IconButton>
                                         </Tooltip>
-                                        <IconButton size="small" onClick={(event) => setMoreAnchor(event.currentTarget)}>
+                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={(event) => setMoreAnchor(event.currentTarget)}>
                                             <MoreVertIcon sx={{ fontSize: 18 }} />
                                         </IconButton>
                                         <Menu anchorEl={moreAnchor} open={Boolean(moreAnchor)} onClose={() => setMoreAnchor(null)}>
@@ -736,26 +688,14 @@ export default function Dashboard({
                                     </Box>
                                 </Box>
                                 <CardContent sx={{ p: 3 }}>
-                                    <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
                                         {t('welcomeMessage')}
                                     </Typography>
                                     <Button
                                         component={Link}
                                         href="/catalog/products"
                                         variant="contained"
-                                        sx={{
-                                            bgcolor: PALETTE.accent,
-                                            color: '#fff',
-                                            textTransform: 'none',
-                                            fontWeight: 600,
-                                            borderRadius: '0.25rem',
-                                            boxShadow: 'none',
-                                            '&:hover': {
-                                                bgcolor: PALETTE.accent,
-                                                opacity: 0.9,
-                                                boxShadow: 'none',
-                                            }
-                                        }}
+                                        sx={fioriEmphasizedSx}
                                     >
                                         {t('manageProducts')}
                                     </Button>
@@ -767,43 +707,33 @@ export default function Dashboard({
 
                 {/* Recent Activity */}
                 {canViewActivity && (
-                    <Card
-                        elevation={0}
-                        sx={{
-                            mt: 3,
-                            borderRadius: '0.25rem',
-                            borderTop: `3px solid ${PALETTE.highlight}`,
-                            bgcolor: 'background.paper',
-                            boxShadow: CARD_SHADOW,
-                        }}
-                    >
+                    <Card elevation={0} sx={{ mt: 3, ...fioriCardSx }}>
                         <Box
                             sx={{
                                 display: 'flex',
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
-                                borderBottom: '1px solid',
-                                borderColor: 'divider',
+                                borderBottom: `1px solid ${FIORI.border}`,
                                 px: 2.5,
                                 py: 1.5,
                             }}
                         >
                             <Box>
-                                <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'text.primary' }}>
+                                <Typography variant="h6" sx={{ fontSize: '1.1rem', fontWeight: 600, color: FIORI.textPrimary }}>
                                     {t('recentActivity')}
                                 </Typography>
-                                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
                                     {t('operations')}
                                 </Typography>
                             </Box>
-                            <Button component={Link} href="/system/activity-logs" size="small" endIcon={<ArrowCircleRightIcon sx={{ fontSize: 16 }} />}>
+                            <Button component={Link} href="/system/activity-logs" size="small" endIcon={<ArrowCircleRightIcon sx={{ fontSize: 16 }} />} sx={fioriGhostSx}>
                                 {t('viewAll')}
                             </Button>
                         </Box>
                         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
                             <Box sx={{ overflowX: 'auto' }}>
                                 <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                    <Box component="thead" sx={{ bgcolor: 'action.hover' }}>
+                                    <Box component="thead" sx={fioriTableHeadSx}>
                                         <Box component="tr">
                                             <Box component="th" sx={TH_SX}>{t('id')}</Box>
                                             <Box component="th" sx={TH_SX}>{t('user')}</Box>
@@ -814,45 +744,37 @@ export default function Dashboard({
                                         </Box>
                                     </Box>
                                     <Box component="tbody">
-                                        {recentActivities.map((activity) => (
-                                            <Box component="tr" key={activity.id} sx={TR_SX}>
-                                                <Box component="td" sx={TD_SX}>#{activity.id}</Box>
-                                                <Box component="td" sx={{ ...TD_SX, fontWeight: 600 }}>{activity.user}</Box>
-                                                <Box component="td" sx={TD_SX}>
-                                                    <Box
-                                                        component="span"
-                                                        sx={{
-                                                            display: 'inline-block',
-                                                            px: 1,
-                                                            py: 0.25,
-                                                            borderRadius: '4px',
-                                                            fontSize: '0.75rem',
-                                                            fontWeight: 600,
-                                                            color: '#fff',
-                                                            bgcolor:
-                                                                activity.event === 'created' ? '#28a745' :
-                                                                    activity.event === 'updated' ? '#007bff' :
-                                                                        activity.event === 'deleted' ? '#dc3545' :
-                                                                            activity.event === 'login' ? '#17a2b8' : '#6c757d',
-                                                        }}
-                                                    >
-                                                        {t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
+                                        {recentActivities.map((activity) => {
+                                            const eventTone: FioriTone =
+                                                activity.event === 'created' ? 'success' :
+                                                    activity.event === 'updated' ? 'information' :
+                                                        activity.event === 'deleted' ? 'error' :
+                                                            'neutral';
+                                            return (
+                                                <Box component="tr" key={activity.id} sx={TR_SX}>
+                                                    <Box component="td" sx={TD_SX}>#{activity.id}</Box>
+                                                    <Box component="td" sx={{ ...TD_SX, fontWeight: 600 }}>{activity.user}</Box>
+                                                    <Box component="td" sx={TD_SX}>
+                                                        <FioriStatus
+                                                            label={t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
+                                                            tone={eventTone}
+                                                        />
+                                                    </Box>
+                                                    <Box component="td" sx={{ ...TD_SX, color: FIORI.textSecondary }}>
+                                                        {activity.auditable_type || '-'}
+                                                    </Box>
+                                                    <Box component="td" sx={TD_SX}>
+                                                        {activity.auditable_id || '-'}
+                                                    </Box>
+                                                    <Box component="td" sx={{ ...TD_SX, color: FIORI.textSecondary }}>
+                                                        {new Date(activity.created_at).toLocaleString()}
                                                     </Box>
                                                 </Box>
-                                                <Box component="td" sx={{ ...TD_SX, color: 'text.secondary' }}>
-                                                    {activity.auditable_type || '-'}
-                                                </Box>
-                                                <Box component="td" sx={TD_SX}>
-                                                    {activity.auditable_id || '-'}
-                                                </Box>
-                                                <Box component="td" sx={{ ...TD_SX, color: 'text.secondary' }}>
-                                                    {new Date(activity.created_at).toLocaleString()}
-                                                </Box>
-                                            </Box>
-                                        ))}
+                                            );
+                                        })}
                                         {recentActivities.length === 0 && (
                                             <Box component="tr">
-                                                <Box component="td" colSpan={6} sx={{ p: 3, textAlign: 'center', color: 'text.secondary' }}>
+                                                <Box component="td" colSpan={6} sx={{ p: 3, textAlign: 'center', color: FIORI.textSecondary }}>
                                                     {t('noActivities')}
                                                 </Box>
                                             </Box>

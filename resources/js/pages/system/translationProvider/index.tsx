@@ -13,13 +13,13 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
-    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     IconButton,
     InputAdornment,
     Paper,
@@ -36,6 +36,19 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface ProviderRow {
     id: number;
@@ -96,166 +109,156 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('translationProvidersTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
-                        {tSystem('translationProvidersTitle')}
-                    </Typography>
+                    <Box>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                            {tSystem('translationProvidersTitle')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+                            {t('results', { count: gridData.total })}
+                        </Typography>
+                    </Box>
                     {canCreate && (
                         <Button
                             variant="contained"
                             onClick={() => router.visit('/system/translationProviders/create')}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                py: 1,
-                                borderRadius: 1.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                         >
                             {tSystem('createTranslationProvider')}
                         </Button>
                     )}
                 </Stack>
 
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={tSystem('searchByName')}
-                            size="small"
-                            sx={{
-                                bgcolor: '#fff',
-                                borderRadius: 5,
-                                '& .MuiOutlinedInput-root': { borderRadius: 5 },
-                                minWidth: 240,
-                            }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Stack>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <Stack
+                        direction={{ xs: 'column', md: 'row' }}
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={2}
+                        sx={{ p: 2 }}
+                    >
+                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                            <TextField
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={tSystem('searchByName')}
+                                size="small"
+                                sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Stack>
 
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FilterListIcon />}
-                            sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', borderRadius: 1.5, bgcolor: '#fff' }}
-                        >
-                            {t('filter')}
-                        </Button>
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
-                        </Paper>
-                        <Typography variant="body2" color="text.secondary">
-                            {t('pageOf', { lastPage })}
-                        </Typography>
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<FilterListIcon />}
+                                sx={fioriDefaultSx}
+                            >
+                                {t('filter')}
+                            </Button>
+                            <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
+                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
+                            </Paper>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('pageOf', { lastPage })}
+                            </Typography>
+                            <Stack direction="row" spacing={0.2}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1}>
+                                    <FirstPageIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1}>
+                                    <ChevronLeftIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage}>
+                                    <ChevronRightIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage}>
+                                    <LastPageIcon fontSize="small" />
+                                </IconButton>
+                            </Stack>
                         </Stack>
                     </Stack>
-                </Stack>
 
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <Table sx={{ minWidth: 650 }}>
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{tSystem('translationProviderName')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{tSystem('translationProviderType')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.status')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{tSystem('isDefaultProvider')}</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actionsHeader')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => (
-                                <TableRow key={row.id} hover>
-                                    <TableCell sx={{ color: '#334155', fontWeight: 500 }}>{row.name}</TableCell>
-                                    <TableCell sx={{ color: '#334155' }}>{row.type}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={row.enabled ? t('enabled') : t('disabled')}
-                                            size="small"
-                                            sx={{ bgcolor: row.enabled ? '#22c55e' : '#94a3b8', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        {row.is_default && (
-                                            <Chip
-                                                label={tSystem('defaultProvider')}
-                                                size="small"
-                                                sx={{ bgcolor: '#3b82f6', color: '#fff', fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                                            />
-                                        )}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                            <Tooltip title={tSystem('testProvider')}>
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{ color: '#64748b' }}
-                                                    disabled={testingId === row.id}
-                                                    onClick={() => {
-                                                        setTestingId(row.id);
-                                                        router.post(`/system/translationProviders/${row.id}/test`, {}, {
-                                                            preserveScroll: true,
-                                                            onFinish: () => setTestingId(null),
-                                                        });
-                                                    }}
-                                                >
-                                                    {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon fontSize="small" />}
-                                                </IconButton>
-                                            </Tooltip>
-                                            {canEdit && (
-                                                <IconButton
-                                                    size="small"
-                                                    sx={{ color: '#64748b' }}
-                                                    onClick={() => router.visit(`/system/translationProviders/${row.id}/edit`)}
-                                                >
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                            {canDelete && (
-                                                <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteId(row.id)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {gridData.data.length === 0 && (
+                    <Divider sx={{ borderColor: FIORI.border }} />
+
+                    <TableContainer>
+                        <Table sx={{ minWidth: 650 }}>
+                            <TableHead sx={fioriTableHeadSx}>
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        {tSystem('noTranslationProvidersFound')}
-                                    </TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('translationProviderName')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('translationProviderType')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.status')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('isDefaultProvider')}</TableCell>
+                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actionsHeader')}</TableCell>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {gridData.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{row.type}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>
+                                            <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />
+                                        </TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>
+                                            {row.is_default && (
+                                                <FioriStatus label={tSystem('defaultProvider')} tone="information" />
+                                            )}
+                                        </TableCell>
+                                        <TableCell align="right" sx={fioriBodyCellSx}>
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                <Tooltip title={tSystem('testProvider')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={fioriIconButtonSx}
+                                                        disabled={testingId === row.id}
+                                                        onClick={() => {
+                                                            setTestingId(row.id);
+                                                            router.post(`/system/translationProviders/${row.id}/test`, {}, {
+                                                                preserveScroll: true,
+                                                                onFinish: () => setTestingId(null),
+                                                            });
+                                                        }}
+                                                    >
+                                                        {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon fontSize="small" />}
+                                                    </IconButton>
+                                                </Tooltip>
+                                                {canEdit && (
+                                                    <IconButton
+                                                        size="small"
+                                                        sx={fioriIconButtonSx}
+                                                        onClick={() => router.visit(`/system/translationProviders/${row.id}/edit`)}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                                {canDelete && (
+                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </Stack>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {gridData.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
+                                            {tSystem('noTranslationProvidersFound')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
             </Box>
 
             <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
@@ -264,7 +267,7 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
                     <DialogContentText>{tSystem('confirmDeleteTranslationProviderMessage')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} color="inherit" disabled={deleting}>
+                    <Button onClick={() => setDeleteId(null)} color="inherit" disabled={deleting} sx={fioriDefaultSx}>
                         {t('cancel')}
                     </Button>
                     <Button
@@ -281,6 +284,7 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
                         variant="contained"
                         disabled={deleting}
                         startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ textTransform: 'none', borderRadius: '8px' }}
                     >
                         {t('delete')}
                     </Button>

@@ -7,6 +7,7 @@
     "confirmDeleteImport": "คุณแน่ใจหรือไม่ว่าต้องการลบการตั้งค่านำเข้านี้?",
     "uploadedFile": "ไฟล์ที่อัปโหลด",
     "noFileUploaded": "ยังไม่ได้อัปโหลดไฟล์",
+    "currentFile": "ไฟล์ปัจจุบัน",
     "downloadSample": "ดาวน์โหลดไฟล์ตัวอย่าง",
     "requiredFields": "ฟิลด์ที่จำเป็นต้องกรอก",
     "chooseFile": "เลือกไฟล์",

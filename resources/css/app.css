@@ -18,3 +18,58 @@ body {
     font-family:
         'Sarabun', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+/*
+ * SAP Fiori (Horizon) design tokens — consumed as var(--fiori-*) by
+ * resources/js/lib/fiori-style.tsx and resources/js/lib/ui-style.ts.
+ * `data-fiori-mode` is set on <html> by app.tsx's ThemedPage based on the
+ * app's existing light/dark appearance toggle, so every page built on the
+ * FIORI tokens gets dark mode for free without any per-page changes.
+ */
+:root {
+    --fiori-brand: #0070f2;
+    --fiori-brand-dark: #0040b0;
+    --fiori-text-primary: #1d2d3e;
+    --fiori-text-secondary: #6a6d70;
+    --fiori-border: #d9d9d9;
+    --fiori-border-strong: #89919a;
+    --fiori-page-bg: #f7f7f7;
+    --fiori-header-bg: #f7f7f7;
+    --fiori-hover: #f5f5f5;
+    --fiori-selected: #e9f2fe;
+    --fiori-success: #257a3e;
+    --fiori-warning: #e76500;
+    --fiori-error: #bb0000;
+    --fiori-neutral: #6a6d70;
+    --fiori-information: #0070f2;
+    --fiori-surface: #ffffff;
+    --fiori-success-bg: #e9f5ec;
+    --fiori-warning-bg: #fdf1e0;
+    --fiori-error-bg: #fbeaea;
+    --fiori-neutral-bg: #f2f2f2;
+    --fiori-brand-bg: rgba(0, 112, 242, 0.08);
+}
+
+[data-fiori-mode='dark'] {
+    --fiori-brand: #4da3ff;
+    --fiori-brand-dark: #1f7ae0;
+    --fiori-text-primary: #e8eaed;
+    --fiori-text-secondary: #9aa4ae;
+    --fiori-border: #383c40;
+    --fiori-border-strong: #565c63;
+    --fiori-page-bg: #17191b;
+    --fiori-header-bg: #202325;
+    --fiori-hover: #26292c;
+    --fiori-selected: rgba(77, 163, 255, 0.18);
+    --fiori-success: #3fb964;
+    --fiori-warning: #f0923d;
+    --fiori-error: #f1685f;
+    --fiori-neutral: #9aa4ae;
+    --fiori-information: #4da3ff;
+    --fiori-surface: #1e2124;
+    --fiori-success-bg: rgba(63, 185, 100, 0.16);
+    --fiori-warning-bg: rgba(240, 146, 61, 0.16);
+    --fiori-error-bg: rgba(241, 104, 95, 0.16);
+    --fiori-neutral-bg: rgba(154, 164, 174, 0.14);
+    --fiori-brand-bg: rgba(77, 163, 255, 0.16);
+}

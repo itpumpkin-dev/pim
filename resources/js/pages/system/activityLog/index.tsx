@@ -4,18 +4,18 @@ import { Head, router } from '@inertiajs/react';
 import {
     Box,
     Button,
-    Card,
-    CardContent,
     FormControl,
     InputLabel,
     MenuItem,
     Pagination,
+    Paper,
     Select,
     Stack,
     TextField,
     Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { FIORI, FioriStatus, type FioriTone, fioriCardSx, fioriGhostSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface Activity {
     id: number;
@@ -48,11 +48,11 @@ interface ActivityLogFilters {
 
 const EMPTY_FILTERS: ActivityLogFilters = { event: null, user_id: null, date_from: null, date_to: null };
 
-const EVENT_COLORS: Record<string, string> = {
-    created: '#28a745',
-    updated: '#007bff',
-    deleted: '#dc3545',
-    login: '#17a2b8',
+const EVENT_TONE: Record<string, FioriTone> = {
+    created: 'success',
+    updated: 'information',
+    deleted: 'error',
+    login: 'neutral',
 };
 
 export default function ActivityLogIndex({
@@ -101,14 +101,14 @@ export default function ActivityLogIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('activityLogsTitle', { count: activities.total })} />
-            <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: FIORI.textPrimary }}>
                     {t('activityLogsTitle', { count: activities.total })}
                 </Typography>
 
-                <Card variant="outlined" sx={{ mb: 3, p: 2, borderRadius: 2 }}>
+                <Paper elevation={0} sx={{ ...fioriCardSx, mb: 3, p: 2 }}>
                     <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap alignItems="center">
-                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 180 }}>
                             <InputLabel id="activity-log-event-label">{t('filterByEvent')}</InputLabel>
                             <Select
                                 labelId="activity-log-event-label"
@@ -125,7 +125,7 @@ export default function ActivityLogIndex({
                             </Select>
                         </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 200 }}>
                             <InputLabel id="activity-log-user-label">{t('filterByUser')}</InputLabel>
                             <Select
                                 labelId="activity-log-user-label"
@@ -149,6 +149,7 @@ export default function ActivityLogIndex({
                             slotProps={{ inputLabel: { shrink: true } }}
                             value={filters.date_from ?? ''}
                             onChange={(event) => applyFilters({ date_from: event.target.value || null })}
+                            sx={fioriSearchFieldSx}
                         />
                         <TextField
                             size="small"
@@ -157,71 +158,61 @@ export default function ActivityLogIndex({
                             slotProps={{ inputLabel: { shrink: true } }}
                             value={filters.date_to ?? ''}
                             onChange={(event) => applyFilters({ date_to: event.target.value || null })}
+                            sx={fioriSearchFieldSx}
                         />
 
                         {hasActiveFilters && (
-                            <Button size="small" onClick={clearFilters}>
+                            <Button size="small" onClick={clearFilters} sx={fioriGhostSx}>
                                 {t('clearFilters')}
                             </Button>
                         )}
                     </Stack>
-                </Card>
+                </Paper>
 
-                <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                    <CardContent sx={{ p: 0 }}>
-                        <Box sx={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.08)' }}>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('id')}</th>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('user')}</th>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('event')}</th>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('targetResource')}</th>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('targetId')}</th>
-                                        <th style={{ padding: '12px 20px', fontWeight: 600, fontSize: '0.875rem' }}>{t('time')}</th>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <Box sx={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                            <thead>
+                                <tr style={{ backgroundColor: FIORI.headerBg, borderBottom: `1px solid ${FIORI.border}` }}>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('id')}</th>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('user')}</th>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('event')}</th>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('targetResource')}</th>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('targetId')}</th>
+                                    <th style={{ padding: '10px 20px', fontWeight: 600, fontSize: '0.8125rem', color: FIORI.textPrimary }}>{t('time')}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {activities.data.map((activity) => (
+                                    <tr key={activity.id} style={{ borderBottom: `1px solid ${FIORI.border}` }}>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem', color: FIORI.textPrimary }}>#{activity.id}</td>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem', fontWeight: 600, color: FIORI.textPrimary }}>{activity.user}</td>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem' }}>
+                                            <FioriStatus
+                                                label={t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
+                                                tone={EVENT_TONE[activity.event] ?? 'neutral'}
+                                            />
+                                        </td>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem', color: FIORI.textSecondary }}>
+                                            {activity.auditable_type || '-'}
+                                        </td>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem', color: FIORI.textPrimary }}>{activity.auditable_id || '-'}</td>
+                                        <td style={{ padding: '10px 20px', fontSize: '0.8125rem', color: FIORI.textSecondary }}>
+                                            {new Date(activity.created_at).toLocaleString()}
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {activities.data.map((activity) => (
-                                        <tr key={activity.id} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem' }}>#{activity.id}</td>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem', fontWeight: 600 }}>{activity.user}</td>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem' }}>
-                                                <span
-                                                    style={{
-                                                        display: 'inline-block',
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: 600,
-                                                        color: '#fff',
-                                                        backgroundColor: EVENT_COLORS[activity.event] ?? '#6c757d',
-                                                    }}
-                                                >
-                                                    {t(activity.event, { defaultValue: activity.event.toUpperCase() }).toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem', color: 'text.secondary' }}>
-                                                {activity.auditable_type || '-'}
-                                            </td>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem' }}>{activity.auditable_id || '-'}</td>
-                                            <td style={{ padding: '12px 20px', fontSize: '0.875rem', color: 'text.secondary' }}>
-                                                {new Date(activity.created_at).toLocaleString()}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {activities.data.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'text.secondary' }}>
-                                                {t('noActivities')}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </Box>
-                    </CardContent>
-                </Card>
+                                ))}
+                                {activities.data.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: FIORI.textSecondary }}>
+                                            {t('noActivities')}
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </Box>
+                </Paper>
 
                 {activities.last_page > 1 && (
                     <Stack direction="row" justifyContent="center" sx={{ mt: 3 }}>
@@ -229,7 +220,10 @@ export default function ActivityLogIndex({
                             count={activities.last_page}
                             page={activities.current_page}
                             onChange={(_event, page) => goToPage(page)}
-                            color="primary"
+                            sx={{
+                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
+                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
+                            }}
                         />
                     </Stack>
                 )}

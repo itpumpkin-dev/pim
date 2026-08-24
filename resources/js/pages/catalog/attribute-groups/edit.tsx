@@ -17,6 +17,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -58,12 +59,12 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Attribute Group: ${group.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />
@@ -76,7 +77,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                 <>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         Edit Attribute Group
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -84,14 +85,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                             component={Link}
                             href="/catalog/attributeGroups"
                             variant="outlined"
-                            sx={{
-                                    
-                                borderColor: 'primary.main',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { borderColor: 'primary.main' },
-                            }}
+                            sx={fioriDefaultSx}
                         >
                             Back
                         </Button>
@@ -100,14 +94,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                             variant="contained"
                             disabled={processing}
                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                         >
                             {processing ? 'Saving…' : 'Save Attribute Group'}
                         </Button>
@@ -116,8 +103,8 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
 
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
                     {/* General Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                             General
                         </Typography>
                         <TextField

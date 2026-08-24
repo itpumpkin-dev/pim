@@ -13,17 +13,7 @@ import { Box, Divider, Drawer, ThemeProvider, Toolbar, Typography } from '@mui/m
 import { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
-
-// AdminLTE sidebars are always dark-on-text, independent of the app's
-// light/dark mode toggle — so the sidebar gets its own fixed-dark theme
-// for text/icon contrast. Its background color still tracks the app's
-// resolved mode (see SIDEBAR_BG below).
-const sidebarTheme = getTheme('dark');
-
-const SIDEBAR_BG = {
-    light: '#343a40',
-    dark: '#0d1117',
-} as const;
+import { FIORI } from '@/lib/fiori-style';
 
 function useMainNavItems(): NavItem[] {
     const { t } = useTranslation('nav');
@@ -273,7 +263,10 @@ export function AppSidebar() {
     const page = usePage();
     const { auth } = usePage<SharedData>().props;
     const { resolved } = useResolvedAppearance();
-    const sidebarBg = SIDEBAR_BG[resolved];
+    // SAP Fiori's SideNavigation follows the app's light/dark appearance
+    // toggle like the rest of the Fiori-themed UI — FIORI.surface below is a
+    // CSS-var token that already resolves to the right shade for `resolved`.
+    const sidebarTheme = useMemo(() => getTheme(resolved), [resolved]);
     const collapsed = state === 'collapsed';
     const mainNavItems = useMainNavItems();
 
@@ -338,7 +331,7 @@ export function AppSidebar() {
                     flexDirection: 'column',
                     alignItems: 'center',
                     borderRight: '1px solid',
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    borderColor: FIORI.border,
                 }}
             >
                 <Toolbar
@@ -357,7 +350,7 @@ export function AppSidebar() {
                         <AppLogo collapsed={true} />
                     </Box>
                 </Toolbar>
-                <Divider sx={{ alignSelf: 'stretch', borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                <Divider sx={{ alignSelf: 'stretch', borderColor: FIORI.border }} />
                 <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', alignSelf: 'stretch' }}>
                     <NavPrimary
                         items={filteredMainNavItems}
@@ -383,7 +376,8 @@ export function AppSidebar() {
                     width: hasSubmenus && !collapsed ? SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON : 0,
                     opacity: hasSubmenus && !collapsed ? 1 : 0,
                     overflow: 'hidden',
-                    bgcolor: 'rgba(0, 0, 0, 0.12)',
+                    bgcolor: FIORI.pageBg,
+                    borderLeft: `1px solid ${FIORI.border}`,
                 }}
             >
                 <Toolbar
@@ -397,16 +391,15 @@ export function AppSidebar() {
                         variant="h6"
                         noWrap
                         sx={{
-                            fontWeight: 700,
-                            fontSize: '1.1rem',
-                            color: '#fff',
-                            letterSpacing: '0.02em',
+                            fontWeight: 600,
+                            fontSize: '1.05rem',
+                            color: FIORI.textPrimary,
                         }}
                     >
                         PIM PK
                     </Typography>
                 </Toolbar>
-                <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+                <Divider sx={{ borderColor: FIORI.border }} />
                 <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
                     {selectedGroup && (
                         <NavSecondary title={selectedGroup.title} items={selectedGroup.items ?? []} />
@@ -424,7 +417,7 @@ export function AppSidebar() {
                     open={openMobile}
                     onClose={() => setOpenMobile(false)}
                     ModalProps={{ keepMounted: true }}
-                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, backgroundColor: sidebarBg } }}
+                    sx={{ '& .MuiDrawer-paper': { width: SIDEBAR_WIDTH, backgroundColor: FIORI.surface } }}
                 >
                     {content}
                 </Drawer>
@@ -444,8 +437,9 @@ export function AppSidebar() {
                         width,
                         boxSizing: 'border-box',
                         overflowX: 'hidden',
-                        boxShadow: '4px 0 8px rgba(0, 0, 0, 0.15)',
-                        backgroundColor: sidebarBg,
+                        boxShadow: 'none',
+                        borderRight: `1px solid ${FIORI.border}`,
+                        backgroundColor: FIORI.surface,
                         transition: (theme) => theme.transitions.create('width', { duration: theme.transitions.duration.shortest }),
                     },
                 }}

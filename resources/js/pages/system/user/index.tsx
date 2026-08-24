@@ -9,6 +9,19 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CreateUserDialog from '@/components/system/create-user-dialog';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface PaginationData<T> {
     data: T[];
@@ -95,31 +108,32 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('usersCount', { count: gridData.total })} />
-            <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                             {tSystem('usersCount', { count: gridData.total })}
                         </Typography>
-                        <TextField
-                            placeholder={tSystem('searchByUsername')}
-                            variant="standard"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                                    </InputAdornment>
-                                ),
-                                disableUnderline: false,
-                            }}
-                            sx={{ minWidth: 300, '& .MuiInput-root': { pb: 1 } }}
-                        />
+                        <Box sx={{ mt: 2 }}>
+                            <TextField
+                                placeholder={tSystem('searchByUsername')}
+                                size="small"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                        </Box>
                     </Box>
                     {canCreate && (
                         <Box>
-                            <Button variant="contained" color="primary" sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }} onClick={() => setCreateOpen(true)}>
+                            <Button variant="contained" sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }} onClick={() => setCreateOpen(true)}>
                                 {tSystem('createUser')}
                             </Button>
                         </Box>
@@ -133,70 +147,76 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                     jobPositions={jobPositions}
                 />
 
-                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
-                    <Table sx={{ minWidth: 650 }}>
-                        <TableHead>
-                            <TableRow>
-                                {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                    <TableCell key={key} sx={{ fontWeight: 'bold', borderBottom: '2px solid', borderColor: 'divider', backgroundColor: '#f5f5f5' }}>
-                                        {t(column.label)}
-                                    </TableCell>
-                                ))}
-                                {visibleActions.length > 0 && (
-                                    <TableCell sx={{ fontWeight: 'bold', borderBottom: '2px solid', borderColor: 'divider', backgroundColor: '#f5f5f5' }}></TableCell>
-                                )}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => (
-                                <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <TableContainer>
+                        <Table sx={{ minWidth: 650 }}>
+                            <TableHead sx={fioriTableHeadSx}>
+                                <TableRow>
                                     {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                        <TableCell key={key} sx={{ fontWeight: key === 'employee_id' || key === 'username' ? 600 : 400 }}>
-                                            {column.type === 'boolean' ? (row[key] ? t('active') : t('inactive')) : (row[key] || '-')}
+                                        <TableCell key={key} sx={fioriTableHeadCellSx}>
+                                            {t(column.label)}
                                         </TableCell>
                                     ))}
                                     {visibleActions.length > 0 && (
-                                        <TableCell align="right">
-                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                {visibleActions.map(([actionKey, action]) => {
-                                                    if (actionKey === 'delete' && row.id === auth.user?.id) {
-                                                        return null;
-                                                    }
-
-                                                    let Icon = EditIcon;
-                                                    if (action.icon === 'copy') Icon = ContentCopyIcon;
-                                                    if (action.icon === 'delete') Icon = DeleteIcon;
-
-                                                    const handleClick = () => {
-                                                        if (actionKey === 'update') {
-                                                            router.visit(`/system/user/${row.id}/edit`);
-                                                        } else if (actionKey === 'delete') {
-                                                            setDeleteUserId(row.id as number);
-                                                        }
-                                                    };
-
-                                                    return (
-                                                        <IconButton key={actionKey} size="small" sx={{ display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                                            <Icon fontSize="small" />
-                                                            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                                                        </IconButton>
-                                                    );
-                                                })}
-                                            </Box>
-                                        </TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}></TableCell>
                                     )}
                                 </TableRow>
-                            ))}
-                            {gridData.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3 }}>
-                                        {t('noDataFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {gridData.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        {Object.entries(gridConfig.columns).map(([key, column]) => (
+                                            <TableCell key={key} sx={{ ...fioriBodyCellSx, fontWeight: key === 'employee_id' || key === 'username' ? 600 : 400 }}>
+                                                {column.type === 'boolean' ? (
+                                                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+                                                ) : (
+                                                    row[key] || '-'
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                        {visibleActions.length > 0 && (
+                                            <TableCell align="right" sx={fioriBodyCellSx}>
+                                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                    {visibleActions.map(([actionKey, action]) => {
+                                                        if (actionKey === 'delete' && row.id === auth.user?.id) {
+                                                            return null;
+                                                        }
+
+                                                        let Icon = EditIcon;
+                                                        if (action.icon === 'copy') Icon = ContentCopyIcon;
+                                                        if (action.icon === 'delete') Icon = DeleteIcon;
+
+                                                        const handleClick = () => {
+                                                            if (actionKey === 'update') {
+                                                                router.visit(`/system/user/${row.id}/edit`);
+                                                            } else if (actionKey === 'delete') {
+                                                                setDeleteUserId(row.id as number);
+                                                            }
+                                                        };
+
+                                                        return (
+                                                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
+                                                                <Icon fontSize="small" />
+                                                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
+                                                            </IconButton>
+                                                        );
+                                                    })}
+                                                </Box>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                ))}
+                                {gridData.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
+                                            {t('noDataFound')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
             </Box>
         <Dialog open={deleteUserId !== null} onClose={() => setDeleteUserId(null)}>
             <DialogTitle>{tSystem('confirmDeletionTitle')}</DialogTitle>
@@ -206,7 +226,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                 </DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button onClick={() => setDeleteUserId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>{t('cancel')}</Button>
+                <Button onClick={() => setDeleteUserId(null)} color="inherit" disabled={deleting} sx={fioriDefaultSx}>{t('cancel')}</Button>
                 <Button onClick={() => {
                     if (deleteUserId !== null) {
                         setDeleting(true);
@@ -215,7 +235,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                             onFinish: () => setDeleting(false),
                         });
                     }
-                }} color="error" variant="contained" sx={{ fontWeight: 'bold' }} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                }} color="error" variant="contained" disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ textTransform: 'none', borderRadius: '8px' }}>
                     {t('delete')}
                 </Button>
             </DialogActions>

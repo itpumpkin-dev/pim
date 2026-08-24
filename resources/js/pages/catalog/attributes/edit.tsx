@@ -11,6 +11,7 @@ import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormContro
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 const swatchTypeKeys: Record<string, string> = {
     text: 'swatchTypeText',
@@ -122,12 +123,12 @@ export default function AttributeEdit({ attribute, translations, options = [], c
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editAttributeTitle')}: ${attribute.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%' }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />
@@ -139,15 +140,15 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                 {tabIndex === 0 && (
                 <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('editAttributeTitle')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editAttributeTitle')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/attributes" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>{t('back')}</Button>
+                        <Button component={Link} href="/catalog/attributes" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>{t('back')}</Button>
                         <Button
-                            sx={{ color: "white" }}
                             type="submit"
                             variant="contained"
                             disabled={processing}
                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                         >
                             {processing ? t('saving') : t('saveAttribute')}
                         </Button>
@@ -155,8 +156,8 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={2}>
                             <TextField
                                 label={t('code')}
@@ -184,16 +185,16 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                         </Stack>
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>{t('validationsTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>{t('validationsTitle')}</Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                             <FormControlLabel control={<Checkbox checked={data.is_required} onChange={(event) => setData('is_required', event.target.checked)} />} label={t('isRequired')} />
                             {/* <FormControlLabel control={<Checkbox checked={data.is_unique} onChange={(event) => setData('is_unique', event.target.checked)} />} label={t('isUnique')} /> */}
                         </Stack>
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>{t('configurationTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>{t('configurationTitle')}</Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} flexWrap="wrap">
                             <FormControlLabel control={<Checkbox checked={data.is_locale_based} onChange={(event) => setData('is_locale_based', event.target.checked)} />} label={t('valuePerLocale')} />
                             <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />

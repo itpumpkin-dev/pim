@@ -7,6 +7,7 @@
     "confirmDeleteImport": "このインポート設定を削除してもよろしいですか？",
     "uploadedFile": "アップロードしたファイル",
     "noFileUploaded": "ファイルが選択されていません",
+    "currentFile": "現在のファイル",
     "downloadSample": "サンプルをダウンロード",
     "requiredFields": "必須フィールド",
     "chooseFile": "ファイルを選択",

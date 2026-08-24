@@ -26,6 +26,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEventHandler, useState, useMemo } from 'react';
+import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -328,17 +329,16 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
             breadcrumbs={breadcrumbs}
             actions={
                 <>
-                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}>
+                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
                         CANCEL
                     </Button>
                     <Button
                         type="submit"
                         form="role-form"
                         variant="contained"
-                        color="primary"
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
+                        sx={{ ...fioriEmphasizedSx, px: 3 }}
                     >
                         {processing ? 'Saving…' : 'Save'}
                     </Button>
@@ -346,12 +346,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
             }
         >
             <Head title={isEdit ? `Edit ${role?.label}` : 'Create Role'} />
-            <Box component="form" id="role-form" onSubmit={submit} sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+            <Box component="form" id="role-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 3 }}>
                     {isEdit ? 'UPDATE' : 'CREATE'}
                 </Typography>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
                     {TABS.map((label, index) => (
                         <Tab key={label} label={label} value={index} />
                     ))}
@@ -359,7 +359,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
                 {tab === 0 && (
                     <Box sx={{ maxWidth: 420 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                             Role Name *
                         </Typography>
                         <TextField
@@ -374,7 +374,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             helperText={errors.label}
                         />
 
-                        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${FIORI.border}` }}>
                             <FormControlLabel
                                 control={<Checkbox checked={data.is_guest} onChange={(e) => setData('is_guest', e.target.checked)} />}
                                 label="Guest role (applies to visitors who aren't logged in)"
@@ -411,7 +411,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                 onChange={() => toggleModuleAll(moduleKey)}
                                                 sx={{ p: 0.5, mr: 0.5 }}
                                             />
-                                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', cursor: 'pointer' }} onClick={() => setExpandedModules({ ...expandedModules, [moduleKey]: !isExpanded })}>
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: FIORI.textSecondary, textTransform: 'uppercase', cursor: 'pointer' }} onClick={() => setExpandedModules({ ...expandedModules, [moduleKey]: !isExpanded })}>
                                                 {module.label}
                                             </Typography>
                                         </Box>
@@ -426,8 +426,11 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                             alignItems: 'center',
                                                             gap: 1,
                                                             py: 0.1,
+                                                            px: 0.5,
+                                                            borderRadius: '6px',
                                                             cursor: 'pointer',
-                                                            color: activeResource === resourceKey ? 'primary.main' : 'text.primary',
+                                                            bgcolor: activeResource === resourceKey ? FIORI.selected : 'transparent',
+                                                            color: activeResource === resourceKey ? FIORI.brand : FIORI.textPrimary,
                                                             fontWeight: activeResource === resourceKey ? 700 : 400,
                                                         }}
                                                     >
@@ -452,10 +455,10 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
                         {activeCatalog && (
                             <Box sx={{ flex: 1 }}>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', mb: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.brand, mb: 1 }}>
                                     {activeCatalog.label}
                                 </Typography>
-                                <Divider sx={{ mb: 1 }} />
+                                <Divider sx={{ mb: 1, borderColor: FIORI.border }} />
                                 {Object.entries(activeCatalog.actions).map(([actionKey, action]) => {
                                     const hasChildren = Boolean(action.children);
                                     const expanded = expandedActions[actionKey] ?? true;
@@ -485,8 +488,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                             {hasChildren && expanded && (
                                                 <Box sx={{
                                                     pl: 4,
-                                                    borderLeft: '1px solid',
-                                                    borderColor: 'divider',
+                                                    borderLeft: `1px solid ${FIORI.border}`,
                                                     ml: 2,
                                                     maxHeight: '400px',
                                                     overflowY: 'auto',
@@ -518,11 +520,11 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
                     {/* Attribute Access Section - Only show if user has products permission */}
                     {hasProductsPermission ? (
-                    <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: '2px solid', borderColor: 'divider', width: '100%' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: 'primary.main' }}>
+                    <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: FIORI.brand }}>
                             📋 Attribute Access
                         </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 2 }}>
                             Read lets this role see the field on a product; Edit lets it change the value (checking Edit turns Read on too).
                             An attribute's Edit is overridden by its Attribute Group's setting — if the group is Read-only, the attribute stays read-only on the product even when Edit is checked here.
                         </Typography>
@@ -537,25 +539,25 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                     mb: 2,
                                     cursor: 'pointer',
                                     p: 1,
-                                    bgcolor: '#f5f5f5',
-                                    borderRadius: 1,
+                                    bgcolor: FIORI.headerBg,
+                                    borderRadius: '8px',
                                 }}
                             >
                                 <IconButton size="small" sx={{ p: 0, mr: 1 }}>
                                     {expandedAttrGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                                 </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
                                     🏷️ Attribute Groups
                                 </Typography>
                             </Box>
 
                             {expandedAttrGroups && (
-                                <TableContainer component={Paper} variant="outlined">
+                                <TableContainer component={Paper} sx={fioriCardSx}>
                                     <Table size="small">
-                                        <TableHead>
+                                        <TableHead sx={fioriTableHeadSx}>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 700 }}>Attribute Group</TableCell>
-                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                <TableCell sx={fioriTableHeadCellSx}>Attribute Group</TableCell>
+                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
                                                     <Checkbox
                                                         size="small"
                                                         checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
@@ -564,7 +566,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                     />
                                                     Read
                                                 </TableCell>
-                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
                                                     <Checkbox
                                                         size="small"
                                                         checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
@@ -577,16 +579,16 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                         </TableHead>
                                         <TableBody>
                                             {attributeGroups.map((group) => (
-                                                <TableRow key={group.id}>
-                                                    <TableCell>{group.name}</TableCell>
-                                                    <TableCell align="center">
+                                                <TableRow key={group.id} sx={fioriTableRowSx(false)}>
+                                                    <TableCell sx={fioriBodyCellSx}>{group.name}</TableCell>
+                                                    <TableCell align="center" sx={fioriBodyCellSx}>
                                                         <Checkbox
                                                             size="small"
                                                             checked={hasAccess('view_attribute_groups', 'view', group.code)}
                                                             onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'read', e.target.checked)}
                                                         />
                                                     </TableCell>
-                                                    <TableCell align="center">
+                                                    <TableCell align="center" sx={fioriBodyCellSx}>
                                                         <Checkbox
                                                             size="small"
                                                             checked={hasAccess('edit_attribute_groups', 'edit', group.code)}
@@ -611,25 +613,25 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                     mb: 2,
                                     cursor: 'pointer',
                                     p: 1,
-                                    bgcolor: '#f5f5f5',
-                                    borderRadius: 1,
+                                    bgcolor: FIORI.headerBg,
+                                    borderRadius: '8px',
                                 }}
                             >
                                 <IconButton size="small" sx={{ p: 0, mr: 1 }}>
                                     {expandedAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                                 </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
                                     ⚙️ Individual Attributes
                                 </Typography>
                             </Box>
 
                             {expandedAttributes && (
-                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 500, overflowY: 'auto' }}>
+                                <TableContainer component={Paper} sx={{ ...fioriCardSx, maxHeight: 500, overflowY: 'auto' }}>
                                     <Table size="small" stickyHeader>
-                                        <TableHead>
+                                        <TableHead sx={fioriTableHeadSx}>
                                             <TableRow>
-                                                <TableCell sx={{ fontWeight: 700 }}>Attribute</TableCell>
-                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                <TableCell sx={fioriTableHeadCellSx}>Attribute</TableCell>
+                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
                                                     <Checkbox
                                                         size="small"
                                                         checked={attributes.length > 0 && attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
@@ -638,7 +640,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                     />
                                                     Read
                                                 </TableCell>
-                                                <TableCell align="center" sx={{ fontWeight: 700, width: 100 }}>
+                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
                                                     <Checkbox
                                                         size="small"
                                                         checked={attributes.length > 0 && attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
@@ -647,23 +649,23 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                                     />
                                                     Edit
                                                     <Tooltip title="A Read-only Attribute Group overrides this — an attribute stays read-only on the product if its group isn't editable, even when checked here.">
-                                                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: 'text.secondary' }} />
+                                                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: FIORI.textSecondary }} />
                                                     </Tooltip>
                                                 </TableCell>
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
                                             {attributes.map((attr: Attribute) => (
-                                                <TableRow key={attr.id}>
-                                                    <TableCell>{attr.name}</TableCell>
-                                                    <TableCell align="center">
+                                                <TableRow key={attr.id} sx={fioriTableRowSx(false)}>
+                                                    <TableCell sx={fioriBodyCellSx}>{attr.name}</TableCell>
+                                                    <TableCell align="center" sx={fioriBodyCellSx}>
                                                         <Checkbox
                                                             size="small"
                                                             checked={hasAccess('view_attributes', 'view', attr.code)}
                                                             onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'read', e.target.checked)}
                                                         />
                                                     </TableCell>
-                                                    <TableCell align="center">
+                                                    <TableCell align="center" sx={fioriBodyCellSx}>
                                                         <Checkbox
                                                             size="small"
                                                             checked={hasAccess('edit_attributes', 'edit', attr.code)}
@@ -679,8 +681,8 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         </Box>
                     </Box>
                     ) : (
-                        <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#fff3cd', border: '1px solid #ffecb5', borderRadius: 1 }}>
-                            <Typography variant="body2" sx={{ color: '#856404' }}>
+                        <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#FFF4E5', border: `1px solid ${FIORI.warning}`, borderRadius: '8px' }}>
+                            <Typography variant="body2" sx={{ color: FIORI.warning }}>
                                 ⚠️ กำหนดสิทธิ์ "Products" ก่อนจึงจะสามารถกำหนดสิทธิ์ Attribute Access ได้
                             </Typography>
                         </Box>
@@ -689,34 +691,34 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 )}
 
                 {tab === 2 && (
-                    <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 1 }}>
+                    <TableContainer component={Paper} sx={fioriCardSx}>
                         <Table size="small">
-                            <TableHead>
+                            <TableHead sx={fioriTableHeadSx}>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Has Role</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Employee ID</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>E-mail</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>First name</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>Last name</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>Has Role</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>Employee ID</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>Username</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>E-mail</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>First name</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>Last name</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {users.map((user) => (
-                                    <TableRow key={user.id}>
-                                        <TableCell>
+                                    <TableRow key={user.id} sx={fioriTableRowSx(data.users.includes(user.id))}>
+                                        <TableCell sx={fioriBodyCellSx}>
                                             <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />
                                         </TableCell>
-                                        <TableCell>{user.employee_id || '-'}</TableCell>
-                                        <TableCell>{user.username}</TableCell>
-                                        <TableCell>{user.email}</TableCell>
-                                        <TableCell>{user.first_name}</TableCell>
-                                        <TableCell>{user.last_name}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{user.employee_id || '-'}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{user.username}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{user.email}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{user.first_name}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{user.last_name}</TableCell>
                                     </TableRow>
                                 ))}
                                 {users.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
                                             No users found.
                                         </TableCell>
                                     </TableRow>

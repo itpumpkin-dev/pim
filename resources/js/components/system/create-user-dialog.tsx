@@ -3,6 +3,7 @@ import { useForm } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, CircularProgress, Dialog, DialogContent, Divider, IconButton, MenuItem, TextField, Typography } from '@mui/material';
 import { FormEventHandler } from 'react';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface DepartmentOption {
     id: number;
@@ -83,18 +84,18 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                     </IconButton>
                 </Box>
 
-                <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, display: 'block', lineHeight: 1 }}>
+                <Typography variant="overline" sx={{ color: FIORI.textSecondary, fontWeight: 700, display: 'block', lineHeight: 1 }}>
                     USERS
                 </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>
+                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                     CREATE
                 </Typography>
-                <Divider sx={{ mb: 3 }} />
+                <Divider sx={{ mb: 3, borderColor: FIORI.border }} />
 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                     {fields.map((field) => (
                         <Box key={field.key}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {field.label} *
                             </Typography>
                             <TextField
@@ -114,7 +115,7 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                     ))}
 
                     <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                             Department
                         </Typography>
                         <TextField
@@ -139,7 +140,7 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                     </Box>
 
                     <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                             Job position
                         </Typography>
                         <TextField
@@ -165,10 +166,10 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                 </Box>
 
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
-                    <Button variant="contained" color="inherit" onClick={handleClose} sx={{ borderRadius: 8, px: 4 }}>
+                    <Button variant="contained" color="inherit" onClick={handleClose} sx={{ ...fioriDefaultSx, px: 4 }}>
                         CANCEL
                     </Button>
-                    <Button type="submit" variant="contained" color="primary" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ borderRadius: 8, px: 4, color: '#fff', }}>
+                    <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ ...fioriEmphasizedSx, px: 4 }}>
                         {processing ? 'SAVING…' : 'SAVE'}
                     </Button>
                 </Box>

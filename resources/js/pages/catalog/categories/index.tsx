@@ -16,6 +16,20 @@ import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, S
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface CategoryItem {
     id: number;
@@ -130,11 +144,11 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categories')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" fontWeight={700}>{tNav('categories')}</Typography>
-                        <Typography color="text.secondary">{tGrid('results', { count: categories.total })}</Typography>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('categories')}</Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: categories.total })}</Typography>
                     </Box>
                     <Stack direction="row" spacing={1.5}>
                         <Button
@@ -142,15 +156,16 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             startIcon={<DownloadIcon />}
                             component="a"
                             href="/catalog/categories/export"
+                            sx={fioriDefaultSx}
                         >
                             {t('exportCategoriesCsv')}
                         </Button>
                         {canCreate && (
                             <Button
-                                sx={{ color: "white" }}
                                 variant="contained"
                                 startIcon={<AddIcon />}
                                 onClick={() => router.visit('/catalog/categories/create')}
+                                sx={fioriEmphasizedSx}
                             >
                                 {t('createCategory')}
                             </Button>
@@ -164,11 +179,11 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t('searchCategories')}
                         size="small"
-                        sx={{ minWidth: 280 }}
+                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon />
+                                    <SearchIcon sx={{ color: FIORI.textSecondary }} />
                                 </InputAdornment>
                             ),
                         }}
@@ -180,7 +195,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             onChange={(e) => applyPlatformFilter(e.target.value)}
                             displayEmpty
                             size="small"
-                            sx={{ minWidth: 180 }}
+                            sx={{ ...fioriSearchFieldSx, minWidth: 180 }}
                         >
                             <MenuItem value="">{t('allPlatforms')}</MenuItem>
                             {MAPPED_PLATFORMS.map((platform) => (
@@ -193,13 +208,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             variant="outlined"
                             startIcon={<FilterListIcon />}
                             onClick={() => setFilterDrawerOpen(true)}
-                            sx={{
-                                color: '#64748b',
-                                borderColor: '#cbd5e1',
-                                textTransform: 'none',
-                                borderRadius: 1.5,
-                                bgcolor: '#fff',
-                            }}
+                            sx={fioriDefaultSx}
                         >
                             {tGrid('filter')}
                             {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
@@ -208,87 +217,93 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             value={perPage}
                             onChange={(e) => handlePerPageChange(Number(e.target.value))}
                             size="small"
-                            sx={{ minWidth: 60, height: 36 }}
+                            sx={{
+                                bgcolor: FIORI.surface,
+                                borderRadius: '8px',
+                                minWidth: 60,
+                                height: 34,
+                                '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
+                            }}
                         >
                             <MenuItem value={10}>10</MenuItem>
                             <MenuItem value={15}>15</MenuItem>
                             <MenuItem value={25}>25</MenuItem>
                             <MenuItem value={50}>50</MenuItem>
                         </Select>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                             {tGrid('perPage')}
                         </Typography>
 
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
+                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
+                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
                         </Paper>
 
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                             {tGrid('pageOf', { lastPage })}
                         </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
                                 <FirstPageIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
                                 <ChevronLeftIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
                                 <ChevronRightIcon fontSize="small" />
                             </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                            <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
                                 <LastPageIcon fontSize="small" />
                             </IconButton>
                         </Stack>
                     </Stack>
                 </Stack>
 
-                <TableContainer component={Paper}>
+                <TableContainer sx={fioriCardSx}>
                     <Table>
-                        <TableHead>
+                        <TableHead sx={fioriTableHeadSx}>
                             <TableRow>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('thumbnail')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>
+                                <TableCell sx={fioriTableHeadCellSx}>{t('thumbnail')}</TableCell>
+                                <TableCell sx={fioriTableHeadCellSx}>
                                     <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
                                         {t('name')}
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('parent')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>
+                                <TableCell sx={fioriTableHeadCellSx}>{t('parent')}</TableCell>
+                                <TableCell sx={fioriTableHeadCellSx}>
                                     <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
                                         {t('description')}
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>
+                                <TableCell sx={fioriTableHeadCellSx}>
                                     <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
                                         {t('slug')}
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700 }} align="right">
+                                <TableCell sx={fioriTableHeadCellSx} align="right">
                                     <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
                                         {t('productsCount')}
                                     </TableSortLabel>
                                 </TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('mappedPlatforms')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('status')}</TableCell>
-                                {(canEdit || canDelete) && <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>}
+                                <TableCell sx={fioriTableHeadCellSx}>{t('mappedPlatforms')}</TableCell>
+                                <TableCell sx={fioriTableHeadCellSx}>{t('status')}</TableCell>
+                                {(canEdit || canDelete) && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
                             </TableRow>
                         </TableHead>
                         <TableBody>
                             {categories.data.map((row) => (
-                                <TableRow key={row.id}>
-                                    <TableCell>
+                                <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                    <TableCell sx={fioriBodyCellSx}>
                                         {row.thumbnail_url ? (
-                                            <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1 }} />
+                                            <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1, border: `1px solid ${FIORI.border}` }} />
                                         ) : (
-                                            <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'action.hover' }} />
+                                            <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'grey.100', border: `1px solid ${FIORI.border}` }} />
                                         )}
                                     </TableCell>
-                                    <TableCell sx={{ fontWeight: 600 }}>{row.name}</TableCell>
-                                    <TableCell>
+                                    <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name}</TableCell>
+                                    <TableCell sx={fioriBodyCellSx}>
                                         {row.parent ? (
-                                            <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
+                                            <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
                                                 {row.parent.name}
                                             </Typography>
                                         ) : (
@@ -297,11 +312,11 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                             </Typography>
                                         )}
                                     </TableCell>
-                                    <TableCell sx={{ color: 'text.secondary', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {row.description || '-'}
                                     </TableCell>
-                                    <TableCell sx={{ color: 'text.secondary' }}>{row.slug || '-'}</TableCell>
-                                    <TableCell align="right">
+                                    <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary }}>{row.slug || '-'}</TableCell>
+                                    <TableCell sx={fioriBodyCellSx} align="right">
                                         {row.products_count ? (
                                             <Typography
                                                 component="a"
@@ -310,7 +325,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                                     e.preventDefault();
                                                     router.visit(`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`);
                                                 }}
-                                                sx={{ color: 'primary.main', fontWeight: 600, cursor: 'pointer', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                                sx={{ color: FIORI.brand, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
                                             >
                                                 {row.products_count}
                                             </Typography>
@@ -318,7 +333,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                             <Typography color="text.disabled">0</Typography>
                                         )}
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell sx={fioriBodyCellSx}>
                                         {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
                                             <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                                                 {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
@@ -336,20 +351,16 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                             </Typography>
                                         )}
                                     </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={row.is_active ? t('active') : t('nonActive')}
-                                            size="small"
-                                            color={row.is_active ? 'success' : 'default'}
-                                            variant={row.is_active ? 'filled' : 'outlined'}
-                                        />
+                                    <TableCell sx={fioriBodyCellSx}>
+                                        <FioriStatus label={row.is_active ? t('active') : t('nonActive')} tone={row.is_active ? 'success' : 'neutral'} />
                                     </TableCell>
                                     {(canEdit || canDelete) && (
-                                        <TableCell align="right">
+                                        <TableCell sx={fioriBodyCellSx} align="right">
                                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                                                 {canEdit && (
                                                     <IconButton
                                                         size="small"
+                                                        sx={fioriIconButtonSx}
                                                         onClick={() => router.visit(`/catalog/categories/${row.id}/edit`)}
                                                     >
                                                         <EditIcon fontSize="small" />
@@ -358,7 +369,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                                                 {canDelete && (
                                                     <IconButton
                                                         size="small"
-                                                        color="error"
+                                                        sx={fioriIconButtonSx}
                                                         onClick={() => setDeleteCategoryId(row.id)}
                                                     >
                                                         <DeleteIcon fontSize="small" />
@@ -371,7 +382,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                             ))}
                             {categories.data.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={(canEdit || canDelete) ? 9 : 8} align="center">
+                                    <TableCell colSpan={(canEdit || canDelete) ? 9 : 8} align="center" sx={{ color: FIORI.textSecondary }}>
                                         {t('noCategoriesFound')}
                                     </TableCell>
                                 </TableRow>
@@ -404,7 +415,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     })()}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteCategoryId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
+                    <Button onClick={() => setDeleteCategoryId(null)} sx={fioriGhostSx} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
@@ -419,7 +430,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         }}
                         color="error"
                         variant="contained"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 700 }}
                         disabled={deleting}
                         startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >

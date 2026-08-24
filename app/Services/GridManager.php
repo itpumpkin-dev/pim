@@ -87,11 +87,24 @@ class GridManager
         // Handle Sorting
         $sortField = $request->input('sort');
         $sortDir = $request->input('dir', 'asc');
-        
+
         if ($sortField && isset($this->config['columns'][$sortField]) && ($this->config['columns'][$sortField]['sortable'] ?? false)) {
             $query->orderBy($sortField, strtolower($sortDir) === 'desc' ? 'desc' : 'asc');
+        } elseif (!$sortField) {
+            // No explicit sort requested — fall back to this grid's own
+            // `default_sort` (opt-in per grid via its YAML, e.g.
+            // product_grid.yml's `updated_at desc`) rather than leaving the
+            // query with no ORDER BY at all, which left row order to
+            // whatever the database happened to return (effectively
+            // undefined, not a real "default"). Grids with no `default_sort`
+            // configured keep their previous unordered behavior unchanged.
+            $default = $this->config['default_sort'] ?? null;
+            $defaultField = $default['field'] ?? null;
+            if ($defaultField && isset($this->config['columns'][$defaultField])) {
+                $query->orderBy($defaultField, strtolower($default['dir'] ?? 'asc') === 'desc' ? 'desc' : 'asc');
+            }
         }
-        
+
         $perPage = (int) $request->input('per_page', 10);
         if (!in_array($perPage, [10, 25, 50], true)) {
             $perPage = 10;

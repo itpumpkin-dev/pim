@@ -38,6 +38,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -209,10 +210,10 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createAttributeFamily')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         {t('createAttributeFamily')}
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -220,14 +221,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             component={Link}
                             href="/catalog/attributeFamilies"
                             variant="outlined"
-                            sx={{
-                                color: 'primary.main',
-                                borderColor: 'primary.main',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { borderColor: 'primary.main' },
-                            }}
+                            sx={fioriDefaultSx}
                         >
                             {t('back')}
                         </Button>
@@ -236,14 +230,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             variant="contained"
                             disabled={processing}
                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                         >
                             {processing ? t('saving') : t('saveAttributeFamily')}
                         </Button>
@@ -253,33 +240,27 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                 <Grid container spacing={3}>
                     {/* Left Column: Groups & Unassigned Attributes */}
                     <Grid item xs={12} md={8}>
-                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                                 <Box>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary">
+                                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                                         {tNav('attributeGroups')}
                                     </Typography>
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                         {t('attributeGroupsPanelSubtitle')}
                                     </Typography>
                                 </Box>
                                 <Stack direction="row" spacing={1.5}>
                                     <Button
                                         onClick={handleDeleteAllGroups}
-                                        sx={{ color: '#ef4444', textTransform: 'none', fontWeight: 600 }}
+                                        sx={{ ...fioriGhostSx, color: FIORI.error }}
                                     >
                                         {t('deleteGroup')}
                                     </Button>
                                     <Button
                                         variant="outlined"
                                         onClick={() => setAssignDialogOpen(true)}
-                                        sx={{
-                                            color: 'primary.main',
-                                            borderColor: 'primary.main',
-                                            textTransform: 'none',
-                                            fontWeight: 600,
-                                            '&:hover': { borderColor: 'primary.main' },
-                                        }}
+                                        sx={fioriDefaultSx}
                                     >
                                         {t('assignAttributeGroup')}
                                     </Button>
@@ -289,7 +270,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             <Grid container spacing={3} sx={{ mt: 1 }}>
                                 {/* Main Column section */}
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="subtitle2" fontWeight={700} color="#334155" sx={{ mb: 1.5 }}>
+                                    <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1.5 }}>
                                         {t('mainColumn')}
                                     </Typography>
 
@@ -302,8 +283,8 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                         }}
                                     >
                                         {assignedGroups.length === 0 ? (
-                                            <Box sx={{ border: '1px dashed #cbd5e1', borderRadius: 2, p: 4, textAlign: 'center' }}>
-                                                <Typography variant="body2" color="text.secondary">
+                                            <Box sx={{ border: `1px dashed ${FIORI.border}`, borderRadius: '8px', p: 4, textAlign: 'center' }}>
+                                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                                     {t('noGroupsAssignedYet')}
                                                 </Typography>
                                             </Box>
@@ -324,7 +305,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                             p: 1,
                                                             borderRadius: 1.5,
                                                             border: '1px dashed transparent',
-                                                            '&:hover': { border: '1px dashed #7c3aed', bgcolor: '#faf5ff' },
+                                                            '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
                                                         }}
                                                     >
                                                         {/* Group Header */}
@@ -336,7 +317,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                                 py: 0.5,
                                                                 cursor: 'pointer',
                                                                 userSelect: 'none',
-                                                                '&:hover': { color: 'primary.main' },
+                                                                '&:hover': { color: FIORI.brand },
                                                             }}
                                                         >
                                                             <Stack direction="row" alignItems="center" spacing={0.5} onClick={() => toggleGroupExpand(group.id)}>
@@ -347,9 +328,9 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                                         <KeyboardArrowRightIcon fontSize="small" />
                                                                     )}
                                                                 </IconButton>
-                                                                <DragIndicatorIcon fontSize="small" sx={{ color: '#94a3b8', fontSize: 16 }} />
-                                                                <FolderOutlinedIcon fontSize="small" sx={{ color: '#64748b', ml: 0.5 }} />
-                                                                <Typography variant="body2" fontWeight={600} color="#334155">
+                                                                <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.textSecondary, fontSize: 16 }} />
+                                                                <FolderOutlinedIcon fontSize="small" sx={{ color: FIORI.textSecondary, ml: 0.5 }} />
+                                                                <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                                                                     {group.name}
                                                                 </Typography>
                                                             </Stack>
@@ -374,21 +355,21 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                                             px: 1,
                                                                             borderRadius: 1,
                                                                             cursor: 'grab',
-                                                                            bgcolor: '#fff',
-                                                                            border: '1px solid #e2e8f0',
-                                                                            '&:hover': { bgcolor: '#f1f5f9' },
+                                                                            bgcolor: FIORI.surface,
+                                                                            border: `1px solid ${FIORI.border}`,
+                                                                            '&:hover': { bgcolor: FIORI.hover },
                                                                         }}
                                                                     >
                                                                         <Stack direction="row" alignItems="center" spacing={1}>
-                                                                            <DragIndicatorIcon fontSize="small" sx={{ color: '#cbd5e1', fontSize: 16 }} />
-                                                                            <Typography variant="body2" color="text.primary" sx={{ fontSize: '0.85rem' }}>
+                                                                            <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.border, fontSize: 16 }} />
+                                                                            <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.85rem' }}>
                                                                                 {attr.name || attr.code}
                                                                             </Typography>
                                                                         </Stack>
                                                                         <IconButton
                                                                             size="small"
                                                                             onClick={() => handleMoveAttributeToUnassigned(attr)}
-                                                                            sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}
+                                                                            sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.error } }}
                                                                         >
                                                                             <RemoveCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
                                                                         </IconButton>
@@ -411,7 +392,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                 {/* Unassigned Attributes list Drop Area */}
                                 <Grid item xs={12} sm={6}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                                        <Typography variant="subtitle2" fontWeight={700} color="#334155">
+                                        <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                                             {t('unassignedAttributes')}
                                         </Typography>
                                         <TextField
@@ -422,12 +403,12 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                             placeholder={t('search')}
                                             InputProps={{
                                                 disableUnderline: true,
-                                                endAdornment: <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
+                                                endAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />,
                                             }}
                                             sx={{ width: 100 }}
                                         />
                                     </Stack>
-                                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 1.5 }}>
                                         {t('dragAttributeToUnassign')}
                                     </Typography>
 
@@ -444,11 +425,11 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                             minHeight: 400,
                                             maxHeight: 500,
                                             overflowY: 'auto',
-                                            bgcolor: '#fff',
+                                            bgcolor: FIORI.surface,
                                             p: 1,
-                                            borderRadius: 2,
+                                            borderRadius: '8px',
                                             border: '1px dashed transparent',
-                                            '&:hover': { border: '1px dashed #7c3aed', bgcolor: '#faf5ff' },
+                                            '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
                                         }}
                                     >
                                         <List dense disablePadding>
@@ -467,10 +448,10 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                         py: 0.8,
                                                         px: 1,
                                                         mb: 0.5,
-                                                        border: '1px solid #e2e8f0',
-                                                        borderRadius: 1,
-                                                        bgcolor: '#fff',
-                                                        '&:hover': { bgcolor: '#f8fafc', borderColor: '#7c3aed' },
+                                                        border: `1px solid ${FIORI.border}`,
+                                                        borderRadius: '6px',
+                                                        bgcolor: FIORI.surface,
+                                                        '&:hover': { bgcolor: FIORI.hover, borderColor: FIORI.brand },
                                                         cursor: 'grab',
                                                     }}
                                                     onClick={() => {
@@ -478,17 +459,17 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                         handleMoveAttributeToGroup(attr, assignedGroups[0].id);
                                                     }}
                                                 >
-                                                    <ListItemIcon sx={{ minWidth: 28, color: '#cbd5e1' }}>
+                                                    <ListItemIcon sx={{ minWidth: 28, color: FIORI.border }}>
                                                         <DragIndicatorIcon fontSize="small" sx={{ fontSize: 16 }} />
                                                     </ListItemIcon>
                                                     <ListItemText
                                                         primary={attr.name || attr.code}
-                                                        primaryTypographyProps={{ variant: 'body2', color: 'text.primary', fontSize: '0.85rem' }}
+                                                        primaryTypographyProps={{ variant: 'body2', sx: { color: FIORI.textPrimary }, fontSize: '0.85rem' }}
                                                     />
                                                 </ListItem>
                                             ))}
                                             {filteredUnassigned.length === 0 && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ p: 2, display: 'block', textAlign: 'center' }}>
+                                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, p: 2, display: 'block', textAlign: 'center' }}>
                                                     {t('dropHereToUnassign')}
                                                 </Typography>
                                             )}
@@ -527,7 +508,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                 PaperProps={{ sx: { borderRadius: 2 } }}
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={700} color="text.primary">
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         {t('assignAttributeGroup')}
                     </Typography>
                     <IconButton onClick={() => setAssignDialogOpen(false)} size="small">
@@ -535,7 +516,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
-                    <Typography variant="body2" fontWeight={600} color="#334155" sx={{ mb: 1 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
                         {t('groupsRequired')}
                     </Typography>
                     <FormControl fullWidth size="small">
@@ -572,15 +553,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                         variant="contained"
                         onClick={handleAssignGroup}
                         disabled={!selectedGroupId}
-                        sx={{
-                            bgcolor: 'primary.main',
-                            color: '#fff',
-                            '&:hover': { bgcolor: 'primary.dark' },
-                            fontWeight: 700,
-                            borderRadius: 1.5,
-                            px: 2.5,
-                            textTransform: 'none',
-                        }}
+                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                     >
                         {t('assignAttributeGroup')}
                     </Button>

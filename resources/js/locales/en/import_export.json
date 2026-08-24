@@ -7,6 +7,7 @@
     "confirmDeleteImport": "Are you sure you want to delete this import configuration?",
     "uploadedFile": "Uploaded File",
     "noFileUploaded": "No file uploaded",
+    "currentFile": "Current file",
     "downloadSample": "Download Sample",
     "requiredFields": "Required fields",
     "chooseFile": "Choose File",

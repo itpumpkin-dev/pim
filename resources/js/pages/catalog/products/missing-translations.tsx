@@ -29,6 +29,7 @@ import {
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER } from '@/lib/ui-style';
+import { FIORI } from '@/lib/fiori-style';
 
 interface LocaleOption {
     id: number;
@@ -210,7 +211,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             }}
                             placeholder={t('missingTranslationsSearch')}
                             size="small"
-                            sx={{ mb: 2, minWidth: 320, bgcolor: '#fff' }}
+                            sx={{ mb: 2, minWidth: 320, bgcolor: FIORI.surface }}
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">

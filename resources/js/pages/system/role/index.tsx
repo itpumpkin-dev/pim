@@ -28,6 +28,19 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface PaginationData<T> {
     data: T[];
@@ -114,27 +127,26 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('rolesCount', { count: gridData.total })} />
-            <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, mb: 2, display: 'inline-block', border: '1px solid', borderColor: 'divider', p: 1, borderRadius: 1 }}>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                             {tSystem('rolesCount', { count: gridData.total })}
                         </Typography>
-                        <Box sx={{ mt: 3 }}>
+                        <Box sx={{ mt: 2 }}>
                             <TextField
                                 placeholder={tSystem('searchByName')}
-                                variant="standard"
+                                size="small"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
+                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <SearchIcon sx={{ color: 'text.secondary' }} />
+                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
                                         </InputAdornment>
                                     ),
-                                    disableUnderline: false,
                                 }}
-                                sx={{ minWidth: 300, '& .MuiInput-root': { pb: 1 } }}
                             />
                         </Box>
                     </Box>
@@ -142,8 +154,7 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                         <Box>
                             <Button
                                 variant="contained"
-                                color="primary"
-                                sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
+                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                                 onClick={() => router.visit('/system/roles/create')}
                             >
                                 {tSystem('createRole')}
@@ -152,71 +163,77 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                     )}
                 </Box>
 
-                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 1, mt: 4 }}>
-                    <Table sx={{ minWidth: 650 }}>
-                        <TableHead>
-                            <TableRow>
-                                {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                    <TableCell key={key} sx={{ fontWeight: 'bold', borderBottom: '2px solid', borderColor: 'divider', backgroundColor: '#f5f5f5' }}>
-                                        {t(column.label)}
-                                    </TableCell>
-                                ))}
-                                {visibleActions.length > 0 && (
-                                    <TableCell sx={{ fontWeight: 'bold', borderBottom: '2px solid', borderColor: 'divider', backgroundColor: '#f5f5f5' }}></TableCell>
-                                )}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => (
-                                <TableRow key={row.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                <Paper elevation={0} sx={{ ...fioriCardSx, mt: 4 }}>
+                    <TableContainer>
+                        <Table sx={{ minWidth: 650 }}>
+                            <TableHead sx={fioriTableHeadSx}>
+                                <TableRow>
                                     {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                        <TableCell key={key} sx={{ fontWeight: key === 'label' ? 600 : 400 }}>
-                                            {column.type === 'boolean' ? (row[key] ? t('active') : t('inactive')) : (row[key] || '-')}
+                                        <TableCell key={key} sx={fioriTableHeadCellSx}>
+                                            {t(column.label)}
                                         </TableCell>
                                     ))}
                                     {visibleActions.length > 0 && (
-                                        <TableCell align="right">
-                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                {visibleActions.map(([actionKey, action]) => {
-                                                    if (actionKey === 'delete' && row.label === 'Administrator') {
-                                                        return null;
-                                                    }
-
-                                                    let Icon = EditIcon;
-                                                    if (action.icon === 'copy') Icon = ContentCopyIcon;
-                                                    if (action.icon === 'delete') Icon = DeleteIcon;
-
-                                                    const handleClick = () => {
-                                                        if (actionKey === 'update') {
-                                                            router.visit(`/system/roles/${row.id}/edit`);
-                                                        }
-                                                        if (actionKey === 'delete') {
-                                                            setDeleteTarget({ id: row.id, label: row.label });
-                                                        }
-                                                    };
-
-                                                    return (
-                                                        <IconButton key={actionKey} size="small" sx={{ display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                                            <Icon fontSize="small" />
-                                                            <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                                                        </IconButton>
-                                                    );
-                                                })}
-                                            </Box>
-                                        </TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}></TableCell>
                                     )}
                                 </TableRow>
-                            ))}
-                            {gridData.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3 }}>
-                                        {t('noDataFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {gridData.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        {Object.entries(gridConfig.columns).map(([key, column]) => (
+                                            <TableCell key={key} sx={{ ...fioriBodyCellSx, fontWeight: key === 'label' ? 600 : 400 }}>
+                                                {column.type === 'boolean' ? (
+                                                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+                                                ) : (
+                                                    row[key] || '-'
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                        {visibleActions.length > 0 && (
+                                            <TableCell align="right" sx={fioriBodyCellSx}>
+                                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                    {visibleActions.map(([actionKey, action]) => {
+                                                        if (actionKey === 'delete' && row.label === 'Administrator') {
+                                                            return null;
+                                                        }
+
+                                                        let Icon = EditIcon;
+                                                        if (action.icon === 'copy') Icon = ContentCopyIcon;
+                                                        if (action.icon === 'delete') Icon = DeleteIcon;
+
+                                                        const handleClick = () => {
+                                                            if (actionKey === 'update') {
+                                                                router.visit(`/system/roles/${row.id}/edit`);
+                                                            }
+                                                            if (actionKey === 'delete') {
+                                                                setDeleteTarget({ id: row.id, label: row.label });
+                                                            }
+                                                        };
+
+                                                        return (
+                                                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
+                                                                <Icon fontSize="small" />
+                                                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
+                                                            </IconButton>
+                                                        );
+                                                    })}
+                                                </Box>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                ))}
+                                {gridData.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
+                                            {t('noDataFound')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
             </Box>
 
             <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
@@ -227,10 +244,17 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)} disabled={deleting} sx={fioriDefaultSx}>
                         {t('cancel')}
                     </Button>
-                    <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={confirmDelete}
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ textTransform: 'none', borderRadius: '8px' }}
+                    >
                         {t('delete')}
                     </Button>
                 </DialogActions>

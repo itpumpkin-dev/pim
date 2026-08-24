@@ -4,6 +4,7 @@ import { FormEventHandler } from 'react';
 
 import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
+import { fioriDefaultSx } from '@/lib/fiori-style';
 
 export default function VerifyEmail({ status }: { status?: string }) {
     const { post, processing } = useForm({});
@@ -31,6 +32,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                         variant="outlined"
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={fioriDefaultSx}
                     >
                         Resend verification email
                     </Button>

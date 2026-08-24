@@ -6,10 +6,23 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
+import {
+    FIORI,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface ChannelItem {
     id: number;
@@ -81,7 +94,7 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('channels')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Tabs
                     value="channels"
                     onChange={(_, val) => router.visit(val === 'platforms' ? '/catalog/sales-platforms' : '/catalog/channels')}
@@ -93,105 +106,110 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
-                        <Typography variant="h4" fontWeight={700}>{tNav('channels')}</Typography>
-                        <Typography color="text.secondary">{tGrid('results', { count: channels.total })}</Typography>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('channels')}</Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: channels.total })}</Typography>
                     </Box>
                     {canCreate && (
                         <Button
-                            sx={{ color: 'white' }}
                             variant="contained"
                             startIcon={<AddIcon />}
                             onClick={() => router.visit('/catalog/channels/create')}
+                            sx={fioriEmphasizedSx}
                         >
                             {t('createChannel')}
                         </Button>
                     )}
                 </Box>
 
-                <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', mb: 3 }}>
-                    <TextField
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder={t('searchChannels')}
-                        size="small"
-                        sx={{ minWidth: 280 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                    <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)}>
-                        {tGrid('filter')}
-                        {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
-                    </Button>
-                </Box>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', p: 2 }}>
+                        <TextField
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder={t('searchChannels')}
+                            size="small"
+                            sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                        <Button variant="outlined" startIcon={<FilterListIcon />} onClick={() => setFilterDrawerOpen(true)} sx={fioriDefaultSx}>
+                            {tGrid('filter')}
+                            {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                        </Button>
+                    </Box>
 
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('code')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('name')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('rootCategoryOptional')}</TableCell>
-                                {(canEdit || canDelete) && <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {channels.data.map((row) => (
-                                <TableRow key={row.id}>
-                                    <TableCell>{row.id}</TableCell>
-                                    <TableCell>{row.code}</TableCell>
-                                    <TableCell sx={{ fontWeight: 600 }}>{row.name || '-'}</TableCell>
-                                    <TableCell>
-                                        {row.rootCategory ? (
-                                            <Typography variant="body2" color="primary" sx={{ fontWeight: 500 }}>
-                                                {row.rootCategory.name}
-                                            </Typography>
-                                        ) : (
-                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                {t('noRootCategory')}
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                    {(canEdit || canDelete) && (
-                                        <TableCell align="right">
-                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                {canEdit && (
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() => router.visit(`/catalog/channels/${row.id}/edit`)}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => setDeleteChannelId(row.id)}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))}
-                            {channels.data.length === 0 && (
+                    <Divider sx={{ borderColor: FIORI.border }} />
+
+                    <TableContainer>
+                        <Table>
+                            <TableHead sx={fioriTableHeadSx}>
                                 <TableRow>
-                                    <TableCell colSpan={5} align="center">
-                                        {t('noChannelsFound')}
-                                    </TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('code')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('name')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('rootCategoryOptional')}</TableCell>
+                                    {(canEdit || canDelete) && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {channels.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{row.code}</TableCell>
+                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name || '-'}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>
+                                            {row.rootCategory ? (
+                                                <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
+                                                    {row.rootCategory.name}
+                                                </Typography>
+                                            ) : (
+                                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                                                    {t('noRootCategory')}
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+                                        {(canEdit || canDelete) && (
+                                            <TableCell align="right" sx={fioriBodyCellSx}>
+                                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                    {canEdit && (
+                                                        <IconButton
+                                                            size="small"
+                                                            sx={fioriIconButtonSx}
+                                                            onClick={() => router.visit(`/catalog/channels/${row.id}/edit`)}
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                    {canDelete && (
+                                                        <IconButton
+                                                            size="small"
+                                                            sx={fioriIconButtonSx}
+                                                            onClick={() => setDeleteChannelId(row.id)}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                ))}
+                                {channels.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
+                                            {t('noChannelsFound')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
 
                 {channels.last_page > 1 && (
                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -199,7 +217,10 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
                             count={channels.last_page}
                             page={channels.current_page}
                             onChange={handlePageChange}
-                            color="primary"
+                            sx={{
+                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
+                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
+                            }}
                         />
                     </Box>
                 )}
@@ -213,7 +234,7 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteChannelId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deleting}>
+                    <Button onClick={() => setDeleteChannelId(null)} sx={fioriGhostSx} disabled={deleting}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
@@ -228,7 +249,7 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
                         }}
                         color="error"
                         variant="contained"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
                         disabled={deleting}
                         startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >

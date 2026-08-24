@@ -7,6 +7,7 @@
     "confirmDeleteImport": "您确定要删除此导入配置吗 ?",
     "uploadedFile": "上传的文件",
     "noFileUploaded": "没有上传文件",
+    "currentFile": "当前文件",
     "downloadSample": "下载样本",
     "requiredFields": "必填字段",
     "chooseFile": "选择文件",

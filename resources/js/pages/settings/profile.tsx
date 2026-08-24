@@ -9,6 +9,7 @@ import HeadingSmall from '@/components/heading-small';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { fioriEmphasizedSx } from '@/lib/fiori-style';
 
 export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
     const { t } = useTranslation('settings');
@@ -130,7 +131,7 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                             )}
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={fioriEmphasizedSx}>
                                     {processing ? t('saving') : t('save')}
                                 </Button>
 

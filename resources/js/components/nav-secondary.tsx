@@ -1,6 +1,7 @@
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { Box, List, ListItemButton, ListItemText, Typography } from '@mui/material';
+import { FIORI } from '@/lib/fiori-style';
 
 interface NavSecondaryProps {
     title: string;
@@ -42,17 +43,17 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                     py: 0.8,
                     mb: 0.5,
                     transition: 'all 0.15s ease-in-out',
-                    color: isActive ? '#fff' : 'rgba(255, 255, 255, 0.7)',
-                    bgcolor: isActive ? 'primary.main' : 'transparent',
+                    color: isActive ? '#fff' : FIORI.textPrimary,
+                    bgcolor: isActive ? FIORI.brand : 'transparent',
                     '&:hover': {
-                        bgcolor: isActive ? 'primary.dark' : 'rgba(255, 255, 255, 0.05)',
-                        color: '#fff',
+                        bgcolor: isActive ? FIORI.brandDark : FIORI.hover,
+                        color: isActive ? '#fff' : FIORI.textPrimary,
                     },
                     '&.Mui-selected': {
-                        bgcolor: 'primary.main',
+                        bgcolor: FIORI.brand,
                         color: '#fff',
                         '&:hover': {
-                            bgcolor: 'primary.dark',
+                            bgcolor: FIORI.brandDark,
                         },
                     },
                 }}
@@ -81,7 +82,7 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                     fontWeight: 700,
                     textTransform: 'uppercase',
                     letterSpacing: '0.08em',
-                    color: 'rgba(255, 255, 255, 0.5)',
+                    color: FIORI.textSecondary,
                     fontSize: '0.75rem',
                 }}
             >
@@ -122,7 +123,7 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                                         fontWeight: 700,
                                         textTransform: 'uppercase',
                                         letterSpacing: '0.08em',
-                                        color: 'rgba(255, 255, 255, 0.35)',
+                                        color: FIORI.textSecondary,
                                         fontSize: '0.68rem',
                                     }}
                                 >

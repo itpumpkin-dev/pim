@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FIORI } from '@/lib/fiori-style';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -111,7 +112,7 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
                         setPage(1);
                     }}
                     size="small"
-                    sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 60, height: 36 }}
+                    sx={{ bgcolor: FIORI.surface, borderRadius: 1.5, minWidth: 60, height: 36 }}
                 >
                     <MenuItem value={10}>10</MenuItem>
                     <MenuItem value={25}>25</MenuItem>
@@ -120,7 +121,7 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
                 <Typography variant="body2" color="text.secondary">
                     Per Page
                 </Typography>
-                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
+                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: 1, display: 'flex', alignItems: 'center' }}>
                     <Typography variant="body2">{page}</Typography>
                 </Paper>
                 <Typography variant="body2" color="text.secondary">

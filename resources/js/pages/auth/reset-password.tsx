@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Stack, TextField } from '@mui/material';
 import { FormEventHandler } from 'react';
 
 import AuthLayout from '@/layouts/auth-layout';
+import { fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface ResetPasswordProps {
     token: string;
@@ -87,6 +88,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                         fullWidth
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...fioriEmphasizedSx, py: 1.25 }}
                     >
                         Reset password
                     </Button>

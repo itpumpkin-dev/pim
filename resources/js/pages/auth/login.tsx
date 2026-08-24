@@ -7,6 +7,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { Box, Button, Checkbox, CircularProgress, FormControlLabel, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
 import { FormEventHandler, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
 
 interface LoginForm {
     email: string;
@@ -44,7 +45,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                     minHeight: '100vh',
                     display: 'grid',
                     gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    bgcolor: 'background.default',
+                    bgcolor: FIORI.pageBg,
                 }}
             >
                 <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 3, sm: 6 }, py: { xs: 4, sm: 6 } }}>
@@ -171,6 +172,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             tabIndex={4}
                                             disabled={processing}
                                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                                            sx={{ ...fioriEmphasizedSx, py: 1.25 }}
                                         >
                                             {t('signIn')}
                                         </Button>
@@ -181,7 +183,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                             variant="text"
                                             fullWidth
                                             tabIndex={5}
-                                            sx={{ mt: 0 }}
+                                            sx={{ ...fioriGhostSx, mt: 0 }}
                                         >
                                             {t('backToHome')}
                                         </Button>
@@ -199,40 +201,17 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         overflow: 'hidden',
-                        bgcolor: 'background.paper',
-                        color: 'text.primary',
-                        borderLeft: 1,
-                        borderColor: 'divider',
+                        bgcolor: FIORI.surface,
+                        color: FIORI.textPrimary,
+                        borderLeft: `1px solid ${FIORI.border}`,
                     }}
                 >
-                    <Box
-                        sx={{
-                            position: 'absolute',
-                            width: 480,
-                            height: 480,
-                            borderRadius: '50%',
-                            top: -160,
-                            right: -160,
-                            bgcolor: 'rgba(255, 255, 255, 0.08)',
-                        }}
-                    />
-                    <Box
-                        sx={{
-                            position: 'absolute',
-                            width: 320,
-                            height: 320,
-                            borderRadius: '50%',
-                            bottom: -120,
-                            left: -100,
-                            bgcolor: 'rgba(255, 255, 255, 0.06)',
-                        }}
-                    />
                     <Stack spacing={1} alignItems="center" sx={{ position: 'relative', textAlign: 'center', px: 6, maxWidth: 420 }}>
                         <AppLogoIcon style={{ width: 96, height: 96 }} />
-                        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                        <Typography variant="h4" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
                             PIM Pumpkin
                         </Typography>
-                        <Typography variant="body1" sx={{ opacity: 0.85 }}>
+                        <Typography variant="body1" sx={{ color: FIORI.textSecondary }}>
                             {t('appTagline')}
                         </Typography>
                     </Stack>

@@ -28,6 +28,7 @@ import {
 } from '@mui/material';
 import { DragEvent, FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx } from '@/lib/fiori-style';
 
 interface AttributeFamilyOption {
     code: string;
@@ -83,15 +84,15 @@ function FileDropzone({
     if (file) {
         return (
             <Paper
-                variant="outlined"
-                sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, borderColor: 'success.main', bgcolor: 'action.hover' }}
+                elevation={0}
+                sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, border: `1px solid ${FIORI.success}`, borderRadius: '8px', bgcolor: FIORI.hover }}
             >
-                <DescriptionIcon color="success" />
+                <DescriptionIcon sx={{ color: FIORI.success }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" fontWeight={600} noWrap>{file.name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{formatFileSize(file.size)}</Typography>
+                    <Typography variant="body2" fontWeight={600} noWrap sx={{ color: FIORI.textPrimary }}>{file.name}</Typography>
+                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{formatFileSize(file.size)}</Typography>
                 </Box>
-                <IconButton size="small" onClick={() => onSelect(null)} aria-label="remove">
+                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => onSelect(null)} aria-label="remove">
                     <CloseIcon fontSize="small" />
                 </IconButton>
             </Paper>
@@ -116,18 +117,18 @@ function FileDropzone({
                     gap: 0.5,
                     p: 3,
                     border: '2px dashed',
-                    borderColor: dragging ? 'primary.main' : 'divider',
-                    borderRadius: 2,
-                    bgcolor: dragging ? 'action.hover' : 'transparent',
+                    borderColor: dragging ? FIORI.brand : FIORI.border,
+                    borderRadius: '8px',
+                    bgcolor: dragging ? FIORI.selected : 'transparent',
                     cursor: 'pointer',
                     textAlign: 'center',
                     transition: 'border-color 0.15s, background-color 0.15s',
-                    '&:hover': { borderColor: 'primary.main' },
+                    '&:hover': { borderColor: FIORI.brand },
                 }}
             >
-                <CloudUploadIcon color={dragging ? 'primary' : 'action'} sx={{ fontSize: 32 }} />
-                <Typography variant="body2" fontWeight={600}>{label}</Typography>
-                {hint && <Typography variant="caption" color="text.secondary">{hint}</Typography>}
+                <CloudUploadIcon sx={{ fontSize: 32, color: dragging ? FIORI.brand : FIORI.textSecondary }} />
+                <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{label}</Typography>
+                {hint && <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{hint}</Typography>}
                 <input type="file" hidden accept=".csv" onChange={(e) => onSelect(e.target.files?.[0] ?? null)} />
             </Box>
             {error && <FormHelperText error>{error}</FormHelperText>}
@@ -182,10 +183,10 @@ export default function WooConvertCreate({ families }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('wooConvertTitle')}</Typography>
-                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertTitle')}</Typography>
+                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                         {tCatalog('back')}
                     </Button>
                 </Stack>
@@ -195,8 +196,8 @@ export default function WooConvertCreate({ families }: Props) {
                 </Alert>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertFileSectionTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertFileSectionTitle')}</Typography>
                         <FileDropzone
                             file={data.file}
                             onSelect={selectFile}
@@ -210,17 +211,17 @@ export default function WooConvertCreate({ families }: Props) {
                         <Button
                             onClick={() => setAdvancedOpen((v) => !v)}
                             endIcon={<ExpandMoreIcon sx={{ transform: advancedOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />}
-                            sx={{ textTransform: 'none', color: 'text.secondary' }}
+                            sx={{ ...fioriGhostSx, color: FIORI.textSecondary }}
                         >
                             {t('wooConvertAdvancedOptions')}
                         </Button>
 
                         <Collapse in={advancedOpen || advancedErrorCount > 0} timeout="auto" unmountOnExit>
                             <Stack spacing={2} sx={{ mt: 1 }}>
-                                <Paper variant="outlined" sx={{ p: 3 }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertCategorySectionTitle')}</Typography>
+                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertCategorySectionTitle')}</Typography>
                                     <Stack spacing={2}>
-                                        <Typography variant="body2" color="text.secondary">{t('wooConvertCategoryHelp')}</Typography>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('wooConvertCategoryHelp')}</Typography>
                                         <FileDropzone
                                             file={data.category_map}
                                             onSelect={(file) => setData('category_map', file)}
@@ -230,8 +231,8 @@ export default function WooConvertCreate({ families }: Props) {
                                     </Stack>
                                 </Paper>
 
-                                <Paper variant="outlined" sx={{ p: 3 }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertFamilySectionTitle')}</Typography>
+                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertFamilySectionTitle')}</Typography>
                                     <FormControl fullWidth>
                                         <InputLabel id="woo-convert-family-label">{t('wooConvertFamilyCode')}</InputLabel>
                                         <Select
@@ -249,8 +250,8 @@ export default function WooConvertCreate({ families }: Props) {
                                     </FormControl>
                                 </Paper>
 
-                                <Paper variant="outlined" sx={{ p: 3 }}>
-                                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertOptionsSectionTitle')}</Typography>
+                                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertOptionsSectionTitle')}</Typography>
                                     <Stack spacing={1}>
                                         <FormControlLabel
                                             control={<Checkbox checked={data.emit_name} onChange={(e) => setData('emit_name', e.target.checked)} />}
@@ -265,7 +266,7 @@ export default function WooConvertCreate({ families }: Props) {
                                             label={t('wooConvertStripHtml')}
                                         />
                                         {(data.emit_name || data.emit_description) && (
-                                            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'pre-line' }}>
+                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, whiteSpace: 'pre-line' }}>
                                                 {t('wooConvertLocaleCaveat')}
                                             </Typography>
                                         )}
@@ -286,10 +287,9 @@ export default function WooConvertCreate({ families }: Props) {
                     type="submit"
                     fullWidth
                     size="large"
-                    sx={{ color: 'white', mt: 3 }}
-                    variant="contained"
                     disabled={processing || !data.file}
                     startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
+                    sx={{ ...fioriEmphasizedSx, mt: 3, py: 1.25 }}
                 >
                     {processing ? t('wooConvertSubmitting') : t('wooConvertSubmit')}
                 </Button>

@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import ISO6391 from 'iso-639-1';
 import { FormEvent } from 'react';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'SYSTEM', href: '#' },
@@ -56,10 +57,10 @@ export default function LocaleCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Locale" />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {/* Header Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
+                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
                         Add Locale
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -67,14 +68,7 @@ export default function LocaleCreate() {
                             component={Link}
                             href="/system/locales"
                             variant="outlined"
-                            sx={{
-                                color: 'primary.main',
-                                borderColor: 'primary.main',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { borderColor: 'primary.main' },
-                            }}
+                            sx={fioriDefaultSx}
                         >
                             Back
                         </Button>
@@ -83,14 +77,7 @@ export default function LocaleCreate() {
                             variant="contained"
                             disabled={processing}
                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={fioriEmphasizedSx}
                         >
                             {processing ? 'Saving…' : 'Save Locale'}
                         </Button>
@@ -99,8 +86,8 @@ export default function LocaleCreate() {
 
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
                     {/* General Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: FIORI.textPrimary, mb: 2 }}>
                             General
                         </Typography>
                         <Stack spacing={2}>
@@ -157,8 +144,8 @@ export default function LocaleCreate() {
                     </Paper>
 
                     {/* Status Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 1 }}>
                             Status
                         </Typography>
                         <Stack direction="row" spacing={3}>

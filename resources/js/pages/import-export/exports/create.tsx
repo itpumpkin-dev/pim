@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface Props {
     types: string[];
@@ -90,30 +91,30 @@ export default function ExportCreate({ types }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createExport')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('createExport')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createExport')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/exports" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/import-export/exports" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {tCatalog('back')}
                         </Button>
-                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />}>
+                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />} sx={fioriDefaultSx}>
                             {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                         </Button>
                         <Button
-                            sx={{ color: 'white' }}
                             variant="contained"
                             disabled={processing}
                             startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
                             onClick={submitAndRun}
+                            sx={fioriEmphasizedSx}
                         >
                             {t('exportNow')}
                         </Button>
                     </Stack>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ p: 3 }}>
-                    <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{tCatalog('generalTitle')}</Typography>
+                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{tCatalog('generalTitle')}</Typography>
                     <Stack spacing={3}>
                         <FormControl fullWidth>
                             <InputLabel id="export-type-label">{t('typeLabel')}</InputLabel>

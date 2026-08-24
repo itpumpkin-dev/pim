@@ -4,6 +4,7 @@ import { FormEventHandler } from 'react';
 
 import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
+import { fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface RegisterForm {
     username: string;
@@ -143,6 +144,7 @@ export default function Register() {
                         tabIndex={7}
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...fioriEmphasizedSx, py: 1.25 }}
                     >
                         Create account
                     </Button>

@@ -18,6 +18,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -36,6 +37,18 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
+import {
+    FIORI,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface GridColumn {
     label: string;
@@ -126,159 +139,153 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributeGroupsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {/* Header Title & Create Button */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
-                        {tCatalog('attributeGroupsTitle')}
-                    </Typography>
+                    <Box>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                            {tCatalog('attributeGroupsTitle')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+                            {t('results', { count: gridData.total })}
+                        </Typography>
+                    </Box>
                     {canCreate && (
                         <Button
                             variant="contained"
                             onClick={() => router.visit('/catalog/attributeGroups/create')}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                py: 1,
-                                borderRadius: 1.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                         >
                             {tCatalog('createAttributeGroup')}
                         </Button>
                     )}
                 </Stack>
 
-                {/* Search & Controls Row */}
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                {/* Table Card: toolbar + head + rows on one Fiori "Table" surface */}
+                <Paper elevation={0} sx={fioriCardSx}>
+                    {/* Toolbar */}
+                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
                         <TextField
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder={tCatalog('search')}
                             size="small"
-                            sx={{
-                                bgcolor: '#fff',
-                                borderRadius: 5,
-                                '& .MuiOutlinedInput-root': { borderRadius: 5 },
-                                minWidth: 240,
-                            }}
+                            sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
+                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
                                     </InputAdornment>
                                 ),
                             }}
                         />
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Stack>
 
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FilterListIcon />}
-                            onClick={() => setFilterDrawerOpen(true)}
-                            sx={{
-                                color: '#64748b',
-                                borderColor: '#cbd5e1',
-                                textTransform: 'none',
-                                borderRadius: 1.5,
-                                bgcolor: '#fff',
-                            }}
-                        >
-                            {t('filter')}
-                            {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
-                        </Button>
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<FilterListIcon />}
+                                onClick={() => setFilterDrawerOpen(true)}
+                                sx={fioriDefaultSx}
+                            >
+                                {t('filter')}
+                                {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                            </Button>
 
-                        <Select
-                            value={perPage}
-                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                            size="small"
-                            sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 60, height: 36 }}
-                        >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
-                        </Select>
+                            <Select
+                                value={perPage}
+                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                                size="small"
+                                sx={{
+                                    bgcolor: FIORI.surface,
+                                    borderRadius: '8px',
+                                    minWidth: 60,
+                                    height: 34,
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
+                                }}
+                            >
+                                <MenuItem value={10}>10</MenuItem>
+                                <MenuItem value={25}>25</MenuItem>
+                                <MenuItem value={50}>50</MenuItem>
+                            </Select>
 
-                        <Typography variant="body2" color="text.secondary">
-                            {t('perPage')}
-                        </Typography>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('perPage')}
+                            </Typography>
 
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
-                        </Paper>
+                            <Paper
+                                variant="outlined"
+                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
+                            >
+                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
+                            </Paper>
 
-                        <Typography variant="body2" color="text.secondary">
-                            {t('pageOf', { lastPage })}
-                        </Typography>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('pageOf', { lastPage })}
+                            </Typography>
 
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
+                            <Stack direction="row" spacing={0.2}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                    <FirstPageIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                    <ChevronLeftIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                    <ChevronRightIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                    <LastPageIcon fontSize="small" />
+                                </IconButton>
+                            </Stack>
                         </Stack>
                     </Stack>
-                </Stack>
 
-                {/* Table */}
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                    <Table sx={{ minWidth: 650 }}>
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.id')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.code')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('fields.name')}</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actionsHeader')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => (
-                                <TableRow key={row.id} hover>
-                                    <TableCell sx={{ color: '#334155' }}>{row.id}</TableCell>
-                                    <TableCell sx={{ color: '#334155', fontWeight: 500 }}>{row.code}</TableCell>
-                                    <TableCell sx={{ color: '#334155' }}>{row.name || ucfirst(row.code)}</TableCell>
-                                    <TableCell align="right">
-                                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                            {canEdit && (
-                                                <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => router.visit(`/catalog/attributeGroups/${row.id}/edit`)}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                            {canDelete && (
-                                                <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setDeleteGroupId(row.id)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {gridData.data.length === 0 && (
+                    <Divider sx={{ borderColor: FIORI.border }} />
+
+                    {/* Table */}
+                    <TableContainer>
+                        <Table sx={{ minWidth: 650 }}>
+                            <TableHead sx={fioriTableHeadSx}>
                                 <TableRow>
-                                    <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        {tCatalog('noAttributeGroupsFound')}
-                                    </TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.id')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.code')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.name')}</TableCell>
+                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actionsHeader')}</TableCell>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {gridData.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
+                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 500 }}>{row.code}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{row.name || ucfirst(row.code)}</TableCell>
+                                        <TableCell align="right">
+                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                {canEdit && (
+                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeGroups/${row.id}/edit`)}>
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                                {canDelete && (
+                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteGroupId(row.id)}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </Stack>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {gridData.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={4} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
+                                            {tCatalog('noAttributeGroupsFound')}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
             </Box>
 
             {/* Delete Dialog */}
@@ -290,7 +297,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteGroupId(null)} color="inherit" disabled={deleting}>
+                    <Button onClick={() => setDeleteGroupId(null)} color="inherit" disabled={deleting} sx={{ textTransform: 'none' }}>
                         {t('cancel')}
                     </Button>
                     <Button
@@ -307,6 +314,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                         variant="contained"
                         disabled={deleting}
                         startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ textTransform: 'none', borderRadius: '8px' }}
                     >
                         {t('delete')}
                     </Button>

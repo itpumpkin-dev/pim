@@ -28,6 +28,7 @@ import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface Props {
     categoryFields: CategoryFieldItem[];
@@ -76,14 +77,14 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createCategory')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('createCategory')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createCategory')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/categories" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/catalog/categories" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
@@ -97,7 +98,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
@@ -149,7 +150,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
                                     {t('thumbnail')}
                                 </Typography>
-                                <Button component="label" variant="outlined" startIcon={<UploadIcon />}>
+                                <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
                                     {t('chooseFile')}
                                     <input
                                         type="file"
@@ -177,7 +178,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                     </Paper>
 
                     {categoryFields.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3 }}>
+                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
                             <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)</Typography>
                             <Stack spacing={3}>
                                 {categoryFields.map((field) => {
@@ -187,7 +188,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
 
                                     return (
                                         <Box key={field.id}>
-                                            <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
+                                            <Typography variant="caption" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5, display: 'block' }}>
                                                 {fieldLabel} {field.is_required && '*'}
                                             </Typography>
                                             <CategoryFieldInput

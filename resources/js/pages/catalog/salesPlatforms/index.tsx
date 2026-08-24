@@ -39,16 +39,22 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
-const TH_SX = { padding: '12px 20px', fontWeight: 600, fontSize: '0.8rem', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.03em' };
-const TD_SX = { padding: '12px 20px', fontSize: '0.875rem' };
-const TR_SX = {
-    borderBottom: '1px solid',
-    borderColor: 'divider',
-    transition: 'background-color 0.15s',
-    '&:hover': { bgcolor: 'action.hover' },
-    '&:last-of-type': { borderBottom: 'none' },
-};
+const TD_SX = { ...fioriBodyCellSx, padding: '12px 20px' };
+const TR_SX = fioriTableRowSx(false);
 
 // Cycled by platform index (not brand colors) — this page's platforms are
 // admin-created and arbitrary (see storePlatform()), not just Lazada/Shopee/
@@ -242,7 +248,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Tabs
                     value="platforms"
                     onChange={(_, val) => router.visit(val === 'channels' ? '/catalog/channels' : '/catalog/sales-platforms')}
@@ -254,10 +260,10 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3, flexWrap: 'wrap' }}>
                     <Box>
-                        <Typography variant="h4" fontWeight={700}>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                             {t('salesPlatformsTitle')}
                         </Typography>
-                        <Typography color="text.secondary">{t('salesPlatformsSubtitle')}</Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('salesPlatformsSubtitle')}</Typography>
                     </Box>
                     <Stack direction="row" spacing={1.5}>
                         <Button
@@ -266,6 +272,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                             endIcon={<ArrowDropDownIcon />}
                             disabled={anySyncing}
                             onClick={(e) => setSyncMenuAnchor(e.currentTarget)}
+                            sx={fioriDefaultSx}
                         >
                             {t('syncData')}
                         </Button>
@@ -285,7 +292,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                             </MenuItem>
                         </Menu>
                         {canCreate && (
-                            <Button sx={{ color: 'white' }} variant="contained" startIcon={<AddIcon />} onClick={openCreatePlatform}>
+                            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreatePlatform} sx={fioriEmphasizedSx}>
                                 {t('createPlatform')}
                             </Button>
                         )}
@@ -293,18 +300,18 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                 </Box>
 
                 {platforms.length === 0 ? (
-                    <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
-                        <Typography color="text.secondary">{t('noPlatformsFound')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 4, textAlign: 'center' }}>
+                        <Typography sx={{ color: FIORI.textSecondary }}>{t('noPlatformsFound')}</Typography>
                     </Paper>
                 ) : (
-                    <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+                    <Paper elevation={0} sx={fioriCardSx}>
                         <Tabs
                             value={activePlatform?.id ?? false}
                             onChange={(_, val) => {
                                 setActivePlatformId(val);
                                 setShowAllShops(false);
                             }}
-                            sx={{ px: 2, borderBottom: 1, borderColor: 'divider' }}
+                            sx={{ px: 2, borderBottom: `1px solid ${FIORI.border}` }}
                         >
                             {platforms.map((platform, index) => (
                                 <Tab
@@ -333,12 +340,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                             <>
                                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', px: 2, py: 1 }}>
                                     {canEdit && (
-                                        <Button size="small" startIcon={<AddIcon fontSize="small" />} onClick={() => openCreateShop(activePlatform.id)}>
+                                        <Button size="small" startIcon={<AddIcon fontSize="small" />} onClick={() => openCreateShop(activePlatform.id)} sx={fioriGhostSx}>
                                             {t('addShop')}
                                         </Button>
                                     )}
                                     {(canEdit || canDelete) && (
-                                        <IconButton size="small" onClick={(e) => setPlatformMenuAnchor(e.currentTarget)}>
+                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setPlatformMenuAnchor(e.currentTarget)}>
                                             <MoreVertIcon fontSize="small" />
                                         </IconButton>
                                     )}
@@ -370,12 +377,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
                                 <TableContainer>
                                     <Table>
-                                        <TableHead>
+                                        <TableHead sx={fioriTableHeadSx}>
                                             <TableRow>
-                                                <TableCell sx={TH_SX}>{t('shopsLabel')}</TableCell>
-                                                <TableCell sx={TH_SX}>{t('linkedPlatformAccount')}</TableCell>
-                                                <TableCell sx={TH_SX}>{t('shopActive')}</TableCell>
-                                                <TableCell sx={{ ...TH_SX, width: 48 }} />
+                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('shopsLabel')}</TableCell>
+                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('linkedPlatformAccount')}</TableCell>
+                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('shopActive')}</TableCell>
+                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px', width: 48 }} />
                                             </TableRow>
                                         </TableHead>
                                         <TableBody>
@@ -383,7 +390,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                                 <TableRow key={shop.id} sx={TR_SX}>
                                                     <TableCell sx={TD_SX}>
                                                         <Typography variant="body2" fontWeight={600}>{shop.name}</Typography>
-                                                        <Typography variant="caption" color="text.secondary">{shop.code}</Typography>
+                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{shop.code}</Typography>
                                                     </TableCell>
                                                     <TableCell sx={TD_SX}>
                                                         {linkedAccountLabel(shop) ?? (
@@ -394,17 +401,14 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                                     </TableCell>
                                                     <TableCell sx={TD_SX}>
                                                         {shop.is_active ? (
-                                                            <Stack direction="row" spacing={0.75} alignItems="center">
-                                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main' }} />
-                                                                <Typography variant="body2">{t('shopActive')}</Typography>
-                                                            </Stack>
+                                                            <FioriStatus label={t('shopActive')} tone="success" />
                                                         ) : (
-                                                            '-'
+                                                            <FioriStatus label="-" tone="neutral" />
                                                         )}
                                                     </TableCell>
                                                     <TableCell sx={{ ...TD_SX, textAlign: 'right' }}>
                                                         {(canEdit || canDelete) && (
-                                                            <IconButton size="small" onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
+                                                            <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
                                                                 <MoreVertIcon fontSize="small" />
                                                             </IconButton>
                                                         )}
@@ -414,7 +418,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                             {activePlatform.shops.length === 0 && (
                                                 <TableRow>
                                                     <TableCell colSpan={4} align="center" sx={TD_SX}>
-                                                        <Typography variant="body2" color="text.secondary">
+                                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                                             {t('noShopsYet')}
                                                         </Typography>
                                                     </TableCell>
@@ -426,7 +430,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
 
                                 {activePlatform.shops.length > SHOPS_PREVIEW_COUNT && (
                                     <Box sx={{ px: 2.5, py: 1.5 }}>
-                                        <Button size="small" onClick={() => setShowAllShops((v) => !v)}>
+                                        <Button size="small" onClick={() => setShowAllShops((v) => !v)} sx={fioriGhostSx}>
                                             {showAllShops ? t('showFewerShops') : t('viewAllShops', { count: activePlatform.shops.length })}
                                         </Button>
                                     </Box>
@@ -504,7 +508,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         </Stack>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setPlatformDialogOpen(false)} color="inherit" disabled={savingPlatform}>
+                        <Button onClick={() => setPlatformDialogOpen(false)} sx={fioriGhostSx} disabled={savingPlatform}>
                             {tGrid('cancel')}
                         </Button>
                         <Button
@@ -512,6 +516,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                             variant="contained"
                             disabled={savingPlatform}
                             startIcon={savingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
+                            sx={fioriEmphasizedSx}
                         >
                             {t('save')}
                         </Button>
@@ -549,7 +554,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         </Stack>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setShopDialogPlatformId(null)} color="inherit" disabled={savingShop}>
+                        <Button onClick={() => setShopDialogPlatformId(null)} sx={fioriGhostSx} disabled={savingShop}>
                             {tGrid('cancel')}
                         </Button>
                         <Button
@@ -557,6 +562,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                             variant="contained"
                             disabled={savingShop}
                             startIcon={savingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
+                            sx={fioriEmphasizedSx}
                         >
                             {t('save')}
                         </Button>
@@ -570,7 +576,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogContentText>{t('confirmDeletePlatform')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeletePlatformId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deletingPlatform}>
+                    <Button onClick={() => setDeletePlatformId(null)} sx={fioriGhostSx} disabled={deletingPlatform}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
@@ -585,7 +591,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         }}
                         color="error"
                         variant="contained"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
                         disabled={deletingPlatform}
                         startIcon={deletingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >
@@ -600,7 +606,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                     <DialogContentText>{t('confirmDeleteShop')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteShopId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={deletingShop}>
+                    <Button onClick={() => setDeleteShopId(null)} sx={fioriGhostSx} disabled={deletingShop}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
@@ -615,7 +621,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                         }}
                         color="error"
                         variant="contained"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
                         disabled={deletingShop}
                         startIcon={deletingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >

@@ -1,15 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
-import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import { Box, Divider, Grid, Typography } from '@mui/material';
+import { Box, Grid, Typography } from '@mui/material';
 import { type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
+import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
  * "จัดการ Ecommerce/Marketplace" — sits between the Management hub and the
@@ -31,11 +29,10 @@ export default function CatalogManagementMarketplace() {
         { title: t('manageEcommerceMarketplaceTab'), href: '#' },
     ];
 
-    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; color: string; title: string; description: string; url: string; permission: string }[] = [
+    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string }[] = [
         {
             key: 'categories',
             icon: CategoryOutlinedIcon,
-            color: PALETTE.highlight,
             title: t('manageCategoriesCard'),
             description: t('marketplaceSyncSubtitle'),
             url: '/catalog/categories/marketplace-sync',
@@ -44,7 +41,6 @@ export default function CatalogManagementMarketplace() {
         {
             key: 'brands',
             icon: StorefrontOutlinedIcon,
-            color: PALETTE.primary,
             title: t('manageBrandsCard'),
             description: t('brandMarketplaceSyncSubtitle'),
             url: '/catalog/brands/marketplace-sync',
@@ -53,7 +49,6 @@ export default function CatalogManagementMarketplace() {
         {
             key: 'marketplaceAttributeMapping',
             icon: AccountTreeOutlinedIcon,
-            color: PALETTE.accent,
             title: t('marketplaceAttributeMapping'),
             description: t('marketplaceAttributeMappingCardDescription'),
             url: '/catalog/attributes/marketplace-mapping',
@@ -66,11 +61,10 @@ export default function CatalogManagementMarketplace() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('manageEcommerceMarketplaceTab')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('manageEcommerceMarketplaceTab')}</Typography>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography color="text.secondary">{t('manageEcommerceMarketplaceSubtitle')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('manageEcommerceMarketplaceTab')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('manageEcommerceMarketplaceSubtitle')}</Typography>
                 </Box>
 
                 <Grid container spacing={3}>
@@ -82,17 +76,13 @@ export default function CatalogManagementMarketplace() {
                                 <Box
                                     onClick={() => router.visit(tile.url)}
                                     sx={{
+                                        ...fioriCardSx,
                                         display: 'flex',
                                         flexDirection: 'column',
                                         height: '100%',
-                                        borderRadius: '0.25rem',
-                                        bgcolor: 'background.paper',
-                                        boxShadow: CARD_SHADOW,
-                                        overflow: 'hidden',
                                         cursor: 'pointer',
-                                        borderTop: `3px solid ${tile.color}`,
-                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                        '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 },
+                                        transition: 'border-color 0.15s ease',
+                                        '&:hover': { borderColor: FIORI.brand },
                                     }}
                                 >
                                     <Box sx={{ p: 3 }}>
@@ -103,15 +93,15 @@ export default function CatalogManagementMarketplace() {
                                                 justifyContent: 'center',
                                                 width: 48,
                                                 height: 48,
-                                                borderRadius: '0.25rem',
-                                                bgcolor: tile.color,
+                                                borderRadius: '8px',
+                                                bgcolor: FIORI.brand,
                                                 mb: 2,
                                             }}
                                         >
                                             <Icon sx={{ fontSize: 26, color: '#fff' }} />
                                         </Box>
-                                        <Typography variant="h6" fontWeight={700}>{tile.title}</Typography>
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{tile.title}</Typography>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
                                             {tile.description}
                                         </Typography>
                                     </Box>
@@ -122,7 +112,7 @@ export default function CatalogManagementMarketplace() {
 
                     {visibleTiles.length === 0 && (
                         <Grid item xs={12}>
-                            <Typography color="text.secondary">{t('managementNoAccess')}</Typography>
+                            <Typography sx={{ color: FIORI.textSecondary }}>{t('managementNoAccess')}</Typography>
                         </Grid>
                     )}
                 </Grid>

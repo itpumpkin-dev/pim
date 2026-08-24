@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface RootCategoryOption {
     id: number;
@@ -87,22 +88,22 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createChannel')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('createChannel')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createChannel')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/channels" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/catalog/channels" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: 'white' }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <FormControl fullWidth>
                                 <InputLabel id="root-category-label">{t('rootCategoryOptional')}</InputLabel>
@@ -131,8 +132,8 @@ export default function ChannelCreate({ rootCategories, locales, currencies }: P
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('currenciesAndLocalesTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('currenciesAndLocalesTitle')}</Typography>
                         <Stack spacing={3}>
                             <FormControl fullWidth required error={Boolean(errors.locale_ids)}>
                                 <InputLabel id="channel-locales-label">{t('localesRequired')}</InputLabel>

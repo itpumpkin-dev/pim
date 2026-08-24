@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface UserSummary {
     id: number;
@@ -78,15 +79,15 @@ export default function WooConvertShow({ conversion }: Props) {
     })();
 
     const stat = (label: string, value: number, tone: 'neutral' | 'good' | 'warn' = 'neutral', icon?: ReactNode) => {
-        const toneColor = tone === 'warn' ? 'warning.main' : tone === 'good' ? 'success.main' : 'text.primary';
+        const toneColor = tone === 'warn' ? FIORI.warning : tone === 'good' ? FIORI.success : FIORI.textPrimary;
         return (
             <Grid item xs={6} sm={3}>
-                <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderColor: tone === 'neutral' ? undefined : toneColor }}>
+                <Paper elevation={0} sx={{ ...fioriCardSx, p: 2, textAlign: 'center', borderColor: tone === 'neutral' ? FIORI.border : toneColor }}>
                     <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
                         {icon}
-                        <Typography variant="h4" fontWeight={700} color={toneColor}>{value}</Typography>
+                        <Typography variant="h4" fontWeight={700} sx={{ color: toneColor }}>{value}</Typography>
                     </Stack>
-                    <Typography variant="body2" color="text.secondary">{label}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{label}</Typography>
                 </Paper>
             </Grid>
         );
@@ -95,14 +96,14 @@ export default function WooConvertShow({ conversion }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertResultTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('wooConvertResultTitle')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertResultTitle')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/woo-convert" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {tCatalog('back')}
                         </Button>
-                        <Button component={Link} href="/import-export/woo-convert/create" variant="outlined" startIcon={<AddIcon />}>
+                        <Button component={Link} href="/import-export/woo-convert/create" variant="outlined" startIcon={<AddIcon />} sx={fioriDefaultSx}>
                             {t('wooConvertAnother')}
                         </Button>
                     </Stack>
@@ -115,7 +116,7 @@ export default function WooConvertShow({ conversion }: Props) {
                         skipped: conversion.sku_missing_count,
                     })}
                 </Alert>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 3 }}>
+                <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 3 }}>
                     {formatLocalDateTime(conversion.created_at)} · {creatorLabel}
                 </Typography>
 
@@ -143,15 +144,15 @@ export default function WooConvertShow({ conversion }: Props) {
                 </Grid>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('wooConvertDownloadsTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertDownloadsTitle')}</Typography>
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                             <Button
                                 variant="contained"
-                                sx={{ color: 'white' }}
                                 startIcon={<DownloadIcon />}
                                 endIcon={<ArrowDropDownIcon />}
                                 onClick={(e) => setDownloadAnchor(e.currentTarget)}
+                                sx={fioriEmphasizedSx}
                             >
                                 {t('wooConvertDownloadButton')}
                             </Button>
@@ -176,6 +177,7 @@ export default function WooConvertShow({ conversion }: Props) {
                                     variant="outlined"
                                     startIcon={<DownloadIcon />}
                                     href={`/import-export/woo-convert/${conversion.id}/download-unmatched`}
+                                    sx={fioriDefaultSx}
                                 >
                                     {t('wooConvertDownloadUnmatched')}
                                 </Button>
@@ -186,8 +188,8 @@ export default function WooConvertShow({ conversion }: Props) {
                                 {t('wooConvertUnmatchedHelp')}
                             </Alert>
                         )}
-                        <Divider sx={{ my: 2 }} />
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        <Divider sx={{ my: 2, borderColor: FIORI.border }} />
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 1.5 }}>
                             {t('wooConvertNextStep')}
                         </Typography>
                         <Button
@@ -195,6 +197,7 @@ export default function WooConvertShow({ conversion }: Props) {
                             href="/import-export/imports/create"
                             variant="text"
                             endIcon={<ArrowForwardIcon />}
+                            sx={{ color: FIORI.brand, fontWeight: 600, textTransform: 'none' }}
                         >
                             {t('wooConvertGoToImport')}
                         </Button>
@@ -207,11 +210,11 @@ export default function WooConvertShow({ conversion }: Props) {
                     )}
 
                     {conversion.brand_new_names.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3 }}>
-                            <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
+                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                            <Typography variant="h6" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
                                 {t('wooConvertNewBrandsTitle', { count: conversion.brand_new_names_total })}
                             </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
                                 {t('wooConvertNewBrandsHelp')}
                             </Typography>
                             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ maxHeight: 320, overflowY: 'auto' }}>
@@ -219,14 +222,14 @@ export default function WooConvertShow({ conversion }: Props) {
                                     <Typography
                                         key={i}
                                         variant="body2"
-                                        sx={{ px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}
+                                        sx={{ px: 1, py: 0.5, bgcolor: FIORI.hover, color: FIORI.textPrimary, borderRadius: '6px' }}
                                     >
                                         {name}
                                     </Typography>
                                 ))}
                             </Stack>
                             {conversion.brand_new_names_total > conversion.brand_new_names.length && (
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, mt: 1, display: 'block' }}>
                                     {t('wooConvertTypeWarningsTruncated', {
                                         remaining: conversion.brand_new_names_total - conversion.brand_new_names.length,
                                     })}
@@ -236,20 +239,20 @@ export default function WooConvertShow({ conversion }: Props) {
                     )}
 
                     {conversion.type_warnings.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3 }}>
-                            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
+                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                            <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>
                                 {t('wooConvertTypeWarningsTitle', { count: conversion.type_warnings_total })}
                             </Typography>
                             <Stack spacing={1} sx={{ maxHeight: 320, overflowY: 'auto' }}>
                                 {conversion.type_warnings.map((warning, i) => (
                                     <Stack key={i} direction="row" spacing={1} alignItems="flex-start">
-                                        <WarningAmberIcon color="warning" sx={{ fontSize: 16, mt: 0.3, flexShrink: 0 }} />
-                                        <Typography variant="body2" color="text.secondary">{warning}</Typography>
+                                        <WarningAmberIcon sx={{ color: FIORI.warning, fontSize: 16, mt: 0.3, flexShrink: 0 }} />
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{warning}</Typography>
                                     </Stack>
                                 ))}
                             </Stack>
                             {conversion.type_warnings_total > conversion.type_warnings.length && (
-                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, mt: 1, display: 'block' }}>
                                     {t('wooConvertTypeWarningsTruncated', {
                                         remaining: conversion.type_warnings_total - conversion.type_warnings.length,
                                     })}

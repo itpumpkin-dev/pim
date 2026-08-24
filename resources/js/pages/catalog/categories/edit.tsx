@@ -32,6 +32,7 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/catalog/lazada-category-picker';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface CategoryItem {
     id: number;
@@ -105,12 +106,12 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editCategory')}: ${category.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />
@@ -122,12 +123,12 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                 {tabIndex === 0 && (
                 <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('editCategory')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editCategory')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/categories" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/catalog/categories" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
@@ -141,7 +142,7 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
@@ -203,7 +204,7 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                                     {t('thumbnail')}
                                 </Typography>
                                 <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />}>
+                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
                                         {t('chooseFile')}
                                         <input
                                             type="file"
@@ -246,7 +247,7 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                     </Paper>
 
                     {categoryFields.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3 }}>
+                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
                             <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)</Typography>
                             <Stack spacing={3}>
                                 {categoryFields.map((field) => {
@@ -256,7 +257,7 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
 
                                     return (
                                         <Box key={field.id}>
-                                            <Typography variant="caption" fontWeight={600} color="#334155" sx={{ mb: 0.5, display: 'block' }}>
+                                            <Typography variant="caption" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5, display: 'block' }}>
                                                 {fieldLabel} {field.is_required && '*'}
                                             </Typography>
                                             <CategoryFieldInput

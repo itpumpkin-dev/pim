@@ -9,6 +9,7 @@ import { LazadaAttributeMappingPanel, type LazadaAttributeMappingPanelProps } fr
 import { ShopeeAttributeMappingPanel, type ShopeeAttributeMappingPanelProps } from '@/components/catalog/shopee-attribute-mapping-panel';
 import { TikTokAttributeMappingPanel, type TikTokAttributeMappingPanelProps } from '@/components/catalog/tiktok-attribute-mapping-panel';
 import { WooCommerceAttributeMappingPanel, type WooCommerceAttributeMappingPanelProps } from '@/components/catalog/woocommerce-attribute-mapping-panel';
+import { FIORI, fioriGhostSx } from '@/lib/fiori-style';
 
 interface Props {
     woocommerce: WooCommerceAttributeMappingPanelProps;
@@ -67,29 +68,29 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('marketplaceAttributeMapping')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Button
                     size="small"
                     startIcon={<ArrowBackIcon fontSize="small" />}
                     onClick={() => router.visit('/catalog/management/marketplace')}
-                    sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
+                    sx={{ ...fioriGhostSx, mb: 1 }}
                 >
                     {t('manageEcommerceMarketplaceTab')}
                 </Button>
-                <Typography variant="h4" fontWeight={700}>{t('marketplaceAttributeMapping')}</Typography>
-                <Divider sx={{ my: 1 }} />
-                <Typography color="text.secondary" sx={{ maxWidth: 840, mb: 3 }}>
+                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('marketplaceAttributeMapping')}</Typography>
+                <Divider sx={{ my: 1, borderColor: FIORI.border }} />
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary, maxWidth: 840, mb: 3 }}>
                     {t('marketplaceAttributeMappingHelp')}
                 </Typography>
 
-                <Box sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}`, display: 'flex', alignItems: 'center' }}>
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => handleTabChange(v)}
                         sx={{
-                            '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: '0.95rem', minWidth: 100 },
-                            '& .Mui-selected': { color: 'text.primary' },
-                            '& .MuiTabs-indicator': { bgcolor: 'grey.800', height: 3 },
+                            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '0.95rem', minWidth: 100, color: FIORI.textSecondary },
+                            '& .Mui-selected': { color: FIORI.brand },
+                            '& .MuiTabs-indicator': { bgcolor: FIORI.brand, height: 2 },
                         }}
                     >
                         <Tab label="WooCommerce" />

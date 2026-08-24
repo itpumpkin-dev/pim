@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface BrandDetail {
     id: number;
@@ -81,14 +82,14 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editBrand')}: ${brand.admin_label || brand.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 640 }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 640, bgcolor: FIORI.pageBg }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('editBrand')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editBrand')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/brands" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/catalog/brands" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: '#fff' }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
@@ -102,7 +103,7 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <TextField
@@ -143,7 +144,7 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>{t('imageLabel')}</Typography>
                                 <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />}>
+                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
                                         {t('chooseFile')}
                                         <input
                                             type="file"

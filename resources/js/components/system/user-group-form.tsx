@@ -19,6 +19,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEventHandler } from 'react';
+import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -95,17 +96,16 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
             breadcrumbs={breadcrumbs}
             actions={
                 <>
-                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ borderRadius: 8, px: 3, fontWeight: 'bold' }}>
+                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
                         CANCEL
                     </Button>
                     <Button
                         type="submit"
                         form="user-group-form"
                         variant="contained"
-                        color="primary"
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ borderRadius: 8, px: 3, fontWeight: 'bold', color: '#fff', }}
+                        sx={{ ...fioriEmphasizedSx, px: 3 }}
                     >
                         {processing ? 'Saving…' : 'Save'}
                     </Button>
@@ -113,45 +113,45 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
             }
         >
             <Head title={isEdit ? `Edit ${group?.name}` : 'Create Group'} />
-            <Box component="form" id="user-group-form" onSubmit={submit} sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+            <Box component="form" id="user-group-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 3 }}>
                     {isEdit ? group?.name : 'New Group'}
                 </Typography>
 
                 <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <Box sx={{ flex: 1, minWidth: 320 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
                             Users
                         </Typography>
-                        <Divider sx={{ mb: 2 }} />
-                        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 1 }}>
+                        <Divider sx={{ mb: 2, borderColor: FIORI.border }} />
+                        <TableContainer component={Paper} sx={fioriCardSx}>
                             <Table size="small">
-                                <TableHead>
+                                <TableHead sx={fioriTableHeadSx}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Has Group</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Employee ID</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Username</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>E-mail</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>First name</TableCell>
-                                        <TableCell sx={{ fontWeight: 'bold' }}>Last name</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>Has Group</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>Employee ID</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>Username</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>E-mail</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>First name</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>Last name</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {users.map((user) => (
-                                        <TableRow key={user.id}>
-                                            <TableCell>
+                                        <TableRow key={user.id} sx={fioriTableRowSx(data.users.includes(user.id))}>
+                                            <TableCell sx={fioriBodyCellSx}>
                                                 <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />
                                             </TableCell>
-                                            <TableCell>{user.employee_id || '-'}</TableCell>
-                                            <TableCell>{user.username}</TableCell>
-                                            <TableCell>{user.email}</TableCell>
-                                            <TableCell>{user.first_name}</TableCell>
-                                            <TableCell>{user.last_name}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{user.employee_id || '-'}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{user.username}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{user.email}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{user.first_name}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{user.last_name}</TableCell>
                                         </TableRow>
                                     ))}
                                     {users.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                                            <TableCell colSpan={6} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
                                                 No users found.
                                             </TableCell>
                                         </TableRow>
@@ -161,15 +161,15 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                         </TableContainer>
                     </Box>
 
-                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' } }} />
+                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, borderColor: FIORI.border }} />
 
                     <Box sx={{ width: 320, flexShrink: 0 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                             General
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                             <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                     Name *
                                 </Typography>
                                 <TextField
@@ -185,7 +185,7 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                                 />
                             </Box>
                             <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                     Description *
                                 </Typography>
                                 <TextField
@@ -204,7 +204,7 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                                 />
                             </Box>
                             <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                     Roles
                                 </Typography>
                                 <Autocomplete

@@ -20,6 +20,7 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface ProviderField {
     key: string;
@@ -105,9 +106,9 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Translation Provider: ${translationProvider.name}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         Edit Translation Provider
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
@@ -115,13 +116,7 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
                             component={Link}
                             href="/system/translationProviders"
                             variant="outlined"
-                            sx={{
-                                borderColor: 'primary.main',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { borderColor: 'primary.main' },
-                            }}
+                            sx={fioriDefaultSx}
                         >
                             Back
                         </Button>
@@ -130,14 +125,7 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
                             variant="contained"
                             disabled={processing}
                             startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{
-                                bgcolor: 'primary.main',
-                                color: '#fff',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2.5,
-                                '&:hover': { bgcolor: 'primary.dark' },
-                            }}
+                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                         >
                             {processing ? 'Saving…' : 'Save Provider'}
                         </Button>
@@ -146,8 +134,8 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
 
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
                     {/* General Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                             General
                         </Typography>
                         <Stack spacing={2}>
@@ -186,8 +174,8 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
 
                     {/* Credentials Panel */}
                     {fields.length > 0 && (
-                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                            <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                 Credentials
                             </Typography>
                             <Stack spacing={2}>
@@ -269,8 +257,8 @@ export default function TranslationProviderEdit({ providerTypes, translationProv
                     )}
 
                     {/* Status Panel */}
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
                             Status
                         </Typography>
                         <Stack direction="row" spacing={3}>

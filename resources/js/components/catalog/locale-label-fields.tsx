@@ -1,4 +1,5 @@
 import { useLocale } from '@/hooks/use-locale';
+import { FIORI } from '@/lib/fiori-style';
 import { Paper, Stack, TextField, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
@@ -18,7 +19,7 @@ export default function LocaleLabelFields({ values, onChange, title = 'Label', d
     const visibleLocales = activeLocales.length > 0 ? activeLocales : locales;
 
     return (
-        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: FIORI.surface }}>
             <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 0.5 }}>
                 {title}
             </Typography>

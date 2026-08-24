@@ -7,6 +7,7 @@ import { Box, Button, CircularProgress, Fade, Stack, TextField, Typography } fro
 import { FormEventHandler, useRef } from 'react';
 
 import HeadingSmall from '@/components/heading-small';
+import { fioriEmphasizedSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -102,7 +103,7 @@ export default function Password() {
                             />
 
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}>
+                                <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined} sx={fioriEmphasizedSx}>
                                     {processing ? 'Saving…' : 'Save password'}
                                 </Button>
 

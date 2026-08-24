@@ -32,6 +32,7 @@ import {
 } from '@mui/material';
 import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx } from '@/lib/fiori-style';
 
 interface UserGroupOption {
     id: number;
@@ -277,7 +278,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         onClick={cancel}
                         variant="contained"
                         color="inherit"
-                        sx={{ borderRadius: 8, px: 4, fontWeight: 'bold' }}
+                        sx={{ ...fioriDefaultSx, px: 4 }}
                     >
                         {t('cancel').toUpperCase()}
                     </Button>
@@ -285,10 +286,9 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         type="button"
                         onClick={performSubmit}
                         variant="contained"
-                        color="primary"
                         disabled={processing}
                         startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ borderRadius: 8, px: 4, fontWeight: 'bold', color: '#fff', }}
+                        sx={{ ...fioriEmphasizedSx, px: 4 }}
                     >
                         {processing ? t('saving').toUpperCase() : t('save').toUpperCase()}
                     </Button>
@@ -296,16 +296,15 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
             }
         >
             <Head title={t('editUserTitle', { name: user.name })} />
-            <Box component="form" id="user-edit-form" onSubmit={submit} sx={{ p: 4, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box component="form" id="user-edit-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                     <Box
                         onClick={() => avatarPreview && setAvatarViewerOpen(true)}
                         sx={{
                             width: 72,
                             height: 72,
-                            borderRadius: 1,
-                            border: '2px solid',
-                            borderColor: 'text.primary',
+                            borderRadius: '8px',
+                            border: `2px solid ${FIORI.border}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -340,17 +339,17 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </DialogContent>
                     </Dialog>
                     <Box>
-                        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                             {user.name}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
                             {t('createdLabel')}: {formatDateTime(user.created_at)} {t('updatedLabel')}: {formatDateTime(user.updated_at)} {t('lastLoggedInLabel')}:{' '}
                             {formatDateTime(user.last_login_at)} {t('loginCountLabel')}: {user.login_count}
                         </Typography>
                     </Box>
                 </Box>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
                     {tabs.map((key) => (
                         <Tab key={key} label={tabLabels[key]} value={key} />
                     ))}
@@ -360,7 +359,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         {canManageAccess && (
                             <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                     {t('statusRequired')}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 2 }}>
@@ -377,7 +376,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         )}
 
                         {/* <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 Name prefix
                             </Typography>
                             <TextField
@@ -391,7 +390,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box> */}
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('firstNameRequired')}
                             </Typography>
                             <TextField
@@ -405,7 +404,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('lastNameRequired')}
                             </Typography>
                             <TextField
@@ -419,7 +418,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('phone')}
                             </Typography>
                             <TextField
@@ -434,7 +433,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('department')}
                             </Typography>
                             <Select
@@ -455,7 +454,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('jobPosition')}
                             </Typography>
                             <Select
@@ -478,9 +477,8 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         <Box
                             onClick={() => fileInputRef.current?.click()}
                             sx={{
-                                border: '2px dashed',
-                                borderColor: 'divider',
-                                borderRadius: 1,
+                                border: `2px dashed ${FIORI.border}`,
+                                borderRadius: '8px',
                                 p: 3,
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -489,8 +487,8 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                                 cursor: 'pointer',
                             }}
                         >
-                            <ImageIcon sx={{ fontSize: 32, color: 'text.secondary' }} />
-                            <Typography variant="body2" color="text.secondary">
+                            <ImageIcon sx={{ fontSize: 32, color: FIORI.textSecondary }} />
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                 {t('dragDropUpload')}
                             </Typography>
                             <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
@@ -502,7 +500,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         )}
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('emailRequired')}
                             </Typography>
                             <TextField
@@ -521,7 +519,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                 {tab === 'groupsAndRoles' && canManageAccess && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 500 }}>
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('userGroups')}
                             </Typography>
                             <Autocomplete
@@ -539,7 +537,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
 
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('rolesRequired')}
                             </Typography>
                             <Autocomplete
@@ -560,27 +558,33 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
 
                 {tab === 'permissions' && (
                     <Box sx={{ maxWidth: 800 }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
                             {t('permissionsDescription')}
                         </Typography>
-                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                        <TableContainer component={Paper} sx={fioriCardSx}>
                             <Table size="small">
-                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                <TableHead sx={fioriTableHeadSx}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('resource')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('action')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('grantedVia')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('resource')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('action')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('grantedVia')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {permissionRows.map((row) => (
                                         <TableRow key={`${row.resource}.${row.action}`}>
-                                            <TableCell>{humanize(row.resource)}</TableCell>
-                                            <TableCell>{humanize(row.action)}</TableCell>
-                                            <TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{humanize(row.resource)}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{humanize(row.action)}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>
                                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                                     {row.sources.map((source) => (
-                                                        <Chip key={source} label={source} size="small" variant="outlined" />
+                                                        <Chip
+                                                            key={source}
+                                                            label={source}
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={{ borderColor: FIORI.border, borderRadius: '6px', color: FIORI.textPrimary }}
+                                                        />
                                                     ))}
                                                 </Box>
                                             </TableCell>
@@ -588,7 +592,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                                     ))}
                                     {permissionRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
                                                 {t('noPermissionsAssigned')}
                                             </TableCell>
                                         </TableRow>
@@ -608,7 +612,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                 {tab === 'password' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('newPassword')}
                             </Typography>
                             <TextField
@@ -623,7 +627,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                             />
                         </Box>
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('newPasswordRepeat')}
                             </Typography>
                             <TextField
@@ -641,7 +645,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                 {tab === 'interfaces' && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 420 }}>
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('uiLocale')}
                             </Typography>
                             <Select
@@ -659,7 +663,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                             </Select>
                         </Box>
                         <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('timezoneRequired')}
                             </Typography>
                             <Select fullWidth size="small" value={data.timezone} onChange={(e) => update('timezone', e.target.value)} error={Boolean(errors.timezone)}>

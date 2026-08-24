@@ -1,4 +1,5 @@
 import ImportFilePreview from '@/components/import-export/import-file-preview';
+import { FioriFileUploader } from '@/components/fiori-file-uploader';
 import AppLayout from '@/layouts/app-layout';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -7,7 +8,6 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import SaveIcon from '@mui/icons-material/Save';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DownloadIcon from '@mui/icons-material/Download';
 import {
     Alert,
@@ -30,6 +30,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
 
 interface Props {
     types: string[];
@@ -103,22 +104,22 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createImport')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('createImport')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createImport')}</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/imports" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/import-export/imports" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {tCatalog('back')}
                         </Button>
-                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />}>
+                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />} sx={fioriDefaultSx}>
                             {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                         </Button>
                         <Button
-                            sx={{ color: 'white' }}
                             variant="contained"
                             disabled={processing}
                             startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
                             onClick={submitAndRun}
+                            sx={fioriEmphasizedSx}
                         >
                             {t('importNow')}
                         </Button>
@@ -126,8 +127,8 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{tCatalog('generalTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{tCatalog('generalTitle')}</Typography>
                         <Stack spacing={3}>
                             <FormControl fullWidth>
                                 <InputLabel id="import-type-label">{t('typeLabel')}</InputLabel>
@@ -159,26 +160,22 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                             </FormControl>
 
                             <Box>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <Button
-                                        component="label"
-                                        variant="outlined"
-                                        startIcon={<CloudUploadIcon />}
-                                    >
-                                        {t('chooseFile')}
-                                        <input
-                                            type="file"
-                                            hidden
+                                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <FioriFileUploader
+                                            files={data.file ? [data.file] : []}
+                                            onFilesChange={(files) => setData('file', files[0] ?? null)}
+                                            placeholder={t('chooseFile')}
                                             accept=".csv,.xls,.xlsx"
-                                            onChange={(e) => setData('file', e.target.files?.[0] ?? null)}
+                                            error={errors.file}
                                         />
-                                    </Button>
-                                    {data.file && <Typography variant="body2" color="text.secondary">{data.file.name}</Typography>}
+                                    </Box>
                                     <Button
                                         variant="text"
                                         startIcon={<DownloadIcon />}
                                         endIcon={<ArrowDropDownIcon />}
                                         onClick={(e) => setSampleAnchor(e.currentTarget)}
+                                        sx={{ ...fioriGhostSx, flexShrink: 0 }}
                                     >
                                         {t('downloadSample')}
                                     </Button>
@@ -201,15 +198,20 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                 </Stack>
                                 {(requiredColumnsByType[data.type] ?? []).length > 0 && (
                                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
-                                        <Typography variant="caption" color="text.secondary">
+                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
                                             {t('requiredFields')}:
                                         </Typography>
                                         {requiredColumnsByType[data.type].map((column) => (
-                                            <Chip key={column} label={columnLabelsByType[data.type]?.[column] ?? column} size="small" variant="outlined" />
+                                            <Chip
+                                                key={column}
+                                                label={columnLabelsByType[data.type]?.[column] ?? column}
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ borderColor: FIORI.borderStrong, borderRadius: '6px', color: FIORI.textPrimary }}
+                                            />
                                         ))}
                                     </Stack>
                                 )}
-                                {errors.file && <FormHelperText error>{errors.file}</FormHelperText>}
                                 <ImportFilePreview file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} />
                             </Box>
 
@@ -224,8 +226,8 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                         </Stack>
                     </Paper>
 
-                    <Paper variant="outlined" sx={{ p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('settingsTitle')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('settingsTitle')}</Typography>
                         <Stack spacing={3}>
                             <FormControl fullWidth>
                                 <InputLabel id="import-action-label">{t('action')}</InputLabel>

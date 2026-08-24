@@ -1,14 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
-import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import TranslateIcon from '@mui/icons-material/Translate';
-import { Box, Divider, Grid, Typography } from '@mui/material';
+import { Box, Grid, Typography } from '@mui/material';
 import { type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const CARD_SHADOW = '0 0 1px rgba(0,0,0,.125), 0 1px 3px rgba(0,0,0,.2)';
+import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
  * "จัดการ" hub — a single sidebar entry consolidating three pages that
@@ -31,11 +29,10 @@ export default function CatalogManagement() {
         { title: tNav('management'), href: '#' },
     ];
 
-    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; color: string; title: string; description: string; url: string; permission: string | string[] }[] = [
+    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string | string[] }[] = [
         {
             key: 'missing-translations',
             icon: TranslateIcon,
-            color: PALETTE.accent,
             title: tNav('missingTranslations'),
             description: t('manageMissingTranslationsDesc'),
             url: '/catalog/product-translations',
@@ -49,7 +46,6 @@ export default function CatalogManagement() {
             // shows only the cards the viewer actually has permission for.
             key: 'ecommerce-marketplace',
             icon: StorefrontOutlinedIcon,
-            color: PALETTE.primary,
             title: t('manageEcommerceMarketplaceTab'),
             description: t('manageEcommerceMarketplaceSubtitle'),
             url: '/catalog/management/marketplace',
@@ -64,11 +60,10 @@ export default function CatalogManagement() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('management')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('managementTitle')}</Typography>
-                    <Divider sx={{ my: 1 }} />
-                    <Typography color="text.secondary">{t('managementSubtitle')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('managementTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('managementSubtitle')}</Typography>
                 </Box>
 
                 <Grid container spacing={3}>
@@ -80,17 +75,13 @@ export default function CatalogManagement() {
                                 <Box
                                     onClick={() => router.visit(tile.url)}
                                     sx={{
+                                        ...fioriCardSx,
                                         display: 'flex',
                                         flexDirection: 'column',
                                         height: '100%',
-                                        borderRadius: '0.25rem',
-                                        bgcolor: 'background.paper',
-                                        boxShadow: CARD_SHADOW,
-                                        overflow: 'hidden',
                                         cursor: 'pointer',
-                                        borderTop: `3px solid ${tile.color}`,
-                                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                                        '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 },
+                                        transition: 'border-color 0.15s ease',
+                                        '&:hover': { borderColor: FIORI.brand },
                                     }}
                                 >
                                     <Box sx={{ p: 3 }}>
@@ -101,15 +92,15 @@ export default function CatalogManagement() {
                                                 justifyContent: 'center',
                                                 width: 48,
                                                 height: 48,
-                                                borderRadius: '0.25rem',
-                                                bgcolor: tile.color,
+                                                borderRadius: '8px',
+                                                bgcolor: FIORI.brand,
                                                 mb: 2,
                                             }}
                                         >
                                             <Icon sx={{ fontSize: 26, color: '#fff' }} />
                                         </Box>
-                                        <Typography variant="h6" fontWeight={700}>{tile.title}</Typography>
-                                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{tile.title}</Typography>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
                                             {tile.description}
                                         </Typography>
                                     </Box>
@@ -120,7 +111,7 @@ export default function CatalogManagement() {
 
                     {visibleTiles.length === 0 && (
                         <Grid item xs={12}>
-                            <Typography color="text.secondary">{t('managementNoAccess')}</Typography>
+                            <Typography sx={{ color: FIORI.textSecondary }}>{t('managementNoAccess')}</Typography>
                         </Grid>
                     )}
                 </Grid>

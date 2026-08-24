@@ -6,13 +6,13 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
     Box,
     Button,
-    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     FormControl,
     IconButton,
     InputLabel,
@@ -31,6 +31,19 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    FIORI,
+    FioriStatus,
+    type FioriTone,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface UserSummary {
     id: number;
@@ -72,12 +85,12 @@ function formatLocalDateTime(value: string | null): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-const STATUS_COLORS: Record<string, 'default' | 'primary' | 'success' | 'error' | 'warning'> = {
-    pending: 'default',
-    processing: 'primary',
+const STATUS_TONES: Record<string, FioriTone> = {
+    pending: 'warning',
+    processing: 'information',
     completed: 'success',
     failed: 'error',
-    cancelled: 'warning',
+    cancelled: 'neutral',
 };
 
 export default function JobTrackerIndex({ jobs, filters }: Props) {
@@ -151,107 +164,118 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('jobTrackerTitle')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('jobTrackerTitle')}</Typography>
-                    <Typography color="text.secondary">{tGrid('results', { count: jobs.total })}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('jobTrackerTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: jobs.total })}</Typography>
                 </Box>
 
-                <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel id="job-status-filter">{t('statusLabel')}</InputLabel>
-                        <Select
-                            labelId="job-status-filter"
-                            label={t('statusLabel')}
-                            value={status}
-                            onChange={(e) => {
-                                setStatus(e.target.value);
-                                applyFilters(e.target.value, jobType);
-                            }}
-                        >
-                            <MenuItem value="">{t('allStatuses')}</MenuItem>
-                            <MenuItem value="pending">{t('statusPending')}</MenuItem>
-                            <MenuItem value="processing">{t('statusProcessing')}</MenuItem>
-                            <MenuItem value="completed">{t('statusCompleted')}</MenuItem>
-                            <MenuItem value="failed">{t('statusFailed')}</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel id="job-type-filter">{t('jobType')}</InputLabel>
-                        <Select
-                            labelId="job-type-filter"
-                            label={t('jobType')}
-                            value={jobType}
-                            onChange={(e) => {
-                                setJobType(e.target.value);
-                                applyFilters(status, e.target.value);
-                            }}
-                        >
-                            <MenuItem value="">{t('allJobTypes')}</MenuItem>
-                            <MenuItem value="import">{t('jobTypeImport')}</MenuItem>
-                            <MenuItem value="export">{t('jobTypeExport')}</MenuItem>
-                        </Select>
-                    </FormControl>
-                </Stack>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <Stack direction="row" spacing={2} sx={{ p: 2 }}>
+                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 180 }}>
+                            <InputLabel id="job-status-filter">{t('statusLabel')}</InputLabel>
+                            <Select
+                                labelId="job-status-filter"
+                                label={t('statusLabel')}
+                                value={status}
+                                onChange={(e) => {
+                                    setStatus(e.target.value);
+                                    applyFilters(e.target.value, jobType);
+                                }}
+                            >
+                                <MenuItem value="">{t('allStatuses')}</MenuItem>
+                                <MenuItem value="pending">{t('statusPending')}</MenuItem>
+                                <MenuItem value="processing">{t('statusProcessing')}</MenuItem>
+                                <MenuItem value="completed">{t('statusCompleted')}</MenuItem>
+                                <MenuItem value="failed">{t('statusFailed')}</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{ ...fioriSearchFieldSx, minWidth: 180 }}>
+                            <InputLabel id="job-type-filter">{t('jobType')}</InputLabel>
+                            <Select
+                                labelId="job-type-filter"
+                                label={t('jobType')}
+                                value={jobType}
+                                onChange={(e) => {
+                                    setJobType(e.target.value);
+                                    applyFilters(status, e.target.value);
+                                }}
+                            >
+                                <MenuItem value="">{t('allJobTypes')}</MenuItem>
+                                <MenuItem value="import">{t('jobTypeImport')}</MenuItem>
+                                <MenuItem value="export">{t('jobTypeExport')}</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Stack>
 
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('job')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('typeLabel')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('jobType')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('statusLabel')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('user')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('startedAt')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }}>{t('completedAt')}</TableCell>
-                                <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {jobs.data.map((row) => (
-                                <TableRow key={row.id}>
-                                    <TableCell>{row.id}</TableCell>
-                                    <TableCell sx={{ fontWeight: 600 }}>{row.config_code}</TableCell>
-                                    <TableCell>{typeLabel(row.entity_type)}</TableCell>
-                                    <TableCell>{row.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            size="small"
-                                            label={t('status' + row.status.charAt(0).toUpperCase() + row.status.slice(1))}
-                                            color={STATUS_COLORS[row.status] ?? 'default'}
-                                        />
-                                    </TableCell>
-                                    <TableCell>{userLabel(row.user)}</TableCell>
-                                    <TableCell>{formatLocalDateTime(row.started_at)}</TableCell>
-                                    <TableCell>{formatLocalDateTime(row.completed_at)}</TableCell>
-                                    <TableCell align="right">
-                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                            {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
-                                                <IconButton size="small" color="error" title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
-                                                    <CancelIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                            <IconButton size="small" onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
-                                                <VisibilityIcon fontSize="small" />
-                                            </IconButton>
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {jobs.data.length === 0 && (
+                    <Divider sx={{ borderColor: FIORI.border }} />
+
+                    <TableContainer>
+                        <Table>
+                            <TableHead sx={fioriTableHeadSx}>
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center">{t('noJobsFound')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('job')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('typeLabel')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('jobType')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('statusLabel')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('user')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('startedAt')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx}>{t('completedAt')}</TableCell>
+                                    <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {jobs.data.map((row) => (
+                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
+                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
+                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.config_code}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{typeLabel(row.entity_type)}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{row.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>
+                                            <FioriStatus
+                                                label={t('status' + row.status.charAt(0).toUpperCase() + row.status.slice(1))}
+                                                tone={STATUS_TONES[row.status] ?? 'neutral'}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{userLabel(row.user)}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.started_at)}</TableCell>
+                                        <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.completed_at)}</TableCell>
+                                        <TableCell align="right" sx={fioriBodyCellSx}>
+                                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                                                {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
+                                                    <IconButton size="small" sx={fioriIconButtonSx} title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
+                                                        <CancelIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
+                                                    <VisibilityIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {jobs.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>{t('noJobsFound')}</TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
 
                 {jobs.last_page > 1 && (
                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination count={jobs.last_page} page={jobs.current_page} onChange={handlePageChange} color="primary" />
+                        <Pagination
+                            count={jobs.last_page}
+                            page={jobs.current_page}
+                            onChange={handlePageChange}
+                            sx={{
+                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
+                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
+                            }}
+                        />
                     </Box>
                 )}
             </Box>
@@ -262,14 +286,14 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
                     <DialogContentText>{t('cancelJobConfirm')}</DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setCancelId(null)} color="inherit" sx={{ fontWeight: 'bold' }} disabled={cancelling}>
+                    <Button onClick={() => setCancelId(null)} sx={fioriGhostSx} disabled={cancelling}>
                         {tGrid('cancel')}
                     </Button>
                     <Button
                         onClick={handleCancelConfirm}
                         color="error"
                         variant="contained"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
                         disabled={cancelling}
                         startIcon={cancelling ? <CircularProgress size={16} color="inherit" /> : undefined}
                     >

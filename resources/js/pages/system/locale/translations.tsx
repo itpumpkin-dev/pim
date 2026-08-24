@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
+import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
 
 const CONTENT_NAMESPACE = 'content';
 
@@ -163,14 +164,14 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${tSystem('translationsTitle')}: ${localeModel.code}`} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
+                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
                         {tSystem('translationsTitle')}: {localeModel.display_name || localeModel.code}
                     </Typography>
                     <Stack direction="row" spacing={1.5} alignItems="center">
                         {!isContentTab && dirtyCount > 0 && (
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                 {tSystem('unsavedTranslationsCount', { count: dirtyCount })}
                             </Typography>
                         )}
@@ -178,7 +179,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                             component={Link}
                             href="/system/locales"
                             variant="outlined"
-                            sx={{ textTransform: 'none', fontWeight: 700, px: 2.5 }}
+                            sx={fioriDefaultSx}
                         >
                             {t('cancel')}
                         </Button>
@@ -188,7 +189,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                                 disabled={dirtyCount === 0 || saving}
                                 onClick={save}
                                 startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={{ textTransform: 'none', fontWeight: 700, px: 2.5 }}
+                                sx={fioriEmphasizedSx}
                             >
                                 {saving ? 'Saving…' : tSystem('saveTranslations')}
                             </Button>
@@ -196,7 +197,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                     </Stack>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ borderRadius: 2, mb: 2, display: 'flex', alignItems: 'center' }}>
+                <Paper elevation={0} sx={{ ...fioriCardSx, mb: 2, display: 'flex', alignItems: 'center' }}>
                     <Tabs
                         value={activeNamespace ?? false}
                         onChange={(_, value: string) => switchNamespace(value)}
@@ -229,11 +230,11 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                                 alignItems: 'center',
                                 gap: 1.5,
                                 pt: 8,
-                                bgcolor: 'rgba(255,255,255,0.7)',
+                                bgcolor: 'rgba(247,247,247,0.7)',
                             }}
                         >
                             <CircularProgress size={32} />
-                            <Typography variant="body2" color="text.secondary">
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
                                 {tSystem('translationsTabLoading')}
                             </Typography>
                         </Box>
@@ -248,33 +249,33 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder={tSystem('searchTranslations')}
                             size="small"
-                            sx={{ mb: 2, minWidth: 320, bgcolor: '#fff' }}
+                            sx={{ ...fioriSearchFieldSx, mb: 2, minWidth: 320 }}
                             InputProps={{
                                 endAdornment: (
                                     <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
+                                        <SearchIcon sx={{ color: FIORI.textSecondary }} />
                                     </InputAdornment>
                                 ),
                             }}
                         />
 
-                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
+                        <TableContainer component={Paper} elevation={0} sx={fioriCardSx}>
                             <Table size="small">
-                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                <TableHead sx={fioriTableHeadSx}>
                                     <TableRow>
-                                        <TableCell sx={{ fontWeight: 700, width: '25%' }}>{tSystem('translationKey')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, width: '35%' }}>{tSystem('translationSource')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, width: '40%' }}>{tSystem('translationValue')}</TableCell>
+                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '25%' }}>{tSystem('translationKey')}</TableCell>
+                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '35%' }}>{tSystem('translationSource')}</TableCell>
+                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '40%' }}>{tSystem('translationValue')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {filteredEntries.map((entry) => (
-                                        <TableRow key={entry.path} hover>
-                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem', color: '#64748b', verticalAlign: 'top', pt: 1.5 }}>
+                                        <TableRow key={entry.path} sx={fioriTableRowSx(false)}>
+                                            <TableCell sx={{ ...fioriBodyCellSx, fontFamily: 'monospace', color: FIORI.textSecondary, verticalAlign: 'top', pt: 1.5 }}>
                                                 {entry.path}
                                             </TableCell>
-                                            <TableCell sx={{ color: 'text.secondary', verticalAlign: 'top', pt: 1.5 }}>{entry.source}</TableCell>
-                                            <TableCell sx={{ verticalAlign: 'top' }}>
+                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, verticalAlign: 'top', pt: 1.5 }}>{entry.source}</TableCell>
+                                            <TableCell sx={{ ...fioriBodyCellSx, verticalAlign: 'top' }}>
                                                 <TextField
                                                     fullWidth
                                                     multiline
@@ -282,9 +283,9 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                                                     value={values[entry.path] ?? ''}
                                                     onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
                                                     sx={{
-                                                        bgcolor: '#fff',
+                                                        bgcolor: FIORI.surface,
                                                         ...(dirty[entry.path] !== undefined && {
-                                                            '& .MuiOutlinedInput-root': { borderColor: 'warning.main' },
+                                                            '& .MuiOutlinedInput-root': { borderColor: FIORI.warning },
                                                         }),
                                                     }}
                                                 />
@@ -293,7 +294,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                                     ))}
                                     {filteredEntries.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
                                                 {tSystem('noTranslationEntriesFound')}
                                             </TableCell>
                                         </TableRow>

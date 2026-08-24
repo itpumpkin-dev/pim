@@ -4,7 +4,7 @@ import './lib/i18n';
 import { createInertiaApp } from '@inertiajs/react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createElement, type ComponentType, type ReactNode } from 'react';
+import { createElement, useEffect, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { PermissionsChangedToast } from './components/permissions-changed-toast';
@@ -30,6 +30,14 @@ function ThemedPage({ children }: { children: ReactNode }) {
     const { resolved } = useResolvedAppearance();
     const theme = getTheme(resolved);
     useSyncI18nLanguage();
+
+    // Drives the SAP Fiori CSS custom properties in app.css — every FIORI.*
+    // token in fiori-style.tsx/ui-style.ts is a var(--fiori-*) reference, so
+    // flipping this attribute is what makes the whole Fiori-themed UI
+    // respond to the app's existing light/dark appearance toggle.
+    useEffect(() => {
+        document.documentElement.setAttribute('data-fiori-mode', resolved);
+    }, [resolved]);
 
     return (
         <ThemeProvider theme={theme}>

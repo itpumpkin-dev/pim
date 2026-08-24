@@ -9,7 +9,6 @@ import DownloadIcon from '@mui/icons-material/Download';
 import {
     Box,
     Button,
-    Chip,
     IconButton,
     Pagination,
     Paper,
@@ -24,6 +23,18 @@ import {
 } from '@mui/material';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+} from '@/lib/fiori-style';
 
 interface UserSummary {
     id: number;
@@ -83,17 +94,17 @@ function DirectionCard({
 }) {
     return (
         <Paper
-            variant="outlined"
+            elevation={0}
             sx={{
+                ...fioriCardSx,
                 p: 3,
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1,
-                borderRadius: 2,
                 cursor: 'pointer',
-                transition: 'border-color 0.15s, box-shadow 0.15s',
-                '&:hover': { borderColor: 'primary.main', boxShadow: 1 },
+                transition: 'border-color 0.15s',
+                '&:hover': { borderColor: FIORI.brand },
             }}
             onClick={onClick}
         >
@@ -106,22 +117,22 @@ function DirectionCard({
                         width: 40,
                         height: 40,
                         borderRadius: '50%',
-                        bgcolor: 'action.hover',
-                        color: 'primary.main',
+                        bgcolor: FIORI.selected,
+                        color: FIORI.brand,
                         flexShrink: 0,
                     }}
                 >
                     {icon}
                 </Box>
-                <Typography variant="h6" fontWeight={700}>{title}</Typography>
+                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{title}</Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
+            <Typography variant="body2" sx={{ color: FIORI.textSecondary, flex: 1 }}>
                 {description}
             </Typography>
             <Button
                 variant="text"
                 endIcon={<ArrowForwardIcon />}
-                sx={{ alignSelf: 'flex-start', textTransform: 'none', mt: 1 }}
+                sx={{ ...fioriGhostSx, alignSelf: 'flex-start', mt: 1 }}
                 onClick={onClick}
             >
                 {buttonLabel}
@@ -157,10 +168,10 @@ export default function WooConvertIndex({ conversions }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>{t('wooConvertTitle')}</Typography>
-                    <Typography color="text.secondary">{t('wooHubSubtitle')}</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('wooHubSubtitle')}</Typography>
                 </Box>
 
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 4 }}>
@@ -183,81 +194,89 @@ export default function WooConvertIndex({ conversions }: Props) {
                 </Stack>
 
                 <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1.5 }}>
-                    <Typography variant="h6" fontWeight={700}>{t('wooConvertHistoryTitle')}</Typography>
-                    <Typography variant="body2" color="text.secondary">{tGrid('results', { count: conversions.total })}</Typography>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertHistoryTitle')}</Typography>
+                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('results', { count: conversions.total })}</Typography>
                 </Stack>
 
                 {conversions.data.length === 0 ? (
-                    <Paper variant="outlined" sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
-                        <UploadFileIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
-                        <Typography color="text.secondary" sx={{ mb: canCreate ? 2 : 0 }}>{t('wooConvertNoneFound')}</Typography>
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 6, textAlign: 'center' }}>
+                        <UploadFileIcon sx={{ fontSize: 40, color: FIORI.textSecondary, mb: 1 }} />
+                        <Typography sx={{ color: FIORI.textSecondary, mb: canCreate ? 2 : 0 }}>{t('wooConvertNoneFound')}</Typography>
                         {canCreate && (
                             <Button
-                                sx={{ color: 'white' }}
                                 variant="contained"
                                 startIcon={<AddIcon />}
                                 onClick={() => router.visit('/import-export/woo-convert/create')}
+                                sx={fioriEmphasizedSx}
                             >
                                 {t('wooConvertNewConversion')}
                             </Button>
                         )}
                     </Paper>
                 ) : (
-                    <TableContainer component={Paper}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>{t('uploadedFile')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="right">{t('wooConvertRowsConverted')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>{t('wooConvertCategoriesMatched')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>{t('user')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }}>{t('startedAt')}</TableCell>
-                                    <TableCell sx={{ fontWeight: 700 }} align="right">{tGrid('actionsHeader')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {conversions.data.map((row) => (
-                                    <TableRow
-                                        key={row.id}
-                                        hover
-                                        onClick={() => router.visit(`/import-export/woo-convert/${row.id}`)}
-                                        sx={{ cursor: 'pointer' }}
-                                    >
-                                        <TableCell>{row.id}</TableCell>
-                                        <TableCell sx={{ fontWeight: 600 }}>{row.original_filename}</TableCell>
-                                        <TableCell align="right">{row.row_count}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                size="small"
-                                                label={`${row.category_matched_count} / ${row.category_matched_count + row.category_unmatched_count}`}
-                                                color={row.has_unmatched ? 'warning' : 'success'}
-                                                variant="outlined"
-                                            />
-                                        </TableCell>
-                                        <TableCell>{userLabel(row.creator)}</TableCell>
-                                        <TableCell>{formatLocalDateTime(row.created_at)}</TableCell>
-                                        <TableCell align="right">
-                                            <IconButton
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    router.visit(`/import-export/woo-convert/${row.id}`);
-                                                }}
-                                            >
-                                                <VisibilityIcon fontSize="small" />
-                                            </IconButton>
-                                        </TableCell>
+                    <Paper elevation={0} sx={fioriCardSx}>
+                        <TableContainer>
+                            <Table>
+                                <TableHead sx={fioriTableHeadSx}>
+                                    <TableRow>
+                                        <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('uploadedFile')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx} align="right">{t('wooConvertRowsConverted')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('wooConvertCategoriesMatched')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('user')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx}>{t('startedAt')}</TableCell>
+                                        <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                                </TableHead>
+                                <TableBody>
+                                    {conversions.data.map((row) => (
+                                        <TableRow
+                                            key={row.id}
+                                            onClick={() => router.visit(`/import-export/woo-convert/${row.id}`)}
+                                            sx={{ ...fioriTableRowSx(false), cursor: 'pointer' }}
+                                        >
+                                            <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
+                                            <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.original_filename}</TableCell>
+                                            <TableCell align="right" sx={fioriBodyCellSx}>{row.row_count}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>
+                                                <FioriStatus
+                                                    label={`${row.category_matched_count} / ${row.category_matched_count + row.category_unmatched_count}`}
+                                                    tone={row.has_unmatched ? 'warning' : 'success'}
+                                                />
+                                            </TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{userLabel(row.creator)}</TableCell>
+                                            <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.created_at)}</TableCell>
+                                            <TableCell align="right" sx={fioriBodyCellSx}>
+                                                <IconButton
+                                                    size="small"
+                                                    sx={fioriIconButtonSx}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        router.visit(`/import-export/woo-convert/${row.id}`);
+                                                    }}
+                                                >
+                                                    <VisibilityIcon fontSize="small" />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Paper>
                 )}
 
                 {conversions.last_page > 1 && (
                     <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                        <Pagination count={conversions.last_page} page={conversions.current_page} onChange={handlePageChange} color="primary" />
+                        <Pagination
+                            count={conversions.last_page}
+                            page={conversions.current_page}
+                            onChange={handlePageChange}
+                            sx={{
+                                '& .MuiPaginationItem-root': { borderRadius: '6px', color: FIORI.textPrimary },
+                                '& .Mui-selected': { bgcolor: `${FIORI.brand} !important`, color: '#fff' },
+                            }}
+                        />
                     </Box>
                 )}
             </Box>

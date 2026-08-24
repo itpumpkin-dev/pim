@@ -10,6 +10,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface CategoryFieldItem {
     id: number;
@@ -67,12 +68,12 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Category Field: ${field.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: '1px solid #e2e8f0' }}
+                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />
@@ -84,19 +85,19 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                 {tabIndex === 0 && (
                 <>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700}>Edit Category Field</Typography>
+                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>Edit Category Field</Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/categoryFields" variant="outlined" color="inherit" startIcon={<ArrowBackIcon />}>
+                        <Button component={Link} href="/catalog/categoryFields" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
-                        <Button sx={{ color: "white" }} type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}>
+                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
                             {processing ? t('saving') : t('save')}
                         </Button>
                     </Stack>
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper variant="outlined" sx={{ p: 3 }}>
+                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
                         <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>General Config</Typography>
                         <Stack spacing={3}>
                             <TextField

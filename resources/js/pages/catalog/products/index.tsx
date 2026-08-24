@@ -58,9 +58,21 @@ import {
     type ProductFamilyOption,
     type ProductFilters,
 } from '@/components/product-filter-drawer';
-import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
-
-const NA_CHIP_SX = { ...naChipSx, height: 22, fontSize: '0.75rem' };
+import {
+    FIORI,
+    FioriStatus,
+    fioriBodyCellSx,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriIconButtonSx,
+    fioriSearchFieldSx,
+    fioriTableHeadCellSx,
+    fioriTableHeadSx,
+    fioriTableRowSx,
+    percentToneFiori,
+} from '@/lib/fiori-style';
 
 interface GridColumn {
     label: string;
@@ -75,6 +87,7 @@ interface GridAction {
 interface GridConfig {
     columns: Record<string, GridColumn>;
     actions?: Record<string, GridAction>;
+    default_sort?: { field: string; dir?: 'asc' | 'desc' };
 }
 interface ProductRow {
     id: number;
@@ -179,7 +192,7 @@ function AttributeThumbnail({ src, alt }: { src: string; alt: string }) {
                 height: 38,
                 bgcolor: 'grey.100',
                 borderRadius: 2,
-                border: `1px solid ${UI_BORDER}`,
+                border: `1px solid ${FIORI.border}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -233,7 +246,7 @@ interface ColumnDef {
     headerRender?: () => ReactNode;
 }
 
-export default function ProductIndex({ gridData, filters, attributes, families, salesChannels }: Props) {
+export default function ProductIndex({ gridConfig, gridData, filters, attributes, families, salesChannels }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { auth } = usePage<SharedData>().props;
@@ -407,8 +420,19 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
     const [categoryId, setCategoryId] = useState(filters.category_id ? String(filters.category_id) : '');
     const [categoryName] = useState(filters.category_name ?? '');
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-    const [sortField, setSortField] = useState(typeof filters.sort === 'string' ? filters.sort : '');
-    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(filters.dir === 'desc' ? 'desc' : 'asc');
+    // filters.sort/dir are only ever non-empty once the user has actually
+    // clicked a column — the backend applies its own default ORDER BY
+    // (gridConfig.default_sort, e.g. "updated_at desc" for products) when
+    // neither is set, but doesn't echo that choice back into filters. Fall
+    // back to the same config here so the sorted column's header shows the
+    // right active/direction state on first load instead of no column
+    // appearing sorted at all.
+    const requestedSort = typeof filters.sort === 'string' ? filters.sort : '';
+    const defaultSort = gridConfig.default_sort;
+    const [sortField, setSortField] = useState(requestedSort || defaultSort?.field || '');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+        requestedSort ? (filters.dir === 'desc' ? 'desc' : 'asc') : defaultSort?.dir === 'desc' ? 'desc' : 'asc',
+    );
     const [exportFormat, setExportFormat] = useState<'CSV' | 'XLS' | 'XLSX'>('CSV');
     const firstRender = useRef(true);
 
@@ -427,7 +451,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                             height: 38,
                             bgcolor: 'grey.100',
                             borderRadius: 2,
-                            border: `1px solid ${UI_BORDER}`,
+                            border: `1px solid ${FIORI.border}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -463,11 +487,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                 key: 'status',
                 label: t('status'),
                 render: (row) => (
-                    <Chip
-                        label={row.enabled ? t('enabled') : t('disabled')}
-                        size="small"
-                        sx={row.enabled ? { ...mappedChipSx, height: 22, fontSize: '0.75rem' } : NA_CHIP_SX}
-                    />
+                    <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />
                 ),
             },
             {
@@ -481,16 +501,9 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                 render: (row) => {
                     const completeness = row.completeness;
                     if (completeness === null || completeness === undefined) {
-                        return <Chip label={t('notApplicable')} size="small" sx={NA_CHIP_SX} />;
+                        return <FioriStatus label={t('notApplicable')} tone="neutral" />;
                     }
-                    const tone = percentTone(completeness);
-                    return (
-                        <Chip
-                            label={`${completeness}%`}
-                            size="small"
-                            sx={{ bgcolor: tone.bg, color: tone.fg, fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                        />
-                    );
+                    return <FioriStatus label={`${completeness}%`} tone={percentToneFiori(completeness)} />;
                 },
             },
             {
@@ -499,16 +512,9 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                 render: (row) => {
                     const completeness = row.translation_completeness;
                     if (completeness === null || completeness === undefined) {
-                        return <Chip label={t('notApplicable')} size="small" sx={NA_CHIP_SX} />;
+                        return <FioriStatus label={t('notApplicable')} tone="neutral" />;
                     }
-                    const tone = percentTone(completeness);
-                    return (
-                        <Chip
-                            label={`${completeness}%`}
-                            size="small"
-                            sx={{ bgcolor: tone.bg, color: tone.fg, fontWeight: 600, height: 22, fontSize: '0.75rem' }}
-                        />
-                    );
+                    return <FioriStatus label={`${completeness}%`} tone={percentToneFiori(completeness)} />;
                 },
             },
             {
@@ -518,20 +524,13 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                     const channels = liveStatusOverrides[row.id] ?? row.sales_channels;
                     const total = channels?.total ?? 0;
                     if (total === 0) {
-                        return <Chip label={t('notLive')} size="small" sx={NA_CHIP_SX} />;
+                        return <FioriStatus label={t('notLive')} tone="neutral" />;
                     }
                     const platforms = channels?.platforms ?? {};
                     const tooltip = Object.entries(platforms)
                         .map(([platform, count]) => `${platform}: ${count}`)
                         .join(', ');
-                    return (
-                        <Chip
-                            label={t('liveOnCount', { count: total })}
-                            title={tooltip}
-                            size="small"
-                            sx={{ ...mappedChipSx, height: 22, fontSize: '0.75rem' }}
-                        />
-                    );
+                    return <FioriStatus label={t('liveOnCount', { count: total })} tone="information" title={tooltip} />;
                 },
             },
             { key: 'created_at', label: t('createdAt'), render: (row) => formatDateTime(row.created_at) },
@@ -720,25 +719,24 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('products')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: 'background.default', minHeight: '100%' }}>
-                {/* Header Title & Actions */}
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                {/* Page Header: Title & Actions */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={700} color="text.primary">
-                        {t('products')}
-                    </Typography>
+                    <Box>
+                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                            {t('products')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+                            {t('results', { count: gridData.total })}
+                        </Typography>
+                    </Box>
 
                     <Stack direction="row" spacing={1.5}>
                         <Button
                             variant="text"
                             startIcon={<FileUploadOutlinedIcon />}
                             onClick={() => setQuickExportOpen(true)}
-                            sx={{
-                                color: 'text.secondary',
-                                textTransform: 'none',
-                                fontWeight: 700,
-                                px: 2,
-                                '&:hover': { bgcolor: 'grey.100' },
-                            }}
+                            sx={fioriGhostSx}
                         >
                             {t('quickExport')}
                         </Button>
@@ -748,7 +746,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                                 startIcon={<ShareOutlinedIcon />}
                                 onClick={openShareDialog}
                                 disabled={selectedIds.length === 0}
-                                sx={{ textTransform: 'none', fontWeight: 700, color: 'text.secondary', borderColor: UI_BORDER }}
+                                sx={fioriDefaultSx}
                             >
                                 {t('share')}
                                 {selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
@@ -758,7 +756,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                             <Button
                                 variant="contained"
                                 onClick={() => router.visit('/catalog/products/create')}
-                                sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 2.5, py: 1, borderRadius: 1.5 }}
+                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                             >
                                 {t('createProduct')}
                             </Button>
@@ -766,224 +764,224 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                     </Stack>
                 </Stack>
 
-                {/* Search & Controls Row */}
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={t('search')}
-                            size="small"
-                            sx={{
-                                bgcolor: '#fff',
-                                borderRadius: 5,
-                                '& .MuiOutlinedInput-root': { borderRadius: 5 },
-                                minWidth: 240,
-                            }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: 'text.secondary' }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                            {t('results', { count: gridData.total })}
-                        </Typography>
-                        {categoryId && (
-                            <Chip
-                                label={t('filteredByCategory', { name: categoryName || categoryId })}
+                {/* Table Card: toolbar + head + rows on one Fiori "Table" surface */}
+                <Paper elevation={0} sx={fioriCardSx}>
+                    {/* Toolbar */}
+                    <Stack
+                        direction={{ xs: 'column', md: 'row' }}
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={2}
+                        sx={{ p: 2 }}
+                    >
+                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
+                            <TextField
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder={t('search')}
                                 size="small"
-                                onDelete={clearCategoryFilter}
-                                variant="outlined"
-                                sx={{ borderColor: UI_BORDER_STRONG, color: 'text.primary' }}
+                                sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
                             />
-                        )}
-                    </Stack>
+                            {categoryId && (
+                                <Chip
+                                    label={t('filteredByCategory', { name: categoryName || categoryId })}
+                                    size="small"
+                                    onDelete={clearCategoryFilter}
+                                    variant="outlined"
+                                    sx={{ borderColor: FIORI.borderStrong, borderRadius: '6px', color: FIORI.textPrimary }}
+                                />
+                            )}
+                        </Stack>
 
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<ViewColumnOutlinedIcon />}
-                            onClick={() => setColumnsDialogOpen(true)}
-                            sx={{
-                                color: 'text.secondary',
-                                borderColor: UI_BORDER,
-                                textTransform: 'none',
-                                borderRadius: 1.5,
-                                bgcolor: '#fff',
-                            }}
-                        >
-                            {t('columns')}
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FilterListIcon />}
-                            onClick={() => setFilterDrawerOpen(true)}
-                            sx={{
-                                color: 'text.secondary',
-                                borderColor: UI_BORDER,
-                                textTransform: 'none',
-                                borderRadius: 1.5,
-                                bgcolor: '#fff',
-                            }}
-                        >
-                            {t('filter')}
-                            {Object.keys(activeFilters).length + activeAttributeFilters.length > 0 &&
-                                ` (${Object.keys(activeFilters).length + activeAttributeFilters.length})`}
-                        </Button>
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<ViewColumnOutlinedIcon />}
+                                onClick={() => setColumnsDialogOpen(true)}
+                                sx={fioriDefaultSx}
+                            >
+                                {t('columns')}
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<FilterListIcon />}
+                                onClick={() => setFilterDrawerOpen(true)}
+                                sx={fioriDefaultSx}
+                            >
+                                {t('filter')}
+                                {Object.keys(activeFilters).length + activeAttributeFilters.length > 0 &&
+                                    ` (${Object.keys(activeFilters).length + activeAttributeFilters.length})`}
+                            </Button>
 
-                        <Select
-                            value={perPage}
-                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                            size="small"
-                            sx={{ bgcolor: '#fff', borderRadius: 1.5, minWidth: 60, height: 36 }}
-                        >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
-                        </Select>
+                            <Select
+                                value={perPage}
+                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                                size="small"
+                                sx={{
+                                    bgcolor: FIORI.surface,
+                                    borderRadius: '8px',
+                                    minWidth: 60,
+                                    height: 34,
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
+                                }}
+                            >
+                                <MenuItem value={10}>10</MenuItem>
+                                <MenuItem value={25}>25</MenuItem>
+                                <MenuItem value={50}>50</MenuItem>
+                            </Select>
 
-                        <Typography variant="body2" color="text.secondary">
-                            {t('perPage')}
-                        </Typography>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('perPage')}
+                            </Typography>
 
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: '#fff', borderRadius: 1, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
-                        </Paper>
+                            <Paper
+                                variant="outlined"
+                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
+                            >
+                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
+                            </Paper>
 
-                        <Typography variant="body2" color="text.secondary">
-                            {t('pageOf', { lastPage })}
-                        </Typography>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('pageOf', { lastPage })}
+                            </Typography>
 
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
+                            <Stack direction="row" spacing={0.2}>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                    <FirstPageIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                    <ChevronLeftIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                    <ChevronRightIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                    <LastPageIcon fontSize="small" />
+                                </IconButton>
+                            </Stack>
                         </Stack>
                     </Stack>
-                </Stack>
 
-                {/* Table */}
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: UI_BORDER }}>
-                    <Table sx={{ minWidth: 800 }}>
-                        <TableHead sx={{ bgcolor: 'grey.100' }}>
-                            <TableRow>
-                                <TableCell padding="checkbox">
-                                    <Checkbox
-                                        indeterminate={selectedIds.length > 0 && selectedIds.length < gridData.data.length}
-                                        checked={gridData.data.length > 0 && selectedIds.length === gridData.data.length}
-                                        onChange={(e) => handleSelectAll(e.target.checked)}
-                                    />
-                                </TableCell>
-                                {visibleColumns.map((col) => {
-                                    const sortKey = SORTABLE_FIELDS[col.key];
+                    <Divider sx={{ borderColor: FIORI.border }} />
 
+                    {/* Table */}
+                    <TableContainer>
+                        <Table sx={{ minWidth: 800 }}>
+                            <TableHead sx={fioriTableHeadSx}>
+                                <TableRow>
+                                    <TableCell padding="checkbox" sx={{ borderBottom: `1px solid ${FIORI.border}` }}>
+                                        <Checkbox
+                                            indeterminate={selectedIds.length > 0 && selectedIds.length < gridData.data.length}
+                                            checked={gridData.data.length > 0 && selectedIds.length === gridData.data.length}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                        />
+                                    </TableCell>
+                                    {visibleColumns.map((col) => {
+                                        const sortKey = SORTABLE_FIELDS[col.key];
+
+                                        return (
+                                            <TableCell key={col.key} sx={fioriTableHeadCellSx}>
+                                                {col.headerRender ? (
+                                                    col.headerRender()
+                                                ) : sortKey ? (
+                                                    <TableSortLabel
+                                                        active={sortField === sortKey}
+                                                        direction={sortField === sortKey ? sortDir : 'asc'}
+                                                        onClick={() => handleSort(sortKey)}
+                                                    >
+                                                        {col.label}
+                                                    </TableSortLabel>
+                                                ) : (
+                                                    col.label
+                                                )}
+                                            </TableCell>
+                                        );
+                                    })}
+                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actions')}</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {gridData.data.map((row) => {
+                                    const isSelected = selectedIds.includes(row.id);
                                     return (
-                                        <TableCell key={col.key} sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
-                                            {col.headerRender ? (
-                                                col.headerRender()
-                                            ) : sortKey ? (
-                                                <TableSortLabel
-                                                    active={sortField === sortKey}
-                                                    direction={sortField === sortKey ? sortDir : 'asc'}
-                                                    onClick={() => handleSort(sortKey)}
-                                                >
-                                                    {col.label}
-                                                </TableSortLabel>
-                                            ) : (
-                                                col.label
-                                            )}
-                                        </TableCell>
+                                        <TableRow key={row.id} sx={fioriTableRowSx(isSelected)}>
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    checked={isSelected}
+                                                    onChange={(e) => handleSelectOne(row.id, e.target.checked)}
+                                                />
+                                            </TableCell>
+                                            {visibleColumns.map((col) => (
+                                                <TableCell key={col.key} sx={fioriBodyCellSx}>
+                                                    {col.render(row)}
+                                                </TableCell>
+                                            ))}
+                                            <TableCell align="right">
+                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                    {canEdit && (
+                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                    {canCreate && (
+                                                        <Tooltip title={t('duplicateProduct')}>
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    sx={fioriIconButtonSx}
+                                                                    onClick={() => setDuplicateProductId(row.id)}
+                                                                >
+                                                                    <ContentCopyIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    )}
+                                                    {canEdit && (
+                                                        <Tooltip title={t('checkLiveStatus')}>
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    sx={fioriIconButtonSx}
+                                                                    disabled={checkingLiveIds.has(row.id)}
+                                                                    onClick={() => checkLiveStatus(row.id)}
+                                                                >
+                                                                    {checkingLiveIds.has(row.id) ? (
+                                                                        <CircularProgress size={16} color="inherit" />
+                                                                    ) : (
+                                                                        <FactCheckOutlinedIcon fontSize="small" />
+                                                                    )}
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    )}
+                                                    {canDelete && (
+                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteProductId(row.id)}>
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    )}
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
                                     );
                                 })}
-                                <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>{t('actions')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => {
-                                const isSelected = selectedIds.includes(row.id);
-                                return (
-                                    <TableRow key={row.id} hover selected={isSelected}>
-                                        <TableCell padding="checkbox">
-                                            <Checkbox
-                                                checked={isSelected}
-                                                onChange={(e) => handleSelectOne(row.id, e.target.checked)}
-                                            />
-                                        </TableCell>
-                                        {visibleColumns.map((col) => (
-                                            <TableCell key={col.key} sx={{ color: '#334155' }}>
-                                                {col.render(row)}
-                                            </TableCell>
-                                        ))}
-                                        <TableCell align="right">
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                {canEdit && (
-                                                    <IconButton size="small" sx={{ color: 'text.secondary' }} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canCreate && (
-                                                    <Tooltip title={t('duplicateProduct')}>
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                sx={{ color: 'text.secondary' }}
-                                                                onClick={() => setDuplicateProductId(row.id)}
-                                                            >
-                                                                <ContentCopyIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
-                                                )}
-                                                {canEdit && (
-                                                    <Tooltip title={t('checkLiveStatus')}>
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                sx={{ color: 'text.secondary' }}
-                                                                disabled={checkingLiveIds.has(row.id)}
-                                                                onClick={() => checkLiveStatus(row.id)}
-                                                            >
-                                                                {checkingLiveIds.has(row.id) ? (
-                                                                    <CircularProgress size={16} color="inherit" />
-                                                                ) : (
-                                                                    <FactCheckOutlinedIcon fontSize="small" />
-                                                                )}
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton size="small" sx={{ color: 'text.secondary' }} onClick={() => setDeleteProductId(row.id)}>
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Stack>
+                                {gridData.data.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={visibleColumns.length + 2} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
+                                            {t('noProductsFound')}
                                         </TableCell>
                                     </TableRow>
-                                );
-                            })}
-                            {gridData.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={visibleColumns.length + 2} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                        {t('noProductsFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Paper>
             </Box>
 
             {/* Quick Export Dialog */}
@@ -1068,7 +1066,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                     <Button
                         onClick={handleQuickExport}
                         variant="contained"
-                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 3 }}
+                        sx={{ ...fioriEmphasizedSx, px: 3 }}
                     >
                         {t('download')}
                     </Button>
@@ -1154,7 +1152,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                         variant="contained"
                         disabled={selectedShopIds.length === 0 || sharing || deactivating}
                         startIcon={sharing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 3 }}
+                        sx={{ ...fioriEmphasizedSx, px: 3 }}
                     >
                         {t('share')}
                     </Button>
@@ -1218,7 +1216,7 @@ export default function ProductIndex({ gridData, filters, attributes, families, 
                         variant="contained"
                         disabled={duplicating}
                         startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={solidActionSx}
+                        sx={fioriEmphasizedSx}
                     >
                         {t('duplicateProduct')}
                     </Button>

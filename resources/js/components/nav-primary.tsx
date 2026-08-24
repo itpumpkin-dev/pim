@@ -1,6 +1,7 @@
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
 import { Box, Tooltip, ButtonBase } from '@mui/material';
+import { FIORI } from '@/lib/fiori-style';
 
 interface NavPrimaryProps {
     items: NavItem[];
@@ -20,7 +21,7 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                 py: 2,
                 gap: 2,
                 borderRight: '1px solid',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
+                borderColor: FIORI.border,
             }}
         >
             {items.map((item) => {
@@ -35,17 +36,17 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                         sx={{
                             width: 48,
                             height: 48,
-                            borderRadius: '12px',
+                            borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             position: 'relative',
                             transition: 'all 0.2s ease-in-out',
-                            color: isActive ? 'primary.main' : 'rgba(255, 255, 255, 0.7)',
-                            bgcolor: isActive ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                            color: isActive ? FIORI.brand : FIORI.textSecondary,
+                            bgcolor: isActive ? FIORI.brandBg : 'transparent',
                             '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                                color: '#fff',
+                                bgcolor: isActive ? FIORI.brandBg : FIORI.hover,
+                                color: isActive ? FIORI.brand : FIORI.textPrimary,
                             },
                         }}
                     >
@@ -58,7 +59,7 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                                     width: 3,
                                     height: 20,
                                     borderRadius: '0 4px 4px 0',
-                                    bgcolor: 'primary.main',
+                                    bgcolor: FIORI.brand,
                                 }}
                             />
                         )}

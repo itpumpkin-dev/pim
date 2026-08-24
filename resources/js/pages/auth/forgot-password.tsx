@@ -1,65 +1,39 @@
-import { Head, useForm } from '@inertiajs/react';
-import { Box, Button, CircularProgress, Stack, TextField, Typography } from '@mui/material';
-import { FormEventHandler } from 'react';
+import { Head } from '@inertiajs/react';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { Box, Stack, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 
 import TextLink from '@/components/text-link';
 import AuthLayout from '@/layouts/auth-layout';
+import { FIORI } from '@/lib/fiori-style';
 
-export default function ForgotPassword({ status }: { status?: string }) {
-    const { data, setData, post, processing, errors } = useForm({
-        email: '',
-    });
-
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
-
-        post(route('password.email'));
-    };
+export default function ForgotPassword() {
+    const { t } = useTranslation('auth');
 
     return (
-        <AuthLayout title="Forgot password" description="Enter your email to receive a password reset link">
-            <Head title="Forgot password" />
-
-            {status && (
-                <Typography variant="body2" color="success.main" sx={{ mb: 2, textAlign: 'center', fontWeight: 500 }}>
-                    {status}
-                </Typography>
-            )}
+        <AuthLayout title={t('forgotPasswordTitle')} description={t('forgotPasswordDescription')}>
+            <Head title={t('forgotPasswordTitle')} />
 
             <Stack spacing={3}>
-                <Box component="form" onSubmit={submit}>
-                    <Stack spacing={2}>
-                        <TextField
-                            id="email"
-                            type="email"
-                            name="email"
-                            label="Email address"
-                            autoComplete="off"
-                            value={data.email}
-                            autoFocus
-                            fullWidth
-                            onChange={(e) => setData('email', e.target.value)}
-                            placeholder="email@example.com"
-                            error={Boolean(errors.email)}
-                            helperText={errors.email}
-                        />
-
-                        <Box sx={{ my: 1, display: 'flex', justifyContent: 'flex-start' }}>
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                fullWidth
-                                disabled={processing}
-                                startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            >
-                                Email password reset link
-                            </Button>
-                        </Box>
-                    </Stack>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.5,
+                        p: 2,
+                        borderRadius: '8px',
+                        border: `1px solid ${FIORI.border}`,
+                        bgcolor: FIORI.pageBg,
+                    }}
+                >
+                    <InfoOutlinedIcon sx={{ color: FIORI.information, mt: '2px' }} fontSize="small" />
+                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                        {t('contactAdminForPasswordReset')}
+                    </Typography>
                 </Box>
 
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-                    Or, return to <TextLink href={route('login')}>log in</TextLink>
+                    <TextLink href={route('login')}>{t('backToLogin')}</TextLink>
                 </Typography>
             </Stack>
         </AuthLayout>
