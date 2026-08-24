@@ -127,6 +127,7 @@ export function WooCommerceAttributeMappingPanel({ attributes, wooCommerceAttrib
 
     return (
         <AttributeMappingTable
+            platform="woocommerce"
             helpTextKey="woocommerceContentMappingHelp"
             syncLabelKey="syncFromWoocommerce"
             coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}

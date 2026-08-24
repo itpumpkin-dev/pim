@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FIORI } from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -13,12 +14,6 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Typography,
     Dialog,
     DialogContent,
@@ -102,6 +97,84 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
     const lastPage = Math.max(1, Math.ceil(entries.length / perPage));
     const pagedEntries = entries.slice((page - 1) * perPage, page * perPage);
 
+    // Column pop-in priority (SAP Fiori responsive table): Date/Time
+    // identifies the entry and Actions holds the only interactive control
+    // (View), so both stay always visible; User and Version are descriptive
+    // and reflow into the pop-in area first as space runs out.
+    const columns: FioriResponsiveColumn<HistoryEntry>[] = [
+        {
+            key: 'dateTime',
+            header: 'Date / Time',
+            priority: 'always',
+            render: (entry) => {
+                const { display, relative } = formatDateTime(entry.created_at);
+                return (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                        <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: '#f59e0b' }} />
+                        <Typography variant="body2" sx={{ color: '#f59e0b' }}>
+                            {display}
+                        </Typography>
+                        {relative && (
+                            <Typography variant="body2" color="text.secondary">
+                                ({relative})
+                            </Typography>
+                        )}
+                    </Stack>
+                );
+            },
+        },
+        {
+            key: 'version',
+            header: 'Version',
+            priority: 'medium',
+            render: (entry) => entry.version,
+        },
+        {
+            key: 'user',
+            header: 'User',
+            priority: 'high',
+            render: (entry) => <Typography sx={{ color: 'primary.main' }}>{entry.user}</Typography>,
+        },
+        {
+            key: 'actions',
+            header: 'Actions',
+            priority: 'always',
+            align: 'right',
+            render: (entry) => (
+                <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setPreviewEntry(entry)}>
+                    <VisibilityOutlinedIcon fontSize="small" />
+                </IconButton>
+            ),
+        },
+    ];
+
+    // The diff preview's Old/New Value columns are given the same priority
+    // so they always pop in (or stay) together — splitting a before/after
+    // comparison across the visible grid and the pop-in area would defeat
+    // the point of a diff view.
+    const diffColumns: FioriResponsiveColumn<HistoryDiffRow>[] = [
+        {
+            key: 'key',
+            header: 'Key',
+            priority: 'always',
+            render: (row) => <Typography sx={{ color: '#334155' }}>{row.key}</Typography>,
+        },
+        {
+            key: 'old',
+            header: <Typography component="span" sx={{ fontWeight: 700, color: '#dc2626' }}>Old Value</Typography>,
+            priority: 'high',
+            render: (row) => <Typography sx={{ color: '#dc2626' }}>{formatValue(row.old)}</Typography>,
+        },
+        {
+            key: 'new',
+            header: <Typography component="span" sx={{ fontWeight: 700, color: 'primary.main' }}>New Value</Typography>,
+            priority: 'high',
+            render: (row) => (
+                <Typography sx={{ color: 'primary.main', fontWeight: 600 }}>{formatValue(row.new)}</Typography>
+            ),
+        },
+    ];
+
     return (
         <Box sx={{ px: { xs: 2, md: 4 } }}>
             <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
@@ -137,56 +210,12 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
                 </Stack>
             </Stack>
 
-            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                <Table>
-                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>Date / Time</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>Version</TableCell>
-                            <TableCell sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>User</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 700, color: 'text.primary', py: 1.5 }}>
-                                Actions
-                            </TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {pagedEntries.map((entry) => {
-                            const { display, relative } = formatDateTime(entry.created_at);
-                            return (
-                                <TableRow key={entry.version} hover>
-                                    <TableCell sx={{ color: '#334155' }}>
-                                        <Stack direction="row" alignItems="center" spacing={1}>
-                                            <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: '#f59e0b' }} />
-                                            <Typography variant="body2" sx={{ color: '#f59e0b' }}>
-                                                {display}
-                                            </Typography>
-                                            {relative && (
-                                                <Typography variant="body2" color="text.secondary">
-                                                    ({relative})
-                                                </Typography>
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell sx={{ color: '#334155' }}>{entry.version}</TableCell>
-                                    <TableCell sx={{ color: 'primary.main' }}>{entry.user}</TableCell>
-                                    <TableCell align="right">
-                                        <IconButton size="small" sx={{ color: '#64748b' }} onClick={() => setPreviewEntry(entry)}>
-                                            <VisibilityOutlinedIcon fontSize="small" />
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                        {!loading && entries.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                    No history found.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <FioriResponsiveTable
+                columns={columns}
+                rows={pagedEntries}
+                getRowKey={(entry) => entry.version}
+                emptyMessage={loading ? null : 'No history found.'}
+            />
 
             <Dialog open={previewEntry !== null} onClose={() => setPreviewEntry(null)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', pb: 1 }}>
@@ -218,33 +247,13 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
                                 </Typography>
                             </Stack>
 
-                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 1.5 }}>
-                                <Table size="small">
-                                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>Key</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: '#dc2626' }}>Old Value</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, color: 'primary.main' }}>New Value</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {previewEntry.diff.map((row) => (
-                                            <TableRow key={row.key}>
-                                                <TableCell sx={{ color: '#334155' }}>{row.key}</TableCell>
-                                                <TableCell sx={{ color: '#dc2626' }}>{formatValue(row.old)}</TableCell>
-                                                <TableCell sx={{ color: 'primary.main', fontWeight: 600 }}>{formatValue(row.new)}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {previewEntry.diff.length === 0 && (
-                                            <TableRow>
-                                                <TableCell colSpan={3} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                                                    No changes recorded.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
+                            <FioriResponsiveTable
+                                size="small"
+                                columns={diffColumns}
+                                rows={previewEntry.diff}
+                                getRowKey={(row) => row.key}
+                                emptyMessage="No changes recorded."
+                            />
                         </>
                     )}
                 </DialogContent>

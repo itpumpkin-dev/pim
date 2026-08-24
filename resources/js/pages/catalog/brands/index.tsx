@@ -31,12 +31,6 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TableSortLabel,
     TextField,
     Tooltip,
@@ -45,18 +39,15 @@ import {
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface BrandItem {
@@ -184,6 +175,151 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
         const url = `/catalog/products?attribute_filters[0][attribute_id]=${attributeId}&attribute_filters[0][value]=${encodeURIComponent(option.code)}`;
         router.visit(url);
     };
+
+    // Column pop-in priority (SAP Fiori responsive table): the brand name
+    // identifies the row and row actions stay visible down to phone width;
+    // the products-count chip is a primary interactive control (navigates to
+    // the brand's products) so it stays next in line, then mapped platforms
+    // and description, with the low-value slug reflowing first — the
+    // decorative thumbnail carries no data worth restating as a label/value
+    // pair, so it's dropped from the pop-in entirely.
+    const columns: FioriResponsiveColumn<BrandItem>[] = [
+        {
+            key: 'thumbnail',
+            header: t('imageLabel'),
+            priority: 'low',
+            hideInPopin: true,
+            render: (row) =>
+                row.thumbnail_url ? (
+                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 1.5, border: `1px solid ${FIORI.border}` }} />
+                ) : (
+                    <Box
+                        sx={{
+                            height: 38,
+                            width: 38,
+                            borderRadius: 1.5,
+                            bgcolor: 'grey.100',
+                            border: `1px solid ${FIORI.border}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'grey.500',
+                        }}
+                    >
+                        <ImageOutlinedIcon fontSize="small" />
+                    </Box>
+                ),
+        },
+        {
+            key: 'name',
+            header: (
+                <TableSortLabel active={sortField === 'admin_label'} direction={sortField === 'admin_label' ? sortDir : 'asc'} onClick={() => handleSort('admin_label')}>
+                    {t('name')}
+                </TableSortLabel>
+            ),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.admin_label || row.code}</Typography>,
+        },
+        {
+            key: 'description',
+            header: (
+                <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
+                    {t('description')}
+                </TableSortLabel>
+            ),
+            priority: 'medium',
+            render: (row) => (
+                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.description || <Typography component="span" color="text.disabled">—</Typography>}
+                </Typography>
+            ),
+        },
+        {
+            key: 'slug',
+            header: (
+                <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
+                    {t('slug')}
+                </TableSortLabel>
+            ),
+            priority: 'low',
+            render: (row) => (
+                <Typography sx={{ color: FIORI.textSecondary }}>
+                    {row.slug || <Typography component="span" color="text.disabled">—</Typography>}
+                </Typography>
+            ),
+        },
+        {
+            key: 'products_count',
+            header: (
+                <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
+                    {t('productsCount')}
+                </TableSortLabel>
+            ),
+            priority: 'high',
+            align: 'right',
+            render: (row) =>
+                row.products_count ? (
+                    <Tooltip title={t('viewBrandProducts')}>
+                        <Chip
+                            label={row.products_count}
+                            size="small"
+                            onClick={() => goToProducts(row)}
+                            sx={{
+                                bgcolor: 'rgba(0,112,242,0.08)',
+                                color: FIORI.brand,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                '&:hover': { bgcolor: 'rgba(0,112,242,0.16)' },
+                            }}
+                        />
+                    </Tooltip>
+                ) : (
+                    <Typography color="text.disabled">0</Typography>
+                ),
+        },
+        {
+            key: 'mappedPlatforms',
+            header: t('mappedPlatforms'),
+            priority: 'medium',
+            render: (row) =>
+                row.mapped_platforms && row.mapped_platforms.length > 0 ? (
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                        {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
+                            <Chip
+                                key={platform.value}
+                                label={platform.label}
+                                size="small"
+                                sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
+                            />
+                        ))}
+                    </Box>
+                ) : (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('notMapped')}
+                    </Typography>
+                ),
+        },
+        ...(canEdit
+            ? [
+                  {
+                      key: 'actions',
+                      header: tGrid('actionsHeader'),
+                      priority: 'always' as const,
+                      align: 'right' as const,
+                      render: (row: BrandItem) => (
+                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
+                                  <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
+                                  <DeleteIcon fontSize="small" />
+                              </IconButton>
+                          </Stack>
+                      ),
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -344,128 +480,12 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                             </Stack>
                         </Stack>
 
-                        <TableContainer sx={fioriCardSx}>
-                            <Table>
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('imageLabel')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>
-                                            <TableSortLabel active={sortField === 'admin_label'} direction={sortField === 'admin_label' ? sortDir : 'asc'} onClick={() => handleSort('admin_label')}>
-                                                {t('name')}
-                                            </TableSortLabel>
-                                        </TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>
-                                            <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
-                                                {t('description')}
-                                            </TableSortLabel>
-                                        </TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>
-                                            <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
-                                                {t('slug')}
-                                            </TableSortLabel>
-                                        </TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx} align="right">
-                                            <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
-                                                {t('productsCount')}
-                                            </TableSortLabel>
-                                        </TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('mappedPlatforms')}</TableCell>
-                                        {canEdit && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {brands.data.map((row) => (
-                                        <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                {row.thumbnail_url ? (
-                                                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 1.5, border: `1px solid ${FIORI.border}` }} />
-                                                ) : (
-                                                    <Box
-                                                        sx={{
-                                                            height: 38,
-                                                            width: 38,
-                                                            borderRadius: 1.5,
-                                                            bgcolor: 'grey.100',
-                                                            border: `1px solid ${FIORI.border}`,
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            color: 'grey.500',
-                                                        }}
-                                                    >
-                                                        <ImageOutlinedIcon fontSize="small" />
-                                                    </Box>
-                                                )}
-                                            </TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.admin_label || row.code}</TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {row.description || <Typography component="span" color="text.disabled">—</Typography>}
-                                            </TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary }}>
-                                                {row.slug || <Typography component="span" color="text.disabled">—</Typography>}
-                                            </TableCell>
-                                            <TableCell sx={fioriBodyCellSx} align="right">
-                                                {row.products_count ? (
-                                                    <Tooltip title={t('viewBrandProducts')}>
-                                                        <Chip
-                                                            label={row.products_count}
-                                                            size="small"
-                                                            onClick={() => goToProducts(row)}
-                                                            sx={{
-                                                                bgcolor: 'rgba(0,112,242,0.08)',
-                                                                color: FIORI.brand,
-                                                                fontWeight: 700,
-                                                                cursor: 'pointer',
-                                                                '&:hover': { bgcolor: 'rgba(0,112,242,0.16)' },
-                                                            }}
-                                                        />
-                                                    </Tooltip>
-                                                ) : (
-                                                    <Typography color="text.disabled">0</Typography>
-                                                )}
-                                            </TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
-                                                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                                        {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
-                                                            <Chip
-                                                                key={platform.value}
-                                                                label={platform.label}
-                                                                size="small"
-                                                                sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
-                                                            />
-                                                        ))}
-                                                    </Box>
-                                                ) : (
-                                                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                        {t('notMapped')}
-                                                    </Typography>
-                                                )}
-                                            </TableCell>
-                                            {canEdit && (
-                                                <TableCell sx={fioriBodyCellSx} align="right">
-                                                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Stack>
-                                                </TableCell>
-                                            )}
-                                        </TableRow>
-                                    ))}
-                                    {brands.data.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={canEdit ? 7 : 6} align="center" sx={{ py: 5, color: FIORI.textSecondary }}>
-                                                {t('noBrandsFound')}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <FioriResponsiveTable
+                            columns={columns}
+                            rows={brands.data}
+                            getRowKey={(row) => row.id}
+                            emptyMessage={t('noBrandsFound')}
+                        />
 
                         <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
                             <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>

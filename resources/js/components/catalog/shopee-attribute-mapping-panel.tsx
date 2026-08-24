@@ -125,6 +125,7 @@ export function ShopeeAttributeMappingPanel({ attributes, shopeeAttributes, cove
 
     return (
         <AttributeMappingTable
+            platform="shopee"
             helpTextKey="shopeeAttributeMappingHelp"
             syncLabelKey="syncFromShopee"
             coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}

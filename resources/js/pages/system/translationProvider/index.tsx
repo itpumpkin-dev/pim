@@ -24,30 +24,21 @@ import {
     InputAdornment,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface ProviderRow {
@@ -105,6 +96,78 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
 
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
+
+    // Column pop-in priority (SAP Fiori responsive table): name identifies
+    // the row and always stays; type is important context and follows;
+    // status/default reflow first as the least essential at a glance.
+    // Actions (test/edit/delete) stay pinned alongside the identifying
+    // column since they're directly-actionable controls.
+    const columns: FioriResponsiveColumn<ProviderRow>[] = [
+        {
+            key: 'name',
+            header: tSystem('translationProviderName'),
+            priority: 'always',
+            render: (row) => <Typography component="span" fontWeight={600}>{row.name}</Typography>,
+        },
+        {
+            key: 'type',
+            header: tSystem('translationProviderType'),
+            priority: 'high',
+            render: (row) => row.type,
+        },
+        {
+            key: 'status',
+            header: t('fields.status'),
+            priority: 'medium',
+            render: (row) => <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />,
+        },
+        {
+            key: 'isDefault',
+            header: tSystem('isDefaultProvider'),
+            priority: 'low',
+            render: (row) => (row.is_default ? <FioriStatus label={tSystem('defaultProvider')} tone="information" /> : null),
+        },
+        {
+            key: 'actions',
+            header: t('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    <Tooltip title={tSystem('testProvider')}>
+                        <IconButton
+                            size="small"
+                            sx={fioriIconButtonSx}
+                            disabled={testingId === row.id}
+                            onClick={() => {
+                                setTestingId(row.id);
+                                router.post(`/system/translationProviders/${row.id}/test`, {}, {
+                                    preserveScroll: true,
+                                    onFinish: () => setTestingId(null),
+                                });
+                            }}
+                        >
+                            {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon fontSize="small" />}
+                        </IconButton>
+                    </Tooltip>
+                    {canEdit && (
+                        <IconButton
+                            size="small"
+                            sx={fioriIconButtonSx}
+                            onClick={() => router.visit(`/system/translationProviders/${row.id}/edit`)}
+                        >
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    {canDelete && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Stack>
+            ),
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -188,76 +251,13 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    <TableContainer>
-                        <Table sx={{ minWidth: 650 }}>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('translationProviderName')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('translationProviderType')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.status')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{tSystem('isDefaultProvider')}</TableCell>
-                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actionsHeader')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {gridData.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{row.type}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />
-                                        </TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            {row.is_default && (
-                                                <FioriStatus label={tSystem('defaultProvider')} tone="information" />
-                                            )}
-                                        </TableCell>
-                                        <TableCell align="right" sx={fioriBodyCellSx}>
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                <Tooltip title={tSystem('testProvider')}>
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        disabled={testingId === row.id}
-                                                        onClick={() => {
-                                                            setTestingId(row.id);
-                                                            router.post(`/system/translationProviders/${row.id}/test`, {}, {
-                                                                preserveScroll: true,
-                                                                onFinish: () => setTestingId(null),
-                                                            });
-                                                        }}
-                                                    >
-                                                        {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <TranslateIcon fontSize="small" />}
-                                                    </IconButton>
-                                                </Tooltip>
-                                                {canEdit && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => router.visit(`/system/translationProviders/${row.id}/edit`)}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {gridData.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            {tSystem('noTranslationProvidersFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={gridData.data}
+                        getRowKey={(row) => row.id}
+                        emptyMessage={tSystem('noTranslationProvidersFound')}
+                    />
                 </Paper>
             </Box>
 

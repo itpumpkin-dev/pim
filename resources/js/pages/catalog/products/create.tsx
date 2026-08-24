@@ -27,17 +27,12 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 
 interface AttributeFamily {
@@ -172,6 +167,68 @@ export default function ProductCreate({ families, attributes }: Props) {
         updated[index] = { ...updated[index], [field]: value };
         setData('variants', updated);
     };
+
+    // Rows need their original array index (to call handleVariantFieldChange
+    // and to key error messages) but FioriResponsiveColumn.render only
+    // receives the row itself, so carry the index along on each row object.
+    type VariantRow = ProductForm['variants'][number] & { __index: number };
+    const variantRows: VariantRow[] = data.variants.map((variant, index) => ({ ...variant, __index: index }));
+
+    // Column pop-in priority (SAP Fiori responsive table): the generated
+    // option label identifies the row; SKU is the required field the user
+    // must fill in per variant, so it stays visible next; price/qty are
+    // secondary and reflow into the pop-in area first.
+    const variantColumns: FioriResponsiveColumn<VariantRow>[] = [
+        {
+            key: 'label',
+            header: 'ตัวเลือกย่อย',
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.label}</Typography>,
+        },
+        {
+            key: 'sku',
+            header: 'SKU ย่อย *',
+            priority: 'high',
+            render: (row) => (
+                <TextField
+                    size="small"
+                    required
+                    value={row.sku}
+                    onChange={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value)}
+                    error={Boolean(errors[`variants.${row.__index}.sku` as keyof typeof errors])}
+                    helperText={errors[`variants.${row.__index}.sku` as keyof typeof errors]}
+                />
+            ),
+        },
+        {
+            key: 'price',
+            header: 'ราคา',
+            priority: 'medium',
+            render: (row) => (
+                <TextField
+                    size="small"
+                    type="number"
+                    value={row.price}
+                    onChange={(e) => handleVariantFieldChange(row.__index, 'price', e.target.value)}
+                    placeholder="ราคา"
+                />
+            ),
+        },
+        {
+            key: 'qty',
+            header: 'จำนวนสต๊อก (Qty)',
+            priority: 'medium',
+            render: (row) => (
+                <TextField
+                    size="small"
+                    type="number"
+                    value={row.qty}
+                    onChange={(e) => handleVariantFieldChange(row.__index, 'qty', e.target.value)}
+                    placeholder="สต๊อก"
+                />
+            ),
+        },
+    ];
 
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -327,55 +384,12 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 </Button>
                             </Stack>
 
-                            <TableContainer>
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell sx={{ fontWeight: 700 }}>ตัวเลือกย่อย</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>SKU ย่อย *</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
-                                            <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {data.variants.map((variant, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell sx={{ fontWeight: 600 }}>
-                                                    {variant.label}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <TextField
-                                                        size="small"
-                                                        required
-                                                        value={variant.sku}
-                                                        onChange={(e) => handleVariantFieldChange(index, 'sku', e.target.value)}
-                                                        error={Boolean(errors[`variants.${index}.sku` as keyof typeof errors])}
-                                                        helperText={errors[`variants.${index}.sku` as keyof typeof errors]}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <TextField
-                                                        size="small"
-                                                        type="number"
-                                                        value={variant.price}
-                                                        onChange={(e) => handleVariantFieldChange(index, 'price', e.target.value)}
-                                                        placeholder="ราคา"
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <TextField
-                                                        size="small"
-                                                        type="number"
-                                                        value={variant.qty}
-                                                        onChange={(e) => handleVariantFieldChange(index, 'qty', e.target.value)}
-                                                        placeholder="สต๊อก"
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
+                            <FioriResponsiveTable
+                                variant="plain"
+                                columns={variantColumns}
+                                rows={variantRows}
+                                getRowKey={(row) => row.__index}
+                            />
                         </Paper>
                     )}
                 </Stack>

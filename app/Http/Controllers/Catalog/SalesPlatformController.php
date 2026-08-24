@@ -12,6 +12,7 @@ use App\Models\SalesPlatform;
 use App\Models\SalesPlatformShop;
 use App\Models\ShopeeSellerAccount;
 use App\Models\TikTokSellerAccount;
+use App\Services\Catalog\MarketplaceApiCatalog;
 use App\Services\CodeGenerator;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\RedirectResponse;
@@ -29,6 +30,48 @@ class SalesPlatformController extends Controller
                 ->orderBy('name')
                 ->get(),
         ]);
+    }
+
+    /**
+     * "API Usage" tab — a reference view of every marketplace API operation
+     * this app calls (MarketplaceApiCatalog), annotated with whether each
+     * platform currently has usable credentials. Never calls any of the
+     * cataloged APIs itself (see that class's docblock) — "configured" only
+     * checks for the *presence* of credentials, not that they still work.
+     */
+    public function apiUsage(): Response
+    {
+        $platforms = MarketplaceApiCatalog::platforms();
+
+        foreach (['lazada' => LazadaSellerAccount::class, 'shopee' => ShopeeSellerAccount::class, 'tiktok' => TikTokSellerAccount::class] as $key => $model) {
+            $platforms[$key]['configured'] = $this->tokenTableHasRows($model);
+        }
+
+        $wooConfig = config('services.woocommerce');
+        $platforms['woocommerce']['configured'] = ! empty($wooConfig['url']) && ! empty($wooConfig['consumer_key']) && ! empty($wooConfig['consumer_secret']);
+
+        return Inertia::render('catalog/salesPlatforms/api-usage', [
+            'platforms' => $platforms,
+        ]);
+    }
+
+    /**
+     * Whether n8n's token table for this platform has at least one row —
+     * `null` (not `false`) if the n8n database connection itself couldn't
+     * be reached, so the page can show "couldn't check" instead of the
+     * misleading "not configured" for what's actually an infra hiccup.
+     *
+     * @param  class-string<LazadaSellerAccount|ShopeeSellerAccount|TikTokSellerAccount>  $model
+     */
+    private function tokenTableHasRows(string $model): ?bool
+    {
+        try {
+            return $model::query()->exists();
+        } catch (\Throwable $e) {
+            Log::warning('Could not reach n8n token table while building API usage view.', ['model' => $model, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     public function storePlatform(Request $request): RedirectResponse

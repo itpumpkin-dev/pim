@@ -19,30 +19,21 @@ import {
     MenuItem,
     Paper,
     Select,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Typography,
     Pagination,
     Stack,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
     type FioriTone,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface UserSummary {
@@ -161,6 +152,86 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
         );
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the job code is
+    // the identifying column and stays visible at every width; status is
+    // the primary progress indicator so it follows next; type/user/dates are
+    // secondary metadata that reflow into the pop-in area first, and the
+    // numeric ID is the least useful on a phone. Row actions stay pinned
+    // like the identifying column.
+    const columns: FioriResponsiveColumn<JobItem>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'job',
+            header: t('job'),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.config_code}</Typography>,
+        },
+        {
+            key: 'entityType',
+            header: t('typeLabel'),
+            priority: 'medium',
+            render: (row) => typeLabel(row.entity_type),
+        },
+        {
+            key: 'jobType',
+            header: t('jobType'),
+            priority: 'medium',
+            render: (row) => (row.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')),
+        },
+        {
+            key: 'status',
+            header: t('statusLabel'),
+            priority: 'high',
+            render: (row) => (
+                <FioriStatus
+                    label={t('status' + row.status.charAt(0).toUpperCase() + row.status.slice(1))}
+                    tone={STATUS_TONES[row.status] ?? 'neutral'}
+                />
+            ),
+        },
+        {
+            key: 'user',
+            header: t('user'),
+            priority: 'medium',
+            render: (row) => userLabel(row.user),
+        },
+        {
+            key: 'startedAt',
+            header: t('startedAt'),
+            priority: 'medium',
+            render: (row) => formatLocalDateTime(row.started_at),
+        },
+        {
+            key: 'completedAt',
+            header: t('completedAt'),
+            priority: 'low',
+            render: (row) => formatLocalDateTime(row.completed_at),
+        },
+        {
+            key: 'actions',
+            header: tGrid('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                    {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
+                        <IconButton size="small" sx={fioriIconButtonSx} title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
+                            <CancelIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
+                        <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                </Box>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('jobTrackerTitle')} />
@@ -210,59 +281,13 @@ export default function JobTrackerIndex({ jobs, filters }: Props) {
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    <TableContainer>
-                        <Table>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('job')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('typeLabel')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('jobType')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('statusLabel')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('user')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('startedAt')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('completedAt')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {jobs.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.config_code}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{typeLabel(row.entity_type)}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{row.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            <FioriStatus
-                                                label={t('status' + row.status.charAt(0).toUpperCase() + row.status.slice(1))}
-                                                tone={STATUS_TONES[row.status] ?? 'neutral'}
-                                            />
-                                        </TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{userLabel(row.user)}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.started_at)}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.completed_at)}</TableCell>
-                                        <TableCell align="right" sx={fioriBodyCellSx}>
-                                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                                                {(row.status === 'pending' || row.status === 'processing') && !row.cancel_requested_at && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} title={t('cancelJob')} onClick={() => setCancelId(row.id)}>
-                                                        <CancelIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/jobs/${row.id}`)}>
-                                                    <VisibilityIcon fontSize="small" />
-                                                </IconButton>
-                                            </Box>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {jobs.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={9} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>{t('noJobsFound')}</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={jobs.data}
+                        getRowKey={(row) => row.id}
+                        emptyMessage={t('noJobsFound')}
+                    />
                 </Paper>
 
                 {jobs.last_page > 1 && (

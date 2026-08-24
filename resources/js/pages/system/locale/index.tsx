@@ -27,32 +27,22 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
     type FioriTone,
-    fioriBodyCellSx,
-    fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface GridColumn {
@@ -184,6 +174,113 @@ export default function LocaleIndex({ gridData, filters }: Props) {
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
 
+    // Column pop-in priority (SAP Fiori responsive table): the locale code
+    // identifies the row and row actions stay reachable at every width;
+    // display name/status are secondary identity/meta and the translation
+    // progress (with its own "start/retry" control) reflows in the middle;
+    // the numeric id is the least useful column on a phone.
+    const columns: FioriResponsiveColumn<LocaleRow>[] = [
+        {
+            key: 'id',
+            header: t('fields.id'),
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'code',
+            header: t('fields.code'),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography>,
+        },
+        {
+            key: 'display_name',
+            header: t('fields.displayName'),
+            priority: 'medium',
+            render: (row) => row.display_name || '-',
+        },
+        {
+            key: 'status',
+            header: t('fields.status'),
+            priority: 'medium',
+            render: (row) => <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />,
+        },
+        {
+            key: 'translation',
+            header: tSystem('translationColumn'),
+            priority: 'high',
+            minWidth: 220,
+            render: (row) =>
+                row.code === 'en' ? (
+                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                        —
+                    </Typography>
+                ) : (
+                    <Stack spacing={0.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                            <FioriStatus
+                                label={`${translationPercent(row)}% · ${tSystem(TRANSLATION_STATUS_LABEL_KEY[row.translation_status])}`}
+                                tone={TRANSLATION_STATUS_TONE[row.translation_status]}
+                            />
+                            <Tooltip title={`${row.translation_translated} / ${row.translation_total}`}>
+                                <Box sx={{ flex: 1, minWidth: 60 }}>
+                                    <LinearProgress
+                                        variant="determinate"
+                                        value={translationPercent(row)}
+                                        sx={{
+                                            height: 6,
+                                            borderRadius: 3,
+                                            bgcolor: FIORI.border,
+                                            '& .MuiLinearProgress-bar': {
+                                                bgcolor: FIORI[TRANSLATION_STATUS_TONE[row.translation_status]],
+                                            },
+                                        }}
+                                    />
+                                </Box>
+                            </Tooltip>
+                        </Stack>
+                        {canEdit && (
+                            <Button
+                                size="small"
+                                startIcon={<TranslateIcon fontSize="small" />}
+                                disabled={ACTIVE_TRANSLATION_STATUSES.includes(row.translation_status)}
+                                onClick={() => startTranslation(row.id)}
+                                sx={{ ...fioriGhostSx, alignSelf: 'flex-start', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
+                            >
+                                {row.translation_status === 'not_started' ? tSystem('startTranslation') : tSystem('retryTranslation')}
+                            </Button>
+                        )}
+                    </Stack>
+                ),
+        },
+        {
+            key: 'actions',
+            header: t('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    {canEdit && (
+                        <Tooltip title={tSystem('editTranslations')}>
+                            <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/system/locales/${row.id}/translations`)}>
+                                <EditNoteIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
+                    {canEdit && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/system/locales/${row.id}/edit`)}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    {canDelete && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteLocaleId(row.id)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Stack>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('localesTitle')} />
@@ -276,109 +373,12 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                 </Stack>
 
                 {/* Table */}
-                <TableContainer component={Paper} elevation={0} sx={fioriCardSx}>
-                    <Table sx={{ minWidth: 650 }}>
-                        <TableHead sx={fioriTableHeadSx}>
-                            <TableRow>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('fields.id')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('fields.code')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('fields.displayName')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('fields.status')}</TableCell>
-                                <TableCell sx={{ ...fioriTableHeadCellSx, minWidth: 220 }}>{tSystem('translationColumn')}</TableCell>
-                                <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actionsHeader')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {gridData.data.map((row) => (
-                                <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                    <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                    <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 500 }}>{row.code}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>{row.display_name || '-'}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        {row.code === 'en' ? (
-                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                                —
-                                            </Typography>
-                                        ) : (
-                                            <Stack spacing={0.5}>
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    <FioriStatus
-                                                        label={`${translationPercent(row)}% · ${tSystem(TRANSLATION_STATUS_LABEL_KEY[row.translation_status])}`}
-                                                        tone={TRANSLATION_STATUS_TONE[row.translation_status]}
-                                                    />
-                                                    <Tooltip title={`${row.translation_translated} / ${row.translation_total}`}>
-                                                        <Box sx={{ flex: 1, minWidth: 60 }}>
-                                                            <LinearProgress
-                                                                variant="determinate"
-                                                                value={translationPercent(row)}
-                                                                sx={{
-                                                                    height: 6,
-                                                                    borderRadius: 3,
-                                                                    bgcolor: FIORI.border,
-                                                                    '& .MuiLinearProgress-bar': {
-                                                                        bgcolor: FIORI[TRANSLATION_STATUS_TONE[row.translation_status]],
-                                                                    },
-                                                                }}
-                                                            />
-                                                        </Box>
-                                                    </Tooltip>
-                                                </Stack>
-                                                {canEdit && (
-                                                    <Button
-                                                        size="small"
-                                                        startIcon={<TranslateIcon fontSize="small" />}
-                                                        disabled={ACTIVE_TRANSLATION_STATUSES.includes(row.translation_status)}
-                                                        onClick={() => startTranslation(row.id)}
-                                                        sx={{ ...fioriGhostSx, alignSelf: 'flex-start', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
-                                                    >
-                                                        {row.translation_status === 'not_started'
-                                                            ? tSystem('startTranslation')
-                                                            : tSystem('retryTranslation')}
-                                                    </Button>
-                                                )}
-                                            </Stack>
-                                        )}
-                                    </TableCell>
-                                    <TableCell align="right" sx={fioriBodyCellSx}>
-                                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                            {canEdit && (
-                                                <Tooltip title={tSystem('editTranslations')}>
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => router.visit(`/system/locales/${row.id}/translations`)}
-                                                    >
-                                                        <EditNoteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            )}
-                                            {canEdit && (
-                                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/system/locales/${row.id}/edit`)}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                            {canDelete && (
-                                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteLocaleId(row.id)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            )}
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {gridData.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                        {tSystem('noLocalesFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={gridData.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage={tSystem('noLocalesFound')}
+                />
             </Box>
 
             {/* Delete Dialog */}

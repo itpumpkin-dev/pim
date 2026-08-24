@@ -15,18 +15,13 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { router, usePage } from '@inertiajs/react';
 import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 
 export interface AttributeOptionItem {
     id: number;
@@ -212,7 +207,141 @@ export function AttributeOptionsPanel({
     const currentPage = Math.min(page, pageCount);
     const pagedRows = filteredRows.slice((currentPage - 1) * perPage, currentPage * perPage);
     const showSwatchColumn = swatchType === 'color' || swatchType === 'image';
-    const columnCount = 2 + 1 + (showSwatchColumn ? 1 : 0);
+
+    // The "Auto / new option" row is always pinned at the top of the grid
+    // (it's the add-row form, not data), so it's modeled as its own row kind
+    // rather than folded into `pagedRows` — keeps its fields (and their
+    // handlers) distinct from an existing option's from column render logic.
+    type OptionRow = { kind: 'new' } | { kind: 'existing'; option: EditableOption };
+    const tableRows: OptionRow[] = [{ kind: 'new' }, ...pagedRows.map((option): OptionRow => ({ kind: 'existing', option }))];
+
+    // Column pop-in priority (SAP Fiori responsive table): Code identifies
+    // the row and Actions holds the row's only interactive control (delete,
+    // or Add Row on the pinned new-option row), so both stay always visible;
+    // Label — the field actually being edited — stays visible down to
+    // tablet width; Swatch is the least essential and reflows first.
+    const columns: FioriResponsiveColumn<OptionRow>[] = [
+        {
+            key: 'code',
+            header: 'Code',
+            priority: 'always',
+            width: 160,
+            render: (row) =>
+                row.kind === 'new' ? (
+                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                        Auto
+                    </Typography>
+                ) : (
+                    <TextField size="small" fullWidth value={row.option.code} disabled />
+                ),
+        },
+        {
+            key: 'label',
+            header: `Label (${activeLocale?.display_name ?? activeLocale?.code})`,
+            priority: 'high',
+            render: (row) =>
+                row.kind === 'new' ? (
+                    <TextField
+                        size="small"
+                        fullWidth
+                        value={activeLocaleId !== undefined ? (newTranslations[String(activeLocaleId)] ?? '') : ''}
+                        onChange={(e) =>
+                            activeLocaleId !== undefined &&
+                            setNewTranslations((prev) => ({ ...prev, [String(activeLocaleId)]: e.target.value }))
+                        }
+                        onKeyDown={submitOnEnter}
+                    />
+                ) : (
+                    <TextField
+                        size="small"
+                        fullWidth
+                        value={activeLocaleId !== undefined ? (row.option.translations[String(activeLocaleId)] ?? '') : ''}
+                        onChange={(e) =>
+                            activeLocaleId !== undefined &&
+                            updateRow(row.option.id, {
+                                ...row.option,
+                                translations: { ...row.option.translations, [String(activeLocaleId)]: e.target.value },
+                            })
+                        }
+                    />
+                ),
+        },
+    ];
+
+    if (showSwatchColumn) {
+        columns.push({
+            key: 'swatch',
+            header: 'Swatch',
+            priority: 'medium',
+            render: (row) => {
+                if (row.kind === 'new') {
+                    return swatchType === 'color' ? (
+                        <TextField
+                            size="small"
+                            placeholder="#hex"
+                            value={newSwatchText}
+                            onChange={(e) => setNewSwatchText(e.target.value)}
+                            onKeyDown={submitOnEnter}
+                        />
+                    ) : (
+                        <TextField
+                            type="file"
+                            size="small"
+                            onChange={(e) => setNewSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
+                            slotProps={{ htmlInput: { accept: 'image/*' } }}
+                        />
+                    );
+                }
+
+                const option = row.option;
+                return swatchType === 'color' ? (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <TextField
+                            size="small"
+                            value={option.swatchText}
+                            onChange={(e) => updateRow(option.id, { ...option, swatchText: e.target.value })}
+                            sx={{ width: 100 }}
+                        />
+                        <SwatchPreview swatchType={swatchType} value={option.existingSwatchValue} />
+                    </Stack>
+                ) : (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <TextField
+                            type="file"
+                            size="small"
+                            onChange={(e) => updateRow(option.id, { ...option, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
+                            slotProps={{ htmlInput: { accept: 'image/*' } }}
+                            sx={{ width: 160 }}
+                        />
+                        <SwatchPreview swatchType={swatchType} value={option.existingSwatchValue} />
+                    </Stack>
+                );
+            },
+        });
+    }
+
+    columns.push({
+        key: 'actions',
+        header: 'Actions',
+        priority: 'always',
+        align: 'right',
+        render: (row) =>
+            row.kind === 'new' ? (
+                <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={addOption}
+                    disabled={!hasNewLabel || adding}
+                    startIcon={adding ? <CircularProgress size={14} color="inherit" /> : undefined}
+                >
+                    {adding ? 'Adding…' : 'Add Row'}
+                </Button>
+            ) : (
+                <IconButton size="small" onClick={() => destroy(row.option.id)} disabled={deletingId === row.option.id} title="Delete">
+                    {deletingId === row.option.id ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon fontSize="small" />}
+                </IconButton>
+            ),
+    });
 
     return (
         <Paper variant="outlined" sx={{ p: 3 }}>
@@ -283,144 +412,26 @@ export function AttributeOptionsPanel({
                 </Stack>
             </Stack>
 
-            <TableContainer sx={{ mb: 1 }}>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell sx={{ fontWeight: 700, width: 160 }}>Code</TableCell>
-                            <TableCell sx={{ fontWeight: 700 }}>
-                                Label ({activeLocale?.display_name ?? activeLocale?.code})
-                            </TableCell>
-                            {showSwatchColumn && <TableCell sx={{ fontWeight: 700 }}>Swatch</TableCell>}
-                            <TableCell align="right" sx={{ fontWeight: 700 }}>Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        <TableRow sx={{ bgcolor: 'action.hover' }}>
-                            <TableCell>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                    Auto
-                                </Typography>
-                            </TableCell>
-                            <TableCell>
-                                <TextField
-                                    size="small"
-                                    fullWidth
-                                    value={activeLocaleId !== undefined ? (newTranslations[String(activeLocaleId)] ?? '') : ''}
-                                    onChange={(e) => activeLocaleId !== undefined && setNewTranslations((prev) => ({ ...prev, [String(activeLocaleId)]: e.target.value }))}
-                                    onKeyDown={submitOnEnter}
-                                />
-                            </TableCell>
-                            {swatchType === 'color' && (
-                                <TableCell>
-                                    <TextField
-                                        size="small"
-                                        placeholder="#hex"
-                                        value={newSwatchText}
-                                        onChange={(e) => setNewSwatchText(e.target.value)}
-                                        onKeyDown={submitOnEnter}
-                                    />
-                                </TableCell>
-                            )}
-                            {swatchType === 'image' && (
-                                <TableCell>
-                                    <TextField
-                                        type="file"
-                                        size="small"
-                                        onChange={(e) => setNewSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
-                                        slotProps={{ htmlInput: { accept: 'image/*' } }}
-                                    />
-                                </TableCell>
-                            )}
-                            <TableCell align="right">
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    onClick={addOption}
-                                    disabled={!hasNewLabel || adding}
-                                    startIcon={adding ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                >
-                                    {adding ? 'Adding…' : 'Add Row'}
-                                </Button>
-                            </TableCell>
-                        </TableRow>
+            <Box sx={{ mb: 1 }}>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={tableRows}
+                    getRowKey={(row) => (row.kind === 'new' ? 'new' : row.option.id)}
+                    rowSx={(row) => (row.kind === 'new' ? { bgcolor: 'action.hover' } : {})}
+                />
+            </Box>
 
-                        {pagedRows.map((row) => {
-                            return (
-                                <TableRow key={row.id}>
-                                    <TableCell>
-                                        <TextField
-                                            size="small"
-                                            fullWidth
-                                            value={row.code}
-                                            disabled
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <TextField
-                                            size="small"
-                                            fullWidth
-                                            value={activeLocaleId !== undefined ? (row.translations[String(activeLocaleId)] ?? '') : ''}
-                                            onChange={(e) => activeLocaleId !== undefined && updateRow(row.id, {
-                                                ...row,
-                                                translations: { ...row.translations, [String(activeLocaleId)]: e.target.value },
-                                            })}
-                                        />
-                                    </TableCell>
-                                    {swatchType === 'color' && (
-                                        <TableCell>
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                <TextField
-                                                    size="small"
-                                                    value={row.swatchText}
-                                                    onChange={(e) => updateRow(row.id, { ...row, swatchText: e.target.value })}
-                                                    sx={{ width: 100 }}
-                                                />
-                                                <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
-                                            </Stack>
-                                        </TableCell>
-                                    )}
-                                    {swatchType === 'image' && (
-                                        <TableCell>
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                <TextField
-                                                    type="file"
-                                                    size="small"
-                                                    onChange={(e) => updateRow(row.id, { ...row, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
-                                                    slotProps={{ htmlInput: { accept: 'image/*' } }}
-                                                    sx={{ width: 160 }}
-                                                />
-                                                <SwatchPreview swatchType={swatchType} value={row.existingSwatchValue} />
-                                            </Stack>
-                                        </TableCell>
-                                    )}
-                                    <TableCell align="right">
-                                        <IconButton size="small" onClick={() => destroy(row.id)} disabled={deletingId === row.id} title="Delete">
-                                            {deletingId === row.id ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon fontSize="small" />}
-                                        </IconButton>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
+            {rows.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                    No options yet
+                </Typography>
+            )}
 
-                        {rows.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={columnCount} align="center" sx={{ py: 3 }}>
-                                    <Typography variant="body2" color="text.secondary">No options yet</Typography>
-                                </TableCell>
-                            </TableRow>
-                        )}
-
-                        {rows.length > 0 && filteredRows.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={columnCount} align="center" sx={{ py: 3 }}>
-                                    <Typography variant="body2" color="text.secondary">No options match your search.</Typography>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            {rows.length > 0 && filteredRows.length === 0 && (
+                <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
+                    No options match your search.
+                </Typography>
+            )}
         </Paper>
     );
 }

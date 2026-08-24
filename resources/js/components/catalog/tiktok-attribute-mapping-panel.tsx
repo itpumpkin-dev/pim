@@ -125,6 +125,7 @@ export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes, cove
 
     return (
         <AttributeMappingTable
+            platform="tiktok"
             helpTextKey="tiktokAttributeMappingHelp"
             syncLabelKey="syncFromTiktok"
             coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}

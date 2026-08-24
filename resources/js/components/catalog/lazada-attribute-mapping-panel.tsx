@@ -124,6 +124,7 @@ export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes, cove
 
     return (
         <AttributeMappingTable
+            platform="lazada"
             helpTextKey="lazadaAttributeMappingHelp"
             syncLabelKey="syncFromLazada"
             coverage={{ payloadFields: payloadFieldsCoverage, platformAttributes: coverage.platformAttributes }}

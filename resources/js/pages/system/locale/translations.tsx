@@ -12,19 +12,14 @@ import {
     Stack,
     Tab,
     Tabs,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
-import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 const CONTENT_NAMESPACE = 'content';
 
@@ -161,6 +156,55 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
         return key ? tSystem(key) : namespace;
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the translation
+    // key identifies the row and the value is the field actually being
+    // edited here, so both stay visible longest; the source path is
+    // secondary context and reflows into the pop-in area first.
+    const columns: FioriResponsiveColumn<TranslationEntry>[] = [
+        {
+            key: 'path',
+            header: tSystem('translationKey'),
+            priority: 'always',
+            minWidth: 200,
+            render: (entry) => (
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
+                    {entry.path}
+                </Typography>
+            ),
+        },
+        {
+            key: 'source',
+            header: tSystem('translationSource'),
+            priority: 'medium',
+            render: (entry) => (
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                    {entry.source}
+                </Typography>
+            ),
+        },
+        {
+            key: 'value',
+            header: tSystem('translationValue'),
+            priority: 'high',
+            minWidth: 260,
+            render: (entry) => (
+                <TextField
+                    fullWidth
+                    multiline
+                    size="small"
+                    value={values[entry.path] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
+                    sx={{
+                        bgcolor: FIORI.surface,
+                        ...(dirty[entry.path] !== undefined && {
+                            '& .MuiOutlinedInput-root': { borderColor: FIORI.warning },
+                        }),
+                    }}
+                />
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${tSystem('translationsTitle')}: ${localeModel.code}`} />
@@ -259,49 +303,13 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                             }}
                         />
 
-                        <TableContainer component={Paper} elevation={0} sx={fioriCardSx}>
-                            <Table size="small">
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '25%' }}>{tSystem('translationKey')}</TableCell>
-                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '35%' }}>{tSystem('translationSource')}</TableCell>
-                                        <TableCell sx={{ ...fioriTableHeadCellSx, width: '40%' }}>{tSystem('translationValue')}</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {filteredEntries.map((entry) => (
-                                        <TableRow key={entry.path} sx={fioriTableRowSx(false)}>
-                                            <TableCell sx={{ ...fioriBodyCellSx, fontFamily: 'monospace', color: FIORI.textSecondary, verticalAlign: 'top', pt: 1.5 }}>
-                                                {entry.path}
-                                            </TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, verticalAlign: 'top', pt: 1.5 }}>{entry.source}</TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, verticalAlign: 'top' }}>
-                                                <TextField
-                                                    fullWidth
-                                                    multiline
-                                                    size="small"
-                                                    value={values[entry.path] ?? ''}
-                                                    onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
-                                                    sx={{
-                                                        bgcolor: FIORI.surface,
-                                                        ...(dirty[entry.path] !== undefined && {
-                                                            '& .MuiOutlinedInput-root': { borderColor: FIORI.warning },
-                                                        }),
-                                                    }}
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {filteredEntries.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                                {tSystem('noTranslationEntriesFound')}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <FioriResponsiveTable
+                            columns={columns}
+                            rows={filteredEntries}
+                            getRowKey={(entry) => entry.path}
+                            size="small"
+                            emptyMessage={tSystem('noTranslationEntriesFound')}
+                        />
                     </>
                 )}
                 </Box>

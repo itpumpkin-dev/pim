@@ -63,6 +63,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributes/export', [AttributeController::class, 'export'])->name('attributes.export')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/marketplace-mapping', [MarketplaceAttributeMappingController::class, 'index'])->name('attributes.marketplaceMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/marketplace-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('attributes.marketplaceMapping.export')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
@@ -174,6 +175,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('channels/{channel}/history', [ChannelController::class, 'history'])->name('channels.history')->middleware('permission:channels,view_history');
 
     Route::get('sales-platforms', [SalesPlatformController::class, 'index'])->name('salesPlatforms.index')->middleware('permission:sales_platforms,list_sales_platforms');
+    Route::get('sales-platforms/api-usage', [SalesPlatformController::class, 'apiUsage'])->name('salesPlatforms.apiUsage')->middleware('permission:sales_platforms,list_sales_platforms');
     Route::post('sales-platforms', [SalesPlatformController::class, 'storePlatform'])->name('salesPlatforms.store')->middleware('permission:sales_platforms,create_sales_platforms');
     Route::put('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'updatePlatform'])->name('salesPlatforms.update')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::delete('sales-platforms/{salesPlatform}', [SalesPlatformController::class, 'destroyPlatform'])->name('salesPlatforms.destroy')->middleware('permission:sales_platforms,delete_sales_platforms');

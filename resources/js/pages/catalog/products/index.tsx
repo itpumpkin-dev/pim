@@ -38,12 +38,6 @@ import {
     Select,
     Snackbar,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TableSortLabel,
     TextField,
     Tooltip,
@@ -51,6 +45,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, type FioriColumnPriority, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
 import {
     ProductFilterDrawer,
@@ -61,15 +56,12 @@ import {
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
     fioriTableRowSx,
     percentToneFiori,
 } from '@/lib/fiori-style';
@@ -244,6 +236,22 @@ interface ColumnDef {
     label: string;
     render: (row: ProductRow) => ReactNode;
     headerRender?: () => ReactNode;
+}
+
+/**
+ * Column pop-in priority (SAP Fiori responsive table) for the products grid.
+ * Columns here are user-configurable (see ManageColumnsDialog) rather than a
+ * fixed set, so priority is derived from the column key instead of position:
+ * image/name identify the row and stay pinned; sku/family are the next most
+ * useful thing to see; status/type/completeness are secondary state; the
+ * rest (ids, dates, translation completeness, sales channels, attribute
+ * columns) are least useful on a narrow screen and pop in first.
+ */
+function productColumnPriority(key: string): FioriColumnPriority {
+    if (key === 'image' || key === 'name') return 'always';
+    if (key === 'sku' || key === 'family') return 'high';
+    if (key === 'status' || key === 'type' || key === 'complete') return 'medium';
+    return 'low';
 }
 
 export default function ProductIndex({ gridConfig, gridData, filters, attributes, families, salesChannels }: Props) {
@@ -716,6 +724,82 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
 
+    const tableColumns: FioriResponsiveColumn<ProductRow>[] = [
+        {
+            key: 'select',
+            header: (
+                <Checkbox
+                    indeterminate={selectedIds.length > 0 && selectedIds.length < gridData.data.length}
+                    checked={gridData.data.length > 0 && selectedIds.length === gridData.data.length}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                />
+            ),
+            priority: 'always',
+            width: 48,
+            render: (row) => <Checkbox checked={selectedIds.includes(row.id)} onChange={(e) => handleSelectOne(row.id, e.target.checked)} />,
+        },
+        ...visibleColumns.map((col): FioriResponsiveColumn<ProductRow> => {
+            const sortKey = SORTABLE_FIELDS[col.key];
+            return {
+                key: col.key,
+                header: col.headerRender ? (
+                    col.headerRender()
+                ) : sortKey ? (
+                    <TableSortLabel active={sortField === sortKey} direction={sortField === sortKey ? sortDir : 'asc'} onClick={() => handleSort(sortKey)}>
+                        {col.label}
+                    </TableSortLabel>
+                ) : (
+                    col.label
+                ),
+                priority: productColumnPriority(col.key),
+                render: col.render,
+            };
+        }),
+        {
+            key: 'actions',
+            header: t('actions'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    {canEdit && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    {canCreate && (
+                        <Tooltip title={t('duplicateProduct')}>
+                            <span>
+                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDuplicateProductId(row.id)}>
+                                    <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
+                    {canEdit && (
+                        <Tooltip title={t('checkLiveStatus')}>
+                            <span>
+                                <IconButton
+                                    size="small"
+                                    sx={fioriIconButtonSx}
+                                    disabled={checkingLiveIds.has(row.id)}
+                                    onClick={() => checkLiveStatus(row.id)}
+                                >
+                                    {checkingLiveIds.has(row.id) ? <CircularProgress size={16} color="inherit" /> : <FactCheckOutlinedIcon fontSize="small" />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
+                    {canDelete && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteProductId(row.id)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Stack>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('products')} />
@@ -872,115 +956,14 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     <Divider sx={{ borderColor: FIORI.border }} />
 
                     {/* Table */}
-                    <TableContainer>
-                        <Table sx={{ minWidth: 800 }}>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell padding="checkbox" sx={{ borderBottom: `1px solid ${FIORI.border}` }}>
-                                        <Checkbox
-                                            indeterminate={selectedIds.length > 0 && selectedIds.length < gridData.data.length}
-                                            checked={gridData.data.length > 0 && selectedIds.length === gridData.data.length}
-                                            onChange={(e) => handleSelectAll(e.target.checked)}
-                                        />
-                                    </TableCell>
-                                    {visibleColumns.map((col) => {
-                                        const sortKey = SORTABLE_FIELDS[col.key];
-
-                                        return (
-                                            <TableCell key={col.key} sx={fioriTableHeadCellSx}>
-                                                {col.headerRender ? (
-                                                    col.headerRender()
-                                                ) : sortKey ? (
-                                                    <TableSortLabel
-                                                        active={sortField === sortKey}
-                                                        direction={sortField === sortKey ? sortDir : 'asc'}
-                                                        onClick={() => handleSort(sortKey)}
-                                                    >
-                                                        {col.label}
-                                                    </TableSortLabel>
-                                                ) : (
-                                                    col.label
-                                                )}
-                                            </TableCell>
-                                        );
-                                    })}
-                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actions')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {gridData.data.map((row) => {
-                                    const isSelected = selectedIds.includes(row.id);
-                                    return (
-                                        <TableRow key={row.id} sx={fioriTableRowSx(isSelected)}>
-                                            <TableCell padding="checkbox">
-                                                <Checkbox
-                                                    checked={isSelected}
-                                                    onChange={(e) => handleSelectOne(row.id, e.target.checked)}
-                                                />
-                                            </TableCell>
-                                            {visibleColumns.map((col) => (
-                                                <TableCell key={col.key} sx={fioriBodyCellSx}>
-                                                    {col.render(row)}
-                                                </TableCell>
-                                            ))}
-                                            <TableCell align="right">
-                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                    {canEdit && (
-                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                    )}
-                                                    {canCreate && (
-                                                        <Tooltip title={t('duplicateProduct')}>
-                                                            <span>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    sx={fioriIconButtonSx}
-                                                                    onClick={() => setDuplicateProductId(row.id)}
-                                                                >
-                                                                    <ContentCopyIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </span>
-                                                        </Tooltip>
-                                                    )}
-                                                    {canEdit && (
-                                                        <Tooltip title={t('checkLiveStatus')}>
-                                                            <span>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    sx={fioriIconButtonSx}
-                                                                    disabled={checkingLiveIds.has(row.id)}
-                                                                    onClick={() => checkLiveStatus(row.id)}
-                                                                >
-                                                                    {checkingLiveIds.has(row.id) ? (
-                                                                        <CircularProgress size={16} color="inherit" />
-                                                                    ) : (
-                                                                        <FactCheckOutlinedIcon fontSize="small" />
-                                                                    )}
-                                                                </IconButton>
-                                                            </span>
-                                                        </Tooltip>
-                                                    )}
-                                                    {canDelete && (
-                                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteProductId(row.id)}>
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
-                                                    )}
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                                {gridData.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={visibleColumns.length + 2} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            {t('noProductsFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={tableColumns}
+                        rows={gridData.data}
+                        getRowKey={(row) => row.id}
+                        rowSx={(row) => fioriTableRowSx(selectedIds.includes(row.id))}
+                        emptyMessage={t('noProductsFound')}
+                    />
                 </Paper>
             </Box>
 

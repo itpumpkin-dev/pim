@@ -1,18 +1,8 @@
-import {
-    Box,
-    CircularProgress,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Typography,
-} from '@mui/material';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import * as XLSX from 'xlsx';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 
 const PREVIEW_ROW_LIMIT = 10;
 
@@ -76,6 +66,23 @@ export default function ImportFilePreview({ file, fileFormat, fieldSeparator }: 
         return null;
     }
 
+    // Column pop-in priority (SAP Fiori responsive table): the source file's
+    // columns aren't known ahead of time (they come straight from whatever
+    // headers the uploaded file has), so priority falls out of column order —
+    // the same convention as the server-driven grid in attributes/index.tsx.
+    const previewColumns: FioriResponsiveColumn<{ key: number; cells: string[] }>[] =
+        rows.length > 0
+            ? rows[0].map((header, idx) => ({
+                  key: String(idx),
+                  header: <span style={{ whiteSpace: 'nowrap' }}>{header}</span>,
+                  priority: idx === 0 ? 'always' : idx === 1 ? 'high' : idx === 2 ? 'medium' : 'low',
+                  render: (row: { key: number; cells: string[] }) => (
+                      <span style={{ whiteSpace: 'nowrap' }}>{row.cells[idx]}</span>
+                  ),
+              }))
+            : [];
+    const previewRows = rows.slice(1).map((cells, idx) => ({ key: idx, cells }));
+
     return (
         <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
@@ -105,30 +112,12 @@ export default function ImportFilePreview({ file, fileFormat, fieldSeparator }: 
 
             {!loading && !error && rows.length > 0 && (
                 <>
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflowX: 'auto' }}>
-                        <Table size="small" stickyHeader>
-                            <TableHead>
-                                <TableRow>
-                                    {rows[0].map((cell, idx) => (
-                                        <TableCell key={idx} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                            {cell}
-                                        </TableCell>
-                                    ))}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {rows.slice(1).map((row, rIdx) => (
-                                    <TableRow key={rIdx}>
-                                        {row.map((cell, cIdx) => (
-                                            <TableCell key={cIdx} sx={{ whiteSpace: 'nowrap' }}>
-                                                {cell}
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        size="small"
+                        columns={previewColumns}
+                        rows={previewRows}
+                        getRowKey={(row) => row.key}
+                    />
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                         {t('previewRowsNote', { count: rows.length })}
                     </Typography>

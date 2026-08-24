@@ -12,21 +12,15 @@ import {
     Divider,
     FormControlLabel,
     IconButton,
-    Paper,
     Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Tabs,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import { FormEventHandler, useState, useMemo } from 'react';
-import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -324,6 +318,183 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
     const activeCatalog = allResources[activeResource];
 
+    // Column pop-in priority (SAP Fiori responsive table): the "Has Role"
+    // checkbox is the control being edited here, so it stays always visible
+    // alongside Username (the natural identifier); the rest are descriptive
+    // and reflow into the pop-in area first as space runs out.
+    const userColumns: FioriResponsiveColumn<RoleUserOption>[] = [
+        {
+            key: 'hasRole',
+            header: 'Has Role',
+            priority: 'always',
+            render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
+        },
+        {
+            key: 'employeeId',
+            header: 'Employee ID',
+            priority: 'low',
+            render: (user) => user.employee_id || '-',
+        },
+        {
+            key: 'username',
+            header: 'Username',
+            priority: 'high',
+            render: (user) => user.username,
+        },
+        {
+            key: 'email',
+            header: 'E-mail',
+            priority: 'medium',
+            render: (user) => user.email,
+        },
+        {
+            key: 'firstName',
+            header: 'First name',
+            priority: 'medium',
+            render: (user) => user.first_name,
+        },
+        {
+            key: 'lastName',
+            header: 'Last name',
+            priority: 'low',
+            render: (user) => user.last_name,
+        },
+    ];
+
+    // Permission-matrix-style tables: only 3 columns total (the resource
+    // name plus a Read and an Edit checkbox column), and Read/Edit are meant
+    // to be seen and toggled together — popping either one into the detail
+    // area beneath the row would split a pair the user needs side by side.
+    // All three stay 'always'.
+    const attributeGroupColumns: FioriResponsiveColumn<AttributeGroup>[] = [
+        {
+            key: 'name',
+            header: 'Attribute Group',
+            priority: 'always',
+            render: (group) => group.name,
+        },
+        {
+            key: 'read',
+            header: (
+                <>
+                    <Checkbox
+                        size="small"
+                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
+                        indeterminate={
+                            attributeGroups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) &&
+                            !attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))
+                        }
+                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'read', e.target.checked)}
+                    />
+                    Read
+                </>
+            ),
+            priority: 'always',
+            align: 'center',
+            width: 100,
+            render: (group) => (
+                <Checkbox
+                    size="small"
+                    checked={hasAccess('view_attribute_groups', 'view', group.code)}
+                    onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'read', e.target.checked)}
+                />
+            ),
+        },
+        {
+            key: 'edit',
+            header: (
+                <>
+                    <Checkbox
+                        size="small"
+                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
+                        indeterminate={
+                            attributeGroups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) &&
+                            !attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))
+                        }
+                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'edit', e.target.checked)}
+                    />
+                    Edit
+                </>
+            ),
+            priority: 'always',
+            align: 'center',
+            width: 100,
+            render: (group) => (
+                <Checkbox
+                    size="small"
+                    checked={hasAccess('edit_attribute_groups', 'edit', group.code)}
+                    onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'edit', e.target.checked)}
+                />
+            ),
+        },
+    ];
+
+    const attributeColumns: FioriResponsiveColumn<Attribute>[] = [
+        {
+            key: 'name',
+            header: 'Attribute',
+            priority: 'always',
+            render: (attr) => attr.name,
+        },
+        {
+            key: 'read',
+            header: (
+                <>
+                    <Checkbox
+                        size="small"
+                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
+                        indeterminate={
+                            attributes.some((a) => hasAccess('view_attributes', 'view', a.code)) &&
+                            !attributes.every((a) => hasAccess('view_attributes', 'view', a.code))
+                        }
+                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'read', e.target.checked)}
+                    />
+                    Read
+                </>
+            ),
+            priority: 'always',
+            align: 'center',
+            width: 100,
+            render: (attr) => (
+                <Checkbox
+                    size="small"
+                    checked={hasAccess('view_attributes', 'view', attr.code)}
+                    onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'read', e.target.checked)}
+                />
+            ),
+        },
+        {
+            key: 'edit',
+            header: (
+                <>
+                    <Checkbox
+                        size="small"
+                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
+                        indeterminate={
+                            attributes.some((a) => hasAccess('edit_attributes', 'edit', a.code)) &&
+                            !attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))
+                        }
+                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
+                    />
+                    Edit
+                    <Tooltip title="A Read-only Attribute Group overrides this — an attribute stays read-only on the product if its group isn't editable, even when checked here.">
+                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: FIORI.textSecondary }} />
+                    </Tooltip>
+                </>
+            ),
+            priority: 'always',
+            align: 'center',
+            width: 100,
+            render: (attr) => (
+                <Checkbox
+                    size="small"
+                    checked={hasAccess('edit_attributes', 'edit', attr.code)}
+                    onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'edit', e.target.checked)}
+                />
+            ),
+        },
+    ];
+
     return (
         <AppLayout
             breadcrumbs={breadcrumbs}
@@ -552,54 +723,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttrGroups && (
-                                <TableContainer component={Paper} sx={fioriCardSx}>
-                                    <Table size="small">
-                                        <TableHead sx={fioriTableHeadSx}>
-                                            <TableRow>
-                                                <TableCell sx={fioriTableHeadCellSx}>Attribute Group</TableCell>
-                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
-                                                        indeterminate={attributeGroups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) && !attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
-                                                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'read', e.target.checked)}
-                                                    />
-                                                    Read
-                                                </TableCell>
-                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
-                                                        indeterminate={attributeGroups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) && !attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
-                                                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'edit', e.target.checked)}
-                                                    />
-                                                    Edit
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {attributeGroups.map((group) => (
-                                                <TableRow key={group.id} sx={fioriTableRowSx(false)}>
-                                                    <TableCell sx={fioriBodyCellSx}>{group.name}</TableCell>
-                                                    <TableCell align="center" sx={fioriBodyCellSx}>
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={hasAccess('view_attribute_groups', 'view', group.code)}
-                                                            onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'read', e.target.checked)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="center" sx={fioriBodyCellSx}>
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={hasAccess('edit_attribute_groups', 'edit', group.code)}
-                                                            onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'edit', e.target.checked)}
-                                                        />
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
+                                <FioriResponsiveTable
+                                    columns={attributeGroupColumns}
+                                    rows={attributeGroups}
+                                    getRowKey={(group) => group.id}
+                                    rowSx={() => fioriTableRowSx(false)}
+                                />
                             )}
                         </Box>
 
@@ -626,57 +755,18 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttributes && (
-                                <TableContainer component={Paper} sx={{ ...fioriCardSx, maxHeight: 500, overflowY: 'auto' }}>
-                                    <Table size="small" stickyHeader>
-                                        <TableHead sx={fioriTableHeadSx}>
-                                            <TableRow>
-                                                <TableCell sx={fioriTableHeadCellSx}>Attribute</TableCell>
-                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
-                                                        indeterminate={attributes.some((a) => hasAccess('view_attributes', 'view', a.code)) && !attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
-                                                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'read', e.target.checked)}
-                                                    />
-                                                    Read
-                                                </TableCell>
-                                                <TableCell align="center" sx={{ ...fioriTableHeadCellSx, width: 100 }}>
-                                                    <Checkbox
-                                                        size="small"
-                                                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
-                                                        indeterminate={attributes.some((a) => hasAccess('edit_attributes', 'edit', a.code)) && !attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
-                                                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
-                                                    />
-                                                    Edit
-                                                    <Tooltip title="A Read-only Attribute Group overrides this — an attribute stays read-only on the product if its group isn't editable, even when checked here.">
-                                                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: FIORI.textSecondary }} />
-                                                    </Tooltip>
-                                                </TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {attributes.map((attr: Attribute) => (
-                                                <TableRow key={attr.id} sx={fioriTableRowSx(false)}>
-                                                    <TableCell sx={fioriBodyCellSx}>{attr.name}</TableCell>
-                                                    <TableCell align="center" sx={fioriBodyCellSx}>
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={hasAccess('view_attributes', 'view', attr.code)}
-                                                            onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'read', e.target.checked)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="center" sx={fioriBodyCellSx}>
-                                                        <Checkbox
-                                                            size="small"
-                                                            checked={hasAccess('edit_attributes', 'edit', attr.code)}
-                                                            onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'edit', e.target.checked)}
-                                                        />
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
+                                // FioriResponsiveTable doesn't expose a stickyHeader option, so the
+                                // header no longer sticks while scrolling this box — the maxHeight/
+                                // scroll behavior itself is preserved via this wrapper.
+                                <Box sx={{ ...fioriCardSx, maxHeight: 500, overflowY: 'auto' }}>
+                                    <FioriResponsiveTable
+                                        variant="plain"
+                                        columns={attributeColumns}
+                                        rows={attributes}
+                                        getRowKey={(attr) => attr.id}
+                                        rowSx={() => fioriTableRowSx(false)}
+                                    />
+                                </Box>
                             )}
                         </Box>
                     </Box>
@@ -691,41 +781,13 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 )}
 
                 {tab === 2 && (
-                    <TableContainer component={Paper} sx={fioriCardSx}>
-                        <Table size="small">
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>Has Role</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>Employee ID</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>Username</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>E-mail</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>First name</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>Last name</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {users.map((user) => (
-                                    <TableRow key={user.id} sx={fioriTableRowSx(data.users.includes(user.id))}>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />
-                                        </TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{user.employee_id || '-'}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{user.username}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{user.email}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{user.first_name}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{user.last_name}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {users.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
-                                            No users found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        columns={userColumns}
+                        rows={users}
+                        getRowKey={(user) => user.id}
+                        rowSx={(user) => fioriTableRowSx(data.users.includes(user.id))}
+                        emptyMessage="No users found."
+                    />
                 )}
             </Box>
         </AppLayout>

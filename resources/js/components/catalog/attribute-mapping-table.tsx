@@ -1,3 +1,5 @@
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
 import {
@@ -6,26 +8,26 @@ import {
     Chip,
     CircularProgress,
     InputAdornment,
+    Menu,
     MenuItem,
-    Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CoverageStat, MappingCoverageSummary } from '@/components/catalog/mapping-coverage-summary';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { useLocale } from '@/hooks/use-locale';
 import { MappingAttributeRow } from '@/hooks/use-attribute-mapping';
-import { mappedChipSx, naChipSx, pendingRowSx, solidActionSx, UI_BORDER } from '@/lib/ui-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { encodeQueryParams } from '@/lib/query-string';
+import { mappedChipSx, naChipSx, pendingRowSx } from '@/lib/ui-style';
 
 export interface AttributeMappingTableProps {
+    /** Which marketplace tab this is — identifies the dataset to `MarketplaceAttributeMappingController::export()`. */
+    platform: 'woocommerce' | 'shopee' | 'lazada' | 'tiktok';
     helpTextKey: string;
     syncLabelKey: string;
     coverage: { payloadFields: CoverageStat; platformAttributes: CoverageStat };
@@ -61,6 +63,7 @@ export interface AttributeMappingTableProps {
  * `useAttributeMapping`).
  */
 export function AttributeMappingTable({
+    platform,
     helpTextKey,
     syncLabelKey,
     coverage,
@@ -82,20 +85,112 @@ export function AttributeMappingTable({
     onSync,
 }: AttributeMappingTableProps) {
     const { t } = useTranslation('catalog');
+    const { locale } = useLocale();
+    const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+
+    // Column pop-in priority (SAP Fiori responsive table): the identifying
+    // column and the "Map to" select — the field actually being edited here
+    // — stay visible down to phone width; Status and Sort order reflow into
+    // the label/value pop-in area beneath each row as space runs out.
+    const columns: FioriResponsiveColumn<MappingAttributeRow>[] = [
+        {
+            key: 'attribute',
+            header: t('attributeColumn'),
+            priority: 'always',
+            minWidth: 220,
+            render: (row) => (
+                <>
+                    <Typography fontWeight={600}>{row.label}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                        {row.code} · {row.type}
+                    </Typography>
+                </>
+            ),
+        },
+        {
+            key: 'status',
+            header: t('status'),
+            priority: 'medium',
+            render: (row) => {
+                const mapped = isMapped(row);
+                const caption = statusCaption(row);
+                return (
+                    <>
+                        <Chip label={mapped ? t('statusMapped') : t('statusUnmapped')} size="small" sx={mapped ? mappedChipSx : naChipSx} />
+                        {mapped && caption && (
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                {caption}
+                            </Typography>
+                        )}
+                    </>
+                );
+            },
+        },
+        {
+            key: 'mapTo',
+            header: t('mapToColumn'),
+            priority: 'high',
+            minWidth: 260,
+            render: (row) => renderMapToCell(row),
+        },
+        {
+            key: 'sortOrder',
+            header: t('sortOrder'),
+            priority: 'low',
+            align: 'right',
+            width: 110,
+            render: (row) =>
+                isMapped(row) ? (
+                    <TextField
+                        type="number"
+                        size="small"
+                        value={sortOrderFor(row)}
+                        onChange={(e) => onSortOrderChange(row, Number(e.target.value) || 0)}
+                        sx={{ width: 90 }}
+                        slotProps={{ htmlInput: { min: 0 } }}
+                    />
+                ) : null,
+        },
+    ];
+
+    const handleExport = (format: 'csv' | 'xlsx') => {
+        // search/status are passed explicitly since this tab's filter is
+        // client-only state (see useAttributeMapping), never round-tripped
+        // to the server otherwise; locale for the same reason as
+        // AttributeController::export() — see its comment.
+        const params = encodeQueryParams({ platform, format, search, status, locale });
+        window.location.href = `/catalog/attributes/marketplace-mapping/export?${params.join('&')}`;
+        setExportAnchor(null);
+    };
 
     return (
         <Box>
             <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'flex-start' }} spacing={2} sx={{ mb: 3 }}>
-                <Typography color="text.secondary" sx={{ maxWidth: 840 }}>
+                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 840 }}>
                     {t(helpTextKey)}
                 </Typography>
 
                 <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
                     <Button
                         variant="outlined"
+                        startIcon={<DownloadIcon />}
+                        endIcon={<ArrowDropDownIcon />}
+                        onClick={(e) => setExportAnchor(e.currentTarget)}
+                        sx={fioriDefaultSx}
+                    >
+                        {t('quickExport')}
+                    </Button>
+                    <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}>
+                        <MenuItem onClick={() => handleExport('csv')}>CSV</MenuItem>
+                        <MenuItem onClick={() => handleExport('xlsx')}>XLSX</MenuItem>
+                    </Menu>
+
+                    <Button
+                        variant="outlined"
                         disabled={syncing}
                         onClick={onSync}
                         startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
+                        sx={fioriDefaultSx}
                     >
                         {t(syncLabelKey)}
                     </Button>
@@ -105,7 +200,7 @@ export function AttributeMappingTable({
                         disabled={pendingCount === 0 || saving}
                         onClick={onSave}
                         startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={solidActionSx}
+                        sx={fioriEmphasizedSx}
                     >
                         {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </Button>
@@ -120,11 +215,11 @@ export function AttributeMappingTable({
                     onChange={(event) => onSearchChange(event.target.value)}
                     placeholder={t('searchAttributes')}
                     size="small"
-                    sx={{ minWidth: 320 }}
+                    sx={{ ...fioriSearchFieldSx, minWidth: 320 }}
                     InputProps={{
                         startAdornment: (
                             <InputAdornment position="start">
-                                <SearchIcon />
+                                <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
                             </InputAdornment>
                         ),
                     }}
@@ -134,7 +229,12 @@ export function AttributeMappingTable({
                     value={status}
                     onChange={(e) => onStatusChange(e.target.value as 'all' | 'mapped' | 'unmapped')}
                     size="small"
-                    sx={{ minWidth: 160 }}
+                    sx={{
+                        minWidth: 160,
+                        bgcolor: FIORI.surface,
+                        borderRadius: '8px',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
+                    }}
                 >
                     <MenuItem value="all">{t('statusAll')}</MenuItem>
                     <MenuItem value="mapped">{t('statusMapped')}</MenuItem>
@@ -142,71 +242,13 @@ export function AttributeMappingTable({
                 </Select>
             </Stack>
 
-            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: UI_BORDER }}>
-                <Table size="small">
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>{t('attributeColumn')}</TableCell>
-                            <TableCell>{t('status')}</TableCell>
-                            <TableCell>{t('mapToColumn')}</TableCell>
-                            <TableCell align="right">{t('sortOrder')}</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {filtered.map((row) => {
-                            const mapped = isMapped(row);
-                            const caption = statusCaption(row);
-
-                            return (
-                                <TableRow key={row.id} sx={pendingRowSx(hasPendingChange(row))}>
-                                    <TableCell sx={{ minWidth: 220 }}>
-                                        <Typography fontWeight={600}>{row.label}</Typography>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                                            {row.code} · {row.type}
-                                        </Typography>
-                                    </TableCell>
-
-                                    <TableCell>
-                                        <Chip
-                                            label={mapped ? t('statusMapped') : t('statusUnmapped')}
-                                            size="small"
-                                            sx={mapped ? mappedChipSx : naChipSx}
-                                        />
-                                        {mapped && caption && (
-                                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                                                {caption}
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-
-                                    <TableCell sx={{ minWidth: 260 }}>{renderMapToCell(row)}</TableCell>
-
-                                    <TableCell align="right" sx={{ width: 110 }}>
-                                        {mapped && (
-                                            <TextField
-                                                type="number"
-                                                size="small"
-                                                value={sortOrderFor(row)}
-                                                onChange={(e) => onSortOrderChange(row, Number(e.target.value) || 0)}
-                                                sx={{ width: 90 }}
-                                                slotProps={{ htmlInput: { min: 0 } }}
-                                            />
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-
-                        {filtered.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                                    <Typography color="text.secondary">{t('noAttributesFound')}</Typography>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+            <FioriResponsiveTable
+                columns={columns}
+                rows={filtered}
+                getRowKey={(row) => row.id}
+                rowSx={(row) => pendingRowSx(hasPendingChange(row))}
+                emptyMessage={t('noAttributesFound')}
+            />
         </Box>
     );
 }

@@ -6,20 +6,17 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Chip } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Chip } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface ImportConfigItem {
@@ -88,6 +85,92 @@ export default function ImportIndex({ configs, filters }: Props) {
         return translated === key ? type : translated;
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the config code
+    // is the identifying column and stays visible at every width; the
+    // uploaded-file indicator (needed to know if "Import Now" is even
+    // available) follows next; type/action are secondary metadata that
+    // reflow into the pop-in area first, and the numeric ID is the least
+    // useful on a phone. Row actions stay pinned like the identifying column.
+    const columns: FioriResponsiveColumn<ImportConfigItem>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'code',
+            header: 'Code',
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.code}</Typography>,
+        },
+        {
+            key: 'type',
+            header: t('typeLabel'),
+            priority: 'medium',
+            render: (row) => typeLabel(row.type),
+        },
+        {
+            key: 'action',
+            header: t('action'),
+            priority: 'medium',
+            render: (row) => (row.action === 'delete' ? t('actionDelete') : t('actionCreateUpdate')),
+        },
+        {
+            key: 'uploadedFile',
+            header: t('uploadedFile'),
+            priority: 'high',
+            render: (row) =>
+                row.source_file_path ? (
+                    <Chip
+                        label={row.source_file_name ?? row.source_file_path.split('/').pop()}
+                        size="small"
+                        sx={{ borderRadius: '6px' }}
+                    />
+                ) : (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('noFileUploaded')}
+                    </Typography>
+                ),
+        },
+        {
+            key: 'actions',
+            header: tGrid('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                    {canRun && row.source_file_path && (
+                        <IconButton
+                            size="small"
+                            sx={fioriIconButtonSx}
+                            title={t('importNow')}
+                            disabled={runningId === row.id}
+                            onClick={() => {
+                                setRunningId(row.id);
+                                router.post(`/import-export/imports/${row.id}/run`, {}, {
+                                    onFinish: () => setRunningId(null),
+                                });
+                            }}
+                        >
+                            {runningId === row.id ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
+                        </IconButton>
+                    )}
+                    {canEdit && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/imports/${row.id}/edit`)}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    {canDelete && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Box>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('importsTitle')} />
@@ -129,78 +212,13 @@ export default function ImportIndex({ configs, filters }: Props) {
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    <TableContainer>
-                        <Table>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>Code</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('typeLabel')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('action')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('uploadedFile')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {configs.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.code}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{typeLabel(row.type)}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{row.action === 'delete' ? t('actionDelete') : t('actionCreateUpdate')}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            {row.source_file_path ? (
-                                                <Chip
-                                                    label={row.source_file_name ?? row.source_file_path.split('/').pop()}
-                                                    size="small"
-                                                    sx={{ borderRadius: '6px' }}
-                                                />
-                                            ) : (
-                                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                    {t('noFileUploaded')}
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell align="right" sx={fioriBodyCellSx}>
-                                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                                                {canRun && row.source_file_path && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        title={t('importNow')}
-                                                        disabled={runningId === row.id}
-                                                        onClick={() => {
-                                                            setRunningId(row.id);
-                                                            router.post(`/import-export/imports/${row.id}/run`, {}, {
-                                                                onFinish: () => setRunningId(null),
-                                                            });
-                                                        }}
-                                                    >
-                                                        {runningId === row.id ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon fontSize="small" />}
-                                                    </IconButton>
-                                                )}
-                                                {canEdit && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/import-export/imports/${row.id}/edit`)}>
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {configs.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>{t('noImportsFound')}</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={configs.data}
+                        getRowKey={(row) => row.id}
+                        emptyMessage={t('noImportsFound')}
+                    />
                 </Paper>
 
                 {configs.last_page > 1 && (

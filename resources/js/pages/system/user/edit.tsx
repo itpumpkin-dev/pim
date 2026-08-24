@@ -17,22 +17,16 @@ import {
     FormControlLabel,
     IconButton,
     MenuItem,
-    Paper,
     Select,
     Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Tabs,
     TextField,
     Typography,
 } from '@mui/material';
 import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx } from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface UserGroupOption {
     id: number;
@@ -214,6 +208,44 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
             (a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action),
         );
     }, [permissions, t]);
+
+    // Column pop-in priority (SAP Fiori responsive table): resource
+    // identifies the row and always stays; action follows as space allows;
+    // "granted via" (a wrapping list of source chips) reflows first since
+    // it's the least compact/least essential of the three.
+    type PermissionRow = (typeof permissionRows)[number];
+    const permissionColumns: FioriResponsiveColumn<PermissionRow>[] = [
+        {
+            key: 'resource',
+            header: t('resource'),
+            priority: 'always',
+            render: (row) => humanize(row.resource),
+        },
+        {
+            key: 'action',
+            header: t('action'),
+            priority: 'high',
+            render: (row) => humanize(row.action),
+        },
+        {
+            key: 'grantedVia',
+            header: t('grantedVia'),
+            priority: 'medium',
+            render: (row) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {row.sources.map((source) => (
+                        <Chip
+                            key={source}
+                            label={source}
+                            size="small"
+                            variant="outlined"
+                            sx={{ borderColor: FIORI.border, borderRadius: '6px', color: FIORI.textPrimary }}
+                        />
+                    ))}
+                </Box>
+            ),
+        },
+    ];
     const [avatarPreview, setAvatarPreview] = useState<string | null>(user.avatar_url);
     const [avatarViewerOpen, setAvatarViewerOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -561,45 +593,13 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
                             {t('permissionsDescription')}
                         </Typography>
-                        <TableContainer component={Paper} sx={fioriCardSx}>
-                            <Table size="small">
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('resource')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('action')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('grantedVia')}</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {permissionRows.map((row) => (
-                                        <TableRow key={`${row.resource}.${row.action}`}>
-                                            <TableCell sx={fioriBodyCellSx}>{humanize(row.resource)}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{humanize(row.action)}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                                    {row.sources.map((source) => (
-                                                        <Chip
-                                                            key={source}
-                                                            label={source}
-                                                            size="small"
-                                                            variant="outlined"
-                                                            sx={{ borderColor: FIORI.border, borderRadius: '6px', color: FIORI.textPrimary }}
-                                                        />
-                                                    ))}
-                                                </Box>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {permissionRows.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                                {t('noPermissionsAssigned')}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <FioriResponsiveTable
+                            size="small"
+                            columns={permissionColumns}
+                            rows={permissionRows}
+                            getRowKey={(row) => `${row.resource}.${row.action}`}
+                            emptyMessage={t('noPermissionsAssigned')}
+                        />
                     </Box>
                 )}
 

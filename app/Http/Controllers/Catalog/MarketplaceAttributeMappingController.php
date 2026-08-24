@@ -12,8 +12,14 @@ use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\WooCommerceAttribute;
 use App\Models\WooCommerceAttributeMapping;
+use App\Services\ImportExport\SpreadsheetWriter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Single entry point ("จับคู่เนื้อหา Marketplace") bundling all four
@@ -121,6 +127,128 @@ class MarketplaceAttributeMappingController extends Controller
                 ],
             ],
         ]);
+    }
+
+    // The custom-attribute-bucket target_field value for each platform (see
+    // self::PAYLOAD_FIELDS's comment) — this is what a row's `target_field`
+    // equals when it's mapped to one specific platform attribute (looked up
+    // via the id/name key below) rather than one of the fixed payload fields.
+    private const CUSTOM_TARGET_FIELD = [
+        'woocommerce' => 'wc_attribute',
+        'shopee' => 'shopee_attribute',
+        'lazada' => 'lazada_attribute',
+        'tiktok' => 'tiktok_attribute',
+    ];
+
+    /**
+     * Exports one platform's attribute-mapping tab as CSV/XLS/XLSX — the
+     * same rows index() feeds that tab (so it reflects the last *saved*
+     * mapping, not a tab's unsaved pending edits, which only ever exist
+     * client-side), honoring whatever search/status filter is currently
+     * applied in that tab (passed explicitly since that filter is
+     * client-only state, never round-tripped to the server otherwise).
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'platform' => ['required', 'in:woocommerce,shopee,lazada,tiktok'],
+            'format' => ['required', 'in:csv,xls,xlsx'],
+            'search' => ['nullable', 'string'],
+            'status' => ['nullable', 'in:all,mapped,unmapped'],
+            'locale' => ['nullable', 'string', Rule::exists('locales', 'code')->where('enabled', true)],
+        ]);
+
+        // Forced explicitly rather than left to resolve from the session/
+        // cookie — see AttributeController::export()'s identical comment for
+        // why that can silently disagree with what the tab is showing.
+        if (! empty($validated['locale'])) {
+            app()->setLocale($validated['locale']);
+        }
+
+        $platform = $validated['platform'];
+        $format = $validated['format'];
+        $status = $validated['status'] ?? 'all';
+        $needle = isset($validated['search']) ? mb_strtolower(trim($validated['search'])) : '';
+
+        $pimAttributes = Attribute::cachedList();
+
+        [$rows, $customIdField, $lookup, $lookupIdKey, $lookupLabelKey] = match ($platform) {
+            'woocommerce' => [
+                $this->woocommerceAttributeRows($pimAttributes, WooCommerceAttributeMapping::cachedList()),
+                'woocommerce_attribute_id',
+                WooCommerceAttribute::cachedList(),
+                'id', 'name',
+            ],
+            'shopee' => [
+                $this->shopeeAttributeRows($pimAttributes, ShopeeAttributeMapping::cachedList()),
+                'shopee_attribute_id',
+                ShopeeAttribute::cachedList(),
+                'id', 'name',
+            ],
+            'lazada' => [
+                $this->lazadaAttributeRows($pimAttributes, LazadaAttributeMapping::cachedList()),
+                'lazada_attribute_name',
+                LazadaAttribute::cachedList(),
+                'name', 'label',
+            ],
+            'tiktok' => [
+                $this->tiktokAttributeRows($pimAttributes, TikTokAttributeMapping::cachedList()),
+                'tiktok_attribute_id',
+                TikTokAttribute::cachedList(),
+                'id', 'name',
+            ],
+        };
+
+        $customTargetField = self::CUSTOM_TARGET_FIELD[$platform];
+        $lookupByKey = $lookup->keyBy($lookupIdKey);
+
+        $exportRows = [];
+        foreach ($rows as $row) {
+            $isMapped = ! empty($row['target_field']);
+
+            if ($status === 'mapped' && ! $isMapped) {
+                continue;
+            }
+            if ($status === 'unmapped' && $isMapped) {
+                continue;
+            }
+            if ($needle !== ''
+                && ! str_contains(mb_strtolower($row['code']), $needle)
+                && ! str_contains(mb_strtolower($row['label']), $needle)) {
+                continue;
+            }
+
+            $mappedTo = '';
+            if ($isMapped) {
+                if ($row['target_field'] === $customTargetField) {
+                    $customValue = $row[$customIdField] ?? null;
+                    $match = $customValue !== null ? $lookupByKey->get($customValue) : null;
+                    $mappedTo = $match ? ($match->{$lookupLabelKey} ?? (string) $customValue) : (string) $customValue;
+                } else {
+                    $mappedTo = $row['target_field'];
+                }
+            }
+
+            $exportRows[] = [
+                'code' => $row['code'],
+                'label' => $row['label'],
+                'type' => $row['type'],
+                'status' => $isMapped ? 'mapped' : 'unmapped',
+                'mapped_to' => $mappedTo,
+                'sort_order' => $row['sort_order'],
+            ];
+        }
+
+        Storage::disk('local')->makeDirectory('tmp-exports');
+        $tempRelativePath = 'tmp-exports/'.Str::uuid().'.'.$format;
+        $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
+
+        $columns = ['code', 'label', 'type', 'status', 'mapped_to', 'sort_order'];
+        SpreadsheetWriter::write($tempAbsolutePath, $format, $columns, $exportRows, ',');
+
+        $downloadName = $platform.'_attribute_mapping_'.now()->format('Ymd_His').'.'.$format;
+
+        return response()->download($tempAbsolutePath, $downloadName)->deleteFileAfterSend(true);
     }
 
     /**

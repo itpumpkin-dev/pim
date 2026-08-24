@@ -12,23 +12,19 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import DownloadIcon from '@mui/icons-material/Download';
-import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TableSortLabel, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, TableSortLabel, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
-    fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface CategoryItem {
@@ -140,6 +136,159 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         setPlatformFilter(value);
         router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir, platform: value }, { preserveState: true });
     };
+
+    // Column pop-in priority (SAP Fiori responsive table): the category
+    // name identifies the row and row actions stay visible down to phone
+    // width; the products-count link and active status are the next most
+    // useful things to act on/scan, then parent/description/mapped
+    // platforms, with the decorative thumbnail and the low-value slug
+    // reflowing first (the thumbnail carries no data worth restating as a
+    // label/value pair, so it's dropped from the pop-in entirely).
+    const columns: FioriResponsiveColumn<CategoryItem>[] = [
+        {
+            key: 'thumbnail',
+            header: t('thumbnail'),
+            priority: 'low',
+            hideInPopin: true,
+            render: (row) =>
+                row.thumbnail_url ? (
+                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1, border: `1px solid ${FIORI.border}` }} />
+                ) : (
+                    <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'grey.100', border: `1px solid ${FIORI.border}` }} />
+                ),
+        },
+        {
+            key: 'name',
+            header: (
+                <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
+                    {t('name')}
+                </TableSortLabel>
+            ),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name}</Typography>,
+        },
+        {
+            key: 'parent',
+            header: t('parent'),
+            priority: 'medium',
+            render: (row) =>
+                row.parent ? (
+                    <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
+                        {row.parent.name}
+                    </Typography>
+                ) : (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('rootCategory')}
+                    </Typography>
+                ),
+        },
+        {
+            key: 'description',
+            header: (
+                <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
+                    {t('description')}
+                </TableSortLabel>
+            ),
+            priority: 'medium',
+            render: (row) => (
+                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.description || '-'}
+                </Typography>
+            ),
+        },
+        {
+            key: 'slug',
+            header: (
+                <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
+                    {t('slug')}
+                </TableSortLabel>
+            ),
+            priority: 'low',
+            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.slug || '-'}</Typography>,
+        },
+        {
+            key: 'products_count',
+            header: (
+                <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
+                    {t('productsCount')}
+                </TableSortLabel>
+            ),
+            priority: 'high',
+            align: 'right',
+            render: (row) =>
+                row.products_count ? (
+                    <Typography
+                        component="a"
+                        href={`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            router.visit(`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`);
+                        }}
+                        sx={{ color: FIORI.brand, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    >
+                        {row.products_count}
+                    </Typography>
+                ) : (
+                    <Typography color="text.disabled">0</Typography>
+                ),
+        },
+        {
+            key: 'mappedPlatforms',
+            header: t('mappedPlatforms'),
+            priority: 'medium',
+            render: (row) =>
+                row.mapped_platforms && row.mapped_platforms.length > 0 ? (
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                        {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
+                            <Chip
+                                key={platform.value}
+                                label={platform.label}
+                                size="small"
+                                sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
+                            />
+                        ))}
+                    </Box>
+                ) : (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('notMapped')}
+                    </Typography>
+                ),
+        },
+        {
+            key: 'status',
+            header: t('status'),
+            priority: 'high',
+            render: (row) => <FioriStatus label={row.is_active ? t('active') : t('nonActive')} tone={row.is_active ? 'success' : 'neutral'} />,
+        },
+        ...((canEdit || canDelete)
+            ? [
+                  {
+                      key: 'actions',
+                      header: tGrid('actionsHeader'),
+                      priority: 'always' as const,
+                      align: 'right' as const,
+                      render: (row: CategoryItem) => (
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                              {canEdit && (
+                                  <IconButton
+                                      size="small"
+                                      sx={fioriIconButtonSx}
+                                      onClick={() => router.visit(`/catalog/categories/${row.id}/edit`)}
+                                  >
+                                      <EditIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                              {canDelete && (
+                                  <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteCategoryId(row.id)}>
+                                      <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                          </Box>
+                      ),
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -259,137 +408,12 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                     </Stack>
                 </Stack>
 
-                <TableContainer sx={fioriCardSx}>
-                    <Table>
-                        <TableHead sx={fioriTableHeadSx}>
-                            <TableRow>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('thumbnail')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>
-                                    <TableSortLabel active={sortField === 'name'} direction={sortField === 'name' ? sortDir : 'asc'} onClick={() => handleSort('name')}>
-                                        {t('name')}
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('parent')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>
-                                    <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
-                                        {t('description')}
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>
-                                    <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
-                                        {t('slug')}
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={fioriTableHeadCellSx} align="right">
-                                    <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
-                                        {t('productsCount')}
-                                    </TableSortLabel>
-                                </TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('mappedPlatforms')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('status')}</TableCell>
-                                {(canEdit || canDelete) && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {categories.data.map((row) => (
-                                <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        {row.thumbnail_url ? (
-                                            <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1, border: `1px solid ${FIORI.border}` }} />
-                                        ) : (
-                                            <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'grey.100', border: `1px solid ${FIORI.border}` }} />
-                                        )}
-                                    </TableCell>
-                                    <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        {row.parent ? (
-                                            <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
-                                                {row.parent.name}
-                                            </Typography>
-                                        ) : (
-                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                {t('rootCategory')}
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary, maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {row.description || '-'}
-                                    </TableCell>
-                                    <TableCell sx={{ ...fioriBodyCellSx, color: FIORI.textSecondary }}>{row.slug || '-'}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx} align="right">
-                                        {row.products_count ? (
-                                            <Typography
-                                                component="a"
-                                                href={`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    router.visit(`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`);
-                                                }}
-                                                sx={{ color: FIORI.brand, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
-                                            >
-                                                {row.products_count}
-                                            </Typography>
-                                        ) : (
-                                            <Typography color="text.disabled">0</Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        {row.mapped_platforms && row.mapped_platforms.length > 0 ? (
-                                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                                                {MAPPED_PLATFORMS.filter((platform) => row.mapped_platforms!.includes(platform.value)).map((platform) => (
-                                                    <Chip
-                                                        key={platform.value}
-                                                        label={platform.label}
-                                                        size="small"
-                                                        sx={{ bgcolor: platform.color, color: '#fff', fontWeight: 600 }}
-                                                    />
-                                                ))}
-                                            </Box>
-                                        ) : (
-                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                {t('notMapped')}
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus label={row.is_active ? t('active') : t('nonActive')} tone={row.is_active ? 'success' : 'neutral'} />
-                                    </TableCell>
-                                    {(canEdit || canDelete) && (
-                                        <TableCell sx={fioriBodyCellSx} align="right">
-                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                {canEdit && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => router.visit(`/catalog/categories/${row.id}/edit`)}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => setDeleteCategoryId(row.id)}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))}
-                            {categories.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={(canEdit || canDelete) ? 9 : 8} align="center" sx={{ color: FIORI.textSecondary }}>
-                                        {t('noCategoriesFound')}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={categories.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage={t('noCategoriesFound')}
+                />
             </Box>
 
             <Dialog open={deleteCategoryId !== null} onClose={() => setDeleteCategoryId(null)}>

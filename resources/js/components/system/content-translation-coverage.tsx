@@ -10,12 +10,6 @@ import {
     Link as MuiLink,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
@@ -23,6 +17,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import { Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 
 export interface ContentMissingRow {
     id: number;
@@ -114,6 +109,48 @@ function ContentGroupCard({
         return group.missing.filter((row) => row.code.toLowerCase().includes(needle));
     }, [group.missing, search]);
 
+    // Only 2 columns (Code, Actions) — both stay always visible, there's
+    // nothing worth deprioritizing into the pop-in area here.
+    const columns: FioriResponsiveColumn<ContentMissingRow>[] = [
+        {
+            key: 'code',
+            header: 'Code',
+            priority: 'always',
+            render: (row) => (
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.code}</Typography>
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'Actions',
+            priority: 'always',
+            align: 'right',
+            render: (row) => {
+                const rowKey = `${group.key}:${row.id}`;
+                const isTranslating = translatingRowKey === rowKey;
+
+                return (
+                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        <Tooltip title="Translate this one">
+                            <span>
+                                <IconButton size="small" disabled={isTranslating} onClick={() => onTranslateOne(row.id)}>
+                                    {isTranslating ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Edit">
+                            <span>
+                                <MuiLink component={Link} href={row.editUrl} sx={{ display: 'flex', alignItems: 'center', px: 0.5 }}>
+                                    <Typography variant="caption">Edit</Typography>
+                                </MuiLink>
+                            </span>
+                        </Tooltip>
+                    </Stack>
+                );
+            },
+        },
+    ];
+
     return (
         <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 1.5 }}>
@@ -169,55 +206,16 @@ function ContentGroupCard({
                             ),
                         }}
                     />
-                    <TableContainer sx={{ maxHeight: 280, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                        <Table size="small" stickyHeader>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
-                                    <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                        Actions
-                                    </TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {filteredMissing.map((row) => {
-                                    const rowKey = `${group.key}:${row.id}`;
-                                    const isTranslating = translatingRowKey === rowKey;
-
-                                    return (
-                                        <TableRow key={row.id} hover>
-                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.code}</TableCell>
-                                            <TableCell align="right">
-                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                    <Tooltip title="Translate this one">
-                                                        <span>
-                                                            <IconButton size="small" disabled={isTranslating} onClick={() => onTranslateOne(row.id)}>
-                                                                {isTranslating ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
-                                                    <Tooltip title="Edit">
-                                                        <span>
-                                                            <MuiLink component={Link} href={row.editUrl} sx={{ display: 'flex', alignItems: 'center', px: 0.5 }}>
-                                                                <Typography variant="caption">Edit</Typography>
-                                                            </MuiLink>
-                                                        </span>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                                {filteredMissing.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={2} align="center" sx={{ py: 2, color: 'text.secondary' }}>
-                                            No matches.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <Box sx={{ maxHeight: 280, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                        <FioriResponsiveTable
+                            variant="plain"
+                            size="small"
+                            columns={columns}
+                            rows={filteredMissing}
+                            getRowKey={(row) => row.id}
+                            emptyMessage="No matches."
+                        />
+                    </Box>
                 </>
             )}
         </Paper>

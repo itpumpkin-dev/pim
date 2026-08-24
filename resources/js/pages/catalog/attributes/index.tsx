@@ -29,32 +29,24 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
+import { encodeQueryParams } from '@/lib/query-string';
 import {
     FIORI,
     FioriBusyOverlay,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface GridColumn extends FilterableGridColumn {}
@@ -62,28 +54,6 @@ interface GridAction { icon: string; label: string; }
 interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<string, GridAction>; }
 interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; current_page: number; last_page: number; per_page: number; }
 interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> }; }
-
-/**
- * Bracket-notation query string encoder (`filters[created_at][from]=...`) —
- * PHP parses this natively into nested arrays, which is what
- * AttributeController::export() expects for `search`/`filters`. Needed
- * because the export link is a plain browser navigation (so the server's
- * BinaryFileResponse triggers a real download) rather than an Inertia
- * `router.get()` visit, which would otherwise handle the nesting for us.
- */
-function encodeQueryParams(params: Record<string, unknown>, prefix = ''): string[] {
-    const parts: string[] = [];
-    for (const [key, value] of Object.entries(params)) {
-        if (value === undefined || value === null || value === '') continue;
-        const paramKey = prefix ? `${prefix}[${key}]` : key;
-        if (typeof value === 'object' && !Array.isArray(value)) {
-            parts.push(...encodeQueryParams(value as Record<string, unknown>, paramKey));
-        } else {
-            parts.push(`${encodeURIComponent(paramKey)}=${encodeURIComponent(String(value))}`);
-        }
-    }
-    return parts;
-}
 
 function cellValue(value: unknown, type: string, t: (key: string) => string) {
     if (type === 'boolean') return <FioriStatus label={value ? t('yes') : t('no')} tone={value ? 'success' : 'neutral'} />;
@@ -137,6 +107,53 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
         if (actionKey === 'delete') return canDelete;
         return true;
     });
+
+    // Column pop-in priority (SAP Fiori responsive table): this grid's
+    // columns come from the server-driven gridConfig rather than a fixed
+    // list, so priority falls out of column order — the first column
+    // identifies the row and always stays, the next two follow as space
+    // allows, and the rest reflow into the pop-in area first. Row actions
+    // stay pinned like the identifying column since they're always reachable
+    // in Fiori's pattern too.
+    type AttributeRow = GridData['data'][number];
+    const columns: FioriResponsiveColumn<AttributeRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
+        key,
+        header: t(column.label),
+        priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
+        render: (row) => cellValue(row[key], column.type, t),
+    }));
+
+    if (visibleActions.length > 0) {
+        columns.push({
+            key: 'actions',
+            header: t('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    {visibleActions.map(([actionKey, action]) => {
+                        let Icon = EditIcon;
+                        if (action.icon === 'delete') Icon = DeleteIcon;
+
+                        const handleClick = () => {
+                            if (actionKey === 'update') {
+                                router.visit(`/catalog/attributes/${row.id}/edit`);
+                            } else if (actionKey === 'delete') {
+                                setDeleteAttributeId(row.id);
+                            }
+                        };
+
+                        return (
+                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
+                                <Icon fontSize="small" />
+                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
+                            </IconButton>
+                        );
+                    })}
+                </Stack>
+            ),
+        });
+    }
 
     useEffect(() => {
         if (firstRender.current) {
@@ -293,59 +310,13 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                     <Divider sx={{ borderColor: FIORI.border }} />
 
                     <FioriBusyOverlay busy={isFetching}>
-                    <TableContainer>
-                        <Table>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                        <TableCell key={key} sx={fioriTableHeadCellSx}>{t(column.label)}</TableCell>
-                                    ))}
-                                    {visibleActions.length > 0 && <TableCell sx={fioriTableHeadCellSx} align="right">{t('actionsHeader')}</TableCell>}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {gridData.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                            <TableCell key={key} sx={fioriBodyCellSx}>{cellValue(row[key], column.type, t)}</TableCell>
-                                        ))}
-                                        {visibleActions.length > 0 && (
-                                            <TableCell align="right">
-                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                    {visibleActions.map(([actionKey, action]) => {
-                                                        let Icon = EditIcon;
-                                                        if (action.icon === 'delete') Icon = DeleteIcon;
-
-                                                        const handleClick = () => {
-                                                            if (actionKey === 'update') {
-                                                                router.visit(`/catalog/attributes/${row.id}/edit`);
-                                                            } else if (actionKey === 'delete') {
-                                                                setDeleteAttributeId(row.id);
-                                                            }
-                                                        };
-
-                                                        return (
-                                                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                                                <Icon fontSize="small" />
-                                                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                                                            </IconButton>
-                                                        );
-                                                    })}
-                                                </Stack>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                                {gridData.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            {tCatalog('noAttributesFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={columns}
+                            rows={gridData.data}
+                            getRowKey={(row) => row.id}
+                            emptyMessage={tCatalog('noAttributesFound')}
+                        />
                     </FioriBusyOverlay>
                 </Paper>
             </Box>

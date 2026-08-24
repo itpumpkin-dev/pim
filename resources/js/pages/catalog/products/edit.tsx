@@ -46,12 +46,6 @@ import {
     Tabs,
     TextField,
     Typography,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Tooltip,
 } from '@mui/material';
 import { FormEvent, memo, useCallback, useEffect, useRef, useState, useTransition } from 'react';
@@ -63,6 +57,7 @@ import { HistoryPanel } from '@/components/history-panel';
 import { CategoryCascadeSelect } from '@/components/category-cascade-select';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 
@@ -472,6 +467,86 @@ export default function ProductEdit({
         setData('variants', data.variants.filter((_, i) => i !== index));
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the variant label
+    // identifies the row and SKU is the required field the user must fill in,
+    // so both stay visible down to phone width (SKU as 'high' rather than
+    // 'always' so it still yields to the label first); price/qty are
+    // secondary editable fields that reflow into the pop-in area first; the
+    // remove action stays pinned like the identifying column.
+    type VariantRow = { v: VariantItem; index: number };
+    const variantColumns: FioriResponsiveColumn<VariantRow>[] = [
+        {
+            key: 'option',
+            header: 'ตัวเลือก',
+            priority: 'always',
+            render: ({ v }) => <Typography component="span" fontWeight={600}>{variantLabel(v)}</Typography>,
+        },
+        {
+            key: 'sku',
+            header: 'SKU *',
+            priority: 'high',
+            render: ({ v, index }) => (
+                <TextField
+                    size="small"
+                    required
+                    value={v.sku}
+                    onChange={(e) => {
+                        const updated = [...data.variants];
+                        updated[index] = { ...v, sku: e.target.value };
+                        setData('variants', updated);
+                    }}
+                />
+            ),
+        },
+        {
+            key: 'price',
+            header: 'ราคา',
+            priority: 'medium',
+            render: ({ v, index }) => (
+                <TextField
+                    size="small"
+                    type="number"
+                    value={v.price}
+                    onChange={(e) => {
+                        const updated = [...data.variants];
+                        updated[index] = { ...v, price: e.target.value };
+                        setData('variants', updated);
+                    }}
+                    placeholder="ราคา"
+                />
+            ),
+        },
+        {
+            key: 'qty',
+            header: 'จำนวนสต๊อก (Qty)',
+            priority: 'medium',
+            render: ({ v, index }) => (
+                <TextField
+                    size="small"
+                    type="number"
+                    value={v.qty}
+                    onChange={(e) => {
+                        const updated = [...data.variants];
+                        updated[index] = { ...v, qty: e.target.value };
+                        setData('variants', updated);
+                    }}
+                    placeholder="สต๊อก"
+                />
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'ลบ',
+            priority: 'always',
+            align: 'right',
+            render: ({ index }) => (
+                <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
+                    <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+            ),
+        },
+    ];
+
     // Switching away from Configurable deletes every variant child on Save
     // (see ProductController::update()) — confirm first since that's not
     // reversible from here once saved.
@@ -520,8 +595,8 @@ export default function ProductEdit({
     // misleading "0%" instead of explaining there's simply nothing to push.
     const translationBlockedReason =
         product.translation_completeness == null
-            ? 'No translatable content tracked for this product — nothing to push.'
-            : `Translation must be 100% complete first (currently ${product.translation_completeness}%).`;
+            ? t('noTranslatableContentToPush')
+            : t('translationMustBeComplete', { percent: product.translation_completeness });
 
     const closePushDialog = () => {
         setPushConfirmShop(null);
@@ -549,25 +624,25 @@ export default function ProductEdit({
             .then(async (res) => {
                 const body = await res.json();
                 const messages: Record<string, string> = {
-                    upserted: 'Translation pushed to TranslatePress.',
-                    skipped_no_english_name: 'No English name set in PIM for this product — nothing to push.',
-                    skipped_not_tracked: "TranslatePress hasn't seen this product's page yet (it only learns a string once it's been viewed live) — view the product on the live site first, then try again.",
-                    not_live_on_woocommerce: "This product isn't currently live on WooCommerce.",
+                    upserted: t('translationPushedSuccess'),
+                    skipped_no_english_name: t('translationSkippedNoEnglishName'),
+                    skipped_not_tracked: t('translationSkippedNotTracked'),
+                    not_live_on_woocommerce: t('translationNotLiveOnWoocommerce'),
                 };
                 const status = body.status as string | undefined;
 
                 if (!res.ok) {
-                    setFillTranslationResult({ severity: 'error', message: body.message ?? 'Could not push translation.' });
+                    setFillTranslationResult({ severity: 'error', message: body.message ?? t('couldNotPushTranslation') });
                 } else if (status === 'upserted') {
                     setFillTranslationResult({ severity: 'success', message: messages.upserted });
                 } else if (status && messages[status]) {
                     setFillTranslationResult({ severity: 'info', message: messages[status] });
                 } else {
-                    setFillTranslationResult({ severity: 'error', message: 'Unexpected response.' });
+                    setFillTranslationResult({ severity: 'error', message: t('unexpectedResponse') });
                 }
             })
             .catch(() => {
-                setFillTranslationResult({ severity: 'error', message: 'Network error while pushing translation.' });
+                setFillTranslationResult({ severity: 'error', message: t('networkErrorPushingTranslation') });
             })
             .finally(() => setFillingTranslation(false));
     };
@@ -590,7 +665,7 @@ export default function ProductEdit({
         setStatusCheck({ shopId, loading: true });
         const routes = PLATFORM_ROUTES[platform.toLowerCase()];
         if (!routes) {
-            setStatusCheck({ shopId, loading: false, error: `Unsupported platform: ${platform}` });
+            setStatusCheck({ shopId, loading: false, error: t('unsupportedPlatform', { platform }) });
             return;
         }
 
@@ -601,7 +676,7 @@ export default function ProductEdit({
                 const body = await res.json();
                 setStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
             })
-            .catch(() => setStatusCheck({ shopId, loading: false, error: `Network error while checking ${platform} status.` }));
+            .catch(() => setStatusCheck({ shopId, loading: false, error: t('networkErrorCheckingStatus', { platform }) }));
     };
 
     // Push/deactivate now run as a background job (see
@@ -627,7 +702,7 @@ export default function ProductEdit({
                     const body = await res.json();
 
                     if (!res.ok) {
-                        onDone({ severity: 'error', message: body.message ?? 'Could not check sync job status.' });
+                        onDone({ severity: 'error', message: body.message ?? t('couldNotCheckSyncJobStatus') });
                         return;
                     }
                     if (body.status === 'completed') {
@@ -635,14 +710,14 @@ export default function ProductEdit({
                         return;
                     }
                     if (body.status === 'failed') {
-                        onDone({ severity: 'error', message: body.message ?? 'Sync failed.' });
+                        onDone({ severity: 'error', message: body.message ?? t('syncFailed') });
                         return;
                     }
 
                     if (attempts >= POLL_MAX_ATTEMPTS) {
                         onDone({
                             severity: 'error',
-                            message: 'Still processing — this is taking longer than expected. It may still complete in the background; check the Live status shortly.',
+                            message: t('syncStillProcessing'),
                         });
                         return;
                     }
@@ -650,7 +725,7 @@ export default function ProductEdit({
                 })
                 .catch(() => {
                     if (attempts >= POLL_MAX_ATTEMPTS) {
-                        onDone({ severity: 'error', message: 'Network error while checking sync status.' });
+                        onDone({ severity: 'error', message: t('networkErrorCheckingSyncStatus') });
                         return;
                     }
                     setTimeout(poll, POLL_INTERVAL_MS);
@@ -688,7 +763,7 @@ export default function ProductEdit({
                 const body = await res.json();
 
                 if (!res.ok || !body.job_id) {
-                    setPushResult({ severity: 'error', message: body.message ?? `Could not queue push to ${platform}.` });
+                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueuePush', { platform }) });
                     setPushing(false);
                     closePushDialog();
                     return;
@@ -701,7 +776,7 @@ export default function ProductEdit({
                 });
             })
             .catch(() => {
-                setPushResult({ severity: 'error', message: `Network error while pushing to ${platform}.` });
+                setPushResult({ severity: 'error', message: t('networkErrorPushingToPlatform', { platform }) });
                 setPushing(false);
                 closePushDialog();
             });
@@ -738,7 +813,7 @@ export default function ProductEdit({
                 const body = await res.json();
 
                 if (!res.ok || !body.job_id) {
-                    setPushResult({ severity: 'error', message: body.message ?? `Could not queue deactivation on ${platform}.` });
+                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueueDeactivation', { platform }) });
                     setDeactivating(false);
                     setDeactivateConfirmShop(null);
                     return;
@@ -751,7 +826,7 @@ export default function ProductEdit({
                 });
             })
             .catch(() => {
-                setPushResult({ severity: 'error', message: `Network error while deactivating on ${platform}.` });
+                setPushResult({ severity: 'error', message: t('networkErrorDeactivatingOnPlatform', { platform }) });
                 setDeactivating(false);
                 setDeactivateConfirmShop(null);
             });
@@ -1179,69 +1254,13 @@ export default function ProductEdit({
                                                                 ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
                                                             </Typography>
                                                         ) : (
-                                                            <TableContainer>
-                                                                <Table size="small">
-                                                                    <TableHead>
-                                                                        <TableRow>
-                                                                            <TableCell sx={{ fontWeight: 700 }}>ตัวเลือก</TableCell>
-                                                                            <TableCell sx={{ fontWeight: 700 }}>SKU *</TableCell>
-                                                                            <TableCell sx={{ fontWeight: 700 }}>ราคา</TableCell>
-                                                                            <TableCell sx={{ fontWeight: 700 }}>จำนวนสต๊อก (Qty)</TableCell>
-                                                                            <TableCell sx={{ fontWeight: 700 }} align="right">ลบ</TableCell>
-                                                                        </TableRow>
-                                                                    </TableHead>
-                                                                    <TableBody>
-                                                                        {data.variants.map((v, index) => (
-                                                                            <TableRow key={v.id ?? `new-${index}`}>
-                                                                                <TableCell sx={{ fontWeight: 600 }}>{variantLabel(v)}</TableCell>
-                                                                                <TableCell>
-                                                                                    <TextField
-                                                                                        size="small"
-                                                                                        required
-                                                                                        value={v.sku}
-                                                                                        onChange={(e) => {
-                                                                                            const updated = [...data.variants];
-                                                                                            updated[index] = { ...v, sku: e.target.value };
-                                                                                            setData('variants', updated);
-                                                                                        }}
-                                                                                    />
-                                                                                </TableCell>
-                                                                                <TableCell>
-                                                                                    <TextField
-                                                                                        size="small"
-                                                                                        type="number"
-                                                                                        value={v.price}
-                                                                                        onChange={(e) => {
-                                                                                            const updated = [...data.variants];
-                                                                                            updated[index] = { ...v, price: e.target.value };
-                                                                                            setData('variants', updated);
-                                                                                        }}
-                                                                                        placeholder="ราคา"
-                                                                                    />
-                                                                                </TableCell>
-                                                                                <TableCell>
-                                                                                    <TextField
-                                                                                        size="small"
-                                                                                        type="number"
-                                                                                        value={v.qty}
-                                                                                        onChange={(e) => {
-                                                                                            const updated = [...data.variants];
-                                                                                            updated[index] = { ...v, qty: e.target.value };
-                                                                                            setData('variants', updated);
-                                                                                        }}
-                                                                                        placeholder="สต๊อก"
-                                                                                    />
-                                                                                </TableCell>
-                                                                                <TableCell align="right">
-                                                                                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
-                                                                                        <DeleteOutlineIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                </TableCell>
-                                                                            </TableRow>
-                                                                        ))}
-                                                                    </TableBody>
-                                                                </Table>
-                                                            </TableContainer>
+                                                            <FioriResponsiveTable
+                                                                variant="plain"
+                                                                size="small"
+                                                                columns={variantColumns}
+                                                                rows={data.variants.map((v, index) => ({ v, index }))}
+                                                                getRowKey={(row) => row.v.id ?? `new-${row.index}`}
+                                                            />
                                                         )}
                                                     </Box>
                                                 )}
@@ -1613,27 +1632,26 @@ export default function ProductEdit({
             </Box>
 
             <Dialog open={pushConfirmShop !== null} onClose={closePushDialog}>
-                <DialogTitle>Push to {pushConfirmShop?.platform}?</DialogTitle>
+                <DialogTitle>{t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        This creates or updates a <strong>real, live listing</strong> on {pushConfirmShop?.platform} for <strong>{pushConfirmShop?.name}</strong>,
-                        visible to real customers. This action can&apos;t be undone from here.
+                        {t('pushToChannelWarning', { platform: pushConfirmShop?.platform, name: pushConfirmShop?.name })}
                     </DialogContentText>
                     {pushStatusCheck && (
                         <Box sx={{ mt: 2 }}>
                             {pushStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">Checking current status on {pushConfirmShop?.platform}...</Typography>
+                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: pushConfirmShop?.platform })}</Typography>
                                 </Stack>
                             ) : pushStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {pushStatusCheck.error}</Alert>
+                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: pushStatusCheck.error })}</Alert>
                             ) : pushStatusCheck.never_pushed ? (
-                                <Alert severity="info" sx={{ py: 0 }}>Not pushed before — this will create a new listing.</Alert>
+                                <Alert severity="info" sx={{ py: 0 }}>{t('neverPushedCreateNew')}</Alert>
                             ) : pushStatusCheck.is_live ? (
-                                <Alert severity="success" sx={{ py: 0 }}>Currently live on {pushConfirmShop?.platform} — this will update the existing listing.</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>{t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}</Alert>
                             ) : (
-                                <Alert severity="info" sx={{ py: 0 }}>Exists on {pushConfirmShop?.platform} but not currently active (status: {pushStatusCheck.status ?? 'unknown'}) — this will update it.</Alert>
+                                <Alert severity="info" sx={{ py: 0 }}>{t('existsNotActiveWillUpdate', { platform: pushConfirmShop?.platform, status: pushStatusCheck.status ?? t('statusUnknown') })}</Alert>
                             )}
                         </Box>
                     )}
@@ -1641,10 +1659,10 @@ export default function ProductEdit({
                         <>
                             <Divider sx={{ my: 2 }} />
                             <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                                Push translation to TranslatePress
+                                {t('pushTranslationToTranslatePress')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                Sends this product&apos;s English name into TranslatePress&apos;s dictionary, so the WooCommerce site can show it translated.
+                                {t('pushTranslationHelp')}
                             </Typography>
                             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
                                 <Tooltip title={translationComplete ? '' : translationBlockedReason}>
@@ -1656,7 +1674,7 @@ export default function ProductEdit({
                                             disabled={!translationComplete || fillingTranslation}
                                             startIcon={fillingTranslation ? <CircularProgress size={14} /> : <TranslateIcon fontSize="small" />}
                                         >
-                                            {fillingTranslation ? 'Pushing...' : 'Push Translation'}
+                                            {fillingTranslation ? t('pushingEllipsis') : t('pushTranslationButton')}
                                         </Button>
                                     </span>
                                 </Tooltip>
@@ -1676,7 +1694,7 @@ export default function ProductEdit({
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={closePushDialog} color="inherit" disabled={pushing}>
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={confirmPush}
@@ -1685,40 +1703,39 @@ export default function ProductEdit({
                         startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}
                         sx={solidActionSx}
                     >
-                        {pushing ? 'Pushing...' : 'Push'}
+                        {pushing ? t('pushingEllipsis') : t('push')}
                     </Button>
                 </DialogActions>
             </Dialog>
 
             <Dialog open={deactivateConfirmShop !== null} onClose={() => setDeactivateConfirmShop(null)}>
-                <DialogTitle>Deactivate on {deactivateConfirmShop?.platform}?</DialogTitle>
+                <DialogTitle>{t('deactivateOnChannelTitle', { platform: deactivateConfirmShop?.platform })}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        This hides the <strong>real, live listing</strong> on {deactivateConfirmShop?.platform} for <strong>{deactivateConfirmShop?.name}</strong> from
-                        customers. It stays deactivated until pushed again. This action can&apos;t be undone from here.
+                        {t('deactivateWarning', { platform: deactivateConfirmShop?.platform, name: deactivateConfirmShop?.name })}
                     </DialogContentText>
                     {deactivateStatusCheck && (
                         <Box sx={{ mt: 2 }}>
                             {deactivateStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">Checking current status on {deactivateConfirmShop?.platform}...</Typography>
+                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}</Typography>
                                 </Stack>
                             ) : deactivateStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>Couldn&apos;t check current status: {deactivateStatusCheck.error}</Alert>
+                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: deactivateStatusCheck.error })}</Alert>
                             ) : deactivateStatusCheck.never_pushed ? (
-                                <Alert severity="error" sx={{ py: 0 }}>This product has never been pushed to this shop — there&apos;s nothing to deactivate.</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>{t('neverPushedNothingToDeactivate')}</Alert>
                             ) : !deactivateStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>Already not active on {deactivateConfirmShop?.platform} (status: {deactivateStatusCheck.status ?? 'unknown'}) — nothing to deactivate.</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>{t('alreadyNotActiveNothingToDeactivate', { platform: deactivateConfirmShop?.platform, status: deactivateStatusCheck.status ?? t('statusUnknown') })}</Alert>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>Confirmed currently live on {deactivateConfirmShop?.platform}.</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>{t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}</Alert>
                             )}
                         </Box>
                     )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setDeactivateConfirmShop(null)} color="inherit" disabled={deactivating}>
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button
                         onClick={confirmDeactivate}
@@ -1732,7 +1749,7 @@ export default function ProductEdit({
                         }
                         startIcon={deactivating ? <CircularProgress size={16} /> : <UnpublishedIcon />}
                     >
-                        {deactivating ? 'Deactivating...' : 'Deactivate'}
+                        {deactivating ? t('deactivatingEllipsis') : t('deactivate')}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -8,18 +8,12 @@ import {
     Checkbox,
     CircularProgress,
     Divider,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { FormEventHandler } from 'react';
-import { FIORI, fioriBodyCellSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableHeadCellSx, fioriTableHeadSx, fioriTableRowSx } from '@/lib/fiori-style';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -91,6 +85,49 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
         setData('users', data.users.includes(userId) ? data.users.filter((id) => id !== userId) : [...data.users, userId]);
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the "Has Group"
+    // checkbox is the control being edited here, so it stays always visible
+    // alongside Username (the natural identifier); the rest are descriptive
+    // and reflow into the pop-in area first as space runs out.
+    const userColumns: FioriResponsiveColumn<UserGroupUserOption>[] = [
+        {
+            key: 'hasGroup',
+            header: 'Has Group',
+            priority: 'always',
+            render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
+        },
+        {
+            key: 'employeeId',
+            header: 'Employee ID',
+            priority: 'low',
+            render: (user) => user.employee_id || '-',
+        },
+        {
+            key: 'username',
+            header: 'Username',
+            priority: 'high',
+            render: (user) => user.username,
+        },
+        {
+            key: 'email',
+            header: 'E-mail',
+            priority: 'medium',
+            render: (user) => user.email,
+        },
+        {
+            key: 'firstName',
+            header: 'First name',
+            priority: 'medium',
+            render: (user) => user.first_name,
+        },
+        {
+            key: 'lastName',
+            header: 'Last name',
+            priority: 'low',
+            render: (user) => user.last_name,
+        },
+    ];
+
     return (
         <AppLayout
             breadcrumbs={breadcrumbs}
@@ -124,41 +161,13 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                             Users
                         </Typography>
                         <Divider sx={{ mb: 2, borderColor: FIORI.border }} />
-                        <TableContainer component={Paper} sx={fioriCardSx}>
-                            <Table size="small">
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={fioriTableHeadCellSx}>Has Group</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>Employee ID</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>Username</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>E-mail</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>First name</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>Last name</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {users.map((user) => (
-                                        <TableRow key={user.id} sx={fioriTableRowSx(data.users.includes(user.id))}>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />
-                                            </TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{user.employee_id || '-'}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{user.username}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{user.email}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{user.first_name}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{user.last_name}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {users.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={6} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
-                                                No users found.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <FioriResponsiveTable
+                            columns={userColumns}
+                            rows={users}
+                            getRowKey={(user) => user.id}
+                            rowSx={(user) => fioriTableRowSx(data.users.includes(user.id))}
+                            emptyMessage="No users found."
+                        />
                     </Box>
 
                     <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, borderColor: FIORI.border }} />

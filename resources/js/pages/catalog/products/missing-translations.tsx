@@ -15,19 +15,14 @@ import {
     LinearProgress,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
     TablePagination,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { mappedChipSx, naChipSx, percentTone, solidActionSx, UI_BORDER } from '@/lib/ui-style';
 import { FIORI } from '@/lib/fiori-style';
 
@@ -144,6 +139,101 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
         );
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the selection
+    // checkbox and sku identify/act on the row and stay pinned; the missing-
+    // locales chips are this page's whole point so they follow close behind;
+    // family/status are secondary context. Row actions stay pinned too.
+    const columns: FioriResponsiveColumn<MissingRow>[] = [
+        ...(canEdit
+            ? [
+                  {
+                      key: 'select',
+                      header: (
+                          <Checkbox
+                              size="small"
+                              checked={allFilteredSelected}
+                              indeterminate={someFilteredSelected && !allFilteredSelected}
+                              onChange={toggleSelectAll}
+                          />
+                      ),
+                      priority: 'always' as const,
+                      width: 48,
+                      render: (row: MissingRow) => (
+                          <Checkbox size="small" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
+                      ),
+                  },
+              ]
+            : []),
+        {
+            key: 'sku',
+            header: t('missingTranslationsColSku'),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.sku}</Typography>,
+        },
+        {
+            key: 'family',
+            header: t('missingTranslationsColFamily'),
+            priority: 'medium',
+            render: (row) => row.family ?? '-',
+        },
+        {
+            key: 'status',
+            header: t('missingTranslationsColStatus'),
+            priority: 'medium',
+            render: (row) => (
+                <Chip
+                    label={row.enabled ? t('enabled') : t('disabled')}
+                    size="small"
+                    variant={row.enabled ? 'filled' : 'outlined'}
+                    sx={row.enabled ? { ...mappedChipSx, height: 20, fontSize: '0.7rem' } : { ...naChipSx, height: 20, fontSize: '0.7rem' }}
+                />
+            ),
+        },
+        {
+            key: 'missing_locales',
+            header: t('missingTranslationsColMissingLocales'),
+            priority: 'high',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                    {row.missing_locales.map(({ locale, missing_attributes }) => (
+                        <Tooltip key={locale.id} title={missing_attributes.map((a) => a.name || a.code).join(', ')}>
+                            <Chip
+                                label={`${locale.display_name || locale.code} (${missing_attributes.length})`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ height: 20, fontSize: '0.7rem' }}
+                            />
+                        </Tooltip>
+                    ))}
+                </Stack>
+            ),
+        },
+        {
+            key: 'actions',
+            header: t('missingTranslationsColActions'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    {canEdit && (
+                        <Tooltip title={t('missingTranslationsTranslateAction')}>
+                            <span>
+                                <IconButton size="small" disabled={translatingId === row.id} onClick={() => translateOne(row.id)}>
+                                    {translatingId === row.id ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
+                    <Tooltip title={t('missingTranslationsEditAction')}>
+                        <IconButton size="small" component={Link} href={`/catalog/products/${row.id}/edit`}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Stack>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('missingTranslationsTitle')} />
@@ -221,109 +311,16 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                             }}
                         />
 
-                        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
-                            <Table size="small">
-                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                                    <TableRow>
-                                        {canEdit && (
-                                            <TableCell padding="checkbox">
-                                                <Checkbox
-                                                    size="small"
-                                                    checked={allFilteredSelected}
-                                                    indeterminate={someFilteredSelected && !allFilteredSelected}
-                                                    onChange={toggleSelectAll}
-                                                />
-                                            </TableCell>
-                                        )}
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColSku')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColFamily')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColStatus')}</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>{t('missingTranslationsColMissingLocales')}</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700 }}>
-                                            {t('missingTranslationsColActions')}
-                                        </TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {pagedRows.map((row) => (
-                                        <TableRow key={row.id} hover selected={selectedIds.has(row.id)}>
-                                            {canEdit && (
-                                                <TableCell padding="checkbox">
-                                                    <Checkbox size="small" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} />
-                                                </TableCell>
-                                            )}
-                                            <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.sku}</TableCell>
-                                            <TableCell>{row.family ?? '-'}</TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={row.enabled ? t('enabled') : t('disabled')}
-                                                    size="small"
-                                                    variant={row.enabled ? 'filled' : 'outlined'}
-                                                    sx={
-                                                        row.enabled
-                                                            ? { ...mappedChipSx, height: 20, fontSize: '0.7rem' }
-                                                            : { ...naChipSx, height: 20, fontSize: '0.7rem' }
-                                                    }
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                                    {row.missing_locales.map(({ locale, missing_attributes }) => (
-                                                        <Tooltip
-                                                            key={locale.id}
-                                                            title={missing_attributes.map((a) => a.name || a.code).join(', ')}
-                                                        >
-                                                            <Chip
-                                                                label={`${locale.display_name || locale.code} (${missing_attributes.length})`}
-                                                                size="small"
-                                                                variant="outlined"
-                                                                sx={{ height: 20, fontSize: '0.7rem' }}
-                                                            />
-                                                        </Tooltip>
-                                                    ))}
-                                                </Stack>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                    {canEdit && (
-                                                        <Tooltip title={t('missingTranslationsTranslateAction')}>
-                                                            <span>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    disabled={translatingId === row.id}
-                                                                    onClick={() => translateOne(row.id)}
-                                                                >
-                                                                    {translatingId === row.id ? (
-                                                                        <CircularProgress size={16} />
-                                                                    ) : (
-                                                                        <TranslateIcon fontSize="small" />
-                                                                    )}
-                                                                </IconButton>
-                                                            </span>
-                                                        </Tooltip>
-                                                    )}
-                                                    <Tooltip title={t('missingTranslationsEditAction')}>
-                                                        <IconButton
-                                                            size="small"
-                                                            component={Link}
-                                                            href={`/catalog/products/${row.id}/edit`}
-                                                        >
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Stack>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                    {filteredRows.length === 0 && (
-                                        <TableRow>
-                                            <TableCell colSpan={canEdit ? 6 : 5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                                {t('missingTranslationsNoMatches')}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                        <Paper variant="outlined" sx={{ borderRadius: 2 }}>
+                            <FioriResponsiveTable
+                                variant="plain"
+                                size="small"
+                                columns={columns}
+                                rows={pagedRows}
+                                getRowKey={(row) => row.id}
+                                rowSx={(row) => (selectedIds.has(row.id) ? { bgcolor: 'action.selected' } : {})}
+                                emptyMessage={t('missingTranslationsNoMatches')}
+                            />
                             <TablePagination
                                 component="div"
                                 count={filteredRows.length}
@@ -337,7 +334,7 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
                                 rowsPerPageOptions={[25, 50, 100, 250]}
                                 labelRowsPerPage={t('missingTranslationsRowsPerPage')}
                             />
-                        </TableContainer>
+                        </Paper>
                     </>
                 )}
             </Box>

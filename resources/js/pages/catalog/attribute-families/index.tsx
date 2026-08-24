@@ -26,29 +26,20 @@ import {
     Paper,
     Select,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import {
     FIORI,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface GridColumn {
@@ -136,6 +127,39 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
         setActiveFilters(next);
         router.get('/catalog/attributeFamilies', { search, per_page: perPage, filters: next }, { preserveState: true });
     };
+
+    // Column pop-in priority (SAP Fiori responsive table): id is the least
+    // useful thing to a human on a narrow screen so it pops in first; code
+    // identifies the row and stays pinned; name follows as space allows.
+    // Row actions stay pinned like the identifying column.
+    const columns: FioriResponsiveColumn<AttributeFamilyRow>[] = [
+        { key: 'id', header: t('fields.id'), priority: 'low', render: (row) => row.id },
+        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography> },
+        { key: 'name', header: t('fields.name'), priority: 'high', render: (row) => row.name || ucfirst(row.code) },
+        {
+            key: 'actions',
+            header: t('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                    {canEdit && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeFamilies/${row.id}/edit`)}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                    <IconButton size="small" sx={fioriIconButtonSx}>
+                        <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                    {canDelete && (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteFamilyId(row.id)}>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    )}
+                </Stack>
+            ),
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -244,51 +268,13 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
                     {/* Table */}
-                    <TableContainer>
-                        <Table sx={{ minWidth: 650 }}>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.id')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.code')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('fields.name')}</TableCell>
-                                    <TableCell align="right" sx={fioriTableHeadCellSx}>{t('actionsHeader')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {gridData.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 500 }}>{row.code}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{row.name || ucfirst(row.code)}</TableCell>
-                                        <TableCell align="right">
-                                            <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                                {canEdit && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeFamilies/${row.id}/edit`)}>
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                <IconButton size="small" sx={fioriIconButtonSx}>
-                                                    <ContentCopyIcon fontSize="small" />
-                                                </IconButton>
-                                                {canDelete && (
-                                                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteFamilyId(row.id)}>
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Stack>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {gridData.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={4} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            {tCatalog('noAttributeFamiliesFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={gridData.data}
+                        getRowKey={(row) => row.id}
+                        emptyMessage={tCatalog('noAttributeFamiliesFound')}
+                    />
                 </Paper>
             </Box>
 

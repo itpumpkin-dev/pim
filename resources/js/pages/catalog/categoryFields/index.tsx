@@ -10,24 +10,20 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
-    fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface CategoryFieldItem {
@@ -118,6 +114,84 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
         // Fallback to first label
         return Object.values(item.labels)[0] || item.code;
     };
+
+    // Column pop-in priority (SAP Fiori responsive table): the field label
+    // identifies the row and row actions stay visible down to phone width;
+    // Status is the next most useful thing to scan for, then the code/type,
+    // with id/required/position reflowing first as the least useful columns
+    // at a glance.
+    const columns: FioriResponsiveColumn<CategoryFieldItem>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'code',
+            header: t('code'),
+            priority: 'medium',
+            render: (row) => row.code,
+        },
+        {
+            key: 'label',
+            header: 'Label',
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{getFieldLabel(row)}</Typography>,
+        },
+        {
+            key: 'type',
+            header: t('type'),
+            priority: 'medium',
+            render: (row) => <FioriStatus label={row.type} tone="information" />,
+        },
+        {
+            key: 'required',
+            header: 'Required',
+            priority: 'low',
+            render: (row) => <FioriStatus label={row.is_required ? 'Yes' : 'No'} tone={row.is_required ? 'information' : 'neutral'} />,
+        },
+        {
+            key: 'status',
+            header: 'Status',
+            priority: 'high',
+            render: (row) => <FioriStatus label={row.status ? 'Active' : 'Inactive'} tone={row.status ? 'success' : 'neutral'} />,
+        },
+        {
+            key: 'position',
+            header: 'Position',
+            priority: 'low',
+            render: (row) => row.position,
+        },
+        ...((canEdit || canDelete)
+            ? [
+                  {
+                      key: 'actions',
+                      header: tGrid('actionsHeader'),
+                      priority: 'always' as const,
+                      align: 'right' as const,
+                      render: (row: CategoryFieldItem) => (
+                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                              {canEdit && (
+                                  <IconButton
+                                      size="small"
+                                      sx={fioriIconButtonSx}
+                                      onClick={() => router.visit(`/catalog/categoryFields/${row.id}/edit`)}
+                                  >
+                                      <EditIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                              {canDelete && (
+                                  <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteFieldId(row.id)}>
+                                      <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                          </Box>
+                      ),
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -212,72 +286,12 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
                     </Stack>
                 </Stack>
 
-                <TableContainer sx={fioriCardSx}>
-                    <Table>
-                        <TableHead sx={fioriTableHeadSx}>
-                            <TableRow>
-                                <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('code')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>Label</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>{t('type')}</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>Required</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>Status</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>Position</TableCell>
-                                {(canEdit || canDelete) && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {fields.data.map((row) => (
-                                <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                    <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>{row.code}</TableCell>
-                                    <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{getFieldLabel(row)}</TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus label={row.type} tone="information" />
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus label={row.is_required ? 'Yes' : 'No'} tone={row.is_required ? 'information' : 'neutral'} />
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus label={row.status ? 'Active' : 'Inactive'} tone={row.status ? 'success' : 'neutral'} />
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>{row.position}</TableCell>
-                                    {(canEdit || canDelete) && (
-                                        <TableCell sx={fioriBodyCellSx} align="right">
-                                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                                                {canEdit && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => router.visit(`/catalog/categoryFields/${row.id}/edit`)}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                                {canDelete && (
-                                                    <IconButton
-                                                        size="small"
-                                                        sx={fioriIconButtonSx}
-                                                        onClick={() => setDeleteFieldId(row.id)}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))}
-                            {fields.data.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={8} align="center" sx={{ color: FIORI.textSecondary }}>
-                                        No category fields found.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={fields.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage="No category fields found."
+                />
             </Box>
 
             <Dialog open={deleteFieldId !== null} onClose={() => setDeleteFieldId(null)}>

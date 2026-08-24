@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Box, Button, CircularProgress, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, CircularProgress, InputAdornment, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -9,18 +9,14 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CreateUserDialog from '@/components/system/create-user-dialog';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
-    fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface PaginationData<T> {
@@ -105,6 +101,63 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
         return () => clearTimeout(delayDebounceFn);
     }, [search]);
 
+    // Column pop-in priority (SAP Fiori responsive table): columns come from
+    // the server-driven gridConfig, so priority falls out of column order —
+    // the first (identifying) columns stay visible longest, less essential
+    // columns reflow into the pop-in area first. Row actions stay pinned
+    // like the identifying columns.
+    type UserRow = UserIndexProps['gridData']['data'][number];
+    const columns: FioriResponsiveColumn<UserRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
+        key,
+        header: t(column.label),
+        priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
+        render: (row) =>
+            column.type === 'boolean' ? (
+                <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+            ) : key === 'employee_id' || key === 'username' ? (
+                <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
+            ) : (
+                row[key] || '-'
+            ),
+    }));
+
+    if (visibleActions.length > 0) {
+        columns.push({
+            key: 'actions',
+            header: '',
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                    {visibleActions.map(([actionKey, action]) => {
+                        if (actionKey === 'delete' && row.id === auth.user?.id) {
+                            return null;
+                        }
+
+                        let Icon = EditIcon;
+                        if (action.icon === 'copy') Icon = ContentCopyIcon;
+                        if (action.icon === 'delete') Icon = DeleteIcon;
+
+                        const handleClick = () => {
+                            if (actionKey === 'update') {
+                                router.visit(`/system/user/${row.id}/edit`);
+                            } else if (actionKey === 'delete') {
+                                setDeleteUserId(row.id as number);
+                            }
+                        };
+
+                        return (
+                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
+                                <Icon fontSize="small" />
+                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
+                            </IconButton>
+                        );
+                    })}
+                </Box>
+            ),
+        });
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('usersCount', { count: gridData.total })} />
@@ -147,76 +200,12 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                     jobPositions={jobPositions}
                 />
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <TableContainer>
-                        <Table sx={{ minWidth: 650 }}>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                        <TableCell key={key} sx={fioriTableHeadCellSx}>
-                                            {t(column.label)}
-                                        </TableCell>
-                                    ))}
-                                    {visibleActions.length > 0 && (
-                                        <TableCell sx={fioriTableHeadCellSx}></TableCell>
-                                    )}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {gridData.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        {Object.entries(gridConfig.columns).map(([key, column]) => (
-                                            <TableCell key={key} sx={{ ...fioriBodyCellSx, fontWeight: key === 'employee_id' || key === 'username' ? 600 : 400 }}>
-                                                {column.type === 'boolean' ? (
-                                                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
-                                                ) : (
-                                                    row[key] || '-'
-                                                )}
-                                            </TableCell>
-                                        ))}
-                                        {visibleActions.length > 0 && (
-                                            <TableCell align="right" sx={fioriBodyCellSx}>
-                                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                                                    {visibleActions.map(([actionKey, action]) => {
-                                                        if (actionKey === 'delete' && row.id === auth.user?.id) {
-                                                            return null;
-                                                        }
-
-                                                        let Icon = EditIcon;
-                                                        if (action.icon === 'copy') Icon = ContentCopyIcon;
-                                                        if (action.icon === 'delete') Icon = DeleteIcon;
-
-                                                        const handleClick = () => {
-                                                            if (actionKey === 'update') {
-                                                                router.visit(`/system/user/${row.id}/edit`);
-                                                            } else if (actionKey === 'delete') {
-                                                                setDeleteUserId(row.id as number);
-                                                            }
-                                                        };
-
-                                                        return (
-                                                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                                                <Icon fontSize="small" />
-                                                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                                                            </IconButton>
-                                                        );
-                                                    })}
-                                                </Box>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                                {gridData.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={Object.keys(gridConfig.columns).length + (visibleActions.length > 0 ? 1 : 0)} align="center" sx={{ py: 3, color: FIORI.textSecondary }}>
-                                            {t('noDataFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={gridData.data}
+                    getRowKey={(row) => row.id}
+                    emptyMessage={t('noDataFound')}
+                />
             </Box>
         <Dialog open={deleteUserId !== null} onClose={() => setDeleteUserId(null)}>
             <DialogTitle>{tSystem('confirmDeletionTitle')}</DialogTitle>

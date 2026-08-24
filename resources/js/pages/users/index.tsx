@@ -14,29 +14,20 @@ import {
     InputAdornment,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
     TablePagination,
-    TableRow,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
 import { useMemo, useState } from 'react';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Users', href: '/users' }];
@@ -56,6 +47,79 @@ export default function UsersIndex({ users }: { users: User[] }) {
     }, [users, search]);
 
     const paged = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+    // Column pop-in priority (SAP Fiori responsive table): the name
+    // (with avatar) identifies the row and stays visible everywhere along
+    // with row actions; email is important secondary identity, status is
+    // meta, and the join date is the least useful column on a phone.
+    const columns: FioriResponsiveColumn<User>[] = [
+        {
+            key: 'name',
+            header: 'ชื่อผู้ใช้งาน',
+            priority: 'always',
+            render: (user) => (
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar src={user.avatar} alt={user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
+                        {getInitials(user.name)}
+                    </Avatar>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                        {user.name}
+                    </Typography>
+                </Stack>
+            ),
+        },
+        {
+            key: 'email',
+            header: 'อีเมล',
+            priority: 'high',
+            render: (user) => (
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                    {user.email}
+                </Typography>
+            ),
+        },
+        {
+            key: 'status',
+            header: 'สถานะอีเมล',
+            priority: 'medium',
+            render: (user) => (
+                <FioriStatus
+                    label={user.email_verified_at ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}
+                    tone={user.email_verified_at ? 'success' : 'warning'}
+                />
+            ),
+        },
+        {
+            key: 'created_at',
+            header: 'วันที่สมัคร',
+            priority: 'low',
+            render: (user) => (
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                    {formatDate(user.created_at)}
+                </Typography>
+            ),
+        },
+        {
+            key: 'actions',
+            header: 'จัดการ',
+            priority: 'always',
+            align: 'right',
+            render: () => (
+                <>
+                    <Tooltip title="แก้ไข">
+                        <IconButton size="small" sx={fioriIconButtonSx}>
+                            <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="ลบ">
+                        <IconButton size="small" sx={{ ...fioriIconButtonSx, '&:hover': { bgcolor: FIORI.headerBg, color: FIORI.error } }}>
+                            <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </>
+            ),
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -96,71 +160,14 @@ export default function UsersIndex({ users }: { users: User[] }) {
                     </Stack>
                 </Stack>
 
-                <TableContainer component={Paper} elevation={0} sx={fioriCardSx}>
-                    <Table>
-                        <TableHead sx={fioriTableHeadSx}>
-                            <TableRow>
-                                <TableCell sx={fioriTableHeadCellSx}>ชื่อผู้ใช้งาน</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>อีเมล</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>สถานะอีเมล</TableCell>
-                                <TableCell sx={fioriTableHeadCellSx}>วันที่สมัคร</TableCell>
-                                <TableCell align="right" sx={fioriTableHeadCellSx}>จัดการ</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {paged.map((user) => (
-                                <TableRow key={user.id} sx={fioriTableRowSx(false)}>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <Stack direction="row" spacing={1.5} alignItems="center">
-                                            <Avatar src={user.avatar} alt={user.name} sx={{ width: 32, height: 32, fontSize: 14 }}>
-                                                {getInitials(user.name)}
-                                            </Avatar>
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                                                {user.name}
-                                            </Typography>
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            {user.email}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <FioriStatus
-                                            label={user.email_verified_at ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน'}
-                                            tone={user.email_verified_at ? 'success' : 'warning'}
-                                        />
-                                    </TableCell>
-                                    <TableCell sx={fioriBodyCellSx}>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            {formatDate(user.created_at)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="right" sx={fioriBodyCellSx}>
-                                        <Tooltip title="แก้ไข">
-                                            <IconButton size="small" sx={fioriIconButtonSx}>
-                                                <EditOutlinedIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="ลบ">
-                                            <IconButton size="small" sx={{ ...fioriIconButtonSx, '&:hover': { bgcolor: FIORI.headerBg, color: FIORI.error } }}>
-                                                <DeleteOutlineIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {paged.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            ไม่พบผู้ใช้งานที่ค้นหา
-                                        </Typography>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                <Paper elevation={0} sx={fioriCardSx}>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={paged}
+                        getRowKey={(user) => user.id}
+                        emptyMessage="ไม่พบผู้ใช้งานที่ค้นหา"
+                    />
                     <TablePagination
                         component="div"
                         count={filtered.length}
@@ -175,7 +182,7 @@ export default function UsersIndex({ users }: { users: User[] }) {
                         labelRowsPerPage="แถวต่อหน้า"
                         sx={{ borderTop: `1px solid ${FIORI.border}` }}
                     />
-                </TableContainer>
+                </Paper>
             </Box>
         </AppLayout>
     );

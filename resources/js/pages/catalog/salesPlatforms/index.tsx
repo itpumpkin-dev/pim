@@ -26,12 +26,6 @@ import {
     Paper,
     Stack,
     Switch,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Tab,
     Tabs,
     TextField,
@@ -39,22 +33,17 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
-
-const TD_SX = { ...fioriBodyCellSx, padding: '12px 20px' };
-const TR_SX = fioriTableRowSx(false);
 
 // Cycled by platform index (not brand colors) — this page's platforms are
 // admin-created and arbitrary (see storePlatform()), not just Lazada/Shopee/
@@ -245,18 +234,60 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const menuShop = activePlatform?.shops.find((s) => s.id === shopMenuAnchor?.shopId) ?? null;
     const visibleShops = activePlatform ? (showAllShops ? activePlatform.shops : activePlatform.shops.slice(0, SHOPS_PREVIEW_COUNT)) : [];
 
+    // Column pop-in priority (SAP Fiori responsive table): the shop
+    // name/code identifies the row and the row-menu action stay visible down
+    // to phone width; the linked-account and active-status columns are
+    // secondary/meta so they reflow into the pop-in area first.
+    const shopColumns: FioriResponsiveColumn<ShopItem>[] = [
+        {
+            key: 'shop',
+            header: t('shopsLabel'),
+            priority: 'always',
+            render: (shop) => (
+                <>
+                    <Typography variant="body2" fontWeight={600}>{shop.name}</Typography>
+                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{shop.code}</Typography>
+                </>
+            ),
+        },
+        {
+            key: 'linkedAccount',
+            header: t('linkedPlatformAccount'),
+            priority: 'high',
+            render: (shop) =>
+                linkedAccountLabel(shop) ?? (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('noLinkedAccount')}
+                    </Typography>
+                ),
+        },
+        {
+            key: 'active',
+            header: t('shopActive'),
+            priority: 'medium',
+            render: (shop) =>
+                shop.is_active ? <FioriStatus label={t('shopActive')} tone="success" /> : <FioriStatus label="-" tone="neutral" />,
+        },
+        {
+            key: 'actions',
+            header: '',
+            priority: 'always',
+            align: 'right',
+            width: 48,
+            render: (shop) =>
+                (canEdit || canDelete) && (
+                    <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
+                        <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
             <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Tabs
-                    value="platforms"
-                    onChange={(_, val) => router.visit(val === 'channels' ? '/catalog/channels' : '/catalog/sales-platforms')}
-                    sx={{ mb: 3 }}
-                >
-                    <Tab value="channels" label={t('channelsTab')} />
-                    <Tab value="platforms" label={t('salesPlatformsTab')} />
-                </Tabs>
+                <SalesChannelSectionTabs active="platforms" />
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3, flexWrap: 'wrap' }}>
                     <Box>
@@ -375,58 +406,13 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                 </Box>
                                 <Divider />
 
-                                <TableContainer>
-                                    <Table>
-                                        <TableHead sx={fioriTableHeadSx}>
-                                            <TableRow>
-                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('shopsLabel')}</TableCell>
-                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('linkedPlatformAccount')}</TableCell>
-                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px' }}>{t('shopActive')}</TableCell>
-                                                <TableCell sx={{ ...fioriTableHeadCellSx, padding: '12px 20px', width: 48 }} />
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {visibleShops.map((shop) => (
-                                                <TableRow key={shop.id} sx={TR_SX}>
-                                                    <TableCell sx={TD_SX}>
-                                                        <Typography variant="body2" fontWeight={600}>{shop.name}</Typography>
-                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{shop.code}</Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={TD_SX}>
-                                                        {linkedAccountLabel(shop) ?? (
-                                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                                {t('noLinkedAccount')}
-                                                            </Typography>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell sx={TD_SX}>
-                                                        {shop.is_active ? (
-                                                            <FioriStatus label={t('shopActive')} tone="success" />
-                                                        ) : (
-                                                            <FioriStatus label="-" tone="neutral" />
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell sx={{ ...TD_SX, textAlign: 'right' }}>
-                                                        {(canEdit || canDelete) && (
-                                                            <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
-                                                                <MoreVertIcon fontSize="small" />
-                                                            </IconButton>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                            {activePlatform.shops.length === 0 && (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} align="center" sx={TD_SX}>
-                                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                            {t('noShopsYet')}
-                                                        </Typography>
-                                                    </TableCell>
-                                                </TableRow>
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </TableContainer>
+                                <FioriResponsiveTable
+                                    variant="plain"
+                                    columns={shopColumns}
+                                    rows={visibleShops}
+                                    getRowKey={(shop) => shop.id}
+                                    emptyMessage={t('noShopsYet')}
+                                />
 
                                 {activePlatform.shops.length > SHOPS_PREVIEW_COUNT && (
                                     <Box sx={{ px: 2.5, py: 1.5 }}>

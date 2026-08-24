@@ -13,27 +13,18 @@ import {
     Pagination,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Typography,
 } from '@mui/material';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface UserSummary {
@@ -165,6 +156,75 @@ export default function WooConvertIndex({ conversions }: Props) {
         router.get('/import-export/woo-convert', { page }, { preserveState: true });
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the uploaded
+    // filename is the identifying column and stays visible at every width;
+    // the category-match status is the primary progress indicator so it
+    // follows next; row count/user/date are secondary metadata that reflow
+    // into the pop-in area first. The numeric ID is the least useful on a
+    // phone. The view action stays pinned like the identifying column.
+    const columns: FioriResponsiveColumn<ConversionItem>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'filename',
+            header: t('uploadedFile'),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.original_filename}</Typography>,
+        },
+        {
+            key: 'rowCount',
+            header: t('wooConvertRowsConverted'),
+            priority: 'medium',
+            align: 'right',
+            render: (row) => row.row_count,
+        },
+        {
+            key: 'categoriesMatched',
+            header: t('wooConvertCategoriesMatched'),
+            priority: 'high',
+            render: (row) => (
+                <FioriStatus
+                    label={`${row.category_matched_count} / ${row.category_matched_count + row.category_unmatched_count}`}
+                    tone={row.has_unmatched ? 'warning' : 'success'}
+                />
+            ),
+        },
+        {
+            key: 'user',
+            header: t('user'),
+            priority: 'medium',
+            render: (row) => userLabel(row.creator),
+        },
+        {
+            key: 'startedAt',
+            header: t('startedAt'),
+            priority: 'medium',
+            render: (row) => formatLocalDateTime(row.created_at),
+        },
+        {
+            key: 'actions',
+            header: tGrid('actionsHeader'),
+            priority: 'always',
+            align: 'right',
+            render: (row) => (
+                <IconButton
+                    size="small"
+                    sx={fioriIconButtonSx}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        router.visit(`/import-export/woo-convert/${row.id}`);
+                    }}
+                >
+                    <VisibilityIcon fontSize="small" />
+                </IconButton>
+            ),
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertTitle')} />
@@ -214,56 +274,12 @@ export default function WooConvertIndex({ conversions }: Props) {
                         )}
                     </Paper>
                 ) : (
-                    <Paper elevation={0} sx={fioriCardSx}>
-                        <TableContainer>
-                            <Table>
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('uploadedFile')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx} align="right">{t('wooConvertRowsConverted')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('wooConvertCategoriesMatched')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('user')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('startedAt')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {conversions.data.map((row) => (
-                                        <TableRow
-                                            key={row.id}
-                                            onClick={() => router.visit(`/import-export/woo-convert/${row.id}`)}
-                                            sx={{ ...fioriTableRowSx(false), cursor: 'pointer' }}
-                                        >
-                                            <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                            <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.original_filename}</TableCell>
-                                            <TableCell align="right" sx={fioriBodyCellSx}>{row.row_count}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                <FioriStatus
-                                                    label={`${row.category_matched_count} / ${row.category_matched_count + row.category_unmatched_count}`}
-                                                    tone={row.has_unmatched ? 'warning' : 'success'}
-                                                />
-                                            </TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{userLabel(row.creator)}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{formatLocalDateTime(row.created_at)}</TableCell>
-                                            <TableCell align="right" sx={fioriBodyCellSx}>
-                                                <IconButton
-                                                    size="small"
-                                                    sx={fioriIconButtonSx}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        router.visit(`/import-export/woo-convert/${row.id}`);
-                                                    }}
-                                                >
-                                                    <VisibilityIcon fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </Paper>
+                    <FioriResponsiveTable
+                        columns={columns}
+                        rows={conversions.data}
+                        getRowKey={(row) => row.id}
+                        onRowClick={(row) => router.visit(`/import-export/woo-convert/${row.id}`)}
+                    />
                 )}
 
                 {conversions.last_page > 1 && (

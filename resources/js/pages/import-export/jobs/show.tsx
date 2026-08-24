@@ -17,28 +17,19 @@ import {
     LinearProgress,
     Paper,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
     type FioriTone,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface UserSummary {
@@ -172,6 +163,36 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
         );
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the row number
+    // identifies which record the error belongs to and always stays; the
+    // level chip is the primary indicator and follows next; the message
+    // text reflows into the pop-in area first since it's the most verbose.
+    const errorLogColumns: FioriResponsiveColumn<ErrorLogEntry>[] = [
+        {
+            key: 'row',
+            header: t('row'),
+            priority: 'always',
+            render: (entry) => entry.row,
+        },
+        {
+            key: 'level',
+            header: t('level'),
+            priority: 'high',
+            render: (entry) => (
+                <FioriStatus
+                    label={entry.level === 'warning' ? t('levelWarning') : t('levelError')}
+                    tone={entry.level === 'warning' ? 'warning' : 'error'}
+                />
+            ),
+        },
+        {
+            key: 'message',
+            header: t('message'),
+            priority: 'medium',
+            render: (entry) => entry.message,
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('jobTrackerTitle')}: ${job.config_code}`} />
@@ -288,31 +309,13 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                 <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                     <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('errorLog')}</Typography>
                     {job.error_log && job.error_log.length > 0 ? (
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead sx={fioriTableHeadSx}>
-                                    <TableRow>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('row')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('level')}</TableCell>
-                                        <TableCell sx={fioriTableHeadCellSx}>{t('message')}</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {job.error_log.map((entry, index) => (
-                                        <TableRow key={index} sx={fioriTableRowSx(false)}>
-                                            <TableCell sx={fioriBodyCellSx}>{entry.row}</TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>
-                                                <FioriStatus
-                                                    label={entry.level === 'warning' ? t('levelWarning') : t('levelError')}
-                                                    tone={entry.level === 'warning' ? 'warning' : 'error'}
-                                                />
-                                            </TableCell>
-                                            <TableCell sx={fioriBodyCellSx}>{entry.message}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <FioriResponsiveTable
+                            variant="plain"
+                            size="small"
+                            columns={errorLogColumns}
+                            rows={job.error_log}
+                            getRowKey={(entry) => job.error_log!.indexOf(entry)}
+                        />
                     ) : (
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('noErrors')}</Typography>
                     )}

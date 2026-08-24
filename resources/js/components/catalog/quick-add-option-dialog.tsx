@@ -1,5 +1,6 @@
 import { router, usePage } from '@inertiajs/react';
 import {
+    Box,
     Button,
     CircularProgress,
     Dialog,
@@ -7,17 +8,12 @@ import {
     DialogContent,
     DialogTitle,
     Stack,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     TextField,
     Typography,
 } from '@mui/material';
 import { KeyboardEvent, useState } from 'react';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { type SharedData } from '@/types';
 
 export interface ExistingOption {
@@ -122,6 +118,23 @@ export function QuickAddOptionDialog({
         }
     };
 
+    // Only 2 columns (Code, Label) in this quick reference list — both stay
+    // always visible, there's nothing worth deprioritizing here.
+    const existingOptionColumns: FioriResponsiveColumn<ExistingOption>[] = [
+        {
+            key: 'code',
+            header: 'Code',
+            priority: 'always',
+            render: (option) => option.code,
+        },
+        {
+            key: 'label',
+            header: 'Label',
+            priority: 'always',
+            render: (option) => option.admin_label || '—',
+        },
+    ];
+
     return (
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
             <DialogTitle>Add option — {attributeLabel}</DialogTitle>
@@ -131,24 +144,15 @@ export function QuickAddOptionDialog({
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
                             Existing options ({existingOptions.length})
                         </Typography>
-                        <TableContainer sx={{ maxHeight: 220, mb: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                            <Table size="small" stickyHeader>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>Code</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Label</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {existingOptions.map((option) => (
-                                        <TableRow key={option.id}>
-                                            <TableCell>{option.code}</TableCell>
-                                            <TableCell>{option.admin_label || '—'}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                        <Box sx={{ maxHeight: 220, mb: 2, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                            <FioriResponsiveTable
+                                variant="plain"
+                                size="small"
+                                columns={existingOptionColumns}
+                                rows={existingOptions}
+                                getRowKey={(option) => option.id}
+                            />
+                        </Box>
                     </>
                 )}
 

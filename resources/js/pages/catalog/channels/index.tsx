@@ -6,22 +6,20 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Tab, Tabs } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
     FIORI,
-    fioriBodyCellSx,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
-    fioriTableHeadCellSx,
-    fioriTableHeadSx,
-    fioriTableRowSx,
 } from '@/lib/fiori-style';
 
 interface ChannelItem {
@@ -91,18 +89,79 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
         router.get('/catalog/channels', { search, filters: next }, { preserveState: true });
     };
 
+    // Column pop-in priority (SAP Fiori responsive table): the channel name
+    // identifies the row and row actions stay visible down to phone width;
+    // the short code follows next, then the linked root category, with the
+    // raw id reflowing first since it's the least useful column at a glance.
+    const columns: FioriResponsiveColumn<ChannelItem>[] = [
+        {
+            key: 'id',
+            header: 'ID',
+            priority: 'low',
+            render: (row) => row.id,
+        },
+        {
+            key: 'code',
+            header: t('code'),
+            priority: 'high',
+            render: (row) => row.code,
+        },
+        {
+            key: 'name',
+            header: t('name'),
+            priority: 'always',
+            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name || '-'}</Typography>,
+        },
+        {
+            key: 'rootCategory',
+            header: t('rootCategoryOptional'),
+            priority: 'medium',
+            render: (row) =>
+                row.rootCategory ? (
+                    <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
+                        {row.rootCategory.name}
+                    </Typography>
+                ) : (
+                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {t('noRootCategory')}
+                    </Typography>
+                ),
+        },
+        ...((canEdit || canDelete)
+            ? [
+                  {
+                      key: 'actions',
+                      header: tGrid('actionsHeader'),
+                      priority: 'always' as const,
+                      align: 'right' as const,
+                      render: (row: ChannelItem) => (
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                              {canEdit && (
+                                  <IconButton
+                                      size="small"
+                                      sx={fioriIconButtonSx}
+                                      onClick={() => router.visit(`/catalog/channels/${row.id}/edit`)}
+                                  >
+                                      <EditIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                              {canDelete && (
+                                  <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteChannelId(row.id)}>
+                                      <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                              )}
+                          </Box>
+                      ),
+                  },
+              ]
+            : []),
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('channels')} />
             <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Tabs
-                    value="channels"
-                    onChange={(_, val) => router.visit(val === 'platforms' ? '/catalog/sales-platforms' : '/catalog/channels')}
-                    sx={{ mb: 3 }}
-                >
-                    <Tab value="channels" label={t('channelsTab')} />
-                    <Tab value="platforms" label={t('salesPlatformsTab')} />
-                </Tabs>
+                <SalesChannelSectionTabs active="channels" />
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
                     <Box>
@@ -145,70 +204,13 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    <TableContainer>
-                        <Table>
-                            <TableHead sx={fioriTableHeadSx}>
-                                <TableRow>
-                                    <TableCell sx={fioriTableHeadCellSx}>ID</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('code')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('name')}</TableCell>
-                                    <TableCell sx={fioriTableHeadCellSx}>{t('rootCategoryOptional')}</TableCell>
-                                    {(canEdit || canDelete) && <TableCell sx={fioriTableHeadCellSx} align="right">{tGrid('actionsHeader')}</TableCell>}
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {channels.data.map((row) => (
-                                    <TableRow key={row.id} sx={fioriTableRowSx(false)}>
-                                        <TableCell sx={fioriBodyCellSx}>{row.id}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>{row.code}</TableCell>
-                                        <TableCell sx={{ ...fioriBodyCellSx, fontWeight: 600 }}>{row.name || '-'}</TableCell>
-                                        <TableCell sx={fioriBodyCellSx}>
-                                            {row.rootCategory ? (
-                                                <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 500 }}>
-                                                    {row.rootCategory.name}
-                                                </Typography>
-                                            ) : (
-                                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                    {t('noRootCategory')}
-                                                </Typography>
-                                            )}
-                                        </TableCell>
-                                        {(canEdit || canDelete) && (
-                                            <TableCell align="right" sx={fioriBodyCellSx}>
-                                                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                                                    {canEdit && (
-                                                        <IconButton
-                                                            size="small"
-                                                            sx={fioriIconButtonSx}
-                                                            onClick={() => router.visit(`/catalog/channels/${row.id}/edit`)}
-                                                        >
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                    )}
-                                                    {canDelete && (
-                                                        <IconButton
-                                                            size="small"
-                                                            sx={fioriIconButtonSx}
-                                                            onClick={() => setDeleteChannelId(row.id)}
-                                                        >
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
-                                                    )}
-                                                </Box>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                                {channels.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={5} align="center" sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            {t('noChannelsFound')}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                    <FioriResponsiveTable
+                        variant="plain"
+                        columns={columns}
+                        rows={channels.data}
+                        getRowKey={(row) => row.id}
+                        emptyMessage={t('noChannelsFound')}
+                    />
                 </Paper>
 
                 {channels.last_page > 1 && (
