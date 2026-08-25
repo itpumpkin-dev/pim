@@ -12,6 +12,11 @@ use Illuminate\Support\Facades\Cache;
  * syncTikTokAttributes(). `id` is a string (TikTok's own attribute id) —
  * see the creating migration's docblock for the cross-category-uniqueness
  * caveat.
+ *
+ * `category_id`/`mandatory` are per-category context layered on top of that
+ * global row — see the migration that added them
+ * (2026_08_25_043816_add_category_and_mandatory_to_tiktok_attributes_table)
+ * and TikTokAttributeMappingController::syncTikTokAttributesForCategory().
  */
 class TikTokAttribute extends Model
 {
@@ -26,11 +31,15 @@ class TikTokAttribute extends Model
         'name',
         'is_customizable',
         'is_multiple_selection',
+        'category_id',
+        'mandatory',
     ];
 
     protected $casts = [
         'is_customizable' => 'boolean',
         'is_multiple_selection' => 'boolean',
+        'category_id' => 'integer',
+        'mandatory' => 'boolean',
     ];
 
     private const LIST_VERSION_KEY = 'tiktok_attributes:list:version';

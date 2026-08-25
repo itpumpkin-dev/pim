@@ -9,6 +9,7 @@ use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaSellerAccount;
 use App\Services\Lazada\LazadaClient;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -53,7 +54,7 @@ class LazadaAttributeMappingController extends Controller
         'lazada_attribute',
     ];
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse|JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
@@ -140,6 +141,15 @@ class LazadaAttributeMappingController extends Controller
 
         LazadaAttributeMapping::bumpListVersion();
 
+        // The embedded per-category picker on categories/lazada-mapping.tsx
+        // calls this same endpoint via plain fetch (Accept: application/json)
+        // instead of an Inertia visit — see
+        // ShopeeAttributeMappingController::update()'s identical branch for
+        // why. Every other caller is a real Inertia POST, unaffected.
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
         return back()->with('success', 'Lazada attribute mapping saved.');
     }
 
@@ -203,5 +213,87 @@ class LazadaAttributeMappingController extends Controller
         LazadaAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsByName).' Lazada attributes across '.count($categoryIds).' categories.');
+    }
+
+    /**
+     * Same idea as syncLazadaAttributes() above, but scoped to exactly one
+     * Lazada category — the "Sync attributes" action on
+     * categories/lazada-mapping.tsx, next to that page's Categories table
+     * (see ShopeeAttributeMappingController::syncShopeeAttributesForCategory()
+     * for the Shopee equivalent this mirrors). Runs synchronously — a single
+     * /category/attributes/get call, same as the per-category loop iteration
+     * above, just without the multi-category rate-limit pacing since there's
+     * only one call here.
+     */
+    public function syncLazadaAttributesForCategory(Request $request): JsonResponse
+    {
+        $account = LazadaSellerAccount::active()->first();
+        if (! $account) {
+            return response()->json(['message' => 'No active Lazada seller account found to authenticate the sync.'], 422);
+        }
+
+        $validated = $request->validate([
+            'lazada_category_id' => ['required', 'integer', 'exists:lazada_categories,id'],
+        ]);
+        $categoryId = $validated['lazada_category_id'];
+
+        $client = new LazadaClient($account);
+        $response = $client->getCategoryAttributes($categoryId);
+        $schema = $response['data'] ?? [];
+
+        $now = now();
+        $rows = array_map(fn (array $attr) => [
+            'name' => $attr['name'],
+            'label' => $attr['label'] ?? $attr['name'],
+            'input_type' => $attr['input_type'] ?? null,
+            'attribute_type' => $attr['attribute_type'] ?? null,
+            'category_id' => $categoryId,
+            'mandatory' => (bool) ($attr['is_mandatory'] ?? false),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $schema);
+
+        if ($rows !== []) {
+            LazadaAttribute::upsert($rows, ['name'], ['label', 'input_type', 'attribute_type', 'category_id', 'mandatory', 'updated_at']);
+        }
+
+        LazadaAttribute::bumpListVersion();
+
+        return response()->json(['count' => count($rows)]);
+    }
+
+    /**
+     * Lazada attributes cached for one category (see the migration's
+     * "informational, not a real FK" caveat on that column — this lists
+     * whatever the most recent sync for that category actually saw), each
+     * annotated with whichever PIM attribute currently maps to it, if any.
+     * Backs the "จับคู่แอตทริบิวต์กับ PIM" column's table on
+     * categories/lazada-mapping.tsx — mirrors
+     * ShopeeAttributeMappingController::shopeeAttributesForCategory()
+     * exactly, keyed by `name` instead of a numeric id (see LazadaAttribute's
+     * docblock for why).
+     */
+    public function lazadaAttributesForCategory(int $lazadaCategoryId): JsonResponse
+    {
+        $attributes = LazadaAttribute::where('category_id', $lazadaCategoryId)->orderBy('label')->get();
+
+        $mappedByLazadaAttributeName = LazadaAttributeMapping::whereIn('lazada_attribute_name', $attributes->pluck('name'))
+            ->with('attribute:id,name')
+            ->get()
+            ->keyBy('lazada_attribute_name');
+
+        $data = $attributes->map(function (LazadaAttribute $attribute) use ($mappedByLazadaAttributeName) {
+            $mapping = $mappedByLazadaAttributeName->get($attribute->name);
+
+            return [
+                'name' => $attribute->name,
+                'label' => $attribute->label,
+                'input_type' => $attribute->input_type,
+                'mandatory' => (bool) $attribute->mandatory,
+                'mapped' => $mapping ? ['id' => $mapping->attribute->id, 'name' => $mapping->attribute->name] : null,
+            ];
+        });
+
+        return response()->json(['data' => $data->values()]);
     }
 }

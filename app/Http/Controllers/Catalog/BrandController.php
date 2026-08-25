@@ -25,7 +25,6 @@ use App\Models\WooCommerceBrand;
 use App\Services\CodeGenerator;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\WooCommerce\WooCommerceClient;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,9 +58,8 @@ class BrandController extends Controller
 
     /**
      * value(brand option code) => count of distinct products, for the
-     * "products_count" badge on both index() and buildBrandMappingData()
-     * (called by all 4 platform mapping pages). This scans product_values
-     * for every load, so it's cached with a short TTL rather than left
+     * "products_count" badge on index(). This scans product_values for
+     * every load, so it's cached with a short TTL rather than left
      * uncached — a plain TTL rather than event-based invalidation because
      * ProductValue rows for pbrand are written from many places (product
      * create/update, bulk import, marketplace sync), so a few minutes of
@@ -300,38 +298,10 @@ class BrandController extends Controller
         return back()->with('success', 'Brand deleted successfully.');
     }
 
-    /**
-     * Hub page for the "จัดการ ecommerce" tab — same shape as
-     * CategoryController::marketplaceSync().
-     */
-    public function marketplaceSync(): Response
-    {
-        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
-
-        // A queued brand sync (Shopee/Lazada/TikTok) can run for minutes —
-        // long enough that a user can easily navigate away and back before
-        // it finishes. Without this, the page had no way to tell that a job
-        // is still processing: the frontend's `syncing` flag is local React
-        // state seeded only right after a fresh dispatch, so a remount
-        // always started blank even though job_trackers still said
-        // 'processing' and the queue worker was still actively running it.
-        // Keyed by config_code so the page can resume polling the right
-        // platform's job without the frontend needing to guess an id.
-        $activeSyncJobs = JobTracker::where('job_type', 'brand_sync')
-            ->whereIn('status', ['pending', 'processing'])
-            ->get(['id', 'config_code'])
-            ->mapWithKeys(fn (JobTracker $tracker) => [$tracker->config_code => $tracker->id]);
-
-        return Inertia::render('catalog/brands/marketplace-sync', [
-            'lastSyncedAt' => [
-                'shopee' => $toIso(ShopeeBrand::max('updated_at')),
-                'woocommerce' => $toIso(WooCommerceBrand::max('updated_at')),
-                'lazada' => $toIso(LazadaBrand::max('updated_at')),
-                'tiktok' => $toIso(TikTokBrand::max('updated_at')),
-            ],
-            'activeSyncJobs' => $activeSyncJobs,
-        ]);
-    }
+    // The old marketplaceSync() hub page/method (brands/marketplace-sync.tsx)
+    // is gone — its two props (lastSyncedAt/activeSyncJobs) and everything it
+    // linked to now live on CategoryController::marketplaceSync() /
+    // categories/marketplace-sync.tsx instead.
 
     /**
      * Queues the local shopee_brands cache refresh rather than running it
@@ -513,70 +483,19 @@ class BrandController extends Controller
         return back()->with('success', 'Synced '.count($rows).' WooCommerce brands.');
     }
 
-    /**
-     * Backs the WooCommerceBrandPicker autocomplete on the mapping page —
-     * same shape as searchLazadaBrands()/searchTiktokBrands() below.
-     */
-    public function searchWoocommerceBrands(Request $request): JsonResponse
-    {
-        return $this->searchMarketplaceBrands($request, WooCommerceBrand::class);
-    }
+    // No searchWoocommerceBrands()/WooCommerceBrandPicker,
+    // searchLazadaBrands()/LazadaBrandPicker, or searchTiktokBrands()/
+    // TikTokBrandPicker anymore — every platform's Brands table now maps in
+    // the opposite direction (pick a PIM brand for a given marketplace
+    // brand row, via PimBrandPicker → searchPimBrands() below), same as
+    // Shopee's was first.
 
-    /**
-     * Backs the LazadaBrandPicker autocomplete on the mapping page — same
-     * shape as searchTiktokBrands()/searchWoocommerceBrands().
-     */
-    public function searchLazadaBrands(Request $request): JsonResponse
-    {
-        return $this->searchMarketplaceBrands($request, LazadaBrand::class);
-    }
-
-    /**
-     * Backs the TikTokBrandPicker autocomplete on the mapping page — same
-     * shape as the other searchXBrands() methods.
-     */
-    public function searchTiktokBrands(Request $request): JsonResponse
-    {
-        return $this->searchMarketplaceBrands($request, TikTokBrand::class);
-    }
-
-    /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
-     */
-    private function searchMarketplaceBrands(Request $request, string $marketplaceModel): JsonResponse
-    {
-        $query = $request->input('q');
-
-        $brands = $marketplaceModel::when($query, fn ($q, $query) => $q->where('name', 'like', "%{$query}%"))
-            ->orderBy('name')
-            ->limit(50)
-            ->get(['id', 'name']);
-
-        return response()->json(['data' => $this->serializeMarketplaceBrands($brands, $marketplaceModel)]);
-    }
-
-    /**
-     * TikTok's brand IDs are 19-digit snowflake-style numbers — PHP's native
-     * 64-bit int handles them exactly (confirmed live), but a plain
-     * response()->json() would serialize `id` as a bare JSON number, and
-     * JavaScript's JSON.parse (used internally by fetch().then(r=>r.json()))
-     * silently rounds anything past Number.MAX_SAFE_INTEGER (2^53-1):
-     * confirmed live, 7417026736480880390 becomes 7417026736480881000 once
-     * parsed in JS — corrupting the id a save would send back. Shopee/
-     * WooCommerce/Lazada's real ids are all comfortably small (largest seen:
-     * Shopee ~1.1M), so this only actually bites for TikTok; left as a
-     * numbers-as-strings fix scoped to that one model rather than changing
-     * the response shape (and every existing picker's assumptions) for
-     * three platforms that don't have the problem.
-     */
-    private function serializeMarketplaceBrands($brands, string $marketplaceModel)
-    {
-        if ($marketplaceModel !== TikTokBrand::class) {
-            return $brands;
-        }
-
-        return $brands->map(fn ($brand) => ['id' => (string) $brand->id, 'name' => $brand->name]);
-    }
+    // No searchMarketplaceBrands()/serializeMarketplaceBrands() anymore —
+    // every platform's marketplace-brand-by-name search picker is gone (see
+    // the comment above). TikTok's own 19-digit-id-as-string handling
+    // (JS's JSON.parse silently rounds anything past Number.MAX_SAFE_INTEGER
+    // — confirmed live, 7417026736480880390 becomes 7417026736480881000 once
+    // parsed) now lives directly in tiktokBrandsList() below instead.
 
     public function bulkMapShopeeBrand(Request $request): RedirectResponse|JsonResponse
     {
@@ -671,13 +590,15 @@ class BrandController extends Controller
     }
 
     /**
-     * Search endpoint backing the PIM brand Autocomplete inside that same
-     * detail table — the mirror image of searchLazadaBrands()/
+     * Search endpoint backing the PIM brand Autocomplete on both Shopee's
+     * and Lazada's Brands tables (categories/shopee-mapping.tsx,
+     * categories/lazada-mapping.tsx) — the mirror image of
      * searchTiktokBrands()/searchWoocommerceBrands() below: those search a
      * marketplace's brand cache by name, this searches our own `pbrand`
-     * attribute options by name, since this table maps in the opposite
-     * direction (pick a PIM brand for a given Shopee brand, not the other
-     * way around).
+     * attribute options by name, since those two tables map in the opposite
+     * direction (pick a PIM brand for a given marketplace brand row, not the
+     * other way around — TikTok/WooCommerce's own brand mapping pages still
+     * go the other way).
      */
     public function searchPimBrands(Request $request): JsonResponse
     {
@@ -698,9 +619,52 @@ class BrandController extends Controller
         return response()->json(['data' => $options->map(fn (AttributeOption $o) => ['id' => $o->id, 'name' => $o->admin_label])]);
     }
 
-    public function woocommerceMapping(Request $request): Response
+    /**
+     * WooCommerce brands, paginated + searched, each annotated with
+     * whichever PIM brand currently maps to it, if any. Backs the Brands
+     * table on categories/woocommerce-mapping.tsx — mirrors
+     * lazadaBrandsList() exactly. WooCommerce's own brand list is tiny
+     * (confirmed live: 4 total for this shop) so pagination barely matters
+     * here, but kept for the same shape every other platform's list uses.
+     */
+    public function woocommerceBrandsList(Request $request): JsonResponse
     {
-        return $this->renderMarketplaceMapping($request, 'catalog/brands/woocommerce-mapping', 'woocommerce_brand_id', WooCommerceBrand::class);
+        $attribute = $this->brandAttribute();
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        $query = WooCommerceBrand::query();
+
+        if ($search !== '') {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
+
+        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
+            ->whereIn('woocommerce_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'admin_label', 'woocommerce_brand_id'])
+            ->keyBy('woocommerce_brand_id');
+
+        $rows = $paginated->getCollection()->map(fn (WooCommerceBrand $brand) => [
+            'id' => $brand->id,
+            'name' => $brand->name,
+            'mapped' => $mappedByBrandId->has($brand->id)
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                : null,
+        ]);
+
+        return response()->json([
+            'data' => $rows->values(),
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
     }
 
     public function bulkMapWoocommerceBrand(Request $request): RedirectResponse|JsonResponse
@@ -708,9 +672,61 @@ class BrandController extends Controller
         return $this->bulkMapMarketplaceBrand($request, 'woocommerce_brand_id', WooCommerceBrand::class, 'brand_woocommerce_mapped');
     }
 
-    public function lazadaMapping(Request $request): Response
+    /**
+     * Lazada brands, paginated + searched, each annotated with whichever PIM
+     * brand currently maps to it, if any. Backs the "จับคู่กับแบรนด์ PIM"
+     * column on the Lazada Brands table on categories/lazada-mapping.tsx —
+     * mirrors BrandController::shopeeBrandsForCategory() exactly (row =
+     * marketplace brand, PimBrandPicker in the mapping column), just without
+     * the category scoping: Lazada's brand catalog isn't category-scoped at
+     * all (see syncLazadaBrands()'s docblock), so this can't be driven by a
+     * route param — its own search/pagination round trips instead.
+     *
+     * Row-centric this way (not the old PIM-option-centric shape the now-gone
+     * buildBrandMappingData() used to produce) — that shared helper's
+     * "browse the PIM brand list, pick a marketplace brand for each" shape
+     * read backwards next to Shopee's own Brands table right above it on the
+     * same page, which goes the other way around (every platform's Brands
+     * table shares this row-centric shape now).
+     */
+    public function lazadaBrandsList(Request $request): JsonResponse
     {
-        return $this->renderMarketplaceMapping($request, 'catalog/brands/lazada-mapping', 'lazada_brand_id', LazadaBrand::class);
+        $attribute = $this->brandAttribute();
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        $query = LazadaBrand::query();
+
+        if ($search !== '') {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
+
+        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
+            ->whereIn('lazada_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'admin_label', 'lazada_brand_id'])
+            ->keyBy('lazada_brand_id');
+
+        $rows = $paginated->getCollection()->map(fn (LazadaBrand $brand) => [
+            'id' => $brand->id,
+            'name' => $brand->name,
+            'mapped' => $mappedByBrandId->has($brand->id)
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                : null,
+        ]);
+
+        return response()->json([
+            'data' => $rows->values(),
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
     }
 
     public function bulkMapLazadaBrand(Request $request): RedirectResponse|JsonResponse
@@ -718,45 +734,61 @@ class BrandController extends Controller
         return $this->bulkMapMarketplaceBrand($request, 'lazada_brand_id', LazadaBrand::class, 'brand_lazada_mapped');
     }
 
-    public function tiktokMapping(Request $request): Response
+    /**
+     * TikTok brands, paginated + searched, each annotated with whichever PIM
+     * brand currently maps to it, if any. Backs the Brands table on
+     * categories/tiktok-mapping.tsx — mirrors lazadaBrandsList() exactly
+     * (TikTokBrand is flat, no category_id, same as LazadaBrand — see that
+     * model's docblock).
+     */
+    public function tiktokBrandsList(Request $request): JsonResponse
     {
-        return $this->renderMarketplaceMapping($request, 'catalog/brands/tiktok-mapping', 'tiktok_brand_id', TikTokBrand::class);
+        $attribute = $this->brandAttribute();
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        $query = TikTokBrand::query();
+
+        if ($search !== '') {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
+
+        // TikTok's own brand ids are large enough (19 digits, confirmed
+        // live) that PHP's native int still round-trips them losslessly,
+        // but JS's JSON.parse doesn't (confirmed live: 7417026736480880390
+        // becomes 7417026736480881000 once parsed) — sent as strings here
+        // to dodge that.
+        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
+            ->whereIn('tiktok_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'admin_label', 'tiktok_brand_id'])
+            ->keyBy('tiktok_brand_id');
+
+        $rows = $paginated->getCollection()->map(fn (TikTokBrand $brand) => [
+            'id' => (string) $brand->id,
+            'name' => $brand->name,
+            'mapped' => $mappedByBrandId->has($brand->id)
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                : null,
+        ]);
+
+        return response()->json([
+            'data' => $rows->values(),
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
     }
 
     public function bulkMapTiktokBrand(Request $request): RedirectResponse|JsonResponse
     {
         return $this->bulkMapMarketplaceBrand($request, 'tiktok_brand_id', TikTokBrand::class, 'brand_tiktok_mapped');
-    }
-
-    /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
-     */
-    private function renderMarketplaceMapping(Request $request, string $component, string $fkColumn, string $marketplaceModel): Response
-    {
-        $search = $request->input('search');
-        $status = $request->input('status', 'all');
-        $onlyWithProducts = $request->boolean('only_with_products');
-        $perPage = (int) $request->input('per_page', 15);
-        if (! in_array($perPage, [10, 15, 25, 50], true)) {
-            $perPage = 15;
-        }
-
-        // Same ::max()-needs-an-explicit-UTC-parse caveat as
-        // CategoryController::marketplaceSync()/shopeeMapping() — a raw
-        // aggregate query returns the DB driver's plain string, not an
-        // Eloquent-cast Carbon, so it carries no timezone marker.
-        $lastSyncedAt = $marketplaceModel::max('updated_at');
-
-        return Inertia::render($component, [
-            ...$this->buildBrandMappingData($request, $status, $search ?? '', $perPage, $onlyWithProducts, $fkColumn, $marketplaceModel),
-            'lastSyncedAt' => $lastSyncedAt ? Carbon::parse($lastSyncedAt, 'UTC')->toISOString() : null,
-            'filters' => [
-                'search' => $search ?? '',
-                'status' => $status,
-                'only_with_products' => $onlyWithProducts,
-                'per_page' => $perPage,
-            ],
-        ]);
     }
 
     /**
@@ -785,14 +817,14 @@ class BrandController extends Controller
             }
 
             // Cast to int before comparing/storing — for TikTok specifically
-            // the frontend now sends this as a numeric string (see
-            // serializeMarketplaceBrands()'s docblock on why), which would
-            // never strictly-equal the int PHP/Postgres already returns for
-            // this column, making the "already mapped to this value" skip
-            // below never fire. PHP's native int is exact for these ids
-            // (confirmed live: a 19-digit TikTok id round-trips losslessly),
-            // so this is a safe normalization for every platform, not just
-            // TikTok — the other 3 already send/receive plain ints today.
+            // the frontend sends this as a numeric string (see
+            // tiktokBrandsList()'s docblock on why), which would never
+            // strictly-equal the int PHP/Postgres already returns for this
+            // column, making the "already mapped to this value" skip below
+            // never fire. PHP's native int is exact for these ids (confirmed
+            // live: a 19-digit TikTok id round-trips losslessly), so this is
+            // a safe normalization for every platform, not just TikTok — the
+            // other 3 already send/receive plain ints today.
             $newId = isset($mapping['marketplace_brand_id']) ? (int) $mapping['marketplace_brand_id'] : null;
             if ($option->{$fkColumn} === $newId) {
                 continue;
@@ -821,79 +853,6 @@ class BrandController extends Controller
         }
 
         return back()->with('success', "Updated {$updated} brand mapping(s).");
-    }
-
-    /**
-     * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
-     * @return array{brands: \Illuminate\Pagination\LengthAwarePaginator, stats: array{total: int, mapped: int}}
-     */
-    private function buildBrandMappingData(Request $request, string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $marketplaceModel): array
-    {
-        $attribute = $this->brandAttribute();
-
-        $options = AttributeOption::where('attribute_id', $attribute->id)
-            ->when($search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('admin_label', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
-                });
-            })
-            ->when($status === 'mapped', fn ($q) => $q->whereNotNull($fkColumn))
-            ->when($status === 'unmapped', fn ($q) => $q->whereNull($fkColumn))
-            ->get();
-
-        // Same cached counting as index() — see brandProductCounts()'s
-        // docblock for why (small lists, no real Eloquent relation to
-        // count() through, short-TTL cache instead of event invalidation).
-        $counts = $this->brandProductCounts($attribute->id);
-
-        if ($onlyWithProducts) {
-            $options = $options->filter(fn (AttributeOption $o) => ($counts[$o->code] ?? 0) > 0)->values();
-        }
-
-        $marketplaceBrandsById = $marketplaceModel::whereIn('id', $options->pluck($fkColumn)->filter())->get(['id', 'name'])->keyBy('id');
-
-        // See serializeMarketplaceBrands()'s docblock — TikTok's 19-digit
-        // brand ids need to reach the frontend as strings, or JS's
-        // JSON.parse silently corrupts them.
-        $isTikTok = $marketplaceModel === TikTokBrand::class;
-
-        $rows = $options->map(function (AttributeOption $option) use ($counts, $marketplaceBrandsById, $fkColumn, $isTikTok) {
-            $current = $option->{$fkColumn} ? $marketplaceBrandsById->get($option->{$fkColumn}) : null;
-
-            return [
-                'id' => $option->id,
-                'code' => $option->code,
-                'name' => $option->admin_label,
-                'current' => $current ? ['id' => $isTikTok ? (string) $current->id : $current->id, 'name' => $current->name] : null,
-                'products_count' => (int) ($counts[$option->code] ?? 0),
-            ];
-        })->sortBy('name')->values();
-
-        $page = (int) $request->input('page', 1);
-        $paginated = new LengthAwarePaginator(
-            $rows->forPage($page, $perPage)->values(),
-            $rows->count(),
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()],
-        );
-
-        return [
-            'brands' => $paginated,
-            'stats' => [
-                'total' => $options->count(),
-                'mapped' => $options->whereNotNull($fkColumn)->count(),
-                // How many brands the local cache actually has to offer —
-                // surfaced separately from "mapped" because a near-empty
-                // cache (e.g. Shopee's, synced per-category and easy to
-                // under-cover — see SyncShopeeBrandsJob) silently caps how
-                // many of these PIM brands *can* be mapped at all, which
-                // "0 mapped" alone doesn't distinguish from "nobody's tried
-                // yet".
-                'cached' => $marketplaceModel::count(),
-            ],
-        ];
     }
 
     /**

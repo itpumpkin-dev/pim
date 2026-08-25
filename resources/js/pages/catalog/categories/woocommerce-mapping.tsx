@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
+import SyncIcon from '@mui/icons-material/Sync';
+import CancelIcon from '@mui/icons-material/Cancel';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -11,10 +13,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
-    Checkbox,
     Chip,
     CircularProgress,
-    FormControlLabel,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -22,30 +22,47 @@ import {
     Select,
     Stack,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/components/catalog/woocommerce-category-picker';
-import { CategoryProductsExpander } from '@/components/catalog/category-products-expander';
-import { mappedChipSx, matchScoreTone, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
+import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
+import { xsrfToken } from '@/lib/csrf';
+import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
-interface Suggestion {
+// Same marketplace-tree-row-centric table as categories/shopee-mapping.tsx/
+// categories/lazada-mapping.tsx/categories/tiktok-mapping.tsx (see
+// CategoryController::woocommerceMapping()'s docblock), plus the same
+// "Brands" detail section (global — WooCommerce's own "Product Brands"
+// taxonomy has no category dimension, same as Lazada's/TikTok's). No
+// "Attributes" section here — unlike Shopee/Lazada/TikTok, WooCommerce's
+// custom attributes aren't scoped to a category schema at all (see
+// WooCommerceAttributeMappingController — syncWoocommerceAttributes() is
+// global, no per-category concept exists to mirror).
+type WoocommerceFilter = 'all' | 'leaf' | 'parent' | 'flagged';
+
+interface MappedCategory {
     id: number;
     name: string;
-    path: string;
-    score: number;
 }
 
-interface MappingRow {
+interface WoocommerceRow {
     id: number;
-    code: string;
     name: string;
-    name_eng: string | null;
     path: string;
-    current: { id: number; name: string } | null;
-    products_count: number;
-    suggestions: Suggestion[];
+    leaf: boolean;
+    mapped_categories: MappedCategory[];
+}
+
+interface WoocommerceBrandRow {
+    id: number;
+    name: string;
+    mapped: { id: number; name: string } | null;
 }
 
 interface PaginatedData<T> {
@@ -57,15 +74,26 @@ interface PaginatedData<T> {
 }
 
 interface Props {
-    categories: PaginatedData<MappingRow>;
-    stats: { total: number; mapped: number };
-    filters: { status: 'unmapped' | 'mapped' | 'all'; search: string; per_page: number; only_with_products: boolean };
+    categories: PaginatedData<WoocommerceRow>;
+    stats: { total: number; leaf: number; parent: number; mapped: number };
+    lastSyncedAt: string | null;
+    filters: { filter: WoocommerceFilter; search: string; per_page: number };
 }
 
-export default function WooCommerceCategoryMapping({ categories, stats, filters }: Props) {
+/** What a pending edit stages for one PIM category id: `null` clears its WooCommerce mapping; an object points it at a (possibly different) WooCommerce node. Keyed by PIM category id, not WooCommerce id — that's what bulkMapWoocommerce() actually persists. */
+interface PendingAssignment {
+    woocommerceId: number;
+    pimName: string;
+}
+
+export default function WoocommerceCategoryMapping({ categories, stats, lastSyncedAt, filters }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
+
+    const { auth } = usePage<SharedData>().props;
+    const permissions = auth.permissions || [];
+    const canEditBrands = permissions.includes('brands.edit_brands');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
@@ -76,13 +104,116 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
     ];
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [status, setStatus] = useState(filters.status ?? 'unmapped');
-    const [onlyWithProducts, setOnlyWithProducts] = useState(filters.only_with_products ?? false);
+    const [filter, setFilter] = useState<WoocommerceFilter>(filters.filter ?? 'all');
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 25);
-    const [pending, setPending] = useState<Record<number, WooCommerceCategoryOption | null>>({});
-    const [manualSearchFor, setManualSearchFor] = useState<number | null>(null);
+    const [pending, setPending] = useState<Record<number, PendingAssignment | null>>({});
+    const [assigningFor, setAssigningFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
+    const [syncingCategories, setSyncingCategories] = useState(false);
     const firstRender = useRef(true);
+
+    const runCategorySync = () => {
+        setSyncingCategories(true);
+        router.post('/catalog/categories/sync-woocommerce', {}, { preserveScroll: true, onFinish: () => setSyncingCategories(false) });
+    };
+
+    // ---- WooCommerce Brands (global — see WoocommerceBrandRow's docblock) ----
+    const [woocommerceBrands, setWoocommerceBrands] = useState<PaginatedData<WoocommerceBrandRow> | null>(null);
+    const [loadingWoocommerceBrands, setLoadingWoocommerceBrands] = useState(false);
+    const [woocommerceBrandSearch, setWoocommerceBrandSearch] = useState('');
+    const [woocommerceBrandPerPage, setWoocommerceBrandPerPage] = useState(25);
+    const [savingWoocommerceBrandId, setSavingWoocommerceBrandId] = useState<number | null>(null);
+    const [woocommerceBrandSyncing, setWoocommerceBrandSyncing] = useState(false);
+    const [woocommerceBrandSyncMessage, setWoocommerceBrandSyncMessage] = useState('');
+    const firstWoocommerceBrandSearchRender = useRef(true);
+
+    const loadWoocommerceBrands = (opts: { search?: string; page?: number; perPage?: number } = {}) => {
+        const params = new URLSearchParams({
+            search: opts.search ?? woocommerceBrandSearch,
+            page: String(opts.page ?? 1),
+            per_page: String(opts.perPage ?? woocommerceBrandPerPage),
+        });
+
+        setLoadingWoocommerceBrands(true);
+        fetch(`/catalog/categories/woocommerce-mapping/woocommerce-brands?${params.toString()}`, { headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : { data: [], current_page: 1, last_page: 1, per_page: 25, total: 0 }))
+            .then((body: PaginatedData<WoocommerceBrandRow>) => setWoocommerceBrands(body))
+            .finally(() => setLoadingWoocommerceBrands(false));
+    };
+
+    // Loads once on mount — WooCommerce's brand catalog has no category
+    // dimension at all, same as Lazada's/TikTok's.
+    useEffect(() => {
+        if (canEditBrands) loadWoocommerceBrands({ page: 1 });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (firstWoocommerceBrandSearchRender.current) {
+            firstWoocommerceBrandSearchRender.current = false;
+            return;
+        }
+
+        const timeout = setTimeout(() => loadWoocommerceBrands({ search: woocommerceBrandSearch, page: 1 }), 300);
+        return () => clearTimeout(timeout);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [woocommerceBrandSearch]);
+
+    const handleWoocommerceBrandPerPageChange = (value: number) => {
+        setWoocommerceBrandPerPage(value);
+        loadWoocommerceBrands({ page: 1, perPage: value });
+    };
+
+    const goToWoocommerceBrandPage = (page: number) => {
+        loadWoocommerceBrands({ page });
+    };
+
+    // WooCommerce's own brand sync runs synchronously (mode: 'sync' — its
+    // Product Brands endpoint returns everything in a couple of pages,
+    // confirmed live: 4 brands total) — a plain POST + Inertia-style
+    // onFinish is enough, no JobTracker/polling needed the way Shopee/
+    // Lazada/TikTok's queued brand syncs do.
+    const triggerWoocommerceBrandSync = () => {
+        setWoocommerceBrandSyncing(true);
+        setWoocommerceBrandSyncMessage('');
+        router.post('/catalog/brands/sync-woocommerce', {}, {
+            preserveScroll: true,
+            onFinish: () => {
+                setWoocommerceBrandSyncing(false);
+                loadWoocommerceBrands({ page: 1 });
+            },
+        });
+    };
+
+    // `optionId` is which PIM AttributeOption row actually gets written to
+    // (attribute_options.woocommerce_brand_id) — for a fresh assignment
+    // that's the newly-picked PIM brand's own id; for clearing an existing
+    // one it's that existing mapping's PIM id, not anything derived from
+    // `woocommerceBrandId`. `display` is what the row should show
+    // afterward. Same shape as the other 3 platforms' persistBrand().
+    const persistWoocommerceBrand = (woocommerceBrandId: number, optionId: number, newWoocommerceId: number | null, display: { id: number; name: string } | null) => {
+        setSavingWoocommerceBrandId(woocommerceBrandId);
+        fetch('/catalog/brands/woocommerce-mapping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+            body: JSON.stringify({ mappings: [{ option_id: optionId, marketplace_brand_id: newWoocommerceId }] }),
+        })
+            .then((res) => {
+                if (!res.ok) return;
+                setWoocommerceBrands((prev) =>
+                    prev ? { ...prev, data: prev.data.map((b) => (b.id === woocommerceBrandId ? { ...b, mapped: display } : b)) } : prev,
+                );
+            })
+            .finally(() => setSavingWoocommerceBrandId(null));
+    };
+
+    const assignWoocommerceBrand = (woocommerceBrandId: number, pimBrand: PimBrandOption) => {
+        persistWoocommerceBrand(woocommerceBrandId, pimBrand.id, woocommerceBrandId, { id: pimBrand.id, name: pimBrand.name });
+    };
+
+    const clearWoocommerceBrand = (woocommerceBrandId: number, currentPimOptionId: number) => {
+        persistWoocommerceBrand(woocommerceBrandId, currentPimOptionId, null, null);
+    };
 
     // Any navigation (page/filter/search change, or a completed save) hands
     // us a fresh `categories` prop — pending picks made against the previous
@@ -90,7 +221,7 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
     // into a future save.
     useEffect(() => {
         setPending({});
-        setManualSearchFor(null);
+        setAssigningFor(null);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [categories]);
 
@@ -101,65 +232,52 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
         }
 
         const timeout = setTimeout(() => {
-            router.get('/catalog/categories/woocommerce-mapping', { search, status, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true, replace: true });
+            router.get('/catalog/categories/woocommerce-mapping', { search, filter, per_page: perPage }, { preserveState: true, replace: true });
         }, 300);
 
         return () => clearTimeout(timeout);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search]);
 
-    const applyStatus = (value: 'unmapped' | 'mapped' | 'all') => {
-        setStatus(value);
-        router.get('/catalog/categories/woocommerce-mapping', { search, status: value, per_page: perPage, only_with_products: onlyWithProducts }, { preserveState: true });
-    };
-
-    const applyOnlyWithProducts = (value: boolean) => {
-        setOnlyWithProducts(value);
-        router.get('/catalog/categories/woocommerce-mapping', { search, status, per_page: perPage, only_with_products: value }, { preserveState: true });
+    const applyFilter = (value: WoocommerceFilter) => {
+        setFilter(value);
+        router.get('/catalog/categories/woocommerce-mapping', { search, filter: value, per_page: perPage }, { preserveState: true });
     };
 
     const handlePerPageChange = (value: number) => {
         setPerPage(value);
-        router.get('/catalog/categories/woocommerce-mapping', { search, status, per_page: value, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/categories/woocommerce-mapping', { search, filter, per_page: value }, { preserveState: true });
     };
 
     const goToPage = (page: number) => {
-        router.get('/catalog/categories/woocommerce-mapping', { search, status, per_page: perPage, page, only_with_products: onlyWithProducts }, { preserveState: true });
+        router.get('/catalog/categories/woocommerce-mapping', { search, filter, per_page: perPage, page }, { preserveState: true });
     };
 
     const currentPage = categories.current_page ?? 1;
     const lastPage = categories.last_page ?? 1;
-
     const pendingCount = Object.keys(pending).length;
 
-    const pickSuggestion = (row: MappingRow, suggestion: Suggestion) => {
+    const stageClear = (pimId: number) => {
+        setPending((prev) => ({ ...prev, [pimId]: null }));
+    };
+
+    const undoPending = (pimId: number) => {
         setPending((prev) => {
             const next = { ...prev };
-            if (next[row.id]?.id === suggestion.id) {
-                delete next[row.id];
-            } else {
-                next[row.id] = { id: suggestion.id, name: suggestion.name, parent_id: null };
-            }
+            delete next[pimId];
             return next;
         });
     };
 
-    const clearMapping = (row: MappingRow) => {
-        setPending((prev) => ({ ...prev, [row.id]: null }));
-    };
-
-    const undoPending = (row: MappingRow) => {
-        setPending((prev) => {
-            const next = { ...prev };
-            delete next[row.id];
-            return next;
-        });
+    const stageAssign = (row: WoocommerceRow, pimCategory: CategoryOption) => {
+        setPending((prev) => ({ ...prev, [pimCategory.id]: { woocommerceId: row.id, pimName: pimCategory.name } }));
+        setAssigningFor(null);
     };
 
     const saveChanges = () => {
-        const mappings = Object.entries(pending).map(([categoryId, option]) => ({
-            category_id: Number(categoryId),
-            woocommerce_category_id: option ? option.id : null,
+        const mappings = Object.entries(pending).map(([pimId, assignment]) => ({
+            category_id: Number(pimId),
+            woocommerce_category_id: assignment ? assignment.woocommerceId : null,
         }));
 
         if (mappings.length === 0) {
@@ -167,12 +285,210 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
         }
 
         setSaving(true);
-        router.post(
-            '/catalog/categories/woocommerce-mapping',
-            { mappings },
-            { preserveScroll: true, onFinish: () => setSaving(false) },
-        );
+        router.post('/catalog/categories/woocommerce-mapping', { mappings }, { preserveScroll: true, onFinish: () => setSaving(false) });
     };
+
+    // A row counts as "pending" (for the dashed row highlight) in either
+    // direction: one of its existing PIM mappings is being cleared/moved
+    // away, or a fresh assignment is landing on it from a different PIM
+    // category.
+    const rowHasPendingChange = (row: WoocommerceRow) =>
+        row.mapped_categories.some((pc) => pc.id in pending) || Object.values(pending).some((assignment) => assignment?.woocommerceId === row.id);
+
+    const columns: FioriResponsiveColumn<WoocommerceRow>[] = [
+        {
+            key: 'id',
+            header: t('idColumn'),
+            priority: 'high',
+            align: 'right',
+            width: 100,
+            render: (row) => (
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
+                    {row.id}
+                </Typography>
+            ),
+        },
+        {
+            key: 'name',
+            header: t('nameColumn'),
+            priority: 'always',
+            minWidth: 220,
+            render: (row) => <Typography fontWeight={600}>{row.name}</Typography>,
+        },
+        {
+            key: 'path',
+            header: t('pathColumn'),
+            priority: 'medium',
+            minWidth: 260,
+            render: (row) => (
+                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    {row.path}
+                </Typography>
+            ),
+        },
+        {
+            key: 'status',
+            header: t('status'),
+            priority: 'medium',
+            render: (row) => (
+                <Chip
+                    label={row.leaf ? t('leafLabel') : t('parentLabel')}
+                    size="small"
+                    sx={{
+                        bgcolor: row.leaf ? FIORI.successBg : FIORI.neutralBg,
+                        color: row.leaf ? FIORI.success : FIORI.textSecondary,
+                        fontWeight: 600,
+                    }}
+                />
+            ),
+        },
+        {
+            key: 'mapping',
+            header: t('mappingColumn'),
+            priority: 'high',
+            minWidth: 320,
+            render: (row) => {
+                if (!row.leaf) {
+                    return (
+                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                            {t('notMappableParent')}
+                        </Typography>
+                    );
+                }
+
+                const existingIds = new Set(row.mapped_categories.map((c) => c.id));
+
+                // Everything currently mapped to this WooCommerce node,
+                // folded together with any pending edit against that same
+                // PIM category — including one that moves it elsewhere,
+                // which has to render here as "will clear" too.
+                const existingChips = row.mapped_categories.map((pc) => {
+                    const staged = pending[pc.id];
+                    if (staged === undefined) {
+                        return (
+                            <Chip
+                                key={pc.id}
+                                label={pc.name}
+                                size="small"
+                                onDelete={() => stageClear(pc.id)}
+                                deleteIcon={<CloseIcon fontSize="small" />}
+                                sx={mappedChipSx}
+                            />
+                        );
+                    }
+
+                    const label = staged && staged.woocommerceId === row.id ? `${t('willMapTo')}: ${pc.name}` : `${t('willClearMapping')}: ${pc.name}`;
+                    return (
+                        <Chip
+                            key={pc.id}
+                            label={label}
+                            size="small"
+                            variant="outlined"
+                            onDelete={() => undoPending(pc.id)}
+                            deleteIcon={<CloseIcon fontSize="small" />}
+                            sx={pendingChipSx}
+                        />
+                    );
+                });
+
+                // A PIM category not currently listed here, but staged (from
+                // its own row elsewhere on this page) to move onto this one.
+                const newlyAssigned = Object.entries(pending)
+                    .filter((entry): entry is [string, PendingAssignment] => {
+                        const [pimId, assignment] = entry;
+                        return assignment !== null && assignment.woocommerceId === row.id && !existingIds.has(Number(pimId));
+                    })
+                    .map(([pimId, assignment]) => (
+                        <Chip
+                            key={pimId}
+                            label={`${t('willMapTo')}: ${assignment.pimName}`}
+                            size="small"
+                            variant="outlined"
+                            onDelete={() => undoPending(Number(pimId))}
+                            deleteIcon={<CloseIcon fontSize="small" />}
+                            sx={pendingChipSx}
+                        />
+                    ));
+
+                const hasChips = existingChips.length > 0 || newlyAssigned.length > 0;
+
+                return (
+                    <Box>
+                        {hasChips && (
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+                                {existingChips}
+                                {newlyAssigned}
+                            </Stack>
+                        )}
+
+                        {assigningFor === row.id ? (
+                            <Box sx={{ maxWidth: 360 }}>
+                                <CategoryPicker value={null} onChange={(val) => val && stageAssign(row, val)} placeholder={t('searchPimCategoryPlaceholder')} />
+                            </Box>
+                        ) : (
+                            <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
+                                {t('assignPimCategory')}
+                            </Button>
+                        )}
+                    </Box>
+                );
+            },
+        },
+    ];
+
+    const woocommerceBrandColumns: FioriResponsiveColumn<WoocommerceBrandRow>[] = [
+        {
+            key: 'id',
+            header: t('idColumn'),
+            priority: 'high',
+            align: 'right',
+            width: 120,
+            render: (brand) => (
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
+                    {brand.id}
+                </Typography>
+            ),
+        },
+        {
+            key: 'name',
+            header: t('nameColumn'),
+            priority: 'always',
+            minWidth: 200,
+            render: (brand) => <Typography fontWeight={600}>{brand.name}</Typography>,
+        },
+        {
+            key: 'mapping',
+            header: t('brandMappingColumn'),
+            priority: 'high',
+            minWidth: 260,
+            render: (brand) => (
+                <Stack direction="row" alignItems="center" spacing={1}>
+                    <Box sx={{ flex: 1, minWidth: 200 }}>
+                        <PimBrandPicker
+                            value={brand.mapped}
+                            disabled={savingWoocommerceBrandId === brand.id}
+                            onChange={(val) => {
+                                if (val) {
+                                    assignWoocommerceBrand(brand.id, val);
+                                } else if (brand.mapped) {
+                                    clearWoocommerceBrand(brand.id, brand.mapped.id);
+                                }
+                            }}
+                            placeholder={t('searchPimBrandPlaceholder')}
+                        />
+                    </Box>
+                    {savingWoocommerceBrandId === brand.id && <CircularProgress size={14} />}
+                </Stack>
+            ),
+        },
+    ];
+
+    const statTiles = [
+        { label: t('statTotalCategories'), value: stats.total },
+        { label: t('statLeafCategories'), value: stats.leaf },
+        { label: t('statParentCategories'), value: stats.parent },
+        { label: t('statMappedCategories'), value: stats.mapped, accent: true },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -190,20 +506,67 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
                         </Button>
                         <Typography variant="h4" fontWeight={700}>{t('woocommerceMappingTitle')}</Typography>
                         <Typography color="text.secondary">
-                            {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.total })}
+                            {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
+                            {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
                         </Typography>
                     </Box>
 
-                    <Button
-                        variant="contained"
-                        disabled={pendingCount === 0 || saving}
-                        onClick={saveChanges}
-                        startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={solidActionSx}
-                    >
+                    <Stack direction="row" spacing={1.5}>
+                        <Button
+                            variant="outlined"
+                            disabled={syncingCategories}
+                            startIcon={syncingCategories ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
+                            onClick={runCategorySync}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {syncingCategories ? t('syncingLazada') : t('syncCategories')}
+                        </Button>
+                        <Button
+                            variant="contained"
+                            disabled={pendingCount === 0 || saving}
+                            onClick={saveChanges}
+                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
+                            sx={solidActionSx}
+                        >
                         {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
                     </Button>
+                    </Stack>
                 </Stack>
+
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+                        gap: '1px',
+                        bgcolor: FIORI.border,
+                        border: `1px solid ${FIORI.border}`,
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        mb: 3,
+                    }}
+                >
+                    {statTiles.map((tile) => (
+                        <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
+                            <Typography
+                                variant="caption"
+                                sx={{ color: FIORI.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}
+                            >
+                                {tile.label}
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    fontSize: 26,
+                                    fontWeight: 700,
+                                    fontVariantNumeric: 'tabular-nums',
+                                    color: tile.accent ? FIORI.brand : FIORI.textPrimary,
+                                    mt: 0.25,
+                                }}
+                            >
+                                {tile.value.toLocaleString()}
+                            </Typography>
+                        </Box>
+                    ))}
+                </Box>
 
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
                     <TextField
@@ -211,34 +574,38 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t('searchCategories')}
                         size="small"
-                        sx={{ minWidth: 280 }}
+                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
-                                    <SearchIcon />
+                                    <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
                                 </InputAdornment>
                             ),
                         }}
                     />
 
                     <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <Select value={status} onChange={(e) => applyStatus(e.target.value as 'unmapped' | 'mapped' | 'all')} size="small" sx={{ minWidth: 140 }}>
-                            <MenuItem value="unmapped">{t('statusUnmapped')}</MenuItem>
-                            <MenuItem value="mapped">{t('statusMapped')}</MenuItem>
-                            <MenuItem value="all">{t('statusAll')}</MenuItem>
-                        </Select>
-
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    size="small"
-                                    checked={onlyWithProducts}
-                                    onChange={(e) => applyOnlyWithProducts(e.target.checked)}
-                                />
-                            }
-                            label={t('onlyWithProducts')}
-                            sx={{ mr: 0 }}
-                        />
+                        <ToggleButtonGroup
+                            value={filter}
+                            exclusive
+                            size="small"
+                            onChange={(_event, value: WoocommerceFilter | null) => value && applyFilter(value)}
+                            sx={{
+                                '& .MuiToggleButton-root': {
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    px: 1.5,
+                                    color: FIORI.textSecondary,
+                                    borderColor: FIORI.border,
+                                    '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
+                                },
+                            }}
+                        >
+                            <ToggleButton value="all">{t('statusAll')}</ToggleButton>
+                            <ToggleButton value="leaf">{t('leafOnly')}</ToggleButton>
+                            <ToggleButton value="parent">{t('parentOnly')}</ToggleButton>
+                            <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
+                        </ToggleButtonGroup>
 
                         <Select value={perPage} onChange={(e) => handlePerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
                             <MenuItem value={10}>10</MenuItem>
@@ -262,112 +629,85 @@ export default function WooCommerceCategoryMapping({ categories, stats, filters 
                     </Stack>
                 </Stack>
 
-                <Stack spacing={1.5}>
-                    {categories.data.map((row) => {
-                        const rowPending = pending[row.id];
-                        const hasPendingChange = row.id in pending;
+                <FioriResponsiveTable
+                    columns={columns}
+                    rows={categories.data}
+                    getRowKey={(row) => row.id}
+                    rowSx={(row) => pendingRowSx(rowHasPendingChange(row))}
+                    emptyMessage={t('noCategoriesFound')}
+                />
 
-                        return (
-                            <Paper key={row.id} variant="outlined" sx={{ p: 2, borderRadius: 2, ...pendingRowSx(hasPendingChange) }}>
-                                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
-                                    <Box sx={{ minWidth: 240, maxWidth: 340 }}>
-                                        <Typography fontWeight={600}>{row.name}</Typography>
-                                        {row.name_eng && (
-                                            <Typography variant="body2" color="text.secondary">{row.name_eng}</Typography>
-                                        )}
-                                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
-                                            {row.path}
-                                        </Typography>
-                                        <Box sx={{ mt: 1 }}>
-                                            <CategoryProductsExpander categoryId={row.id} count={row.products_count} />
-                                        </Box>
-                                    </Box>
+                {canEditBrands && (
+                    <>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
+                            <Typography variant="h6" fontWeight={700}>{t('woocommerceBrandsSectionTitle')}</Typography>
 
-                                    <Box sx={{ flex: 1 }}>
-                                        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                                            {row.current && !hasPendingChange && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>
-                                                    {t('currentMapping')}:
-                                                </Typography>
-                                            )}
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                {woocommerceBrandSyncMessage && (
+                                    <Typography variant="caption" color="text.secondary">{woocommerceBrandSyncMessage}</Typography>
+                                )}
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={woocommerceBrandSyncing}
+                                    startIcon={woocommerceBrandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                    onClick={triggerWoocommerceBrandSync}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    {woocommerceBrandSyncing ? t('syncingBrands') : t('syncBrands')}
+                                </Button>
+                            </Stack>
+                        </Stack>
 
-                                            {row.current && !hasPendingChange && (
-                                                <Chip
-                                                    label={row.current.name}
-                                                    size="small"
-                                                    onDelete={() => clearMapping(row)}
-                                                    deleteIcon={<CloseIcon fontSize="small" />}
-                                                    sx={mappedChipSx}
-                                                />
-                                            )}
+                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                            <TextField
+                                value={woocommerceBrandSearch}
+                                onChange={(event) => setWoocommerceBrandSearch(event.target.value)}
+                                placeholder={t('searchBrands')}
+                                size="small"
+                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
 
-                                            {hasPendingChange && (
-                                                <Chip
-                                                    label={rowPending ? `${t('willMapTo')}: ${rowPending.name}` : t('willClearMapping')}
-                                                    size="small"
-                                                    onDelete={() => undoPending(row)}
-                                                    deleteIcon={<CloseIcon fontSize="small" />}
-                                                    variant="outlined"
-                                                    sx={pendingChipSx}
-                                                />
-                                            )}
+                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                                {loadingWoocommerceBrands && <CircularProgress size={18} />}
 
-                                            {!row.current && !hasPendingChange && row.suggestions.length === 0 && (
-                                                <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                    {t('noSuggestions')}
-                                                </Typography>
-                                            )}
-                                        </Stack>
+                                <Select value={woocommerceBrandPerPage} onChange={(e) => handleWoocommerceBrandPerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                                    <MenuItem value={10}>10</MenuItem>
+                                    <MenuItem value={25}>25</MenuItem>
+                                    <MenuItem value={50}>50</MenuItem>
+                                    <MenuItem value={100}>100</MenuItem>
+                                </Select>
+                                <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
 
-                                        {row.suggestions.length > 0 && (
-                                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                                                {row.suggestions.slice(0, 3).map((s) => {
-                                                    const tone = matchScoreTone(s.score);
-                                                    const isPicked = rowPending?.id === s.id;
-                                                    return (
-                                                        <Chip
-                                                            key={s.id}
-                                                            label={`${s.name} · ${s.score}%`}
-                                                            size="small"
-                                                            variant={isPicked ? 'filled' : 'outlined'}
-                                                            onClick={() => pickSuggestion(row, s)}
-                                                            title={s.path}
-                                                            sx={{
-                                                                cursor: 'pointer',
-                                                                borderColor: tone.border,
-                                                                ...(isPicked ? { bgcolor: tone.bg, color: tone.fg } : { color: tone.border }),
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </Stack>
-                                        )}
+                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
+                                    <Typography variant="body2">{woocommerceBrands?.current_page ?? 1}</Typography>
+                                </Paper>
+                                <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage: woocommerceBrands?.last_page ?? 1 })}</Typography>
 
-                                        {manualSearchFor === row.id ? (
-                                            <Box sx={{ maxWidth: 360 }}>
-                                                <WooCommerceCategoryPicker
-                                                    value={rowPending ?? null}
-                                                    onChange={(val) => setPending((prev) => ({ ...prev, [row.id]: val }))}
-                                                    placeholder={t('searchManually')}
-                                                />
-                                            </Box>
-                                        ) : (
-                                            <Button size="small" onClick={() => setManualSearchFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
-                                                {t('searchManually')}
-                                            </Button>
-                                        )}
-                                    </Box>
+                                <Stack direction="row" spacing={0.2}>
+                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) <= 1} onClick={() => goToWoocommerceBrandPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) <= 1} onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)} onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)} onClick={() => goToWoocommerceBrandPage(woocommerceBrands?.last_page ?? 1)}><LastPageIcon fontSize="small" /></IconButton>
                                 </Stack>
-                            </Paper>
-                        );
-                    })}
+                            </Stack>
+                        </Stack>
 
-                    {categories.data.length === 0 && (
-                        <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-                            <Typography color="text.secondary">{t('noCategoriesFound')}</Typography>
-                        </Paper>
-                    )}
-                </Stack>
+                        <FioriResponsiveTable
+                            columns={woocommerceBrandColumns}
+                            rows={woocommerceBrands?.data ?? []}
+                            getRowKey={(brand) => brand.id}
+                            emptyMessage={loadingWoocommerceBrands ? <CircularProgress size={20} /> : t('noBrandsFound')}
+                        />
+                    </>
+                )}
             </Box>
         </AppLayout>
     );

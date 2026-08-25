@@ -56,6 +56,12 @@ class LazadaClient
      * endpoint alone — see LazadaProductSyncService::buildPayload(), which
      * currently sends the fixed "No Brand" value instead of attempting a
      * match.
+     *
+     * response.data also carries `page_index`/`total_page`/`total_record` —
+     * see SyncLazadaBrandsJob's docblock for why that pair, not
+     * count(module) < $pageSize, is the only reliable "was that the last
+     * page" signal (confirmed live: a short page can show up mid-result-set,
+     * not just on the genuine last one).
      */
     public function queryBrands(int $startRow = 0, int $pageSize = 40): array
     {
@@ -104,6 +110,21 @@ class LazadaClient
             'limit' => 10,
             'sku_seller_list' => json_encode([$sellerSku]),
         ], requiresAccessToken: true);
+    }
+
+    /**
+     * `/product/item/get` — the single-item lookup findProductBySku()'s own
+     * docblock above mentions trying first and passing over (it needs a
+     * known item_id up front, which that method's whole point is to avoid).
+     * Kept here as its own method for the opposite case: item_id is already
+     * known (e.g. from getLiveProducts()/product_platform_shops.platform_item_id)
+     * and the full single-item detail — attributes, variation schema,
+     * hiddenReason, rejectReason, etc. — is wanted, which /products/get's
+     * bulk shape doesn't return.
+     */
+    public function getProductItem(int $itemId): array
+    {
+        return $this->request('/product/item/get', ['item_id' => $itemId], requiresAccessToken: true);
     }
 
     /**

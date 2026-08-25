@@ -19,7 +19,6 @@ use App\Models\TikTokCategory;
 use App\Models\TikTokSellerAccount;
 use App\Models\WooCommerceCategory;
 use App\Services\Catalog\AttributeValueFormatter;
-use App\Services\CategoryMatcher;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\SpreadsheetWriter;
@@ -129,9 +128,8 @@ class CategoryController extends Controller
         // below) — so it can't go through GridManager::applyFilters() like
         // the rest of $filterColumns, which only ever does a plain where()
         // on the filter key as a column name. Handled as its own request
-        // input instead, same way BrandController::buildBrandMappingData()
-        // handles its 'status' (mapped/unmapped/all) filter outside the
-        // generic grid filter system.
+        // input instead, same way shopeeMapping()'s 'filter' (all/leaf/
+        // parent/flagged) is handled outside the generic grid filter system.
         $platformColumns = [
             'lazada' => 'lazada_category_id',
             'shopee' => 'shopee_category_id',
@@ -719,6 +717,11 @@ class CategoryController extends Controller
         // parser misreads the naive string as local time.
         $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
+        // Brand data (lastSyncedAt/activeSyncJobs) used to live here too —
+        // see categories/marketplace-sync.tsx's docblock for why that moved
+        // again: brand mapping/sync now lives entirely on each platform's
+        // own categories/{platform}-mapping.tsx page (all four, not just
+        // Shopee/Lazada), so this hub only ever needed category data.
         return Inertia::render('catalog/categories/marketplace-sync', [
             'lastSyncedAt' => [
                 'lazada' => $toIso(LazadaCategory::max('updated_at')),
@@ -1114,10 +1117,10 @@ class CategoryController extends Controller
             ->limit(50)
             ->get(['id', 'parent_id', 'name']);
 
-        // Loaded once for ancestor-chain resolution, same trade-off as
-        // buildCategoryMappingData()'s $allCategories — a full path per
-        // result disambiguates same-named leaves (e.g. two "Others" under
-        // different parents) that a bare name list can't.
+        // Loaded once for ancestor-chain resolution, same trade-off as the
+        // marketplace-tree-row-centric mapping pages' own $allX — a full
+        // path per result disambiguates same-named leaves (e.g. two
+        // "Others" under different parents) that a bare name list can't.
         $allCategories = Category::query()->without('translations')->get(['id', 'parent_id', 'name'])->keyBy('id');
         $pathOf = function (int $id) use ($allCategories): string {
             $names = [];
@@ -1170,41 +1173,12 @@ class CategoryController extends Controller
         return response()->json(['data' => $categories]);
     }
 
-    /**
-     * Search endpoint backing the TikTok category Autocomplete on the
-     * mapping review page — mirrors searchLazadaCategories()/
-     * searchShopeeCategories() above.
-     */
-    public function searchTikTokCategories(Request $request): JsonResponse
-    {
-        $query = trim((string) $request->query('q', ''));
-
-        $categories = TikTokCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
-            ->orderBy('name')
-            ->limit(50)
-            ->get(['id', 'name', 'parent_id']);
-
-        return response()->json(['data' => $categories]);
-    }
-
-    /**
-     * Search endpoint backing the WooCommerce category Autocomplete on the
-     * mapping review page — mirrors searchLazadaCategories()/
-     * searchShopeeCategories()/searchTikTokCategories() above.
-     */
-    public function searchWoocommerceCategories(Request $request): JsonResponse
-    {
-        $query = trim((string) $request->query('q', ''));
-
-        $categories = WooCommerceCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
-            ->orderBy('name')
-            ->limit(50)
-            ->get(['id', 'name', 'parent_id']);
-
-        return response()->json(['data' => $categories]);
-    }
+    // No searchTikTokCategories()/searchWoocommerceCategories() anymore —
+    // TikTokCategoryPicker/WooCommerceCategoryPicker (their only consumers)
+    // are gone along with the old fuzzy-match mapping pages they backed; the
+    // new tiktok-mapping.tsx/woocommerce-mapping.tsx pages search their own
+    // marketplace tree directly via tiktokMapping()'s/woocommerceMapping()'s
+    // own `search` param instead.
 
     /**
      * Lightweight product list for one category — powers the Lazada/Shopee
@@ -1224,13 +1198,25 @@ class CategoryController extends Controller
     }
 
     /**
-     * @return array{0: string, 1: string, 2: int, 3: bool}
+     * Bulk review UI for mapping Lazada's category tree to local PIM
+     * categories — same table shape and reasoning as shopeeMapping() (see
+     * that method's docblock): every row is a node from the local Lazada
+     * tree mirror (~lazada_categories, synced via syncLazadaCategories()),
+     * not a PIM category with a fuzzy-matched suggestion the way the old
+     * buildCategoryMappingData()-backed pages used to work (all 4 platforms
+     * have since moved to this same marketplace-tree-row-centric shape —
+     * that helper is gone).
+     *
+     * No brand_count column here unlike shopeeMapping()'s — Lazada's brand
+     * list isn't category-scoped at all (confirmed live: no category param
+     * on /category/brands/query), so there's no per-category brand data to
+     * surface on this page.
      */
-    private function parseMappingFilters(Request $request): array
+    public function lazadaMapping(Request $request): Response
     {
-        $status = $request->input('status', 'unmapped');
-        if (! in_array($status, ['unmapped', 'mapped', 'all'], true)) {
-            $status = 'unmapped';
+        $filter = $request->input('filter', 'all');
+        if (! in_array($filter, ['all', 'leaf', 'parent', 'flagged'], true)) {
+            $filter = 'all';
         }
 
         $search = trim((string) $request->input('search', ''));
@@ -1240,183 +1226,87 @@ class CategoryController extends Controller
             $perPage = 25;
         }
 
-        $onlyWithProducts = $request->boolean('only_with_products');
+        // Loaded once for ancestor-chain resolution — cheap for a few
+        // thousand rows and avoids one query per row per tree level.
+        $allLazada = LazadaCategory::query()->get(['id', 'parent_id', 'name'])->keyBy('id');
 
-        return [$status, $search, $perPage, $onlyWithProducts];
-    }
-
-    /**
-     * Shared query/scoring logic behind lazadaMapping() and shopeeMapping()
-     * — only the marketplace side (which model, FK column, relation) differs
-     * between the two; the local-category half (ancestor chains, name
-     * resolution, pagination) is identical either way. Suggestions are a
-     * ranking aid only (see CategoryMatcher); nothing is persisted here
-     * until bulkMapMarketplaceCategory() is called with explicit picks.
-     *
-     * @param  class-string<LazadaCategory>|class-string<ShopeeCategory>  $marketplaceModel
-     * @return array{categories: mixed, stats: array{total: int, mapped: int}}
-     */
-    private function buildCategoryMappingData(string $status, string $search, int $perPage, bool $onlyWithProducts, string $fkColumn, string $relation, string $marketplaceModel): array
-    {
-        // Load the whole local tree once (~1,100 rows) so each row's
-        // ancestor chain can be resolved in memory regardless of depth,
-        // instead of firing one query per row per level.
-        $allCategories = Category::query()->without('translations')
-            ->get(['id', 'parent_id', 'name', 'additional_data', 'is_active', $fkColumn])
-            ->keyBy('id');
-
-        $childParentIds = $allCategories->pluck('parent_id')->filter()->unique();
-        $leafIds = $allCategories->reject(fn (Category $c) => $childParentIds->contains($c->id))->pluck('id');
-
-        // Marketplace mapping is only meaningful for categories actually in
-        // use — the ~1,086 legacy categories deactivated when the real
-        // WooCommerce category list was reconciled in (see the is_active
-        // migration) would otherwise flood this page with stale rows nobody
-        // needs to map. $leafIds itself stays unfiltered (ancestorNameEngTokens/
-        // pathOf below still need to walk through inactive ancestors, if any,
-        // to build an accurate path/hint).
-        $activeLeafIds = $allCategories->whereIn('id', $leafIds)->where('is_active', true)->pluck('id');
-
-        $nameEngOf = fn (Category $category) => trim((string) ($category->additional_data['name_eng'] ?? '')) ?: $category->name;
-
-        $ancestorNameEngTokens = function (int $id) use ($allCategories, $nameEngOf): array {
-            $tokens = [];
-            $currentParentId = $allCategories->get($id)?->parent_id;
-            while ($currentParentId && $allCategories->has($currentParentId)) {
-                $tokens = [...$tokens, ...CategoryMatcher::tokenize($nameEngOf($allCategories->get($currentParentId)))];
-                $currentParentId = $allCategories->get($currentParentId)->parent_id;
-            }
-
-            return $tokens;
-        };
-
-        $pathOf = function (int $id) use ($allCategories): string {
+        $pathOf = function (int $id) use ($allLazada): string {
             $names = [];
-            $node = $allCategories->get($id);
+            $node = $allLazada->get($id);
             while ($node) {
                 array_unshift($names, $node->name);
-                $node = $node->parent_id ? $allCategories->get($node->parent_id) : null;
+                $node = $node->parent_id ? $allLazada->get($node->parent_id) : null;
             }
 
             return implode(' > ', $names);
         };
 
-        $query = Category::query()->without('translations')
-            ->whereIn('id', $activeLeafIds)
-            ->withCount('products')
-            ->with("{$relation}:id,name,parent_id");
+        $mappedLazadaIds = Category::query()->whereNotNull('lazada_category_id')->pluck('lazada_category_id')->unique()->values();
 
-        if ($status === 'unmapped') {
-            $query->whereNull($fkColumn);
-        } elseif ($status === 'mapped') {
-            $query->whereNotNull($fkColumn);
-        }
+        $query = LazadaCategory::query();
 
-        if ($onlyWithProducts) {
-            $query->whereHas('products');
+        if ($filter === 'leaf') {
+            $query->where('is_leaf', true);
+        } elseif ($filter === 'parent') {
+            $query->where('is_leaf', false);
+        } elseif ($filter === 'flagged') {
+            $query->whereIn('id', $mappedLazadaIds->isEmpty() ? [0] : $mappedLazadaIds);
         }
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhereRaw("additional_data->>'name_eng' ILIKE ?", ["%{$search}%"]);
+                $q->where('name', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
             });
         }
 
         $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
 
-        // Marketplace leaf candidates + their token sets, precomputed once
-        // and reused for every row scored on this page.
-        $allMarketplace = $marketplaceModel::query()->get(['id', 'parent_id', 'name', 'is_leaf'])->keyBy('id');
+        $pageIds = $paginated->getCollection()->pluck('id');
+        $mappedByLazadaId = Category::query()->without('translations')
+            ->whereIn('lazada_category_id', $pageIds)
+            ->get(['id', 'name', 'lazada_category_id'])
+            ->groupBy('lazada_category_id');
 
-        $marketplaceAncestorTokens = function (int $id) use ($allMarketplace): array {
-            $tokens = [];
-            $currentParentId = $allMarketplace->get($id)?->parent_id;
-            while ($currentParentId && $allMarketplace->has($currentParentId)) {
-                $tokens = [...$tokens, ...CategoryMatcher::tokenize($allMarketplace->get($currentParentId)->name)];
-                $currentParentId = $allMarketplace->get($currentParentId)->parent_id;
-            }
-
-            return $tokens;
-        };
-
-        $marketplacePathOf = function (int $id) use ($allMarketplace): string {
-            $names = [];
-            $node = $allMarketplace->get($id);
-            while ($node) {
-                array_unshift($names, $node->name);
-                $node = $node->parent_id ? $allMarketplace->get($node->parent_id) : null;
-            }
-
-            return implode(' > ', $names);
-        };
-
-        $candidates = $allMarketplace->filter(fn ($c) => $c->is_leaf)
-            ->map(fn ($c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-                'path' => $marketplacePathOf($c->id),
-                'tokens' => CategoryMatcher::tokenize($c->name),
-                'parentTokens' => $marketplaceAncestorTokens($c->id),
-            ])
-            ->values()
-            ->all();
-
-        $rows = $paginated->getCollection()->map(function (Category $category) use ($nameEngOf, $ancestorNameEngTokens, $pathOf, $candidates, $relation) {
-            $leafTokens = CategoryMatcher::tokenize($nameEngOf($category));
-            $parentTokens = $ancestorNameEngTokens($category->id);
-
-            return [
-                'id' => $category->id,
-                'code' => $category->code,
-                'name' => $category->name,
-                'name_eng' => $category->additional_data['name_eng'] ?? null,
-                'path' => $pathOf($category->id),
-                'current' => $category->{$relation} ? [
-                    'id' => $category->{$relation}->id,
-                    'name' => $category->{$relation}->name,
-                ] : null,
-                'products_count' => $category->products_count,
-                'suggestions' => CategoryMatcher::suggest($leafTokens, $parentTokens, $candidates),
-            ];
-        });
+        $rows = $paginated->getCollection()->map(fn (LazadaCategory $lazada) => [
+            'id' => $lazada->id,
+            'name' => $lazada->name,
+            'path' => $pathOf($lazada->id),
+            'leaf' => (bool) $lazada->is_leaf,
+            'mapped_categories' => ($mappedByLazadaId->get($lazada->id) ?? collect())
+                ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name])
+                ->values(),
+        ]);
 
         $paginated->setCollection($rows);
 
-        return [
-            'categories' => $paginated,
-            'stats' => [
-                'total' => $activeLeafIds->count(),
-                'mapped' => $allCategories->whereIn('id', $activeLeafIds)->whereNotNull($fkColumn)->count(),
-            ],
-        ];
-    }
-
-    /**
-     * Bulk review UI for mapping local leaf categories to a Lazada leaf
-     * category — the prerequisite LazadaProductSyncService::buildPayload()
-     * enforces before any product in that category can be pushed.
-     */
-    public function lazadaMapping(Request $request): Response
-    {
-        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+        // See marketplaceSync()'s comment on why ::max() needs an explicit
+        // UTC parse before serializing.
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/lazada-mapping', [
-            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'lazada_category_id', 'lazadaCategory', LazadaCategory::class),
-            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+            'categories' => $paginated,
+            'stats' => [
+                'total' => LazadaCategory::count(),
+                'leaf' => LazadaCategory::where('is_leaf', true)->count(),
+                'parent' => LazadaCategory::where('is_leaf', false)->count(),
+                'mapped' => $mappedLazadaIds->count(),
+            ],
+            'lastSyncedAt' => $toIso(LazadaCategory::max('updated_at')),
+            'filters' => ['filter' => $filter, 'search' => $search, 'per_page' => $perPage],
         ]);
     }
 
     /**
      * Bulk review UI for mapping Shopee's category tree to local PIM
-     * categories — deliberately the mirror image of
-     * buildCategoryMappingData() above (which drives lazadaMapping()/
-     * tiktokMapping()/woocommerceMapping()). There, every row is a PIM
-     * category and the marketplace side is a fuzzy-matched suggestion; here
-     * every row is a category from the local Shopee tree mirror (~2.4k rows
-     * synced from v2.product.get_category — see syncShopeeCategories()) and
-     * each one lists whichever PIM categories currently point at it via
-     * categories.shopee_category_id. Shopee's tree is deep and organized
+     * categories — every row is a category from the local Shopee tree
+     * mirror (~2.4k rows synced from v2.product.get_category — see
+     * syncShopeeCategories()) and each one lists whichever PIM categories
+     * currently point at it via categories.shopee_category_id (lazadaMapping()/
+     * tiktokMapping()/woocommerceMapping() all work the same way now).
+     * Shopee's tree is deep and organized
      * differently enough from ours that reviewing it directly — "what PIM
      * category should this Shopee leaf be?" — catches bad picks (like a
      * generator mapped to "Industrial Adhesives & Tapes") that fuzzy name
@@ -1424,12 +1314,11 @@ class CategoryController extends Controller
      */
     public function shopeeMapping(Request $request): Response
     {
-        // Not parseMappingFilters() — that helper's status/only_with_products
-        // pair doesn't fit here (rows are Shopee categories, not PIM ones
-        // with a product count). This page has a single segmented filter
-        // instead: All / Leaf only / Parent only / Flagged (= has a PIM
-        // mapping — surfaced for review, since the one real mapping this
-        // page replaced turned out to be wrong).
+        // Rows are Shopee categories, not PIM ones with a product count, so
+        // this page uses a single segmented filter instead: All / Leaf only /
+        // Parent only / Flagged (= has a PIM mapping — surfaced for review,
+        // since the one real mapping this page replaced turned out to be
+        // wrong).
         $filter = $request->input('filter', 'all');
         if (! in_array($filter, ['all', 'leaf', 'parent', 'flagged'], true)) {
             $filter = 'all';
@@ -1526,31 +1415,206 @@ class CategoryController extends Controller
     }
 
     /**
-     * Same bulk review UI as lazadaMapping()/shopeeMapping() above, but
-     * against TikTok's category tree — see buildCategoryMappingData().
+     * Bulk review UI for mapping TikTok's category tree to local PIM
+     * categories — same table shape and reasoning as lazadaMapping()/
+     * shopeeMapping() (see shopeeMapping()'s docblock): every row is a node
+     * from the local TikTok tree mirror (tiktok_categories, synced via
+     * syncTikTokCategories()), not a PIM category with a fuzzy-matched
+     * suggestion the way the old buildCategoryMappingData()-backed page used
+     * to work (all 4 platforms share this shape now — see shopeeMapping()'s
+     * docblock).
+     *
+     * No brand_count column here (unlike shopeeMapping()'s) — TikTok's
+     * brand list isn't category-scoped in this app's own sync (see
+     * BrandController::syncTiktokBrands()'s docblock: getBrands() is called
+     * without a category_id), so there's no per-category brand data to
+     * surface on this page.
      */
     public function tiktokMapping(Request $request): Response
     {
-        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+        $filter = $request->input('filter', 'all');
+        if (! in_array($filter, ['all', 'leaf', 'parent', 'flagged'], true)) {
+            $filter = 'all';
+        }
+
+        $search = trim((string) $request->input('search', ''));
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        // Loaded once for ancestor-chain resolution — cheap for a few
+        // thousand rows and avoids one query per row per tree level.
+        $allTikTok = TikTokCategory::query()->get(['id', 'parent_id', 'name'])->keyBy('id');
+
+        $pathOf = function (int $id) use ($allTikTok): string {
+            $names = [];
+            $node = $allTikTok->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allTikTok->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $mappedTikTokIds = Category::query()->whereNotNull('tiktok_category_id')->pluck('tiktok_category_id')->unique()->values();
+
+        $query = TikTokCategory::query();
+
+        if ($filter === 'leaf') {
+            $query->where('is_leaf', true);
+        } elseif ($filter === 'parent') {
+            $query->where('is_leaf', false);
+        } elseif ($filter === 'flagged') {
+            $query->whereIn('id', $mappedTikTokIds->isEmpty() ? [0] : $mappedTikTokIds);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
+            });
+        }
+
+        $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
+
+        $pageIds = $paginated->getCollection()->pluck('id');
+        $mappedByTikTokId = Category::query()->without('translations')
+            ->whereIn('tiktok_category_id', $pageIds)
+            ->get(['id', 'name', 'tiktok_category_id'])
+            ->groupBy('tiktok_category_id');
+
+        $rows = $paginated->getCollection()->map(fn (TikTokCategory $tiktok) => [
+            'id' => $tiktok->id,
+            'name' => $tiktok->name,
+            'path' => $pathOf($tiktok->id),
+            'leaf' => (bool) $tiktok->is_leaf,
+            'mapped_categories' => ($mappedByTikTokId->get($tiktok->id) ?? collect())
+                ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name])
+                ->values(),
+        ]);
+
+        $paginated->setCollection($rows);
+
+        // See marketplaceSync()'s comment on why ::max() needs an explicit
+        // UTC parse before serializing.
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/tiktok-mapping', [
-            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'tiktok_category_id', 'tiktokCategory', TikTokCategory::class),
-            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+            'categories' => $paginated,
+            'stats' => [
+                'total' => TikTokCategory::count(),
+                'leaf' => TikTokCategory::where('is_leaf', true)->count(),
+                'parent' => TikTokCategory::where('is_leaf', false)->count(),
+                'mapped' => $mappedTikTokIds->count(),
+            ],
+            'lastSyncedAt' => $toIso(TikTokCategory::max('updated_at')),
+            'filters' => ['filter' => $filter, 'search' => $search, 'per_page' => $perPage],
         ]);
     }
 
     /**
-     * Same bulk review UI as lazadaMapping()/shopeeMapping()/tiktokMapping()
-     * above, but against WooCommerce's product categories — see
-     * buildCategoryMappingData().
+     * Bulk review UI for mapping WooCommerce's product categories to local
+     * PIM categories — same shape as tiktokMapping()/lazadaMapping()/
+     * shopeeMapping() (see shopeeMapping()'s docblock). This was the last
+     * page still using the old PIM-row-centric buildCategoryMappingData()
+     * shape; for consistency with the other 3 platforms' own rewrites (and
+     * so the Brands section below shares one page layout), it gets the same
+     * marketplace-tree-row-centric table here too now.
+     *
+     * No brand_count column (unlike shopeeMapping()'s) — WooCommerce's
+     * brand list isn't category-scoped at all (confirmed live: its own
+     * "Product Brands" taxonomy has no per-category relationship), so
+     * there's no per-category brand data to surface on this page.
      */
     public function woocommerceMapping(Request $request): Response
     {
-        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+        $filter = $request->input('filter', 'all');
+        if (! in_array($filter, ['all', 'leaf', 'parent', 'flagged'], true)) {
+            $filter = 'all';
+        }
+
+        $search = trim((string) $request->input('search', ''));
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        // Loaded once for ancestor-chain resolution — cheap for a few
+        // thousand rows and avoids one query per row per tree level.
+        $allWoocommerce = WooCommerceCategory::query()->get(['id', 'parent_id', 'name'])->keyBy('id');
+
+        $pathOf = function (int $id) use ($allWoocommerce): string {
+            $names = [];
+            $node = $allWoocommerce->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allWoocommerce->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $mappedWoocommerceIds = Category::query()->whereNotNull('woocommerce_category_id')->pluck('woocommerce_category_id')->unique()->values();
+
+        $query = WooCommerceCategory::query();
+
+        if ($filter === 'leaf') {
+            $query->where('is_leaf', true);
+        } elseif ($filter === 'parent') {
+            $query->where('is_leaf', false);
+        } elseif ($filter === 'flagged') {
+            $query->whereIn('id', $mappedWoocommerceIds->isEmpty() ? [0] : $mappedWoocommerceIds);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
+            });
+        }
+
+        $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
+
+        $pageIds = $paginated->getCollection()->pluck('id');
+        $mappedByWoocommerceId = Category::query()->without('translations')
+            ->whereIn('woocommerce_category_id', $pageIds)
+            ->get(['id', 'name', 'woocommerce_category_id'])
+            ->groupBy('woocommerce_category_id');
+
+        $rows = $paginated->getCollection()->map(fn (WooCommerceCategory $woo) => [
+            'id' => $woo->id,
+            'name' => $woo->name,
+            'path' => $pathOf($woo->id),
+            'leaf' => (bool) $woo->is_leaf,
+            'mapped_categories' => ($mappedByWoocommerceId->get($woo->id) ?? collect())
+                ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name])
+                ->values(),
+        ]);
+
+        $paginated->setCollection($rows);
+
+        // See marketplaceSync()'s comment on why ::max() needs an explicit
+        // UTC parse before serializing.
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/woocommerce-mapping', [
-            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'woocommerce_category_id', 'woocommerceCategory', WooCommerceCategory::class),
-            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+            'categories' => $paginated,
+            'stats' => [
+                'total' => WooCommerceCategory::count(),
+                'leaf' => WooCommerceCategory::where('is_leaf', true)->count(),
+                'parent' => WooCommerceCategory::where('is_leaf', false)->count(),
+                'mapped' => $mappedWoocommerceIds->count(),
+            ],
+            'lastSyncedAt' => $toIso(WooCommerceCategory::max('updated_at')),
+            'filters' => ['filter' => $filter, 'search' => $search, 'per_page' => $perPage],
         ]);
     }
 

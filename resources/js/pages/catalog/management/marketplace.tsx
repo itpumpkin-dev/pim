@@ -3,7 +3,6 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
-import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import { Box, Grid, Typography } from '@mui/material';
 import { type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,10 +10,15 @@ import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
  * "จัดการ Ecommerce/Marketplace" — sits between the Management hub and the
- * two real sync pages (categories/marketplace-sync, brands/marketplace-sync),
- * which used to be separate tiles on that hub. Purely a launcher like the
- * hub itself: each card just navigates to the existing page, which still
- * owns all of its own sync/mapping actions and permission checks.
+ * real sync pages, which used to be separate tiles on that hub. Purely a
+ * launcher like the hub itself: each card just navigates to the existing
+ * page, which still owns all of its own sync/mapping actions and permission
+ * checks.
+ *
+ * No separate "brands" tile anymore — brands/marketplace-sync.tsx is gone;
+ * every brand sync/mapping action it linked to now lives on the "categories"
+ * tile's own destination page (categories/marketplace-sync.tsx), alongside
+ * category actions. See that page's docblock for why.
  */
 export default function CatalogManagementMarketplace() {
     const { t } = useTranslation('catalog');
@@ -37,14 +41,6 @@ export default function CatalogManagementMarketplace() {
             description: t('marketplaceSyncSubtitle'),
             url: '/catalog/categories/marketplace-sync',
             permission: 'categories.list_categories',
-        },
-        {
-            key: 'brands',
-            icon: StorefrontOutlinedIcon,
-            title: t('manageBrandsCard'),
-            description: t('brandMarketplaceSyncSubtitle'),
-            url: '/catalog/brands/marketplace-sync',
-            permission: 'brands.list_brands',
         },
         {
             key: 'marketplaceAttributeMapping',

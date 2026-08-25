@@ -31,10 +31,10 @@ export interface NavItem {
     matchUrls?: string[];
     /**
      * URL prefixes that would otherwise prefix-match this item's own `url`
-     * but shouldn't — e.g. /catalog/brands/marketplace-sync sits under
-     * /catalog/brands by URL structure (it's routed alongside the Brands
-     * CRUD endpoints), but has been reassigned to the "จัดการ" hub's
-     * matchUrls, so it must not also light up the "แบรนด์" list item.
+     * but shouldn't — e.g. /catalog/categories/marketplace-sync sits under
+     * /catalog/categories by URL structure (it's routed alongside the
+     * Categories CRUD endpoints), but has been reassigned to the "จัดการ"
+     * hub's matchUrls, so it must not also light up the "หมวดหมู่" list item.
      */
     excludeUrls?: string[];
 }

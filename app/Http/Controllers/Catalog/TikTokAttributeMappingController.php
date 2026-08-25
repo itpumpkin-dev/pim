@@ -9,6 +9,7 @@ use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokSellerAccount;
 use App\Services\TikTok\TikTokClient;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -41,7 +42,7 @@ class TikTokAttributeMappingController extends Controller
         'tiktok_attribute',
     ];
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse|JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
@@ -126,6 +127,15 @@ class TikTokAttributeMappingController extends Controller
 
         TikTokAttributeMapping::bumpListVersion();
 
+        // The embedded per-category picker on categories/tiktok-mapping.tsx
+        // calls this same endpoint via plain fetch (Accept: application/json)
+        // instead of an Inertia visit — see
+        // ShopeeAttributeMappingController::update()'s identical branch for
+        // why. Every other caller is a real Inertia POST, unaffected.
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
         return back()->with('success', 'TikTok attribute mapping saved.');
     }
 
@@ -191,5 +201,93 @@ class TikTokAttributeMappingController extends Controller
         TikTokAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsById).' TikTok attributes across '.count($categoryIds).' categories.');
+    }
+
+    /**
+     * Same idea as syncTikTokAttributes() above, but scoped to exactly one
+     * TikTok category — the "Sync attributes" action on
+     * categories/tiktok-mapping.tsx, mirroring
+     * ShopeeAttributeMappingController::syncShopeeAttributesForCategory()/
+     * LazadaAttributeMappingController::syncLazadaAttributesForCategory().
+     * Runs synchronously — a single getAttributes() call, same as the
+     * multi-category loop iteration above, just without the rate-limit
+     * pacing since there's only one call here.
+     */
+    public function syncTikTokAttributesForCategory(Request $request): JsonResponse
+    {
+        $account = TikTokSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No TikTok seller account found to authenticate the sync.'], 422);
+        }
+
+        $validated = $request->validate([
+            'tiktok_category_id' => ['required', 'integer', 'exists:tiktok_categories,id'],
+        ]);
+        $categoryId = $validated['tiktok_category_id'];
+
+        $client = new TikTokClient($account);
+        $response = $client->getAttributes((string) $categoryId);
+        $schema = $response['data']['attributes'] ?? [];
+
+        $now = now();
+        $rows = [];
+        foreach ($schema as $attr) {
+            if (($attr['type'] ?? null) !== 'PRODUCT_PROPERTY') {
+                continue;
+            }
+
+            $rows[] = [
+                'id' => $attr['id'],
+                'name' => $attr['name'],
+                'is_customizable' => (bool) ($attr['is_customizable'] ?? false),
+                'is_multiple_selection' => (bool) ($attr['is_multiple_selection'] ?? false),
+                'category_id' => $categoryId,
+                'mandatory' => (bool) ($attr['is_requried'] ?? false),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if ($rows !== []) {
+            TikTokAttribute::upsert($rows, ['id'], ['name', 'is_customizable', 'is_multiple_selection', 'category_id', 'mandatory', 'updated_at']);
+        }
+
+        TikTokAttribute::bumpListVersion();
+
+        return response()->json(['count' => count($rows)]);
+    }
+
+    /**
+     * TikTok attributes cached for one category (see the migration's
+     * "informational, not a real FK" caveat on that column — this lists
+     * whatever the most recent sync for that category actually saw), each
+     * annotated with whichever PIM attribute currently maps to it, if any.
+     * Backs the "จับคู่ Attribute กับ PIM" column's table on
+     * categories/tiktok-mapping.tsx — mirrors
+     * ShopeeAttributeMappingController::shopeeAttributesForCategory()
+     * exactly, keyed by `id` (a string, per TikTokAttribute's own PK type).
+     */
+    public function tiktokAttributesForCategory(int $tiktokCategoryId): JsonResponse
+    {
+        $attributes = TikTokAttribute::where('category_id', $tiktokCategoryId)->orderBy('name')->get();
+
+        $mappedByTikTokAttributeId = TikTokAttributeMapping::whereIn('tiktok_attribute_id', $attributes->pluck('id'))
+            ->with('attribute:id,name')
+            ->get()
+            ->keyBy('tiktok_attribute_id');
+
+        $data = $attributes->map(function (TikTokAttribute $attribute) use ($mappedByTikTokAttributeId) {
+            $mapping = $mappedByTikTokAttributeId->get($attribute->id);
+
+            return [
+                'id' => $attribute->id,
+                'name' => $attribute->name,
+                'is_customizable' => (bool) $attribute->is_customizable,
+                'mandatory' => (bool) $attribute->mandatory,
+                'mapped' => $mapping ? ['id' => $mapping->attribute->id, 'name' => $mapping->attribute->name] : null,
+            ];
+        });
+
+        return response()->json(['data' => $data->values()]);
     }
 }

@@ -82,17 +82,14 @@ function useMainNavItems(): NavItem[] {
                             title: t('brands'),
                             url: '/catalog/brands',
                             permission: 'brands.list_brands',
-                            // Same reasoning as Categories' excludeUrls above
-                            // — the marketplace-sync + mapping flow now
-                            // belongs to "จัดการ", not the Brands list.
-                            // No /catalog/brands/shopee-mapping entry here —
-                            // that page is gone; Shopee brand mapping lives
-                            // on /catalog/categories/shopee-mapping instead
-                            // (already covered by the Categories excludeUrls
-                            // above).
-                            excludeUrls: [
-                                '/catalog/brands/marketplace-sync',
-                            ],
+                            // No /catalog/brands/shopee-mapping or
+                            // /catalog/brands/marketplace-sync entries here
+                            // anymore — both pages are gone; brand mapping
+                            // and sync now live on /catalog/categories/
+                            // shopee-mapping, /catalog/categories/
+                            // lazada-mapping, and /catalog/categories/
+                            // marketplace-sync instead (already covered by
+                            // the Categories excludeUrls above).
                         },
                     ],
                 },
@@ -148,7 +145,6 @@ function useMainNavItems(): NavItem[] {
                                 '/catalog/categories/shopee-mapping',
                                 '/catalog/categories/tiktok-mapping',
                                 '/catalog/categories/woocommerce-mapping',
-                                '/catalog/brands/marketplace-sync',
                             ],
                         },
                     ],

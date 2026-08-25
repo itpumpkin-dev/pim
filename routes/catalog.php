@@ -91,7 +91,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('brands/{brand}', [BrandController::class, 'update'])->name('brands.update')->middleware('permission:brands,edit_brands');
     Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy')->middleware('permission:brands,edit_brands');
 
-    Route::get('brands/marketplace-sync', [BrandController::class, 'marketplaceSync'])->name('brands.marketplaceSync')->middleware('permission:brands,edit_brands');
+    // No GET brands/marketplace-sync hub anymore — its two props
+    // (lastSyncedAt/activeSyncJobs) and every action it linked to now live
+    // on categories/marketplace-sync.tsx (see CategoryController::
+    // marketplaceSync()'s docblock).
     Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
     // No GET brands/shopee-mapping page anymore — Shopee brand mapping now
     // lives on categories/shopee-mapping.tsx (get_brand_list is
@@ -103,16 +106,21 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
     Route::get('brands/search-pim', [BrandController::class, 'searchPimBrands'])->name('brands.searchPim')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
-    Route::get('brands/search-woocommerce', [BrandController::class, 'searchWoocommerceBrands'])->name('brands.searchWoocommerce')->middleware('permission:brands,edit_brands');
-    Route::get('brands/woocommerce-mapping', [BrandController::class, 'woocommerceMapping'])->name('brands.woocommerceMapping')->middleware('permission:brands,edit_brands');
+    // No GET brands/woocommerce-mapping page or brands/search-woocommerce
+    // endpoint anymore — same move as Lazada's above, WooCommerce brand
+    // management now lives on categories/woocommerce-mapping.tsx.
     Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-lazada', [BrandController::class, 'syncLazadaBrands'])->name('brands.syncLazada')->middleware('permission:brands,edit_brands');
-    Route::get('brands/search-lazada', [BrandController::class, 'searchLazadaBrands'])->name('brands.searchLazada')->middleware('permission:brands,edit_brands');
-    Route::get('brands/lazada-mapping', [BrandController::class, 'lazadaMapping'])->name('brands.lazadaMapping')->middleware('permission:brands,edit_brands');
+    // No GET brands/lazada-mapping page or brands/search-lazada endpoint
+    // anymore — Lazada brand management now lives on
+    // categories/lazada-mapping.tsx, mapping in the opposite direction (see
+    // that page's docblock and BrandController::lazadaBrandsList()'s). The
+    // POST below is unchanged and still does the actual save.
     Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-tiktok', [BrandController::class, 'syncTiktokBrands'])->name('brands.syncTiktok')->middleware('permission:brands,edit_brands');
-    Route::get('brands/search-tiktok', [BrandController::class, 'searchTiktokBrands'])->name('brands.searchTiktok')->middleware('permission:brands,edit_brands');
-    Route::get('brands/tiktok-mapping', [BrandController::class, 'tiktokMapping'])->name('brands.tiktokMapping')->middleware('permission:brands,edit_brands');
+    // No GET brands/tiktok-mapping page or brands/search-tiktok endpoint
+    // anymore — same move as Lazada's/WooCommerce's above, TikTok brand
+    // management now lives on categories/tiktok-mapping.tsx.
     Route::post('brands/tiktok-mapping', [BrandController::class, 'bulkMapTiktokBrand'])->name('brands.bulkMapTiktok')->middleware('permission:brands,edit_brands');
     // Generic status/cancel for any queued brand-sync job (Shopee, Lazada,
     // TikTok, ...) — not platform-specific, so the route path names the
@@ -154,6 +162,20 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
     Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:categories,edit_categories');
+    // Brand-side action embedded in the same page (see
+    // BrandController::lazadaBrandsList()'s docblock) — gated on
+    // brands,edit_brands rather than categories,edit_categories since it
+    // reads/writes brand data, even though it's reached from the
+    // categories/lazada-mapping.tsx table. Not category-scoped (unlike
+    // Shopee's equivalent) — Lazada's brand catalog has no category
+    // dimension at all, so there's no {lazadaCategoryId} in this path.
+    Route::get('categories/lazada-mapping/lazada-brands', [BrandController::class, 'lazadaBrandsList'])->name('categories.lazadaMapping.lazadaBrands')->middleware('permission:brands,edit_brands');
+    // Same idea, attribute-domain instead of brand-domain — see
+    // LazadaAttributeMappingController's docblocks on these two. Lazada's
+    // attribute schema IS category-scoped (/category/attributes/get), so
+    // this pair mirrors Shopee's {shopeeCategoryId} shape exactly.
+    Route::post('categories/lazada-mapping/sync-attributes', [LazadaAttributeMappingController::class, 'syncLazadaAttributesForCategory'])->name('categories.lazadaMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('categories/{lazadaCategoryId}/lazada-attributes', [LazadaAttributeMappingController::class, 'lazadaAttributesForCategory'])->name('categories.lazadaAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
     Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
@@ -167,13 +189,31 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ShopeeAttributeMappingController's docblocks on these two.
     Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:categories,edit_categories');
+    // No categories/search-tiktok route anymore — TikTokCategoryPicker (its
+    // only consumer) is gone along with the old fuzzy-match tiktok-mapping.tsx
+    // it backed; the new page's search box queries the tiktok_categories
+    // table directly via categories/tiktok-mapping's own `search` param.
     Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');
+    // Brand-side action embedded in the same page (see
+    // BrandController::tiktokBrandsList()'s docblock) — not category-scoped
+    // (like Lazada's/WooCommerce's, unlike Shopee's), so no
+    // {tiktokCategoryId} in this path.
+    Route::get('categories/tiktok-mapping/tiktok-brands', [BrandController::class, 'tiktokBrandsList'])->name('categories.tiktokMapping.tiktokBrands')->middleware('permission:brands,edit_brands');
+    // Attribute-domain equivalent — TikTok's Get Attributes endpoint IS
+    // category-scoped (one category_id per call), so this pair mirrors
+    // Shopee's/Lazada's {xCategoryId} shape.
+    Route::post('categories/tiktok-mapping/sync-attributes', [TikTokAttributeMappingController::class, 'syncTikTokAttributesForCategory'])->name('categories.tiktokMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('categories/{tiktokCategoryId}/tiktok-attributes', [TikTokAttributeMappingController::class, 'tiktokAttributesForCategory'])->name('categories.tiktokAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::post('categories/sync-woocommerce', [CategoryController::class, 'syncWoocommerceCategories'])->name('categories.syncWoocommerce')->middleware('permission:categories,edit_categories');
-    Route::get('categories/search-woocommerce', [CategoryController::class, 'searchWoocommerceCategories'])->name('categories.searchWoocommerce')->middleware('permission:categories,edit_categories');
+    // No categories/search-woocommerce route anymore — same reason as
+    // TikTok's above.
     Route::get('categories/woocommerce-mapping', [CategoryController::class, 'woocommerceMapping'])->name('categories.woocommerceMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/woocommerce-mapping', [CategoryController::class, 'bulkMapWoocommerce'])->name('categories.bulkMapWoocommerce')->middleware('permission:categories,edit_categories');
+    // Brand-side action embedded in the same page (see
+    // BrandController::woocommerceBrandsList()'s docblock) — not
+    // category-scoped, same reasoning as Lazada's/TikTok's above.
+    Route::get('categories/woocommerce-mapping/woocommerce-brands', [BrandController::class, 'woocommerceBrandsList'])->name('categories.woocommerceMapping.woocommerceBrands')->middleware('permission:brands,edit_brands');
     Route::get('categories/export-woocommerce', [CategoryController::class, 'exportWoocommerceCategories'])->name('categories.exportWoocommerce')->middleware('permission:categories,edit_categories');
     Route::post('categories/import-woocommerce', [CategoryController::class, 'importFromWoocommerce'])->name('categories.importWoocommerce')->middleware('permission:categories,edit_categories');
 
