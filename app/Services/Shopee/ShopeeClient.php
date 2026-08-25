@@ -71,7 +71,20 @@ class ShopeeClient
      * category-specific "no brand"/generic option is (Shopee has no single
      * universal fallback the way Lazada's fixed "No Brand" string is).
      */
-    public function getBrandList(int $categoryId, int $offset = 0, int $pageSize = 50): array
+    /**
+     * @param  int  $offset  NOT a page index/multiple of $pageSize — confirmed
+     *  live that this is an opaque cursor. Pass 0 for the first page, then on
+     *  every subsequent call pass whatever the previous response returned as
+     *  `response.next_offset` verbatim (observed to be the next brand_id in
+     *  Shopee's own ordering, not anything derived from page size). Passing a
+     *  hand-computed offset instead makes later pages silently replay an
+     *  earlier page forever while `has_next_page` keeps reporting true — see
+     *  SyncShopeeBrandsJob's pagination loop for the fallout this caused
+     *  before the cursor was wired through correctly.
+     * @param  int  $pageSize  Capped by Shopee at 100 (confirmed live:
+     *  101+ is rejected with "invalid GetMpskuBrandsRequest.PageSize").
+     */
+    public function getBrandList(int $categoryId, int $offset = 0, int $pageSize = 100): array
     {
         return $this->request('/api/v2/product/get_brand_list', [
             'category_id' => $categoryId,
@@ -386,6 +399,25 @@ class ShopeeClient
     }
 
     /**
+     * v2.product.delete_item — permanently deletes a listing, unlike
+     * unlistItem() above which only hides it (the listing and its item_id
+     * both stop existing on Shopee's side; unlisting can be reversed by
+     * relisting, this can't). Called from ShopeeProductSyncService::delete()
+     * → ProductController::deleteFromShopee() — Shopee's the only platform
+     * this is wired up for so far.
+     *
+     * FIRES A REAL, LIVE WRITE — permanently deletes an actual listing.
+     * Cannot be undone from Shopee's side. Same "explicit go-ahead only"
+     * rule as addItem()/unlistItem().
+     */
+    public function deleteItem(int $itemId): array
+    {
+        return $this->request('/api/v2/product/delete_item', [
+            'item_id' => $itemId,
+        ], method: 'POST', jsonBody: true);
+    }
+
+    /**
      * Reverses Storage::disk('public')->url($path) — identical to
      * LazadaClient's version of this helper.
      */
@@ -458,8 +490,13 @@ class ShopeeClient
                 'response' => $data,
             ]);
 
+            // Shopee's actual error payload carries the human-readable detail
+            // in `msg` (confirmed by this exact bug — a real "no permission"
+            // response only ever had `msg` set, so this used to always fall
+            // through to the "unknown error" fallback and hide it from
+            // whatever surfaced this exception's message to a user).
             throw new RuntimeException(
-                "Shopee API error [{$data['error']}]: ".($data['message'] ?? 'unknown error')
+                "Shopee API error [{$data['error']}]: ".($data['msg'] ?? $data['message'] ?? 'unknown error')
             );
         }
 

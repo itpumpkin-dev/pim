@@ -31,7 +31,14 @@ class SyncShopeeBrandsJob implements ShouldQueue
 
     public int $timeout = 3600;
 
-    public function __construct(public int $jobTrackerId)
+    /**
+     * @param  array<int>|null  $categoryIds  Explicit Shopee category ids to
+     *  sync (the "Sync brand" row action on categories/shopee-mapping.tsx,
+     *  scoped to whichever one row it was clicked on). Null falls back to
+     *  every Shopee category currently mapped from a PIM category — the
+     *  original bulk "Sync Now" behavior on the brands marketplace-sync hub.
+     */
+    public function __construct(public int $jobTrackerId, public ?array $categoryIds = null)
     {
     }
 
@@ -49,7 +56,10 @@ class SyncShopeeBrandsJob implements ShouldQueue
             return;
         }
 
-        $categoryIds = Category::whereNotNull('shopee_category_id')->distinct()->pluck('shopee_category_id');
+        $categoryIds = $this->categoryIds !== null
+            ? collect($this->categoryIds)
+            : Category::whereNotNull('shopee_category_id')->distinct()->pluck('shopee_category_id');
+
         if ($categoryIds->isEmpty()) {
             $this->markFailed($tracker, 'No PIM categories are mapped to a Shopee category yet — map categories first (Categories > Marketplace Sync > Shopee), then sync brands.');
 
@@ -69,14 +79,46 @@ class SyncShopeeBrandsJob implements ShouldQueue
         $progressFlushInterval = 5;
         $pagesSinceFlush = 0;
 
+        // Confirmed live against a real category: Shopee can keep answering
+        // has_next_page=true indefinitely without the brand_id set actually
+        // growing (see this class's docblock) — with no API error to catch,
+        // that reads as a normal, endless loop. If a category goes this many
+        // consecutive pages without contributing even one new brand_id,
+        // treat it as stalled and move on instead of spinning until someone
+        // notices and cancels the whole job by hand.
+        $maxStalePages = 5;
+
         try {
             foreach ($categoryIds as $categoryId) {
                 $offset = 0;
-                $pageSize = 50;
+                // Shopee's own cap (confirmed live) — fewer, fuller pages
+                // means fewer round trips for the same amount of real data.
+                $pageSize = 100;
+                $stalePages = 0;
+                // Local to this category, unlike $seenIds below — a bulk run
+                // (categoryIds === null) walks every PIM-mapped category in
+                // one job, and the same brand_id legitimately recurs across
+                // categories (a shared/global brand). Measuring staleness
+                // against the job-wide $seenIds meant a later category whose
+                // pages happened to be full of brands an earlier category
+                // already recorded looked "stalled" and got skipped after 5
+                // pages, even though it was making real progress — silently
+                // truncating that category's coverage the same way the
+                // original offset-cursor bug did.
+                $categorySeenIds = [];
 
                 do {
                     $response = $client->getBrandList((int) $categoryId, $offset, $pageSize);
 
+                    $countBefore = count($categorySeenIds);
+                    // Keyed by brand_id, not appended — confirmed live that a
+                    // single page's brand_list can contain the same brand_id
+                    // twice (Shopee-side data quality, not a pagination
+                    // artifact: seen within one response, not across pages).
+                    // Postgres's upsert() rejects a batch that targets the
+                    // same conflict key twice ("ON CONFLICT DO UPDATE command
+                    // cannot affect row a second time"), so this has to be
+                    // deduped before it ever reaches the upsert call below.
                     $chunk = [];
                     foreach ($response['response']['brand_list'] ?? [] as $brand) {
                         $brandId = (int) ($brand['brand_id'] ?? 0);
@@ -87,7 +129,8 @@ class SyncShopeeBrandsJob implements ShouldQueue
                         }
 
                         $seenIds[$brandId] = true;
-                        $chunk[] = [
+                        $categorySeenIds[$brandId] = true;
+                        $chunk[$brandId] = [
                             'id' => $brandId,
                             'name' => $brand['original_brand_name'] ?? (string) $brandId,
                             'category_id' => (int) $categoryId,
@@ -95,6 +138,7 @@ class SyncShopeeBrandsJob implements ShouldQueue
                             'updated_at' => $now,
                         ];
                     }
+                    $chunk = array_values($chunk);
 
                     if ($chunk !== []) {
                         // Upserted per page (not accumulated for one big
@@ -104,9 +148,26 @@ class SyncShopeeBrandsJob implements ShouldQueue
                         ShopeeBrand::upsert($chunk, ['id'], ['name', 'category_id', 'updated_at']);
                     }
 
+                    $stalePages = count($categorySeenIds) > $countBefore ? 0 : $stalePages + 1;
+
                     $hasMore = (bool) ($response['response']['has_next_page'] ?? false);
-                    $offset += $pageSize;
+                    // NOT $offset + $pageSize — confirmed live that get_brand_list's
+                    // "offset" is an opaque cursor the response hands back as
+                    // next_offset (observed value: the next brand_id to start
+                    // from), not a page multiplier. Treating it as the latter is
+                    // what made every category "stall" after page 1: offset=100,
+                    // offset=200, etc. all replayed the exact same second page
+                    // instead of advancing, which is exactly what the stale-page
+                    // safeguard below was (correctly) catching — real brands
+                    // thousands of pages deep, like a category's actual "Pumpkin"
+                    // brand, were simply never reachable under the old math.
+                    $offset = (int) ($response['response']['next_offset'] ?? 0);
                     $pagesSinceFlush++;
+
+                    if ($stalePages >= $maxStalePages) {
+                        $tracker->appendWarning(0, "Category {$categoryId} stopped after {$maxStalePages} consecutive pages (offset {$offset}) with no new brands — Shopee kept reporting more pages without any new brand_id, so this category was skipped instead of paginating forever.");
+                        break;
+                    }
 
                     if ($pagesSinceFlush >= $progressFlushInterval) {
                         $tracker->update(['total_rows_processed' => count($seenIds)]);

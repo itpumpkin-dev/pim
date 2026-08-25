@@ -53,20 +53,46 @@ class SyncProductToMarketplaceJob implements ShouldQueue
                 default => throw new \RuntimeException("Unknown marketplace platform: {$record->platform}"),
             };
 
-            $result = $record->action === 'deactivate'
-                ? $service->deactivate($record->product, $record->shop)
-                : $service->push($record->product, $record->shop);
+            // 'delete' is Shopee-only for now (see ShopeeProductSyncService::
+            // delete()) — the other 3 services don't implement it, so
+            // method_exists() turns "not supported on this platform" into a
+            // clean failed-job message instead of a fatal error, the same
+            // way ProductController::queueMarketplaceSync() never even lets
+            // an unpublished shop reach this job in the first place.
+            $result = match (true) {
+                $record->action === 'deactivate' => $service->deactivate($record->product, $record->shop),
+                $record->action === 'delete' && method_exists($service, 'delete') => $service->delete($record->product, $record->shop),
+                $record->action === 'delete' => throw new \RuntimeException("Permanently deleting a listing isn't supported on {$record->platform} yet."),
+                default => $service->push($record->product, $record->shop),
+            };
 
-            $verb = $record->action === 'deactivate' ? 'Deactivated on' : 'Pushed to';
+            $verb = match ($record->action) {
+                'deactivate' => 'Deactivated on',
+                'delete' => 'Permanently deleted from',
+                default => 'Pushed to',
+            };
+            $message = "{$verb} '{$record->shop->name}' successfully.";
+
+            // Currently only ShopeeProductSyncService::push() ever sets this
+            // (see its withVideoWarning()) — a non-fatal video-upload
+            // failure that the rest of the push carried on through anyway.
+            // Surfaced here so it doesn't just disappear into the `result`
+            // JSON nobody's looking at.
+            if (! empty($result['_video_upload_warning'])) {
+                $message .= " Video upload skipped: {$result['_video_upload_warning']}";
+            }
+
             $record->update([
                 'status' => 'completed',
-                'message' => "{$verb} '{$record->shop->name}' successfully.",
+                'message' => $message,
                 'result' => $result,
             ]);
 
-            $event = $record->action === 'deactivate'
-                ? "deactivated_on_{$record->platform}"
-                : "pushed_to_{$record->platform}";
+            $event = match ($record->action) {
+                'deactivate' => "deactivated_on_{$record->platform}",
+                'delete' => "deleted_from_{$record->platform}",
+                default => "pushed_to_{$record->platform}",
+            };
 
             AuditLog::record($event, $record->product, null, [
                 'shop_id' => $record->shop->id,

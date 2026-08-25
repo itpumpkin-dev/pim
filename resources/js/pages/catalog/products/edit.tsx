@@ -7,6 +7,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -569,9 +570,13 @@ export default function ProductEdit({
     // confirm step and explicit trigger (never automatic) are deliberate
     // given that. Platform-generic (Lazada, Shopee, ...) — each shop's group
     // carries its own platform name (group.platform), which picks the route.
-    const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string }> = {
+    // `delete` is optional and, for now, Shopee-only (see
+    // ShopeeProductSyncService::delete() / SyncProductToMarketplaceJob's
+    // method_exists() guard) — permanently removing a listing isn't wired
+    // up for the other platforms yet.
+    const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string; delete?: string }> = {
         lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
-        shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status' },
+        shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status', delete: 'delete-shopee' },
         tiktok: { push: 'push-tiktok', deactivate: 'deactivate-tiktok', status: 'tiktok-status' },
         woocommerce: { push: 'push-woocommerce', deactivate: 'deactivate-woocommerce', status: 'woocommerce-status' },
     };
@@ -832,12 +837,72 @@ export default function ProductEdit({
             });
     };
 
+    // Permanent delete — a strictly more dangerous action than deactivate
+    // (can't be undone at all, not even by re-pushing), so on top of the
+    // same explicit-confirm dialog it also requires typing the product's
+    // own SKU before the confirm button enables (deleteConfirmText), reset
+    // whenever the dialog opens/closes so a stale value can't carry over
+    // to a different shop.
+    const [deleteListingConfirmShop, setDeleteListingConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
+    const [deletingListing, setDeletingListing] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+    const closeDeleteListingDialog = () => {
+        setDeleteListingConfirmShop(null);
+        setDeleteConfirmText('');
+    };
+
+    const confirmDeleteListing = () => {
+        if (!deleteListingConfirmShop || deleteConfirmText !== product.sku) return;
+        const { id: shopId, platform } = deleteListingConfirmShop;
+        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
+        if (!routes?.delete) return;
+        setDeletingListing(true);
+
+        const xsrfToken = decodeURIComponent(
+            document.cookie
+                .split('; ')
+                .find((row) => row.startsWith('XSRF-TOKEN='))
+                ?.split('=')[1] ?? '',
+        );
+
+        fetch(`/catalog/products/${product.id}/${routes.delete}/${shopId}`, {
+            method: 'POST',
+            headers: {
+                'X-XSRF-TOKEN': xsrfToken,
+                Accept: 'application/json',
+            },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+
+                if (!res.ok || !body.job_id) {
+                    setPushResult({ severity: 'error', message: body.message ?? t('couldNotQueueDeletion', { platform }) });
+                    setDeletingListing(false);
+                    closeDeleteListingDialog();
+                    return;
+                }
+
+                pollSyncJobStatus(body.job_id, (result) => {
+                    setPushResult(result);
+                    setDeletingListing(false);
+                    closeDeleteListingDialog();
+                });
+            })
+            .catch(() => {
+                setPushResult({ severity: 'error', message: t('networkErrorDeletingFromPlatform', { platform }) });
+                setDeletingListing(false);
+                closeDeleteListingDialog();
+            });
+    };
+
     // Narrowed views of statusCheck for each dialog — plain `statusCheck &&`
     // (rather than the optional-chained comparison used to compute this)
     // is what lets TypeScript actually narrow away the `null` case at every
     // read site below.
     const pushStatusCheck = statusCheck && pushConfirmShop && statusCheck.shopId === pushConfirmShop.id ? statusCheck : null;
     const deactivateStatusCheck = statusCheck && deactivateConfirmShop && statusCheck.shopId === deactivateConfirmShop.id ? statusCheck : null;
+    const deleteListingStatusCheck = statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
 
     // Resolves which nested keys a given attribute's value lives under for the
     // currently selected channel/locale, based on its own scoping flags.
@@ -1606,6 +1671,28 @@ export default function ProductEdit({
                                                                                 <UnpublishedIcon fontSize="small" />
                                                                             </IconButton>
                                                                         )}
+                                                                        {/* Shopee-only for now (see PLATFORM_ROUTES' `delete` key
+                                                                            and ShopeeProductSyncService::delete()) — separated
+                                                                            visually from Push/Deactivate (error color, distinct
+                                                                            icon) since it's a strictly more dangerous action:
+                                                                            unlike Deactivate this can never be undone, not even
+                                                                            by pushing again — a brand-new listing would be
+                                                                            required. Same ch.is_live gate as Deactivate, for the
+                                                                            same reason (nothing live means nothing to delete). */}
+                                                                        {canPushOrDeactivate && ch.is_live && group.platform.toLowerCase() === 'shopee' && (
+                                                                            <IconButton
+                                                                                size="small"
+                                                                                title={t('deleteListingButton') + ` — ${group.platform}`}
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    setDeleteListingConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
+                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                }}
+                                                                                sx={{ color: active ? '#fff' : 'error.main' }}
+                                                                            >
+                                                                                <DeleteForeverIcon fontSize="small" />
+                                                                            </IconButton>
+                                                                        )}
                                                                     </Box>
                                                                 );
                                                             })}
@@ -1750,6 +1837,65 @@ export default function ProductEdit({
                         startIcon={deactivating ? <CircularProgress size={16} /> : <UnpublishedIcon />}
                     >
                         {deactivating ? t('deactivatingEllipsis') : t('deactivate')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={deleteListingConfirmShop !== null} onClose={closeDeleteListingDialog}>
+                <DialogTitle sx={{ color: 'error.main' }}>{t('deleteListingTitle', { platform: deleteListingConfirmShop?.platform })}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {t('deleteListingWarning', { platform: deleteListingConfirmShop?.platform, name: deleteListingConfirmShop?.name })}
+                    </DialogContentText>
+                    {deleteListingStatusCheck && (
+                        <Box sx={{ mt: 2 }}>
+                            {deleteListingStatusCheck.loading ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <CircularProgress size={14} />
+                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}</Typography>
+                                </Stack>
+                            ) : deleteListingStatusCheck.error ? (
+                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: deleteListingStatusCheck.error })}</Alert>
+                            ) : deleteListingStatusCheck.never_pushed ? (
+                                <Alert severity="error" sx={{ py: 0 }}>{t('neverPushedNothingToDelete')}</Alert>
+                            ) : !deleteListingStatusCheck.is_live ? (
+                                <Alert severity="error" sx={{ py: 0 }}>{t('alreadyNotActiveNothingToDelete', { platform: deleteListingConfirmShop?.platform, status: deleteListingStatusCheck.status ?? t('statusUnknown') })}</Alert>
+                            ) : (
+                                <Alert severity="success" sx={{ py: 0 }}>{t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}</Alert>
+                            )}
+                        </Box>
+                    )}
+                    {deleteListingStatusCheck && !deleteListingStatusCheck.loading && !deleteListingStatusCheck.error && deleteListingStatusCheck.is_live && (
+                        <TextField
+                            fullWidth
+                            size="small"
+                            sx={{ mt: 2.5 }}
+                            label={t('deleteListingTypeToConfirm', { sku: product.sku })}
+                            placeholder={t('deleteListingConfirmPlaceholder')}
+                            value={deleteConfirmText}
+                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                            autoComplete="off"
+                        />
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={closeDeleteListingDialog} color="inherit" disabled={deletingListing}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={confirmDeleteListing}
+                        color="error"
+                        variant="contained"
+                        disabled={
+                            deletingListing ||
+                            !deleteListingStatusCheck ||
+                            deleteListingStatusCheck.loading ||
+                            (!deleteListingStatusCheck.error && (deleteListingStatusCheck.never_pushed || !deleteListingStatusCheck.is_live)) ||
+                            deleteConfirmText !== product.sku
+                        }
+                        startIcon={deletingListing ? <CircularProgress size={16} /> : <DeleteForeverIcon />}
+                    >
+                        {deletingListing ? t('deletingListingEllipsis') : t('deleteListingButton')}
                     </Button>
                 </DialogActions>
             </Dialog>

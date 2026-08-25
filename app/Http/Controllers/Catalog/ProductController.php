@@ -1819,6 +1819,19 @@ class ProductController extends Controller
     }
 
     /**
+     * FIRES A REAL, LIVE WRITE TO SHOPEE — permanently deletes an actual
+     * listing (ShopeeProductSyncService::delete(), via v2.product.delete_item
+     * — see ShopeeClient::deleteItem()'s docblock). Cannot be undone from
+     * Shopee's side. Same "published" guard as deactivateShopee(), reusing
+     * the same queued-job infrastructure — Shopee-only for now, no
+     * equivalent wired for the other platforms.
+     */
+    public function deleteFromShopee(Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        return $this->queueMarketplaceSync($product, $shop, 'shopee', 'delete');
+    }
+
+    /**
      * Same role as checkLazadaStatus()/checkShopeeStatus() above, but
      * degraded — see TikTokProductSyncService::checkLiveStatus()'s
      * docblock: TikTok has no documented single-item "Get Product" endpoint
@@ -2009,10 +2022,16 @@ class ProductController extends Controller
 
         $syncJob = $this->dispatchMarketplaceSyncJob($product, $shop, $platform, $action);
 
+        $message = match ($action) {
+            'deactivate' => "Deactivation on '{$shop->name}' queued.",
+            'delete' => "Permanent deletion from '{$shop->name}' queued.",
+            default => "Push to '{$shop->name}' queued.",
+        };
+
         return response()->json([
             'job_id' => $syncJob->id,
             'status' => 'queued',
-            'message' => ($action === 'deactivate' ? 'Deactivation' : 'Push').' to '."'{$shop->name}'".' queued.',
+            'message' => $message,
         ], 202);
     }
 

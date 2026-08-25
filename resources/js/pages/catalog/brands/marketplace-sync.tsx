@@ -18,7 +18,13 @@ import { solidActionSx, syncDetailCardSx, syncPlatformCardSx } from '@/lib/ui-st
 // like CategoryController::syncWoocommerceCategories() does ('sync') — no
 // polling, the result shows via the app-wide FlashToast success message.
 const BRAND_SYNC_PLATFORMS = [
-    { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/brands/shopee-mapping', mode: 'queued' },
+    // Shopee brand mapping moved onto categories/shopee-mapping.tsx (see
+    // that page's docblock) — get_brand_list is category-scoped, so mapping
+    // right next to the category a brand came from beat a separate global
+    // brand list. "Sync Now" here still runs the full sweep over every
+    // PIM-mapped category, complementing that page's per-category "Sync
+    // brand" row action.
+    { value: 'shopee', label: 'Shopee', route: '/catalog/brands/sync-shopee', mappingRoute: '/catalog/categories/shopee-mapping', mode: 'queued' },
     // Lazada's brand list isn't scoped to any category at all (confirmed
     // live: /category/brands/query has no category param) — 153,551 brands
     // total for this account, even bigger than Shopee's per-category count,

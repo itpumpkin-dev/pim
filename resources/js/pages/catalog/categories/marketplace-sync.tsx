@@ -145,14 +145,20 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                                     >
                                         {t('mapToPlatformCategories', { platform: selected.label })}
                                     </Button>
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
-                                        disabled={syncing}
-                                        onClick={runSync}
-                                    >
-                                        {syncing ? t('syncingLazada') : t('syncCategories')}
-                                    </Button>
+                                    {/* Shopee's own "Sync Categories" button now lives on
+                                        categories/shopee-mapping.tsx itself (see that page's
+                                        docblock) — its category tree tends to need re-syncing
+                                        right before a mapping session, not from this hub. */}
+                                    {selected.value !== 'shopee' && (
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
+                                            disabled={syncing}
+                                            onClick={runSync}
+                                        >
+                                            {syncing ? t('syncingLazada') : t('syncCategories')}
+                                        </Button>
+                                    )}
                                     {selected.exportRoute && (
                                         <Button
                                             variant="outlined"

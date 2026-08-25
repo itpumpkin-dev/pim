@@ -9,6 +9,7 @@ use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeSellerAccount;
 use App\Services\Shopee\ShopeeClient;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -41,7 +42,7 @@ class ShopeeAttributeMappingController extends Controller
         'shopee_attribute',
     ];
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): RedirectResponse|JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'mappings' => ['required', 'array', 'min:1'],
@@ -128,6 +129,15 @@ class ShopeeAttributeMappingController extends Controller
 
         ShopeeAttributeMapping::bumpListVersion();
 
+        // The embedded per-category picker on categories/shopee-mapping.tsx
+        // calls this same endpoint via plain fetch (Accept: application/json)
+        // instead of an Inertia visit — see
+        // BrandController::bulkMapMarketplaceBrand()'s identical branch for
+        // why. Every other caller is a real Inertia POST, unaffected.
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
         return back()->with('success', 'Shopee attribute mapping saved.');
     }
 
@@ -184,5 +194,109 @@ class ShopeeAttributeMappingController extends Controller
         ShopeeAttribute::bumpListVersion();
 
         return back()->with('success', 'Synced '.count($rowsById).' Shopee attributes.');
+    }
+
+    /**
+     * Same idea as syncShopeeAttributes() above, but scoped to exactly one
+     * Shopee category — the "Sync Attributes" action on
+     * categories/shopee-mapping.tsx, next to that page's identical "Sync
+     * brand" row action (see BrandController::syncShopeeBrandsForCategory()).
+     * Unlike brands, get_attribute_tree has no pagination and a category's
+     * schema is small (single digits to a few dozen rows, not thousands), so
+     * this runs synchronously in the request — no JobTracker/queue needed.
+     */
+    public function syncShopeeAttributesForCategory(Request $request): JsonResponse
+    {
+        $account = ShopeeSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No Shopee seller account found to authenticate the sync.'], 422);
+        }
+
+        $validated = $request->validate([
+            'shopee_category_id' => ['required', 'integer', 'exists:shopee_categories,id'],
+        ]);
+        $categoryId = $validated['shopee_category_id'];
+
+        $client = new ShopeeClient($account);
+        $response = $client->getAttributeTree([$categoryId]);
+        $tree = $response['response']['list'][0]['attribute_tree'] ?? [];
+
+        $now = now();
+        $rows = array_map(fn (array $attr) => [
+            'id' => $attr['attribute_id'],
+            'name' => $attr['name'],
+            'input_type' => $attr['attribute_info']['input_type'] ?? null,
+            'category_id' => $categoryId,
+            'mandatory' => (bool) ($attr['mandatory'] ?? false),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $tree);
+
+        if ($rows !== []) {
+            ShopeeAttribute::upsert($rows, ['id'], ['name', 'input_type', 'category_id', 'mandatory', 'updated_at']);
+        }
+
+        ShopeeAttribute::bumpListVersion();
+
+        return response()->json(['count' => count($rows)]);
+    }
+
+    /**
+     * Shopee attributes cached for one category (see the migration's
+     * "informational, not a real FK" caveat on that column — this lists
+     * whatever the most recent sync for that category actually saw), each
+     * annotated with whichever PIM attribute currently maps to it, if any.
+     * Backs the "จับคู่แบรนด์กับ PIM"-equivalent column's table on
+     * categories/shopee-mapping.tsx — mirrors
+     * BrandController::shopeeBrandsForCategory() exactly.
+     */
+    public function shopeeAttributesForCategory(int $shopeeCategoryId): JsonResponse
+    {
+        $attributes = ShopeeAttribute::where('category_id', $shopeeCategoryId)->orderBy('name')->get();
+
+        $mappedByShopeeAttributeId = ShopeeAttributeMapping::whereIn('shopee_attribute_id', $attributes->pluck('id'))
+            ->with('attribute:id,name')
+            ->get()
+            ->keyBy('shopee_attribute_id');
+
+        $data = $attributes->map(function (ShopeeAttribute $attribute) use ($mappedByShopeeAttributeId) {
+            $mapping = $mappedByShopeeAttributeId->get($attribute->id);
+
+            return [
+                'id' => $attribute->id,
+                'name' => $attribute->name,
+                'input_type' => $attribute->input_type,
+                'mandatory' => (bool) $attribute->mandatory,
+                'mapped' => $mapping ? ['id' => $mapping->attribute->id, 'name' => $mapping->attribute->name] : null,
+            ];
+        });
+
+        return response()->json(['data' => $data->values()]);
+    }
+
+    /**
+     * Search endpoint backing the PIM attribute Autocomplete inside that
+     * same table — the mirror image of BrandController::searchPimBrands():
+     * that one searches PIM brand options, this searches PIM attributes by
+     * label, since here too mapping starts from the Shopee side (pick a PIM
+     * attribute for a given Shopee attribute row) rather than the other way
+     * around.
+     */
+    public function searchPimAttributes(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $attributes = Attribute::query()
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where(function ($q2) use ($query) {
+                    $q2->where('name', 'like', "%{$query}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
+                });
+            })
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name']);
+
+        return response()->json(['data' => $attributes->map(fn (Attribute $a) => ['id' => $a->id, 'name' => $a->name])]);
     }
 }

@@ -7,6 +7,7 @@ use App\Models\SalesPlatformShop;
 use App\Models\ShopeeAttributeMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -39,6 +40,14 @@ class ShopeeProductSyncService
     public function __construct(private readonly ShopeeClient $client)
     {
     }
+
+    /**
+     * Set by uploadVideoToShopee() when the video upload failed but the
+     * rest of push() carried on anyway — see that method's docblock. Reset
+     * at the start of every push() so a warning from a previous call can
+     * never leak into a later one on the same service instance.
+     */
+    private ?string $lastVideoUploadWarning = null;
 
     public static function forShop(SalesPlatformShop $shop): self
     {
@@ -197,10 +206,39 @@ class ShopeeProductSyncService
     private function uploadVideoToShopee(array $payload): array
     {
         if (!empty($payload['video_upload_id'][0])) {
-            $payload['video_upload_id'] = [$this->client->uploadVideo($payload['video_upload_id'][0])];
+            try {
+                $payload['video_upload_id'] = [$this->client->uploadVideo($payload['video_upload_id'][0])];
+            } catch (\Throwable $e) {
+                // Best-effort, not fatal: Shopee's Media/Video Upload API
+                // needs a separate, app-level permission grant beyond basic
+                // Product API access — Shopee returns error_permission/"no
+                // permission" when it's missing (confirmed live 2026-08-24),
+                // and that's an account/Partner-Center setting, not
+                // something a retry or a code fix here can resolve. A shop
+                // without that grant should still get everything else about
+                // the product pushed rather than being fully blocked by one
+                // optional field — drop video_upload_id from the payload and
+                // surface the failure via lastVideoUploadWarning() so push()
+                // can note it on the result instead of silently losing it.
+                Log::warning('Shopee video upload failed — pushing the product without its video.', [
+                    'error' => $e->getMessage(),
+                ]);
+                $this->lastVideoUploadWarning = $e->getMessage();
+                unset($payload['video_upload_id']);
+            }
         }
 
         return $payload;
+    }
+
+    /** Tags a push() result with the last video-upload failure, if any — see uploadVideoToShopee(). */
+    private function withVideoWarning(array $result): array
+    {
+        if ($this->lastVideoUploadWarning !== null) {
+            $result['_video_upload_warning'] = $this->lastVideoUploadWarning;
+        }
+
+        return $result;
     }
 
     /**
@@ -218,6 +256,8 @@ class ShopeeProductSyncService
      */
     public function push(Product $product, SalesPlatformShop $shop): array
     {
+        $this->lastVideoUploadWarning = null;
+
         $payload = $this->buildPayload($product, $shop);
         $payload = $this->uploadImagesToShopee($payload);
         $payload = $this->uploadVideoToShopee($payload);
@@ -229,7 +269,7 @@ class ShopeeProductSyncService
 
         if ($cachedItemId) {
             try {
-                return $this->client->updateItem([...$payload, 'item_id' => (int) $cachedItemId]);
+                return $this->withVideoWarning($this->client->updateItem([...$payload, 'item_id' => (int) $cachedItemId]));
             } catch (\Throwable $e) {
                 // Cached item_id no longer resolves on Shopee's side (e.g.
                 // deleted outside this app) — fall through to create fresh
@@ -247,7 +287,7 @@ class ShopeeProductSyncService
             );
         }
 
-        return $result;
+        return $this->withVideoWarning($result);
     }
 
     /**
@@ -268,6 +308,38 @@ class ShopeeProductSyncService
         }
 
         return $this->client->unlistItem((int) $itemId);
+    }
+
+    /**
+     * FIRES A REAL, LIVE WRITE TO SHOPEE — permanently deletes an actual
+     * listing. Cannot be undone from Shopee's side, unlike deactivate()
+     * above which only hides it. Requires a cached platform_item_id, same
+     * as deactivate() — nothing to delete without one.
+     *
+     * Clears platform_item_id/status on the product_platform_shops row
+     * afterward (the id Shopee just deleted is no longer meaningful) so a
+     * future push() falls through to addItem() and creates a fresh
+     * listing, instead of calling updateItem() against a dead id.
+     */
+    public function delete(Product $product, SalesPlatformShop $shop): array
+    {
+        $itemId = DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->where('sales_platform_shop_id', $shop->id)
+            ->value('platform_item_id');
+
+        if (!$itemId) {
+            throw new RuntimeException("Product '{$product->sku}' has never been pushed to '{$shop->name}' — nothing to delete.");
+        }
+
+        $result = $this->client->deleteItem((int) $itemId);
+
+        DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->where('sales_platform_shop_id', $shop->id)
+            ->update(['platform_item_id' => null, 'status' => null, 'updated_at' => now()]);
+
+        return $result;
     }
 
     /**

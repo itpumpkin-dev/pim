@@ -12,6 +12,7 @@ use App\Models\CategoryTranslation;
 use App\Models\LazadaCategory;
 use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
+use App\Models\ShopeeBrand;
 use App\Models\ShopeeCategory;
 use App\Models\ShopeeSellerAccount;
 use App\Models\TikTokCategory;
@@ -1092,6 +1093,49 @@ class CategoryController extends Controller
     }
 
     /**
+     * Search endpoint backing the PIM category Autocomplete on
+     * categories/shopee-mapping.tsx — the mirror image of
+     * searchShopeeCategories() below. Mapping there starts from a Shopee
+     * node and asks "which of *our* categories is this", so the picker
+     * needs to search local leaf categories, not a marketplace's.
+     */
+    public function searchCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = Category::query()->without('translations')
+            ->where('is_active', true)
+            ->whereDoesntHave('children')
+            ->when($query !== '', fn ($q) => $q->where(function ($q2) use ($query) {
+                $q2->where('name', 'like', "%{$query}%")
+                    ->orWhereRaw("additional_data->>'name_eng' ILIKE ?", ["%{$query}%"]);
+            }))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'parent_id', 'name']);
+
+        // Loaded once for ancestor-chain resolution, same trade-off as
+        // buildCategoryMappingData()'s $allCategories — a full path per
+        // result disambiguates same-named leaves (e.g. two "Others" under
+        // different parents) that a bare name list can't.
+        $allCategories = Category::query()->without('translations')->get(['id', 'parent_id', 'name'])->keyBy('id');
+        $pathOf = function (int $id) use ($allCategories): string {
+            $names = [];
+            $node = $allCategories->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allCategories->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $data = $categories->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name, 'path' => $pathOf($c->id)])->values();
+
+        return response()->json(['data' => $data]);
+    }
+
+    /**
      * Search endpoint backing the Lazada category Autocomplete on the
      * category edit form — only leaf categories are selectable, since
      * Lazada requires products to be assigned to a leaf, not a parent node.
@@ -1364,16 +1408,120 @@ class CategoryController extends Controller
     }
 
     /**
-     * Same bulk review UI as lazadaMapping() above, but against Shopee's
-     * category tree — see buildCategoryMappingData().
+     * Bulk review UI for mapping Shopee's category tree to local PIM
+     * categories — deliberately the mirror image of
+     * buildCategoryMappingData() above (which drives lazadaMapping()/
+     * tiktokMapping()/woocommerceMapping()). There, every row is a PIM
+     * category and the marketplace side is a fuzzy-matched suggestion; here
+     * every row is a category from the local Shopee tree mirror (~2.4k rows
+     * synced from v2.product.get_category — see syncShopeeCategories()) and
+     * each one lists whichever PIM categories currently point at it via
+     * categories.shopee_category_id. Shopee's tree is deep and organized
+     * differently enough from ours that reviewing it directly — "what PIM
+     * category should this Shopee leaf be?" — catches bad picks (like a
+     * generator mapped to "Industrial Adhesives & Tapes") that fuzzy name
+     * matching alone missed.
      */
     public function shopeeMapping(Request $request): Response
     {
-        [$status, $search, $perPage, $onlyWithProducts] = $this->parseMappingFilters($request);
+        // Not parseMappingFilters() — that helper's status/only_with_products
+        // pair doesn't fit here (rows are Shopee categories, not PIM ones
+        // with a product count). This page has a single segmented filter
+        // instead: All / Leaf only / Parent only / Flagged (= has a PIM
+        // mapping — surfaced for review, since the one real mapping this
+        // page replaced turned out to be wrong).
+        $filter = $request->input('filter', 'all');
+        if (! in_array($filter, ['all', 'leaf', 'parent', 'flagged'], true)) {
+            $filter = 'all';
+        }
+
+        $search = trim((string) $request->input('search', ''));
+
+        $perPage = (int) $request->input('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        // Loaded once for ancestor-chain resolution — cheap for a few
+        // thousand rows and avoids one query per row per tree level.
+        $allShopee = ShopeeCategory::query()->get(['id', 'parent_id', 'name'])->keyBy('id');
+
+        $pathOf = function (int $id) use ($allShopee): string {
+            $names = [];
+            $node = $allShopee->get($id);
+            while ($node) {
+                array_unshift($names, $node->name);
+                $node = $node->parent_id ? $allShopee->get($node->parent_id) : null;
+            }
+
+            return implode(' > ', $names);
+        };
+
+        $mappedShopeeIds = Category::query()->whereNotNull('shopee_category_id')->pluck('shopee_category_id')->unique()->values();
+
+        $query = ShopeeCategory::query();
+
+        if ($filter === 'leaf') {
+            $query->where('is_leaf', true);
+        } elseif ($filter === 'parent') {
+            $query->where('is_leaf', false);
+        } elseif ($filter === 'flagged') {
+            $query->whereIn('id', $mappedShopeeIds->isEmpty() ? [0] : $mappedShopeeIds);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%");
+                if (ctype_digit($search)) {
+                    $q->orWhere('id', (int) $search);
+                }
+            });
+        }
+
+        $paginated = $query->orderBy('id')->paginate($perPage)->withQueryString();
+
+        $pageIds = $paginated->getCollection()->pluck('id');
+        $mappedByShopeeId = Category::query()->without('translations')
+            ->whereIn('shopee_category_id', $pageIds)
+            ->get(['id', 'name', 'shopee_category_id'])
+            ->groupBy('shopee_category_id');
+
+        // How many Shopee brands are cached for each of this page's
+        // categories — just a count, not the list itself (that's fetched
+        // lazily per row on first expand, same trade-off as
+        // CategoryProductsExpander/BrandController::shopeeBrandsForCategory()).
+        $brandCountByShopeeId = ShopeeBrand::whereIn('category_id', $pageIds)
+            ->selectRaw('category_id, count(*) as cnt')
+            ->groupBy('category_id')
+            ->pluck('cnt', 'category_id');
+
+        $rows = $paginated->getCollection()->map(fn (ShopeeCategory $shopee) => [
+            'id' => $shopee->id,
+            'name' => $shopee->name,
+            'path' => $pathOf($shopee->id),
+            'leaf' => (bool) $shopee->is_leaf,
+            'mapped_categories' => ($mappedByShopeeId->get($shopee->id) ?? collect())
+                ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name])
+                ->values(),
+            'brand_count' => (int) ($brandCountByShopeeId[$shopee->id] ?? 0),
+        ]);
+
+        $paginated->setCollection($rows);
+
+        // See marketplaceSync()'s comment on why ::max() needs an explicit
+        // UTC parse before serializing.
+        $toIso = fn (?string $value) => $value ? Carbon::parse($value, 'UTC')->toISOString() : null;
 
         return Inertia::render('catalog/categories/shopee-mapping', [
-            ...$this->buildCategoryMappingData($status, $search, $perPage, $onlyWithProducts, 'shopee_category_id', 'shopeeCategory', ShopeeCategory::class),
-            'filters' => ['status' => $status, 'search' => $search, 'per_page' => $perPage, 'only_with_products' => $onlyWithProducts],
+            'categories' => $paginated,
+            'stats' => [
+                'total' => ShopeeCategory::count(),
+                'leaf' => ShopeeCategory::where('is_leaf', true)->count(),
+                'parent' => ShopeeCategory::where('is_leaf', false)->count(),
+                'mapped' => $mappedShopeeIds->count(),
+            ],
+            'lastSyncedAt' => $toIso(ShopeeCategory::max('updated_at')),
+            'filters' => ['filter' => $filter, 'search' => $search, 'per_page' => $perPage],
         ]);
     }
 

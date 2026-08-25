@@ -471,15 +471,6 @@ class BrandController extends Controller
     }
 
     /**
-     * Backs the ShopeeBrandPicker autocomplete on the mapping page — mirrors
-     * CategoryController::searchShopeeCategories() exactly.
-     */
-    public function searchShopeeBrands(Request $request): JsonResponse
-    {
-        return $this->searchMarketplaceBrands($request, ShopeeBrand::class);
-    }
-
-    /**
      * Refreshes the local woocommerce_brands cache — unlike Shopee, this
      * runs synchronously (no JobTracker/queued job): WooCommerce's Product
      * Brands endpoint returns everything in a small number of pages
@@ -524,7 +515,7 @@ class BrandController extends Controller
 
     /**
      * Backs the WooCommerceBrandPicker autocomplete on the mapping page —
-     * same shape as searchShopeeBrands().
+     * same shape as searchLazadaBrands()/searchTiktokBrands() below.
      */
     public function searchWoocommerceBrands(Request $request): JsonResponse
     {
@@ -533,7 +524,7 @@ class BrandController extends Controller
 
     /**
      * Backs the LazadaBrandPicker autocomplete on the mapping page — same
-     * shape as searchShopeeBrands()/searchWoocommerceBrands().
+     * shape as searchTiktokBrands()/searchWoocommerceBrands().
      */
     public function searchLazadaBrands(Request $request): JsonResponse
     {
@@ -587,14 +578,124 @@ class BrandController extends Controller
         return $brands->map(fn ($brand) => ['id' => (string) $brand->id, 'name' => $brand->name]);
     }
 
-    public function shopeeMapping(Request $request): Response
-    {
-        return $this->renderMarketplaceMapping($request, 'catalog/brands/shopee-mapping', 'shopee_brand_id', ShopeeBrand::class);
-    }
-
-    public function bulkMapShopeeBrand(Request $request): RedirectResponse
+    public function bulkMapShopeeBrand(Request $request): RedirectResponse|JsonResponse
     {
         return $this->bulkMapMarketplaceBrand($request, 'shopee_brand_id', ShopeeBrand::class, 'brand_shopee_mapped');
+    }
+
+    /**
+     * Same as syncShopeeBrands() below, but scoped to exactly one Shopee
+     * category — the "Sync brand" row action on categories/shopee-mapping.tsx
+     * now that category mapping and brand mapping live on the same page (see
+     * that page's docblock for why: get_brand_list is category-scoped, so
+     * reviewing a category's brands makes the most sense right where you're
+     * already looking at that category).
+     */
+    public function syncShopeeBrandsForCategory(Request $request): JsonResponse
+    {
+        $account = ShopeeSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No Shopee seller account found to authenticate the sync.'], 422);
+        }
+
+        $validated = $request->validate([
+            'shopee_category_id' => ['required', 'integer', 'exists:shopee_categories,id'],
+        ]);
+
+        $tracker = JobTracker::create([
+            'job_type' => 'brand_sync',
+            'entity_type' => 'shopee_brands',
+            'config_code' => 'shopee',
+            'status' => 'pending',
+            'user_id' => $request->user()?->id,
+        ]);
+
+        SyncShopeeBrandsJob::dispatch($tracker->id, [$validated['shopee_category_id']]);
+
+        return response()->json(['job_tracker_id' => $tracker->id]);
+    }
+
+    /**
+     * Shopee brands cached for one category (see ShopeeCategory's
+     * "informational, not a real FK" caveat on that column — this lists
+     * whatever the most recent sync for that category actually saw), each
+     * annotated with whichever PIM brand currently maps to it, if any.
+     * Backs the "จับคู่แบรนด์กับ PIM" column on the Shopee Brands detail
+     * table on categories/shopee-mapping.tsx (driven by whichever category
+     * row is selected above it).
+     */
+    public function shopeeBrandsForCategory(Request $request, int $shopeeCategoryId): JsonResponse
+    {
+        $attribute = $this->brandAttribute();
+
+        $search = trim((string) $request->query('search', ''));
+        $perPage = (int) $request->query('per_page', 25);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 25;
+        }
+
+        // Paginated, not a single get() — a category's brand list can run
+        // into five figures (confirmed live: 12,102 for one real category
+        // after the pagination-cursor fix in SyncShopeeBrandsJob started
+        // actually reaching all of it). Sending and rendering that many rows
+        // at once is what made this table slow to load; the frontend now
+        // asks for one page at a time, same as the categories table above it.
+        $query = ShopeeBrand::where('category_id', $shopeeCategoryId);
+
+        if ($search !== '') {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
+
+        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
+            ->whereIn('shopee_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'admin_label', 'shopee_brand_id'])
+            ->keyBy('shopee_brand_id');
+
+        $rows = $paginated->getCollection()->map(fn (ShopeeBrand $brand) => [
+            'id' => $brand->id,
+            'name' => $brand->name,
+            'mapped' => $mappedByBrandId->has($brand->id)
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                : null,
+        ]);
+
+        return response()->json([
+            'data' => $rows->values(),
+            'current_page' => $paginated->currentPage(),
+            'last_page' => $paginated->lastPage(),
+            'per_page' => $paginated->perPage(),
+            'total' => $paginated->total(),
+        ]);
+    }
+
+    /**
+     * Search endpoint backing the PIM brand Autocomplete inside that same
+     * detail table — the mirror image of searchLazadaBrands()/
+     * searchTiktokBrands()/searchWoocommerceBrands() below: those search a
+     * marketplace's brand cache by name, this searches our own `pbrand`
+     * attribute options by name, since this table maps in the opposite
+     * direction (pick a PIM brand for a given Shopee brand, not the other
+     * way around).
+     */
+    public function searchPimBrands(Request $request): JsonResponse
+    {
+        $attribute = $this->brandAttribute();
+        $query = trim((string) $request->query('q', ''));
+
+        $options = AttributeOption::where('attribute_id', $attribute->id)
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where(function ($q2) use ($query) {
+                    $q2->where('admin_label', 'like', "%{$query}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
+                });
+            })
+            ->orderBy('admin_label')
+            ->limit(50)
+            ->get(['id', 'admin_label']);
+
+        return response()->json(['data' => $options->map(fn (AttributeOption $o) => ['id' => $o->id, 'name' => $o->admin_label])]);
     }
 
     public function woocommerceMapping(Request $request): Response
@@ -602,7 +703,7 @@ class BrandController extends Controller
         return $this->renderMarketplaceMapping($request, 'catalog/brands/woocommerce-mapping', 'woocommerce_brand_id', WooCommerceBrand::class);
     }
 
-    public function bulkMapWoocommerceBrand(Request $request): RedirectResponse
+    public function bulkMapWoocommerceBrand(Request $request): RedirectResponse|JsonResponse
     {
         return $this->bulkMapMarketplaceBrand($request, 'woocommerce_brand_id', WooCommerceBrand::class, 'brand_woocommerce_mapped');
     }
@@ -612,7 +713,7 @@ class BrandController extends Controller
         return $this->renderMarketplaceMapping($request, 'catalog/brands/lazada-mapping', 'lazada_brand_id', LazadaBrand::class);
     }
 
-    public function bulkMapLazadaBrand(Request $request): RedirectResponse
+    public function bulkMapLazadaBrand(Request $request): RedirectResponse|JsonResponse
     {
         return $this->bulkMapMarketplaceBrand($request, 'lazada_brand_id', LazadaBrand::class, 'brand_lazada_mapped');
     }
@@ -622,7 +723,7 @@ class BrandController extends Controller
         return $this->renderMarketplaceMapping($request, 'catalog/brands/tiktok-mapping', 'tiktok_brand_id', TikTokBrand::class);
     }
 
-    public function bulkMapTiktokBrand(Request $request): RedirectResponse
+    public function bulkMapTiktokBrand(Request $request): RedirectResponse|JsonResponse
     {
         return $this->bulkMapMarketplaceBrand($request, 'tiktok_brand_id', TikTokBrand::class, 'brand_tiktok_mapped');
     }
@@ -640,8 +741,15 @@ class BrandController extends Controller
             $perPage = 15;
         }
 
+        // Same ::max()-needs-an-explicit-UTC-parse caveat as
+        // CategoryController::marketplaceSync()/shopeeMapping() — a raw
+        // aggregate query returns the DB driver's plain string, not an
+        // Eloquent-cast Carbon, so it carries no timezone marker.
+        $lastSyncedAt = $marketplaceModel::max('updated_at');
+
         return Inertia::render($component, [
             ...$this->buildBrandMappingData($request, $status, $search ?? '', $perPage, $onlyWithProducts, $fkColumn, $marketplaceModel),
+            'lastSyncedAt' => $lastSyncedAt ? Carbon::parse($lastSyncedAt, 'UTC')->toISOString() : null,
             'filters' => [
                 'search' => $search ?? '',
                 'status' => $status,
@@ -654,7 +762,7 @@ class BrandController extends Controller
     /**
      * @param  class-string<ShopeeBrand|WooCommerceBrand|LazadaBrand|TikTokBrand>  $marketplaceModel
      */
-    private function bulkMapMarketplaceBrand(Request $request, string $fkColumn, string $marketplaceModel, string $auditEvent): RedirectResponse
+    private function bulkMapMarketplaceBrand(Request $request, string $fkColumn, string $marketplaceModel, string $auditEvent): RedirectResponse|JsonResponse
     {
         $attribute = $this->brandAttribute();
         $table = (new $marketplaceModel())->getTable();
@@ -700,6 +808,16 @@ class BrandController extends Controller
                 ["option#{$option->id}.{$fkColumn}" => $newId],
             );
             $updated++;
+        }
+
+        // The embedded per-category brand picker on categories/shopee-mapping.tsx
+        // calls this same endpoint via plain fetch (Accept: application/json)
+        // instead of an Inertia visit — it saves one pick at a time inline in a
+        // table cell, where a full-page redirect/flash-toast round trip would
+        // be jarring. Every other caller is a real Inertia POST (no explicit
+        // json Accept header), so this doesn't change their response at all.
+        if ($request->wantsJson()) {
+            return response()->json(['updated' => $updated]);
         }
 
         return back()->with('success', "Updated {$updated} brand mapping(s).");
@@ -766,6 +884,14 @@ class BrandController extends Controller
             'stats' => [
                 'total' => $options->count(),
                 'mapped' => $options->whereNotNull($fkColumn)->count(),
+                // How many brands the local cache actually has to offer —
+                // surfaced separately from "mapped" because a near-empty
+                // cache (e.g. Shopee's, synced per-category and easy to
+                // under-cover — see SyncShopeeBrandsJob) silently caps how
+                // many of these PIM brands *can* be mapped at all, which
+                // "0 mapped" alone doesn't distinguish from "nobody's tried
+                // yet".
+                'cached' => $marketplaceModel::count(),
             ],
         ];
     }

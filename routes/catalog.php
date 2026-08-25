@@ -48,6 +48,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:products,edit_products');
     Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/delete-shopee/{shop}', [ProductController::class, 'deleteFromShopee'])->name('products.deleteFromShopee')->middleware('permission:products,edit_products');
     Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:products,edit_products');
     Route::post('products/{product}/push-tiktok/{shop}', [ProductController::class, 'pushToTikTok'])->name('products.pushTiktok')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:products,edit_products');
@@ -68,6 +69,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/search-pim', [ShopeeAttributeMappingController::class, 'searchPimAttributes'])->name('attributes.searchPim')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
@@ -91,9 +93,15 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::get('brands/marketplace-sync', [BrandController::class, 'marketplaceSync'])->name('brands.marketplaceSync')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
-    Route::get('brands/search-shopee', [BrandController::class, 'searchShopeeBrands'])->name('brands.searchShopee')->middleware('permission:brands,edit_brands');
-    Route::get('brands/shopee-mapping', [BrandController::class, 'shopeeMapping'])->name('brands.shopeeMapping')->middleware('permission:brands,edit_brands');
+    // No GET brands/shopee-mapping page anymore — Shopee brand mapping now
+    // lives on categories/shopee-mapping.tsx (get_brand_list is
+    // category-scoped, so mapping right where you're already looking at the
+    // category made more sense than a separate global brand list). The POST
+    // below is unchanged and still does the actual save; the search-pim/
+    // shopee-brands-for-category endpoints it now works alongside live under
+    // the categories/ group below.
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
+    Route::get('brands/search-pim', [BrandController::class, 'searchPimBrands'])->name('brands.searchPim')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
     Route::get('brands/search-woocommerce', [BrandController::class, 'searchWoocommerceBrands'])->name('brands.searchWoocommerce')->middleware('permission:brands,edit_brands');
     Route::get('brands/woocommerce-mapping', [BrandController::class, 'woocommerceMapping'])->name('brands.woocommerceMapping')->middleware('permission:brands,edit_brands');
@@ -129,6 +137,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributeFamilies/{attributeFamily}/history', [AttributeFamilyController::class, 'history'])->name('attributeFamilies.history')->middleware('permission:attribute_families,view_history');
 
     Route::get('categories/tree', [CategoryController::class, 'tree'])->name('categories.tree')->middleware('permission:categories,list_categories');
+    Route::get('categories/search', [CategoryController::class, 'searchCategories'])->name('categories.search')->middleware('permission:categories,edit_categories');
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index')->middleware('permission:categories,list_categories');
     Route::get('categories/export', [CategoryController::class, 'exportCategories'])->name('categories.export')->middleware('permission:categories,list_categories');
     Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create')->middleware('permission:categories,create_categories');
@@ -148,6 +157,16 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
     Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
+    // Brand-side actions embedded in the same page (see BrandController's
+    // docblocks on these two) — gated on brands,edit_brands rather than
+    // categories,edit_categories since they read/write brand data, even
+    // though they're reached from the categories/shopee-mapping.tsx table.
+    Route::post('categories/shopee-mapping/sync-brands', [BrandController::class, 'syncShopeeBrandsForCategory'])->name('categories.shopeeMapping.syncBrands')->middleware('permission:brands,edit_brands');
+    Route::get('categories/{shopeeCategoryId}/shopee-brands', [BrandController::class, 'shopeeBrandsForCategory'])->name('categories.shopeeBrandsForCategory')->middleware('permission:brands,edit_brands');
+    // Same idea, attribute-domain instead of brand-domain — see
+    // ShopeeAttributeMappingController's docblocks on these two.
+    Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:categories,edit_categories');
     Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');

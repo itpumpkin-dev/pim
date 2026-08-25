@@ -85,9 +85,13 @@ function useMainNavItems(): NavItem[] {
                             // Same reasoning as Categories' excludeUrls above
                             // — the marketplace-sync + mapping flow now
                             // belongs to "จัดการ", not the Brands list.
+                            // No /catalog/brands/shopee-mapping entry here —
+                            // that page is gone; Shopee brand mapping lives
+                            // on /catalog/categories/shopee-mapping instead
+                            // (already covered by the Categories excludeUrls
+                            // above).
                             excludeUrls: [
                                 '/catalog/brands/marketplace-sync',
-                                '/catalog/brands/shopee-mapping',
                             ],
                         },
                     ],
@@ -145,7 +149,6 @@ function useMainNavItems(): NavItem[] {
                                 '/catalog/categories/tiktok-mapping',
                                 '/catalog/categories/woocommerce-mapping',
                                 '/catalog/brands/marketplace-sync',
-                                '/catalog/brands/shopee-mapping',
                             ],
                         },
                     ],
