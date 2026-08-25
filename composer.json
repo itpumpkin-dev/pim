@@ -17,6 +17,7 @@
         "phpoffice/phpspreadsheet": "^5.9",
         "pusher/pusher-php-server": "^7.2",
         "sentry/sentry-laravel": "^4.27",
+        "symfony/yaml": "^7.4",
         "tightenco/ziggy": "^2.4"
     },
     "require-dev": {
