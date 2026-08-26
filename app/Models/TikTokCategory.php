@@ -28,6 +28,7 @@ class TikTokCategory extends Model
         'id',
         'parent_id',
         'name',
+        'name_th',
         'is_leaf',
     ];
 

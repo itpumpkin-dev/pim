@@ -4,14 +4,16 @@ import { useEffect, useState } from 'react';
 export interface ShopeeCategoryOption {
     id: number;
     name: string;
+    name_th: string | null;
     parent_id: number | null;
 }
 
 /**
- * Search-by-name picker over the locally cached Shopee category tree (see
- * CategoryController::searchShopeeCategories) — mirrors LazadaCategoryPicker.
- * Only leaf categories are returned, since Shopee requires products to map
- * to a leaf, never a parent node.
+ * ตัวค้นหา category ของ Shopee จากชื่อ โดยดึงจาก tree ที่แคชไว้ในเครื่อง
+ * (ดูที่ CategoryController::searchShopeeCategories) — ทำงานเหมือน
+ * LazadaCategoryPicker เลย จะคืนมาเฉพาะ category ที่เป็น leaf เท่านั้น
+ * เพราะ Shopee บังคับให้สินค้าต้อง map กับ leaf category เท่านั้น
+ * จะ map กับ category แม่ไม่ได้
  */
 export function ShopeeCategoryPicker({
     value,
@@ -47,7 +49,7 @@ export function ShopeeCategoryPicker({
             options={results}
             loading={loading}
             filterOptions={(options) => options}
-            getOptionLabel={(opt) => opt.name}
+            getOptionLabel={(opt) => (opt.name_th ? `${opt.name} (${opt.name_th})` : opt.name)}
             isOptionEqualToValue={(opt, val) => opt.id === val.id}
             value={value}
             onChange={(_, val) => onChange(val)}

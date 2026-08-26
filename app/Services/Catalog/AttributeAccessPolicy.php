@@ -10,22 +10,20 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 
 /**
- * Shared "Attribute Access" permission checks — whether a user's role can
- * view/edit a given Attribute Group or individual Attribute. Extracted from
- * ProductController (still the canonical place these rules were designed
- * for — the product edit page) so the same rules can gate other surfaces
- * that expose attribute values outside that page, e.g. bulk product
- * import/export columns, and the public (no-login) product preview page.
+ * ตัวเช็คสิทธิ์ "Attribute Access" ที่ใช้ร่วมกันหลายที่ — เช็คว่า role ของ user
+ * คนนั้นดู/แก้ Attribute Group หรือ Attribute แต่ละตัวได้ไหม ย้ายโค้ดมาจาก
+ * ProductController (ที่ยังเป็นที่หลักที่ออกแบบกฎพวกนี้ไว้ — หน้าแก้ไขสินค้า)
+ * เพื่อให้เอากฎเดียวกันไปใช้กับหน้าอื่นๆ ที่โชว์ค่า attribute นอกเหนือจากหน้านั้นได้ด้วย
+ * เช่น คอลัมน์ import/export สินค้าแบบ bulk และหน้า preview สินค้าแบบสาธารณะ (ไม่ต้อง login)
  */
 class AttributeAccessPolicy
 {
     /**
-     * Which role's permissions actually govern this check: the given user's
-     * own, or — when there's no user at all (an anonymous visitor) — the
-     * designated `is_guest` role's, if one has been configured (see
-     * Role::guest()). Null means "fully unrestricted", preserving the
-     * original behavior for anonymous visitors on an install that hasn't
-     * set up a guest role.
+     * เช็คว่าจะใช้สิทธิ์ของ role ไหนมากำหนดผล: ของ user คนนั้นเอง หรือ — ถ้าไม่มี
+     * user เลย (ผู้เข้าชมแบบไม่ login) — ก็ใช้ role `is_guest` ที่ตั้งไว้ (ถ้ามีการ
+     * ตั้งค่าไว้ ดู Role::guest()) ค่า null หมายถึง "ไม่จำกัดสิทธิ์เลย" เพื่อให้
+     * พฤติกรรมเดิมของผู้เข้าชมแบบไม่ login ยังทำงานเหมือนเดิมในระบบที่ยังไม่ได้ตั้ง
+     * guest role
      */
     private function actorFor(?User $user): User|Role|null
     {
@@ -33,10 +31,10 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Uses permission format: 'view_attribute_groups.view_{group_code}'.
-     * If a role has never touched the "Attribute Access" section at all (no
-     * rows for this resource), access is granted by default — backward
-     * compatible with every role that predates this permission.
+     * ใช้รูปแบบ permission: 'view_attribute_groups.view_{group_code}'
+     * ถ้า role นั้นไม่เคยแตะส่วน "Attribute Access" เลย (ไม่มีข้อมูล permission
+     * สำหรับ resource นี้) จะอนุญาตให้เข้าถึงได้โดย default — เพื่อให้ยังใช้งานได้กับ
+     * role เก่าๆ ที่มีมาก่อนจะมี permission ตัวนี้
      */
     public function canViewGroup(?User $user, AttributeGroup $group): bool
     {
@@ -53,8 +51,8 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Uses permission format: 'view_attributes.view_{attribute_code}'. Same
-     * "untouched resource = default allow" fallback as canViewGroup().
+     * ใช้รูปแบบ permission: 'view_attributes.view_{attribute_code}' ใช้ fallback
+     * แบบเดียวกับ canViewGroup() คือ "ยังไม่เคยตั้งค่า resource นี้เลย = อนุญาตโดย default"
      */
     public function canViewAttribute(?User $user, Attribute $attribute): bool
     {
@@ -71,11 +69,11 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Always a subset of view access. Falls back to "editable" only when the
-     * role hasn't touched attribute group access AT ALL (no view rows
-     * either) — a role given Read-only access (view rows exist, but no Edit
-     * was ever checked) has zero edit_attribute_groups rows too, which would
-     * wrongly fall back to "editable" if that resource were checked alone.
+     * สิทธิ์แก้ไขต้องเป็น subset ของสิทธิ์ดูเสมอ จะ fallback เป็น "แก้ไขได้" ก็ต่อเมื่อ
+     * role นั้นไม่เคยแตะเรื่องสิทธิ์ attribute group เลยจริงๆ (ไม่มีแม้แต่ข้อมูลฝั่ง view) —
+     * เพราะ role ที่ให้สิทธิ์แค่ดูอย่างเดียว (มีข้อมูลฝั่ง view แต่ไม่เคยติ๊ก Edit เลย)
+     * ก็จะไม่มีข้อมูล edit_attribute_groups เหมือนกัน ซึ่งถ้าเช็คแค่ resource นี้เดี่ยวๆ
+     * จะ fallback เป็น "แก้ไขได้" ผิดๆ ไปด้วย
      */
     public function canEditGroup(?User $user, AttributeGroup $group): bool
     {
@@ -96,7 +94,7 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Same "touched at all" fallback as canEditGroup() above.
+     * ใช้ fallback แบบ "ไม่เคยแตะเลยจริงๆ" เหมือนกับ canEditGroup() ด้านบน
      */
     public function canEditAttribute(?User $user, Attribute $attribute): bool
     {
@@ -117,14 +115,13 @@ class AttributeAccessPolicy
     }
 
     /**
-     * True only if there's at least one attribute group this user/role
-     * cannot view. Unlike a coarse "has the view_attribute_groups resource
-     * been touched at all" check, this correctly treats a role that has
-     * every group explicitly granted the same as one that's never touched
-     * the section — both mean unrestricted — instead of flagging any
-     * explicit grant as a restriction. Used to gate import/export job
-     * details, which can't be checked against one particular group since a
-     * product job's data spans every attribute group at once.
+     * จะ true ก็ต่อเมื่อมี attribute group อย่างน้อยหนึ่งกลุ่มที่ user/role นี้ดูไม่ได้
+     * ต่างจากการเช็คแบบหยาบๆ ว่า "resource view_attribute_groups เคยถูกแตะไหม" —
+     * เมธอดนี้จะถือว่า role ที่ได้รับสิทธิ์ดูทุกกลุ่มแบบระบุชัดเจน เหมือนกับ role ที่
+     * ไม่เคยแตะส่วนนี้เลย (ทั้งสองแบบถือว่า "ไม่ถูกจำกัด") แทนที่จะตีความว่าการให้
+     * สิทธิ์แบบระบุชัดคือการจำกัดสิทธิ์ ใช้เมธอดนี้เพื่อเช็คหน้ารายละเอียด job
+     * import/export ซึ่งเช็คกับ group ใดกลุ่มหนึ่งไม่ได้ เพราะข้อมูลของ job สินค้า
+     * ครอบคลุมทุก attribute group พร้อมกัน
      */
     public function hasAnyGroupRestriction(?User $user): bool
     {
@@ -136,18 +133,17 @@ class AttributeAccessPolicy
     }
 
     /**
-     * An attribute's group membership is per-family (family_attributes.
-     * attribute_group_id), not fixed on the attribute itself — the same
-     * attribute can sit in an allowed group for one family and a restricted
-     * one for another. A bulk export/import isn't scoped to a single family,
-     * so this asks the conservative version of the question: is $attribute
-     * viewable considering *every* family it's assigned to? One restricted
-     * group anywhere is enough to exclude it — consistent with treating
-     * "any restriction configured" as the safer default everywhere else
-     * this permission is enforced.
+     * การเป็นสมาชิกของ group นั้นผูกอยู่กับแต่ละ family (family_attributes.
+     * attribute_group_id) ไม่ได้ fix ตายตัวอยู่ที่ตัว attribute เอง — attribute
+     * ตัวเดียวกันอาจอยู่ใน group ที่อนุญาตสำหรับ family หนึ่ง แต่อยู่ใน group ที่ถูก
+     * จำกัดสำหรับอีก family หนึ่งก็ได้ การ export/import แบบ bulk ไม่ได้จำกัดอยู่แค่
+     * family เดียว เมธอดนี้เลยถามคำถามแบบระมัดระวังที่สุด: $attribute นี้ดูได้ไหม
+     * ถ้านับรวม *ทุก* family ที่มันถูก assign อยู่ แค่มี group ที่ถูกจำกัดอยู่ group
+     * เดียวก็พอที่จะตัดออกแล้ว — สอดคล้องกับแนวทางที่ใช้ทั่วทั้งระบบว่า "มีการจำกัด
+     * ตรงไหนก็ตาม" ให้ถือเป็นค่า default ที่ปลอดภัยกว่า
      *
-     * @param  callable(?User, Attribute): bool  $attributeCheck  canViewAttribute or canEditAttribute
-     * @param  callable(?User, AttributeGroup): bool  $groupCheck  canViewGroup or canEditGroup
+     * @param  callable(?User, Attribute): bool  $attributeCheck  canViewAttribute หรือ canEditAttribute
+     * @param  callable(?User, AttributeGroup): bool  $groupCheck  canViewGroup หรือ canEditGroup
      */
     private function acrossFamilies(?User $user, Attribute $attribute, callable $attributeCheck, callable $groupCheck): bool
     {
@@ -179,9 +175,9 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Batched version of canViewAttributeAcrossFamilies()/canEditAttributeAcrossFamilies()
-     * for filtering a whole attribute list (e.g. export/import columns) in a
-     * bounded number of queries instead of one family lookup per attribute.
+     * เป็นเวอร์ชันแบบ batch ของ canViewAttributeAcrossFamilies()/canEditAttributeAcrossFamilies()
+     * ไว้กรอง attribute ทั้งลิสต์ (เช่น คอลัมน์ export/import) โดยใช้จำนวน query
+     * ที่จำกัด แทนที่จะ query หา family ทีละ attribute
      *
      * @param  Collection<int, Attribute>  $attributes
      * @param  'view'|'edit'  $mode
@@ -217,10 +213,10 @@ class AttributeAccessPolicy
     }
 
     /**
-     * Same as filterAttributes(), but for a plain list of attribute codes
-     * (e.g. bulk product import/export columns) rather than Attribute
-     * models — resolves the codes to models, filters, and returns just the
-     * codes that survived, in their original order.
+     * เหมือนกับ filterAttributes() แต่รับเป็นลิสต์ธรรมดาของ attribute code
+     * (เช่น คอลัมน์ import/export สินค้าแบบ bulk) แทนที่จะเป็น Attribute model —
+     * แปลง code เป็น model ก่อน กรอง แล้วคืนเฉพาะ code ที่ผ่านเงื่อนไข โดยเรียง
+     * ตามลำดับเดิม
      *
      * @param  array<int, string>  $codes
      * @param  'view'|'edit'  $mode

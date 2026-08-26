@@ -81,22 +81,20 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
-    // Drives the table's Busy State (FioriBusyOverlay) while a search/sort/
-    // filter/pagination request is in flight — these are `preserveState`
-    // visits, which RouteLoadingSkeleton (the app's full-page loading
-    // placeholder) deliberately ignores, so without this the table gave no
-    // feedback at all for a slow request.
+    // ตัวนี้ควบคุม Busy State ของตาราง (FioriBusyOverlay) ระหว่างที่มี request
+    // ค้นหา/เรียงลำดับ/กรอง/เปลี่ยนหน้า กำลังทำงานอยู่ — เพราะ request พวกนี้เป็น visit
+    // แบบ `preserveState` ซึ่ง RouteLoadingSkeleton (loading placeholder เต็มหน้าจอของแอป)
+    // จะไม่แสดงให้เห็นโดยตั้งใจ ถ้าไม่มีตัวนี้ ตาราง
+    // จะไม่มีอะไรบอกผู้ใช้เลยเวลา request ช้า
     const [isFetching, setIsFetching] = useState(false);
     const visitOptions = { onStart: () => setIsFetching(true), onFinish: () => setIsFetching(false) };
     const firstRender = useRef(true);
 
     const handleExport = (format: 'csv' | 'xlsx') => {
-        // Passed explicitly rather than left for the server to guess from
-        // the session/cookie — a user whose profile has no saved UI locale
-        // and whose `locale` cookie doesn't ride along on this particular
-        // request (observed happening in practice) would otherwise silently
-        // fall back to the app's default locale instead of matching what's
-        // actually on screen.
+        // ส่ง locale ไปตรงๆ แบบนี้ดีกว่าปล่อยให้ server เดาเอาจาก session/cookie —
+        // ถ้าผู้ใช้คนไหนที่โปรไฟล์ไม่มี UI locale บันทึกไว้ และคุกกี้ `locale` ก็ไม่ได้
+        // แนบมากับ request นี้พอดี (เจอเคสแบบนี้จริงๆ) มันจะเงียบๆ ตกไปใช้
+        // locale เริ่มต้นของแอปแทน ซึ่งไม่ตรงกับที่ผู้ใช้เห็นอยู่บนจอ
         const params = encodeQueryParams({ format, search, filters: activeFilters, locale });
         window.location.href = `/catalog/attributes/export?${params.join('&')}`;
         setExportAnchor(null);
@@ -108,13 +106,12 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
         return true;
     });
 
-    // Column pop-in priority (SAP Fiori responsive table): this grid's
-    // columns come from the server-driven gridConfig rather than a fixed
-    // list, so priority falls out of column order — the first column
-    // identifies the row and always stays, the next two follow as space
-    // allows, and the rest reflow into the pop-in area first. Row actions
-    // stay pinned like the identifying column since they're always reachable
-    // in Fiori's pattern too.
+    // ลำดับความสำคัญของคอลัมน์เวลาจอแคบ (ตาราง responsive แบบ SAP Fiori): คอลัมน์ของ
+    // ตารางนี้มาจาก gridConfig ที่ฝั่ง server กำหนดมา ไม่ใช่ลิสต์ตายตัว ดังนั้นลำดับ
+    // ความสำคัญเลยอิงตามลำดับคอลัมน์ — คอลัมน์แรกใช้ระบุแถวเลยตรึงไว้เสมอ สองคอลัมน์
+    // ถัดมาจะโชว์ตามพื้นที่ที่เหลือ ส่วนที่เหลือจะถูกซ่อนเข้า pop-in ก่อนเป็นอันดับแรก
+    // คอลัมน์ actions ก็ตรึงไว้เหมือนคอลัมน์ที่ใช้ระบุแถว เพราะตามแพทเทิร์นของ Fiori
+    // ต้องกดถึงได้เสมอเช่นกัน
     type AttributeRow = GridData['data'][number];
     const columns: FioriResponsiveColumn<AttributeRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
         key,
@@ -230,9 +227,9 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                     </Stack>
                 </Stack>
 
-                {/* Table Card: toolbar + head + rows on one Fiori "Table" surface */}
+                {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
                 <Paper elevation={0} sx={fioriCardSx}>
-                    {/* Toolbar */}
+                    {/* แถบเครื่องมือ */}
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
                         <TextField
                             value={search}

@@ -108,18 +108,17 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
     const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
-    // assignedGroups/unassignedAttrs start populated from familyAttributes
-    // (see the effect below), so "non-empty" can't signal dirty the way it
-    // does on the Create page — this flips true the moment any of the
-    // group-assignment handlers actually mutate that arrangement.
+    // assignedGroups/unassignedAttrs เริ่มต้นมาพร้อมข้อมูลจาก familyAttributes อยู่แล้ว
+    // (ดู effect ด้านล่าง) ดังนั้นแค่เช็คว่า "ไม่ว่าง" จะเอามาบอกว่ามีการแก้ไขแบบหน้า Create
+    // ไม่ได้ — ตัวแปรนี้จะกลายเป็น true ก็ต่อเมื่อมีการเรียก handler ที่จัดการกลุ่ม
+    // จริงๆ จนไปแก้ไขการจัดเรียงนั้น
     const [groupsDirty, setGroupsDirty] = useState(false);
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty || groupsDirty);
 
-    // Dragging (or clicking) an attribute only means anything once at least
-    // one group exists to receive it — with none yet, there's nowhere to
-    // drop it at all (the group column just shows the empty-state
-    // placeholder). Warn instead of letting the drag/click silently do
-    // nothing, which otherwise looks like a bug rather than a missing step.
+    // การลาก (หรือคลิก) แอตทริบิวต์จะมีความหมายก็ต่อเมื่อมีกลุ่มให้ตกลงไปแล้วอย่างน้อยหนึ่งกลุ่ม
+    // ถ้ายังไม่มีกลุ่มเลยก็ไม่มีที่ให้วาง (คอลัมน์กลุ่มจะโชว์แค่ placeholder ว่างๆ)
+    // เลยต้องเตือนผู้ใช้แทนที่จะปล่อยให้ลาก/คลิกแล้วไม่มีอะไรเกิดขึ้นแบบเงียบๆ
+    // เพราะแบบนั้นมันดูเหมือนบั๊กมากกว่าจะรู้ว่ายังขาดขั้นตอนอยู่
     const requireGroupBeforeAssigning = (): boolean => {
         if (assignedGroups.length === 0) {
             setNoGroupWarningOpen(true);
@@ -129,7 +128,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     };
 
     useEffect(() => {
-        // Build assignedGroups and unassignedAttrs from real DB familyAttributes & attributes props
+        // สร้าง assignedGroups และ unassignedAttrs จากข้อมูลจริงใน DB (familyAttributes กับ attributes props)
         const groupsMap: Record<number, AssignedGroup> = {};
         const assignedAttrIds = new Set<number>();
 
@@ -194,11 +193,10 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         setAssignDialogOpen(false);
     };
 
-    // Handles both "assign to group" (targetIndex omitted -> appended at the
-    // end) and "reorder within/into a group at a specific position" (dropped
-    // on another attribute row). Always removes the attribute from wherever
-    // it currently is first, so dragging within the same group moves it
-    // rather than duplicating it.
+    // ฟังก์ชันนี้จัดการทั้งกรณี "กำหนดเข้ากลุ่ม" (ไม่ส่ง targetIndex มา -> จะเพิ่มต่อท้ายให้)
+    // และกรณี "จัดเรียงใหม่ภายใน/เข้าไปในกลุ่มที่ตำแหน่งที่ระบุ" (ลากไปวางทับ
+    // แอตทริบิวต์ตัวอื่น) จะลบแอตทริบิวต์ออกจากตำแหน่งเดิมก่อนเสมอ
+    // ดังนั้นการลากภายในกลุ่มเดียวกันจะเป็นการย้ายตำแหน่ง ไม่ใช่การสร้างซ้ำ
     const handleDropAttribute = (attr: AttributeItem, targetGroupId: number, targetIndex?: number) => {
         setGroupsDirty(true);
         setUnassignedAttrs((prev) => prev.filter((a) => a.id !== attr.id));
@@ -228,9 +226,9 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         });
     };
 
-    // Moves the dragged group to sit where the drop-target group currently
-    // is (array order here is what submit() turns into sort_order, so this
-    // is the entire mechanism — no separate "group order" field to sync).
+    // ย้ายกลุ่มที่ลากไปแทนที่ตำแหน่งของกลุ่มเป้าหมายที่วาง (ลำดับใน array ตรงนี้
+    // คือสิ่งที่ submit() จะแปลงเป็น sort_order เลย ดังนั้นนี่คือกลไกทั้งหมด
+    // ไม่มีฟิลด์ "ลำดับกลุ่ม" แยกต่างหากให้ต้องคอย sync กันอีก)
     const handleReorderGroup = (sourceGroupId: number, targetGroupId: number) => {
         if (sourceGroupId === targetGroupId) return;
 
@@ -307,7 +305,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
 
                 {tabIndex === 0 && (
                 <>
-                {/* Header Title & Actions */}
+                {/* หัวข้อและปุ่มต่างๆ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         Edit Attribute Family
@@ -334,7 +332,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                 </Stack>
 
                 <Grid container spacing={3}>
-                    {/* Left Column: Groups & Unassigned Attributes */}
+                    {/* คอลัมน์ซ้าย: กลุ่มและแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
                     <Grid item xs={12} md={8}>
                         <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
@@ -364,7 +362,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                             </Stack>
 
                             <Grid container spacing={3} sx={{ mt: 1 }}>
-                                {/* Main Column section */}
+                                {/* ส่วนคอลัมน์หลัก */}
                                 <Grid item xs={12} sm={6}>
                                     <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1.5 }}>
                                         Main Column
@@ -407,7 +405,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                             '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
                                                         }}
                                                     >
-                                                        {/* Group Header */}
+                                                        {/* หัวข้อกลุ่ม */}
                                                         <Stack
                                                             direction="row"
                                                             alignItems="center"
@@ -455,7 +453,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                             </IconButton>
                                                         </Stack>
 
-                                                        {/* Group Attributes List */}
+                                                        {/* รายการแอตทริบิวต์ในกลุ่ม */}
                                                         <Collapse in={group.expanded} timeout="auto" unmountOnExit>
                                                             <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
                                                                 {group.attributes.map((attr, attrIndex) => (
@@ -514,7 +512,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                     </Box>
                                 </Grid>
 
-                                {/* Unassigned Attributes list Drop Area */}
+                                {/* พื้นที่วางสำหรับแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
                                 <Grid item xs={12} sm={6}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                                         <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
@@ -605,10 +603,10 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                         </Paper>
                     </Grid>
 
-                    {/* Right Column: General & Label panels */}
+                    {/* คอลัมน์ขวา: ส่วนข้อมูลทั่วไปและป้ายชื่อ */}
                     <Grid item xs={12} md={4}>
                         <Stack spacing={3}>
-                            {/* General Panel */}
+                            {/* ส่วนข้อมูลทั่วไป */}
                             <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                                 <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                     General
@@ -640,7 +638,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                 )}
             </Box>
 
-            {/* Assign Attribute Group Dialog */}
+            {/* ไดอะล็อกสำหรับกำหนดกลุ่มแอตทริบิวต์ */}
             <Dialog
                 open={assignDialogOpen}
                 onClose={() => setAssignDialogOpen(false)}

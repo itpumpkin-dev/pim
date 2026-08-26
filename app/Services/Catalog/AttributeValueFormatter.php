@@ -8,18 +8,18 @@ use Illuminate\Support\Facades\Storage;
 class AttributeValueFormatter
 {
     /**
-     * Converts a raw stored attribute value into its public-facing form —
-     * image/file/video/gallery values are stored as paths relative to the
-     * 'public' disk (see ProductController's upload handling) and need a URL
-     * built against that specific disk to become fetchable.
+     * แปลงค่า attribute ดิบที่เก็บไว้ในฐานข้อมูลให้เป็นรูปแบบที่ใช้แสดงผลจริงได้ —
+     * ค่าแบบ image/file/video/gallery จะถูกเก็บเป็น path แบบ relative บน disk
+     * 'public' (ดูส่วนจัดการอัปโหลดใน ProductController) เลยต้อง build URL โดย
+     * อิงกับ disk ตัวนั้นเป๊ะๆ ถึงจะโหลดได้จริง
      *
-     * Deliberately not `Storage::url()` (the default-disk facade): that
-     * resolves against whatever FILESYSTEM_DISK happens to be configured
-     * (here, 'local', which isn't even the disk these files are stored on)
-     * and — since the 'local' disk has no 'url' key — silently falls back to
-     * a bare `/storage/...` path with no scheme or host. That's harmless for
-     * same-origin browser rendering but useless to an external consumer like
-     * the Lazada API, which needs an absolute, publicly-fetchable URL.
+     * จงใจไม่ใช้ `Storage::url()` (facade ที่ใช้ disk default) เพราะมันจะไป
+     * resolve ตาม FILESYSTEM_DISK ที่ตั้งค่าไว้ (ในที่นี้คือ 'local' ซึ่งไม่ใช่
+     * disk ที่เก็บไฟล์พวกนี้อยู่ด้วยซ้ำ) และ — เพราะ disk 'local' ไม่มี key 'url' —
+     * มันจะเงียบๆ fallback ไปเป็น path เปล่าๆ แบบ `/storage/...` ที่ไม่มี scheme
+     * หรือ host เลย ซึ่งไม่มีปัญหาถ้าเรียกจาก browser ฝั่งเดียวกัน (same-origin)
+     * แต่ใช้ไม่ได้เลยกับผู้บริโภคภายนอกอย่าง Lazada API ที่ต้องการ URL แบบ absolute
+     * ที่เข้าถึงได้จากสาธารณะจริงๆ
      */
     public static function format(Attribute $attribute, ?string $rawValue): mixed
     {
@@ -41,13 +41,13 @@ class AttributeValueFormatter
     }
 
     /**
-     * Builds a public URL for a stored image/file/video/gallery value —
-     * except when it's already an absolute URL, which happens for rows
-     * brought in via import (e.g. a WooCommerce-converted CSV's `pimage`
-     * column carries the original external image URL, never downloaded
-     * into local storage). Running that through Storage::url() would nest
-     * it under this app's own /storage/ prefix and break it, so pass
-     * already-absolute values through unchanged.
+     * สร้าง public URL ให้ค่าที่เก็บไว้แบบ image/file/video/gallery —
+     * ยกเว้นกรณีที่มันเป็น absolute URL อยู่แล้ว ซึ่งจะเกิดกับข้อมูลที่นำเข้ามา
+     * ผ่านการ import (เช่น คอลัมน์ `pimage` ของ CSV ที่แปลงมาจาก WooCommerce
+     * จะพก URL รูปภายนอกตัวจริงมาด้วย โดยไม่เคยถูกดาวน์โหลดมาเก็บใน local storage
+     * เลย) ถ้าเอาค่านี้ไปวิ่งผ่าน Storage::url() มันจะเอาไปแปะซ้อนใต้ prefix
+     * /storage/ ของแอปเรา แล้วทำให้ลิงก์พัง เลยต้องปล่อยค่าที่เป็น absolute
+     * อยู่แล้วผ่านไปโดยไม่แตะต้อง
      */
     public static function resolveStorageUrl(?string $path): ?string
     {

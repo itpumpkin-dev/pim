@@ -19,10 +19,10 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function () {
-    // Static hub linking to the missing-translations list and the
-    // Categories/Brands marketplace-sync pages — those routes already
-    // enforce their own permissions, so this needs no middleware of its
-    // own beyond auth; the frontend hides tiles the user can't reach.
+    // หน้ารวม static ที่ลิงก์ไปหน้ารายการคำแปลที่ขาดหาย และหน้า
+    // marketplace-sync ของ Categories/Brands — route พวกนั้นมีการเช็คสิทธิ์
+    // ของตัวเองอยู่แล้ว หน้ารวมนี้เลยไม่ต้องมี middleware อะไรเพิ่มนอกจาก auth
+    // ฝั่ง frontend จะซ่อน tile ที่ user คนนั้นเข้าไม่ได้เองอยู่แล้ว
     Route::get('management', fn () => Inertia::render('catalog/management/index'))->name('management');
     Route::get('management/marketplace', fn () => Inertia::render('catalog/management/marketplace'))->name('management.marketplace');
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
@@ -80,7 +80,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::delete('attributes/{attribute}', [AttributeController::class, 'destroy'])->name('attributes.destroy')->middleware('permission:attributes,delete_attributes');
     Route::get('attributes/{attribute}/history', [AttributeController::class, 'history'])->name('attributes.history')->middleware('permission:attributes,view_history');
     Route::post('attributes/{attribute}/options', [AttributeOptionController::class, 'store'])->name('attributes.options.store')->middleware('permission:attributes,edit_attributes');
-    // Must be registered before the {option} route below, otherwise "batch" would be swallowed as an {option} id.
+    // ต้อง register route นี้ไว้ก่อน route {option} ด้านล่าง ไม่งั้นคำว่า "batch" จะถูกตีความเป็น {option} id ไปแทน
     Route::put('attributes/{attribute}/options/batch', [AttributeOptionController::class, 'batchUpdate'])->name('attributes.options.batchUpdate')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'update'])->name('attributes.options.update')->middleware('permission:attributes,edit_attributes');
     Route::delete('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'destroy'])->name('attributes.options.destroy')->middleware('permission:attributes,edit_attributes');
@@ -91,40 +91,40 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('brands/{brand}', [BrandController::class, 'update'])->name('brands.update')->middleware('permission:brands,edit_brands');
     Route::delete('brands/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy')->middleware('permission:brands,edit_brands');
 
-    // No GET brands/marketplace-sync hub anymore — its two props
-    // (lastSyncedAt/activeSyncJobs) and every action it linked to now live
-    // on categories/marketplace-sync.tsx (see CategoryController::
-    // marketplaceSync()'s docblock).
+    // ไม่มีหน้ารวม GET brands/marketplace-sync แล้ว — props ทั้งสองตัวของมัน
+    // (lastSyncedAt/activeSyncJobs) และทุก action ที่มันลิงก์ไปย้ายไปอยู่ที่
+    // categories/marketplace-sync.tsx แล้ว (ดู docblock ของ
+    // CategoryController::marketplaceSync())
     Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
-    // No GET brands/shopee-mapping page anymore — Shopee brand mapping now
-    // lives on categories/shopee-mapping.tsx (get_brand_list is
-    // category-scoped, so mapping right where you're already looking at the
-    // category made more sense than a separate global brand list). The POST
-    // below is unchanged and still does the actual save; the search-pim/
-    // shopee-brands-for-category endpoints it now works alongside live under
-    // the categories/ group below.
+    // ไม่มีหน้า GET brands/shopee-mapping แล้ว — การจับคู่แบรนด์ Shopee ย้ายไป
+    // อยู่ที่ categories/shopee-mapping.tsx แทน (เพราะ get_brand_list ผูกกับ
+    // category อยู่แล้ว การจับคู่ตรงจุดที่กำลังดู category อยู่พอดีเลยสมเหตุสมผล
+    // กว่าแยกเป็นหน้ารายชื่อแบรนด์แบบ global ต่างหาก) route POST ด้านล่างนี้
+    // ยังเหมือนเดิม ยังคงทำหน้าที่บันทึกข้อมูลจริงอยู่ ส่วน endpoint search-pim/
+    // shopee-brands-for-category ที่มันทำงานคู่กันด้วยตอนนี้ย้ายไปอยู่ใน
+    // กลุ่ม categories/ ด้านล่างแล้ว
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
     Route::get('brands/search-pim', [BrandController::class, 'searchPimBrands'])->name('brands.searchPim')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
-    // No GET brands/woocommerce-mapping page or brands/search-woocommerce
-    // endpoint anymore — same move as Lazada's above, WooCommerce brand
-    // management now lives on categories/woocommerce-mapping.tsx.
+    // ไม่มีหน้า GET brands/woocommerce-mapping หรือ endpoint
+    // brands/search-woocommerce แล้ว — ย้ายแบบเดียวกับของ Lazada ด้านบน
+    // การจัดการแบรนด์ WooCommerce ตอนนี้ย้ายไปอยู่ที่ categories/woocommerce-mapping.tsx
     Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-lazada', [BrandController::class, 'syncLazadaBrands'])->name('brands.syncLazada')->middleware('permission:brands,edit_brands');
-    // No GET brands/lazada-mapping page or brands/search-lazada endpoint
-    // anymore — Lazada brand management now lives on
-    // categories/lazada-mapping.tsx, mapping in the opposite direction (see
-    // that page's docblock and BrandController::lazadaBrandsList()'s). The
-    // POST below is unchanged and still does the actual save.
+    // ไม่มีหน้า GET brands/lazada-mapping หรือ endpoint brands/search-lazada
+    // แล้ว — การจัดการแบรนด์ Lazada ตอนนี้ย้ายไปอยู่ที่ categories/lazada-mapping.tsx
+    // โดยจับคู่กันคนละทิศทาง (ดู docblock ของหน้านั้นและของ
+    // BrandController::lazadaBrandsList()) route POST ด้านล่างนี้ยังเหมือนเดิม
+    // ยังคงทำหน้าที่บันทึกข้อมูลจริงอยู่
     Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-tiktok', [BrandController::class, 'syncTiktokBrands'])->name('brands.syncTiktok')->middleware('permission:brands,edit_brands');
-    // No GET brands/tiktok-mapping page or brands/search-tiktok endpoint
-    // anymore — same move as Lazada's/WooCommerce's above, TikTok brand
-    // management now lives on categories/tiktok-mapping.tsx.
+    // ไม่มีหน้า GET brands/tiktok-mapping หรือ endpoint brands/search-tiktok
+    // แล้ว — ย้ายแบบเดียวกับของ Lazada/WooCommerce ด้านบน การจัดการแบรนด์
+    // TikTok ตอนนี้ย้ายไปอยู่ที่ categories/tiktok-mapping.tsx
     Route::post('brands/tiktok-mapping', [BrandController::class, 'bulkMapTiktokBrand'])->name('brands.bulkMapTiktok')->middleware('permission:brands,edit_brands');
-    // Generic status/cancel for any queued brand-sync job (Shopee, Lazada,
-    // TikTok, ...) — not platform-specific, so the route path names the
-    // concept ("sync-jobs"), not one platform.
+    // route สำหรับเช็คสถานะ/ยกเลิก brand-sync job ที่อยู่ใน queue แบบทั่วไป
+    // (ใช้ได้ทั้ง Shopee, Lazada, TikTok, ...) — ไม่ได้ผูกกับแพลตฟอร์มไหนโดยเฉพาะ
+    // path ของ route เลยตั้งชื่อตามแนวคิด ("sync-jobs") ไม่ใช่ชื่อแพลตฟอร์มใดแพลตฟอร์มหนึ่ง
     Route::get('brands/sync-jobs/{jobTracker}/status', [BrandController::class, 'brandSyncStatus'])->name('brands.syncStatus')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-jobs/{jobTracker}/cancel', [BrandController::class, 'cancelBrandSync'])->name('brands.syncCancel')->middleware('permission:brands,edit_brands');
 
@@ -162,57 +162,56 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
     Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:categories,edit_categories');
-    // Brand-side action embedded in the same page (see
-    // BrandController::lazadaBrandsList()'s docblock) — gated on
-    // brands,edit_brands rather than categories,edit_categories since it
-    // reads/writes brand data, even though it's reached from the
-    // categories/lazada-mapping.tsx table. Not category-scoped (unlike
-    // Shopee's equivalent) — Lazada's brand catalog has no category
-    // dimension at all, so there's no {lazadaCategoryId} in this path.
+    // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
+    // BrandController::lazadaBrandsList()) — เช็คสิทธิ์ด้วย brands,edit_brands
+    // แทนที่จะเป็น categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์
+    // แม้ว่าจะถูกเรียกจากตาราง categories/lazada-mapping.tsx ก็ตาม ไม่ได้ผูกกับ
+    // category (ต่างจากของ Shopee) — แคตตาล็อกแบรนด์ของ Lazada ไม่มีมิติเรื่อง
+    // category เลย เลยไม่มี {lazadaCategoryId} ใน path นี้
     Route::get('categories/lazada-mapping/lazada-brands', [BrandController::class, 'lazadaBrandsList'])->name('categories.lazadaMapping.lazadaBrands')->middleware('permission:brands,edit_brands');
-    // Same idea, attribute-domain instead of brand-domain — see
-    // LazadaAttributeMappingController's docblocks on these two. Lazada's
-    // attribute schema IS category-scoped (/category/attributes/get), so
-    // this pair mirrors Shopee's {shopeeCategoryId} shape exactly.
+    // แนวคิดเดียวกัน แต่เป็นฝั่ง attribute แทนฝั่งแบรนด์ — ดู docblock ของ
+    // LazadaAttributeMappingController สำหรับสอง route นี้ schema attribute
+    // ของ Lazada ผูกกับ category จริงๆ (/category/attributes/get) คู่ route นี้
+    // เลยมีรูปแบบเหมือนกับ {shopeeCategoryId} ของ Shopee เป๊ะๆ
     Route::post('categories/lazada-mapping/sync-attributes', [LazadaAttributeMappingController::class, 'syncLazadaAttributesForCategory'])->name('categories.lazadaMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{lazadaCategoryId}/lazada-attributes', [LazadaAttributeMappingController::class, 'lazadaAttributesForCategory'])->name('categories.lazadaAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
     Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
-    // Brand-side actions embedded in the same page (see BrandController's
-    // docblocks on these two) — gated on brands,edit_brands rather than
-    // categories,edit_categories since they read/write brand data, even
-    // though they're reached from the categories/shopee-mapping.tsx table.
+    // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ BrandController
+    // สำหรับสอง route นี้) — เช็คสิทธิ์ด้วย brands,edit_brands แทนที่จะเป็น
+    // categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์ แม้ว่าจะถูกเรียก
+    // จากตาราง categories/shopee-mapping.tsx ก็ตาม
     Route::post('categories/shopee-mapping/sync-brands', [BrandController::class, 'syncShopeeBrandsForCategory'])->name('categories.shopeeMapping.syncBrands')->middleware('permission:brands,edit_brands');
     Route::get('categories/{shopeeCategoryId}/shopee-brands', [BrandController::class, 'shopeeBrandsForCategory'])->name('categories.shopeeBrandsForCategory')->middleware('permission:brands,edit_brands');
-    // Same idea, attribute-domain instead of brand-domain — see
-    // ShopeeAttributeMappingController's docblocks on these two.
+    // แนวคิดเดียวกัน แต่เป็นฝั่ง attribute แทนฝั่งแบรนด์ — ดู docblock ของ
+    // ShopeeAttributeMappingController สำหรับสอง route นี้
     Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    // No categories/search-tiktok route anymore — TikTokCategoryPicker (its
-    // only consumer) is gone along with the old fuzzy-match tiktok-mapping.tsx
-    // it backed; the new page's search box queries the tiktok_categories
-    // table directly via categories/tiktok-mapping's own `search` param.
+    // ไม่มี route categories/search-tiktok แล้ว — TikTokCategoryPicker (ผู้เรียก
+    // ใช้เพียงตัวเดียวของมัน) ถูกเอาออกไปพร้อมกับหน้า tiktok-mapping.tsx แบบ
+    // fuzzy-match เก่าที่มันรองรับอยู่ ช่องค้นหาของหน้าใหม่จะ query ตาราง
+    // tiktok_categories โดยตรงผ่าน param `search` ของ categories/tiktok-mapping เอง
     Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');
-    // Brand-side action embedded in the same page (see
-    // BrandController::tiktokBrandsList()'s docblock) — not category-scoped
-    // (like Lazada's/WooCommerce's, unlike Shopee's), so no
-    // {tiktokCategoryId} in this path.
+    // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
+    // BrandController::tiktokBrandsList()) — ไม่ได้ผูกกับ category
+    // (เหมือนของ Lazada/WooCommerce ต่างจากของ Shopee) เลยไม่มี
+    // {tiktokCategoryId} ใน path นี้
     Route::get('categories/tiktok-mapping/tiktok-brands', [BrandController::class, 'tiktokBrandsList'])->name('categories.tiktokMapping.tiktokBrands')->middleware('permission:brands,edit_brands');
-    // Attribute-domain equivalent — TikTok's Get Attributes endpoint IS
-    // category-scoped (one category_id per call), so this pair mirrors
-    // Shopee's/Lazada's {xCategoryId} shape.
+    // ส่วนที่เทียบเท่าฝั่ง attribute — endpoint Get Attributes ของ TikTok
+    // ผูกกับ category จริงๆ (เรียกทีละ category_id) คู่ route นี้เลยมีรูปแบบ
+    // เหมือนกับ {xCategoryId} ของ Shopee/Lazada
     Route::post('categories/tiktok-mapping/sync-attributes', [TikTokAttributeMappingController::class, 'syncTikTokAttributesForCategory'])->name('categories.tiktokMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{tiktokCategoryId}/tiktok-attributes', [TikTokAttributeMappingController::class, 'tiktokAttributesForCategory'])->name('categories.tiktokAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::post('categories/sync-woocommerce', [CategoryController::class, 'syncWoocommerceCategories'])->name('categories.syncWoocommerce')->middleware('permission:categories,edit_categories');
-    // No categories/search-woocommerce route anymore — same reason as
-    // TikTok's above.
+    // ไม่มี route categories/search-woocommerce แล้ว — เหตุผลเดียวกับของ
+    // TikTok ด้านบน
     Route::get('categories/woocommerce-mapping', [CategoryController::class, 'woocommerceMapping'])->name('categories.woocommerceMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/woocommerce-mapping', [CategoryController::class, 'bulkMapWoocommerce'])->name('categories.bulkMapWoocommerce')->middleware('permission:categories,edit_categories');
-    // Brand-side action embedded in the same page (see
-    // BrandController::woocommerceBrandsList()'s docblock) — not
-    // category-scoped, same reasoning as Lazada's/TikTok's above.
+    // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
+    // BrandController::woocommerceBrandsList()) — ไม่ได้ผูกกับ category
+    // เหตุผลเดียวกับของ Lazada/TikTok ด้านบน
     Route::get('categories/woocommerce-mapping/woocommerce-brands', [BrandController::class, 'woocommerceBrandsList'])->name('categories.woocommerceMapping.woocommerceBrands')->middleware('permission:brands,edit_brands');
     Route::get('categories/export-woocommerce', [CategoryController::class, 'exportWoocommerceCategories'])->name('categories.exportWoocommerce')->middleware('permission:categories,edit_categories');
     Route::post('categories/import-woocommerce', [CategoryController::class, 'importFromWoocommerce'])->name('categories.importWoocommerce')->middleware('permission:categories,edit_categories');

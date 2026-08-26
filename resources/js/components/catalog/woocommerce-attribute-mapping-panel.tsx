@@ -19,22 +19,24 @@ type TargetField =
     | 'wc_attribute'
     | '';
 
-// Three resolution modes, not just three groups of labels — see
-// WooCommerceProductSyncService::buildContentFields() (compose every
-// mapped attribute), resolveMappedField() (first mapped attribute with a
-// value wins), and buildWooCommerceAttributes() (first-match-wins per
-// distinct woocommerce_attribute_id). The grouping below exists to make
-// that distinction visible in the picker, not just for tidiness. Video has
-// no type restriction here (unlike Shopee/Lazada/TikTok's video fields) —
-// WooCommerce pushes it as a plain `meta_data[key=youtube_url]` URL string,
-// no upload/transcode API involved, so any text-shaped attribute works.
+// มี resolution mode อยู่ 3 แบบ ไม่ใช่แค่แบ่งกลุ่ม label เฉยๆ — ดูที่
+// WooCommerceProductSyncService::buildContentFields() (รวมทุก attribute ที่
+// map ไว้เข้าด้วยกัน), resolveMappedField() (attribute ตัวแรกที่ map ไว้แล้ว
+// มีค่าจะชนะ) และ buildWooCommerceAttributes() (แบบ first-match-wins ต่อ
+// woocommerce_attribute_id แต่ละตัว) การจัดกลุ่มด้านล่างนี้มีไว้เพื่อให้เห็น
+// ความต่างนี้ชัดๆ ใน picker ไม่ใช่แค่จัดให้เรียบร้อยเฉยๆ ฟิลด์วิดีโอตรงนี้ไม่มี
+// ข้อจำกัดเรื่องประเภท (ต่างจากฟิลด์วิดีโอของ Shopee/Lazada/TikTok) — เพราะ
+// WooCommerce ส่งมันเป็นแค่ string URL ธรรมดาใน
+// `meta_data[key=youtube_url]` ไม่ได้ผ่าน API อัปโหลด/แปลงไฟล์ใดๆ เลย
+// เพราะฉะนั้น attribute ประเภทข้อความแบบไหนก็ใช้ได้
 const CONTENT_FIELDS: TargetField[] = ['description', 'short_description'];
 const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'image', 'qty', 'weight', 'length', 'width', 'height', 'video'];
 
-// The target Select's value is a plain TargetField string for every fixed
-// target, but a WooCommerce Product Attribute mapping needs to also carry
-// *which* one — encoded as this prefix + its id (e.g. "wc_attribute:7") so
-// one MUI Select can represent both without a second control.
+// ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับ target
+// ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป WooCommerce Product Attribute
+// ต้องแนบด้วยว่า *ตัวไหน* — เลยเข้ารหัสเป็น prefix นี้ + id (เช่น
+// "wc_attribute:7") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้ โดยไม่ต้อง
+// มี control ตัวที่สอง
 const WC_ATTRIBUTE_PREFIX = 'wc_attribute:';
 
 interface WooCommerceAttributeOption {
@@ -59,12 +61,11 @@ export interface WooCommerceAttributeMappingPanelProps {
     coverage: { payloadFields: CoverageStat; platformAttributes: CoverageStat };
 }
 
-// Field identifiers are snake_case (matching the backend's target_field
-// values) but this app's i18n keys are camelCase — map explicitly rather
-// than assuming `t(field)` resolves, which would silently fail for
-// short_description.
-// 'wc_attribute' has no fixed label here — its MenuItem is rendered from
-// the synced WooCommerce attribute's own name instead (see WC_ATTRIBUTE_PREFIX).
+// ชื่อฟิลด์เป็น snake_case (ตรงกับค่า target_field ฝั่ง backend) แต่ i18n key
+// ของแอปนี้เป็น camelCase — เลยต้อง map ตรงๆ แบบนี้ ไม่ใช้วิธีเดา
+// ว่า `t(field)` จะ resolve ได้เอง เพราะจะพังเงียบๆ กับ short_description
+// 'wc_attribute' ไม่มี label ตายตัวตรงนี้ — MenuItem ของมันจะแสดงชื่อจริงของ
+// WooCommerce attribute ที่ sync มาแทน (ดู WC_ATTRIBUTE_PREFIX)
 const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'wc_attribute'>, string> = {
     description: 'description',
     short_description: 'shortDescription',
@@ -104,9 +105,9 @@ export function WooCommerceAttributeMappingPanel({ attributes, wooCommerceAttrib
         }),
     });
 
-    // Backend reports payloadFields.missing as raw target_field keys (e.g.
-    // "short_description") — translate through the same FIELD_LABEL_KEYS
-    // map the picker itself uses, so the tooltip reads like the UI does.
+    // Backend ส่ง payloadFields.missing มาเป็น target_field key ดิบๆ (เช่น
+    // "short_description") — แปลผ่าน FIELD_LABEL_KEYS ชุดเดียวกับที่ picker
+    // เองใช้ เพื่อให้ tooltip อ่านแล้วตรงกับที่ UI แสดง
     const payloadFieldsCoverage = {
         ...coverage.payloadFields,
         missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'wc_attribute'>])),

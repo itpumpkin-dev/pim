@@ -89,10 +89,9 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        // PHP does not parse multipart/form-data bodies for PUT requests, so
-        // saving must go through POST with a spoofed _method — Image/File
-        // category fields put a raw File into additional_data, which forces
-        // this request into multipart.
+        // PHP มันไม่รองรับการอ่าน multipart/form-data ตอนเป็น PUT request
+        // เลยต้องส่งผ่าน POST แล้วปลอมเป็น _method แทน — เพราะฟิลด์ประเภท Image/File
+        // ของหมวดหมู่จะยัด File ดิบๆ ลงใน additional_data ทำให้ request นี้ต้องเป็น multipart
         transform((formData) => ({ ...formData, _method: 'put' }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/categories/${category.id}`, {

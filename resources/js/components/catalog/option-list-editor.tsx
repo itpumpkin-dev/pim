@@ -2,9 +2,9 @@ import { Button, Chip, Stack, TextField, Typography } from '@mui/material';
 import { useState } from 'react';
 
 /**
- * Simple add/remove list of plain-text option values, used by Select and
- * Multiselect category fields (no swatches — that's the product Attribute
- * option system, which is a separate, richer feature).
+ * ลิสต์เพิ่ม/ลบค่า option แบบข้อความล้วนๆ ง่ายๆ ใช้กับ category field ประเภท
+ * Select และ Multiselect (ไม่มีสวอตช์สี — เรื่องสวอตช์เป็นของระบบ option ของ
+ * Attribute สินค้า ซึ่งเป็นฟีเจอร์แยกที่ซับซ้อนกว่านี้)
  */
 export function OptionListEditor({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
     const [draft, setDraft] = useState('');

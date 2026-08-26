@@ -8,10 +8,10 @@ export interface LazadaCategoryOption {
 }
 
 /**
- * Search-by-name picker over the locally cached Lazada category tree (see
- * CategoryController::searchLazadaCategories) — only leaf categories are
- * returned, since Lazada requires products to map to a leaf, never a
- * parent node.
+ * ตัวค้นหา category ของ Lazada จากชื่อ โดยดึงจาก tree ที่แคชไว้ในเครื่อง
+ * (ดูที่ CategoryController::searchLazadaCategories) — จะคืนมาเฉพาะ category
+ * ที่เป็น leaf (ไม่มีลูกต่อ) เท่านั้น เพราะ Lazada บังคับให้สินค้าต้อง map กับ
+ * leaf category เท่านั้น จะ map กับ category แม่ไม่ได้
  */
 export function LazadaCategoryPicker({
     value,

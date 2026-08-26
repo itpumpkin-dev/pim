@@ -7,16 +7,18 @@ export interface PimAttributeOption {
 }
 
 /**
- * Search-by-name picker over PIM attributes (see
- * ShopeeAttributeMappingController::searchPimAttributes) — the attribute
- * mirror of PimBrandPicker. Backs the "pick a PIM attribute for this Shopee
- * attribute" column on the Shopee Attributes table on
- * categories/shopee-mapping.tsx, only ever shown for FREE_TEXT_FILED rows
- * (see that table's column definition) since
- * ShopeeAttributeMappingController::update() rejects any other input_type.
+ * ตัว picker ค้นหาด้วยชื่อ บนแอตทริบิวต์ของ PIM (ดู
+ * ShopeeAttributeMappingController::searchPimAttributes) — เป็นเวอร์ชัน
+ * attribute ของ PimBrandPicker ใช้รองรับคอลัมน์ "เลือกแอตทริบิวต์ PIM ให้
+ * แอตทริบิวต์ Shopee ตัวนี้" บนตาราง Shopee Attributes ที่
+ * categories/shopee-mapping.tsx ซึ่งจะแสดงเฉพาะแถวที่เป็น FREE_TEXT_FILED
+ * เท่านั้น (ดู column definition ของตารางนั้น) เพราะ
+ * ShopeeAttributeMappingController::update() จะปฏิเสธ input_type แบบอื่น
+ * ทั้งหมด
  *
- * Same open-gated fetching as PimBrandPicker, for the same reason: this
- * table can render one of these per attribute row all at once.
+ * ใช้วิธี fetch แบบมีเงื่อนไขต้องเปิด dropdown ก่อนเหมือนกับ PimBrandPicker
+ * ด้วยเหตุผลเดียวกัน คือตารางนี้ก็ render ตัวนี้หนึ่งตัวต่อหนึ่งแถวแอตทริบิวต์
+ * พร้อมกันได้เหมือนกัน
  */
 export function PimAttributePicker({
     value,

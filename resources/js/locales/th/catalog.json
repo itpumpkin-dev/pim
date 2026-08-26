@@ -387,6 +387,7 @@
     "idColumn": "ID",
     "nameColumn": "ชื่อ",
     "pathColumn": "Path",
+    "noThaiName": "ยังไม่มีชื่อภาษาไทย",
     "marketplaceColumn": "Marketplace",
     "manageColumn": "จัดการ",
     "assignPimCategory": "กำหนดหมวดหมู่ PIM",

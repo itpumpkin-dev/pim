@@ -67,20 +67,20 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
 const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 /**
- * Options CRUD for select/multiselect attributes, laid out as a grid with a
- * single label column for whichever locale is currently active — rather
- * than one column per locale — so filling in options doesn't mean scrolling
- * a wide table of every language at once. Follows the same active locale as
- * this page's own LocaleLabelFields (the site-wide language dropdown in the
- * header, via useLocale()) rather than having its own separate selector, so
- * there's one control for "which language am I editing" on this page, not
- * two that could disagree. Reloading on a language switch is safe here even
- * with rows mid-edit: the reconciliation effect below keeps any row that
- * still exists (matched by id) untouched, so in-progress edits survive it.
- * Add/delete are still immediate, independent requests, but edits to existing
- * rows are batched: some of these option lists run into the hundreds
- * (bulk-imported taxonomy data), where a save button per row isn't practical.
- * "Save all" sends every row's current values in one request.
+ * ตัว CRUD จัดการ options ของแอตทริบิวต์แบบ select/multiselect วางเป็นกริดที่
+ * มีคอลัมน์ label แค่คอลัมน์เดียวตามภาษาที่กำลังเลือกอยู่ตอนนั้น — แทนที่จะทำ
+ * คอลัมน์แยกทีละภาษา — เพื่อไม่ให้การกรอก options ต้องเลื่อนดูตารางกว้างๆ
+ * ที่มีทุกภาษาพร้อมกัน ใช้ภาษาที่ active เดียวกับ LocaleLabelFields ของหน้านี้
+ * (dropdown เลือกภาษาที่ header ของทั้งเว็บ ผ่าน useLocale()) แทนที่จะมี
+ * ตัวเลือกภาษาแยกของตัวเอง เพื่อให้ทั้งหน้ามี control เดียวสำหรับ "กำลังแก้
+ * ภาษาไหนอยู่" ไม่ใช่มีสองตัวที่อาจไม่ตรงกัน การรีโหลดตอนสลับภาษาปลอดภัย
+ * แม้จะมีแถวที่กำลังแก้ค้างอยู่ก็ตาม เพราะ effect การ reconcile ด้านล่างจะ
+ * คงแถวที่ยังมีอยู่จริง (จับคู่ด้วย id) ไว้ไม่ให้โดนแตะ ทำให้การแก้ที่ค้างอยู่
+ * รอดไปได้ Add/delete ยังคงเป็นการยิง request ทันทีแบบแยกกันเหมือนเดิม
+ * แต่การแก้แถวที่มีอยู่แล้วจะถูก batch รวมกัน เพราะบาง option list พวกนี้มี
+ * เป็นร้อยๆ รายการ (ข้อมูล taxonomy ที่ import เข้ามาทีเดียวจำนวนมาก) การมี
+ * ปุ่ม save แยกทีละแถวเลยไม่สะดวก ปุ่ม "Save all" จะส่งค่าปัจจุบันของทุกแถว
+ * ไปในคำขอเดียว
  */
 export function AttributeOptionsPanel({
     attributeId,
@@ -101,9 +101,9 @@ export function AttributeOptionsPanel({
     const activeLocale = locales.find((l) => l.code === locale) ?? locales[0];
     const activeLocaleId = activeLocale?.id;
 
-    // Reconciles with fresh server data (after add/delete/save-all) without
-    // discarding in-progress edits to rows that are still around — only rows
-    // that are new (just added) or gone (just deleted) actually change here.
+    // reconcile กับข้อมูลสดจากเซิร์ฟเวอร์ (หลัง add/delete/save-all) โดยไม่ทิ้ง
+    // การแก้ไขที่ยังค้างอยู่ของแถวที่ยังคงอยู่ — มีแค่แถวที่เพิ่งเพิ่มใหม่ หรือ
+    // เพิ่งถูกลบไปเท่านั้นที่จะเปลี่ยนจริงๆ ตรงนี้
     useEffect(() => {
         setRows((prevRows) => {
             const prevById = new Map(prevRows.map((row) => [row.id, row]));
@@ -144,10 +144,10 @@ export function AttributeOptionsPanel({
 
     const saveAll = () => {
         setSaving(true);
-        // PHP does not parse multipart/form-data bodies for PUT requests, so
-        // this has to go through POST with a spoofed _method — same reason
-        // ProductController's own submit does it (see edit.tsx), otherwise
-        // the batch endpoint sees an empty request and silently no-ops.
+        // PHP ไม่ parse body แบบ multipart/form-data ให้กับ PUT request เลย
+        // ทีนี้ต้องส่งผ่าน POST แล้วปลอม _method แทน — เหตุผลเดียวกับที่
+        // ProductController เองก็ทำแบบนี้ตอน submit (ดู edit.tsx) ไม่งั้น
+        // endpoint แบบ batch จะเห็น request ว่างเปล่าแล้วเงียบๆ ไม่ทำอะไรเลย
         router.post(
             `/catalog/attributes/${attributeId}/options/batch`,
             {
@@ -178,10 +178,10 @@ export function AttributeOptionsPanel({
         });
     };
 
-    // This panel is always rendered inside the attribute edit page's own
-    // <form>, so it can't be a <form> itself (nested forms are invalid HTML
-    // and React warns/hydration-fails on them) — Enter is wired up manually
-    // instead of relying on native form-submit-on-Enter.
+    // panel นี้จะถูก render อยู่ใน <form> ของหน้าแก้ไขแอตทริบิวต์เสมอ เลยทำ
+    // เป็น <form> ซ้อนตัวเองไม่ได้ (form ซ้อน form เป็น HTML ที่ผิด แล้ว React
+    // ก็จะ warn หรือ hydration พังด้วย) เลยต้องต่อปุ่ม Enter เองแบบ manual
+    // แทนที่จะพึ่งพฤติกรรม submit-on-Enter ของ form ปกติ
     const submitOnEnter = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Enter') {
             event.preventDefault();
@@ -208,18 +208,18 @@ export function AttributeOptionsPanel({
     const pagedRows = filteredRows.slice((currentPage - 1) * perPage, currentPage * perPage);
     const showSwatchColumn = swatchType === 'color' || swatchType === 'image';
 
-    // The "Auto / new option" row is always pinned at the top of the grid
-    // (it's the add-row form, not data), so it's modeled as its own row kind
-    // rather than folded into `pagedRows` — keeps its fields (and their
-    // handlers) distinct from an existing option's from column render logic.
+    // แถว "Auto / new option" จะถูกปักหมุดไว้บนสุดของกริดเสมอ (มันคือฟอร์ม
+    // สำหรับเพิ่มแถวใหม่ ไม่ใช่ข้อมูลจริง) เลยทำเป็น row kind ของตัวเองแยก
+    // ต่างหาก แทนที่จะยัดรวมเข้าไปใน `pagedRows` — เพื่อให้ field (และ
+    // handler) ของมันแยกออกจาก logic การ render column ของ option ที่มีอยู่แล้ว
     type OptionRow = { kind: 'new' } | { kind: 'existing'; option: EditableOption };
     const tableRows: OptionRow[] = [{ kind: 'new' }, ...pagedRows.map((option): OptionRow => ({ kind: 'existing', option }))];
 
-    // Column pop-in priority (SAP Fiori responsive table): Code identifies
-    // the row and Actions holds the row's only interactive control (delete,
-    // or Add Row on the pinned new-option row), so both stay always visible;
-    // Label — the field actually being edited — stays visible down to
-    // tablet width; Swatch is the least essential and reflows first.
+    // ลำดับความสำคัญของคอลัมน์ตอนจอเล็ก (SAP Fiori responsive table): Code
+    // ใช้ระบุตัวตนของแถว ส่วน Actions มี control ที่กดได้ตัวเดียวของแถว
+    // (delete หรือ Add Row บนแถว new-option ที่ปักหมุดไว้) ทั้งสองเลยแสดง
+    // อยู่เสมอ Label — ฟิลด์ที่กำลังแก้ไขจริงๆ — จะแสดงอยู่จนถึงจอขนาดแท็บเล็ต
+    // ส่วน Swatch สำคัญน้อยสุดเลยไหลไปที่อื่นก่อน
     const columns: FioriResponsiveColumn<OptionRow>[] = [
         {
             key: 'code',
@@ -361,7 +361,7 @@ export function AttributeOptionsPanel({
                 </Button>
             </Stack>
 
-            {/* Option Errors Alert */}
+            {/* กล่องแจ้ง Error ของ Options */}
             {(errors.options || Object.keys(errors).some(k => k.startsWith('options.'))) && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {errors.options}

@@ -102,16 +102,15 @@ export default function ProductCreate({ families, attributes }: Props) {
 
     const [configModalOpen, setConfigModalOpen] = useState(false);
 
-    // Filter dynamic attributes that have options (e.g. Color, Size)
+    // กรองเอาเฉพาะ attribute ที่มี options ให้เลือก (เช่น สี, ไซส์)
     const selectedAttributeObjects = attributes.filter((attr) =>
         data.configurable_attributes.includes(attr.id)
     );
 
-    // Restrict the variant-attribute picker to attributes actually assigned to
-    // the selected family — previously any system attribute with options could
-    // be picked here even if it had nothing to do with the chosen family, and
-    // the resulting variant values would then never show up in Edit's
-    // family-scoped attribute groups.
+    // จำกัดตัวเลือกใน variant-attribute picker ให้เหลือแค่ attribute ที่ผูกกับ
+    // family ที่เลือกไว้จริงๆ — แต่ก่อนเลือก attribute ระบบไหนก็ได้ที่มี options
+    // มาใช้ตรงนี้ได้หมด ถึงจะไม่เกี่ยวกับ family ที่เลือกเลยก็ตาม สุดท้าย value
+    // ของ variant ที่ได้ก็จะไม่โผล่ในกลุ่ม attribute ของ family นั้นตอนไปหน้า Edit
     const familyScopedAttributeOptions = attributes.filter(
         (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
     );
@@ -168,16 +167,15 @@ export default function ProductCreate({ families, attributes }: Props) {
         setData('variants', updated);
     };
 
-    // Rows need their original array index (to call handleVariantFieldChange
-    // and to key error messages) but FioriResponsiveColumn.render only
-    // receives the row itself, so carry the index along on each row object.
+    // แต่ละแถวต้องรู้ index เดิมในอาเรย์ (เพื่อเรียก handleVariantFieldChange
+    // และเอาไปใช้เป็น key ของ error message) แต่ FioriResponsiveColumn.render
+    // ส่งมาแค่ตัวแถวเฉยๆ เลยต้องแนบ index ติดไปกับ object ของแต่ละแถวด้วย
     type VariantRow = ProductForm['variants'][number] & { __index: number };
     const variantRows: VariantRow[] = data.variants.map((variant, index) => ({ ...variant, __index: index }));
 
-    // Column pop-in priority (SAP Fiori responsive table): the generated
-    // option label identifies the row; SKU is the required field the user
-    // must fill in per variant, so it stays visible next; price/qty are
-    // secondary and reflow into the pop-in area first.
+    // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
+    // label ของตัวเลือกที่ generate มาเป็นตัวระบุแถว ส่วน SKU เป็นช่องที่ผู้ใช้ต้อง
+    // กรอกเองต่อ variant เลยให้โชว์ต่อจากกัน ส่วน price/qty เป็นข้อมูลรองเลยซ่อนก่อน
     const variantColumns: FioriResponsiveColumn<VariantRow>[] = [
         {
             key: 'label',
@@ -234,9 +232,9 @@ export default function ProductCreate({ families, attributes }: Props) {
 
     const handleFormSubmit = (e?: FormEvent) => {
         if (e) e.preventDefault();
-        // The server redirects straight into Edit (or the list, for a role that
-        // can create but not edit products) — Inertia already follows that
-        // redirect, so there's nothing left to do here on success.
+        // ฝั่ง server จะ redirect ไปหน้า Edit ทันที (หรือไปหน้า list ถ้า role นั้น
+        // สร้างได้แต่แก้ไม่ได้) — Inertia ตาม redirect นี้ให้อยู่แล้ว เลยไม่ต้องทำ
+        // อะไรเพิ่มตรงนี้ตอน success
         skipNavigationGuardRef.current = true;
         post('/catalog/products', {
             onFinish: () => {
@@ -276,7 +274,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         </Typography>
 
                         <Stack spacing={3}>
-                            {/* Status */}
+                            {/* สถานะ */}
                             <Box>
                                 <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
                                     {t('status')}
@@ -303,7 +301,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 </Stack>
                             </Box>
 
-                            {/* Family */}
+                            {/* Family (กลุ่มสินค้า) */}
                             <FormControl fullWidth required error={Boolean(errors.family_id)}>
                                 <InputLabel id="family-label">{t('familyRequired')}</InputLabel>
                                 <Select
@@ -314,9 +312,8 @@ export default function ProductCreate({ families, attributes }: Props) {
                                         setData((prev) => ({
                                             ...prev,
                                             family_id: e.target.value,
-                                            // A variant axis chosen for the previous family may not
-                                            // apply to the new one, so the generated matrix can't
-                                            // carry over either.
+                                            // แกน variant ที่เลือกไว้จาก family เดิม อาจใช้ไม่ได้กับ
+                                            // family ใหม่ เลยต้องล้าง matrix ที่ generate ไว้ทิ้งไปด้วย
                                             configurable_attributes: [],
                                             variants: [],
                                         }))
@@ -331,7 +328,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 {errors.family_id && <FormHelperText>{errors.family_id}</FormHelperText>}
                             </FormControl>
 
-                            {/* Product Type */}
+                            {/* ประเภทสินค้า */}
                             <FormControl fullWidth required error={Boolean(errors.type)}>
                                 <InputLabel id="product-type-label">{t('productTypesRequired')}</InputLabel>
                                 <Select
@@ -354,7 +351,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
                             </FormControl>
 
-                            {/* Parent SKU */}
+                            {/* SKU หลัก */}
                             <TextField
                                 label={t('skuRequired')}
                                 required
@@ -368,7 +365,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                         </Stack>
                     </Paper>
 
-                    {/* Cartesian Variants Table */}
+                    {/* ตาราง Variants ที่ generate แบบ cartesian */}
                     {data.type === 'configurable' && data.variants.length > 0 && (
                         <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5, borderColor: UI_BORDER }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -401,7 +398,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                 )}
             </Box>
 
-            {/* Configurable Attributes Dialog */}
+            {/* Dialog เลือก Attribute สำหรับ Configurable */}
             <Dialog
                 open={configModalOpen}
                 onClose={() => setConfigModalOpen(false)}

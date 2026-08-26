@@ -111,15 +111,14 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
         if (activeLocale && item.labels[activeLocale.id]) {
             return item.labels[activeLocale.id];
         }
-        // Fallback to first label
+        // ถ้าไม่มี ให้ fallback ไปใช้ label แรกที่เจอ
         return Object.values(item.labels)[0] || item.code;
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the field label
-    // identifies the row and row actions stay visible down to phone width;
-    // Status is the next most useful thing to scan for, then the code/type,
-    // with id/required/position reflowing first as the least useful columns
-    // at a glance.
+    // ลำดับความสำคัญคอลัมน์ตอนย่อจอ (SAP Fiori responsive table): label ของฟิลด์
+    // เป็นตัวบ่งบอกแถวและปุ่ม action ต้องโชว์ตลอดแม้จอมือถือ; Status เป็นสิ่งที่
+    // ต้องสแกนดูรองลงมา ตามด้วย code/type ส่วน id/required/position จะถูกซ่อนก่อนเพื่อน
+    // เพราะเป็นคอลัมน์ที่มีประโยชน์น้อยสุดตอนดูผ่านๆ
     const columns: FioriResponsiveColumn<CategoryFieldItem>[] = [
         {
             key: 'id',

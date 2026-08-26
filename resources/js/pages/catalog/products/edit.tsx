@@ -1,4 +1,15 @@
+import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
+import { CategoryCascadeSelect } from '@/components/category-cascade-select';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { HistoryPanel } from '@/components/history-panel';
+import { ProductPicker, type ProductOption } from '@/components/product-picker';
+import RichTextEditor from '@/components/rich-text-editor';
+import { useLocale } from '@/hooks/use-locale';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
+import { localizedLabel, type Translation } from '@/lib/localized-label';
+import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
+import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
@@ -11,7 +22,6 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
 import TranslateIcon from '@mui/icons-material/Translate';
@@ -31,7 +41,6 @@ import {
     DialogContentText,
     DialogTitle,
     Divider,
-    Fab,
     FormControl,
     FormControlLabel,
     Grid,
@@ -46,26 +55,28 @@ import {
     Tab,
     Tabs,
     TextField,
-    Typography,
     Tooltip,
+    Typography,
 } from '@mui/material';
-import { FormEvent, memo, useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
-import RichTextEditor from '@/components/rich-text-editor';
-import { useLocale } from '@/hooks/use-locale';
-import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { HistoryPanel } from '@/components/history-panel';
-import { CategoryCascadeSelect } from '@/components/category-cascade-select';
-import { ProductPicker, type ProductOption } from '@/components/product-picker';
-import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { localizedLabel, type Translation } from '@/lib/localized-label';
-import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
+
+// ใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับ MAPPED_PLATFORMS ใน category-cascade-select.tsx /
+// MAPPED_PLATFORMS ใน categories/index.tsx (Lazada, Shopee, TikTok,
+// WooCommerce) — ที่นี่แยกก็อปปี้เก็บไว้เอง ตามแนวทางเดิมที่ "เล็กพอจะก็อปปี้ซ้ำได้"
+const BRAND_MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
+    { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
+    { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
+    { value: 'tiktok', label: 'TikTok', color: PALETTE.primary },
+    { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
+];
 
 interface AttributeOption {
     id: number;
     code?: string;
     admin_label?: string;
+    /** ตัวเลือกนี้ (เช่น ค่าของ `pbrand`) ถูก map ไปยัง marketplace ไหนแล้วบ้าง — ดูที่ ProductController::decorateOptionsWithMappedPlatforms() */
+    mapped_platforms?: string[];
 }
 
 interface AttributeItem {
@@ -79,11 +90,11 @@ interface AttributeItem {
     is_channel_based?: boolean;
     swatch_type?: string | null;
     options?: AttributeOption[];
-    /** false when the current user's role has Read-only (not Edit) access to this attribute — see "Attribute Access" on the Role form. Absent/true means editable, for backward compatibility. */
+    /** เป็น false เมื่อ role ของผู้ใช้ปัจจุบันมีสิทธิ์แค่ดู (ไม่ใช่แก้ไข) ในแอตทริบิวต์นี้ — ดูที่ "Attribute Access" ในฟอร์ม Role ถ้าไม่มีค่าหรือเป็น true คือแก้ไขได้ (เผื่อความเข้ากันได้กับของเก่า) */
     editable?: boolean;
-    /** Family ids this attribute is assigned to — used to scope the variant-attribute picker to the product's own family. */
+    /** family id ที่แอตทริบิวต์นี้ถูกผูกไว้ด้วย — ใช้จำกัดขอบเขตของ variant-attribute picker ให้ตรงกับ family ของสินค้านั้นๆ */
     family_ids?: number[];
-    /** Every locale's label — lets the displayed name switch instantly on locale change instead of waiting for a server round-trip to re-resolve `name`. */
+    /** label ของทุก locale — ทำให้ชื่อที่แสดงเปลี่ยนได้ทันทีตอนสลับ locale โดยไม่ต้องรอ round-trip ไปเซิร์ฟเวอร์เพื่อ resolve `name` ใหม่ */
     translations?: Translation[];
 }
 
@@ -101,7 +112,6 @@ interface AttributeFamily {
     name?: string;
     translations?: Translation[];
 }
-
 
 interface ChannelOption {
     id: number;
@@ -135,7 +145,7 @@ interface VariantItem {
     sku: string;
     price: string;
     qty: string;
-    /** attribute_id -> option code, defining which combination (e.g. Color: Red, Size: M) this variant is. Empty/absent for a manually added variant that isn't tied to any generated combination. */
+    /** attribute_id -> option code บอกว่า variant นี้เป็นชุดค่าผสมไหน (เช่น สี: แดง, ไซส์: M) ถ้าว่างหรือไม่มีค่าแปลว่าเป็น variant ที่เพิ่มเองด้วยมือ ไม่ได้ผูกกับชุดค่าผสมที่ generate ไว้ */
     attributes?: Record<number, string>;
 }
 
@@ -156,7 +166,7 @@ interface Props {
 
 type AttributeValue = string | File | (string | File)[];
 
-// values: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value
+// values: attribute_id -> channelKey ('global' หรือ channel id) -> localeKey ('default' หรือ locale id) -> value
 interface ProductForm {
     sku: string;
     family_id: number;
@@ -171,9 +181,9 @@ interface ProductForm {
     [key: string]: any;
 }
 
-// `product.created_at`/`updated_at` are ISO 8601 with an explicit UTC
-// offset (see ProductController::edit()); this localizes them to the
-// viewer's own timezone instead of showing the raw UTC string verbatim.
+// `product.created_at`/`updated_at` เป็นรูปแบบ ISO 8601 ที่ระบุ UTC offset ชัดเจน
+// (ดูที่ ProductController::edit()) ฟังก์ชันนี้แปลงให้เป็นเวลาท้องถิ่นของผู้ดู
+// แทนที่จะโชว์ค่า UTC ดิบๆ ตรงๆ
 function formatLocalDateTime(value: string): string {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
@@ -207,38 +217,55 @@ export default function ProductEdit({
     const { t } = useTranslation('catalog');
     const { auth } = usePage<SharedData>().props;
     const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
+    // pbrand จะอยู่ใน family group ไหนก็ได้ที่มันถูกผูกไว้ เหมือน attribute ทั่วไป —
+    // ที่ดึงออกมาตรงนี้เพื่อให้ render เป็น panel ของตัวเอง (ต่อจาก Categories)
+    // แทนที่จะวนแสดงในลูปของ attribute-groups ทั่วไป ดูเงื่อนไข
+    // `attr.code === 'pbrand'` ที่กันมันออกในลูปด้านล่างประกอบด้วย
+    const brandAttr = useMemo(() => {
+        for (const group of assignedGroups) {
+            const found = group.attributes.find((attr) => attr.code === 'pbrand');
+            if (found) return found;
+        }
+        return null;
+    }, [assignedGroups]);
     const [tabIndex, setTabIndex] = useState(0);
-    // Sub-tabs within the "General" top-level tab, grouping the left-column
-    // form content — order matches the reference layout: General info ->
-    // Attributes -> Details -> Sales info -> Shipping -> Others. The right
-    // sidebar (Product Info/Categories/Associations/Sales Channels) is
-    // unaffected by this — it stays visible regardless of which sub-tab is
-    // active, per explicit direction (kept as-is, not folded into tabs).
+    // แท็บย่อยภายในแท็บหลัก "General" ใช้จัดกลุ่มเนื้อหาฟอร์มฝั่งคอลัมน์ซ้าย —
+    // ลำดับอ้างอิงตาม layout ต้นแบบ: General info -> Attributes -> Details ->
+    // Sales info -> Shipping -> Others ส่วน sidebar ฝั่งขวา (Product Info/
+    // Categories/Associations/Sales Channels) ไม่เกี่ยวกับแท็บพวกนี้ — จะโชว์
+    // ตลอดไม่ว่าแท็บย่อยไหนจะ active อยู่ ตามที่ตกลงกันไว้ชัดเจนแล้ว (คงไว้แบบเดิม
+    // ไม่เอาไปรวมกับแท็บ)
     //
-    // All groups render stacked on the page at once (not swapped in/out) —
-    // the tab bar is a scroll-spy nav: clicking a tab smooth-scrolls to that
-    // section, and scrolling the page updates which tab is highlighted based
-    // on which section is currently under the sticky tab bar.
+    // ทุกกลุ่ม (group) จะ render เรียงต่อกันในหน้าเดียวพร้อมกันหมด (ไม่ได้สลับโชว์
+    // ทีละกลุ่ม) — แถบแท็บทำหน้าที่เป็น scroll-spy nav: คลิกแท็บจะ smooth-scroll
+    // ไปยัง section นั้น และตอน scroll หน้าเอง แท็บที่ไฮไลต์ก็จะเปลี่ยนตามว่า
+    // section ไหนอยู่ใต้แถบแท็บที่ sticky อยู่ตอนนั้น
     const [groupTabIndex, setGroupTabIndex] = useState(0);
     const groupSectionRefs = useRef<(HTMLDivElement | null)[]>([]);
     const groupTabBarRef = useRef<HTMLDivElement | null>(null);
-    // The scrollable region for this page's whole body — see its JSX below
-    // ("Scrollable Body"). Everything above it (breadcrumb header from the
-    // layout, this page's own top tabs + SKU/Save toolbar) sits outside this
-    // box entirely, so it's simply always visible without any sticky
-    // positioning or runtime header-height math — only what's actually
-    // meant to scroll (group tabs + their stacked sections + sidebar) lives
-    // inside it.
+    // พื้นที่ที่ scroll ได้ของเนื้อหาทั้งหน้านี้ — ดู JSX ด้านล่าง ("Scrollable Body")
+    // ทุกอย่างที่อยู่เหนือมัน (header breadcrumb จาก layout, แท็บบนสุดของหน้านี้ +
+    // toolbar SKU/Save) จะอยู่นอกกล่องนี้ทั้งหมด เลยโชว์ตลอดโดยไม่ต้องใช้ sticky
+    // positioning หรือคำนวณความสูง header ตอน runtime เลย — มีแค่ส่วนที่ตั้งใจ
+    // ให้ scroll ได้จริงๆ (แท็บกลุ่ม + section ที่เรียงต่อกัน + sidebar) เท่านั้นที่
+    // อยู่ข้างในนี้
     const scrollBodyRef = useRef<HTMLDivElement | null>(null);
-    // Scroll-driven tab highlighting is suppressed for a moment after a tab
-    // click's own programmatic scrollIntoView — otherwise the scroll events
-    // that smooth-scroll produces would fight the click for which tab ends
-    // up highlighted.
+    // การไฮไลต์แท็บตาม scroll จะถูกปิดชั่วคราวหลังจากคลิกแท็บแล้วเรียก
+    // scrollIntoView เอง — ไม่งั้น event scroll ที่เกิดจาก smooth-scroll จะมาแย่งกับ
+    // การคลิกว่าสุดท้ายแท็บไหนจะถูกไฮไลต์
     const suppressScrollSpy = useRef(false);
-    // Floating "back to top" button — appears once the user has scrolled
-    // down a meaningful amount, since a fixed nav element only earns its
-    // screen space once scrolling back up by hand would actually be a chore.
+    // ปุ่มลอย "กลับขึ้นบนสุด" — จะโผล่มาก็ต่อเมื่อผู้ใช้ scroll ลงมาไกลพอสมควรแล้ว
+    // เพราะปุ่มลอยแบบนี้ควรมีพื้นที่หน้าจอก็ต่อเมื่อการ scroll กลับขึ้นไปเองมันเริ่มลำบากจริงๆ
     const [showScrollTop, setShowScrollTop] = useState(false);
+    // เปิด/ปิด (collapse) เนื้อหาของแต่ละ group panel (ข้อมูลทั่วไป/คุณลักษณะ/ฯลฯ)
+    // แยกอิสระต่อ group — คลิกที่ header ของ panel เพื่อพับ/กาง เก็บด้วย group.id
+    // เป็น key, ค่าเริ่มต้น (key ไม่มีใน object) ถือว่ากางอยู่ (ไม่ collapsed) ผลคือ
+    // ทุก panel เปิดโชว์ตามปกติจนกว่าผู้ใช้จะคลิกพับเอง — ref บน Paper (ใช้โดย
+    // scroll-spy ด้านบน) ยังอยู่ที่กล่องนอกเหมือนเดิม ไม่ถูกกระทบตอน collapse
+    const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<number, boolean>>({});
+    const toggleGroupCollapse = (groupId: number) => {
+        setCollapsedGroupIds((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+    };
 
     const scrollToGroup = (idx: number) => {
         suppressScrollSpy.current = true;
@@ -262,14 +289,11 @@ export default function ProductEdit({
 
             if (suppressScrollSpy.current) return;
 
-            // The section whose top has most recently crossed this line
-            // (i.e. the last one still <= threshold) is what the user is
-            // currently reading — threshold is the sticky tab bar's own
-            // bottom edge, so a section counts as "active" right as it
-            // tucks under it, not only once it's scrolled to the very top.
-            const threshold = groupTabBarRef.current
-                ? groupTabBarRef.current.getBoundingClientRect().bottom
-                : 0;
+            // section ที่ขอบบนเพิ่งจะข้ามเส้นนี้ล่าสุด (คือ section สุดท้ายที่ยัง <=
+            // threshold) คือ section ที่ผู้ใช้กำลังอ่านอยู่ — threshold คือขอบล่าง
+            // ของแถบแท็บที่ sticky อยู่ ดังนั้น section จะถือว่า "active" ทันทีที่มัน
+            // เลื่อนเข้าไปซ่อนใต้แถบแท็บ ไม่ต้องรอให้เลื่อนขึ้นไปสุดจริงๆ ก่อน
+            const threshold = groupTabBarRef.current ? groupTabBarRef.current.getBoundingClientRect().bottom : 0;
             let activeIdx = 0;
             for (let i = 0; i < groupSectionRefs.current.length; i++) {
                 const el = groupSectionRefs.current[i];
@@ -284,18 +308,17 @@ export default function ProductEdit({
         scrollParent.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
         return () => scrollParent.removeEventListener('scroll', handleScroll);
-         
     }, [assignedGroups.length]);
 
     const [relatedProducts, setRelatedProducts] = useState<ProductOption[]>(associations.related);
     const [upSellProducts, setUpSellProducts] = useState<ProductOption[]>(associations.up_sell);
     const [crossSellProducts, setCrossSellProducts] = useState<ProductOption[]>(associations.cross_sell);
 
-    // Find active locale ID matching system language
+    // หา locale ID ที่ตรงกับภาษาของระบบตอนนี้
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
     const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
 
-    // Sync activeLocaleId when currentLocaleCode changes (system language changed at top dropdown)
+    // ซิงค์ activeLocaleId เมื่อ currentLocaleCode เปลี่ยน (ผู้ใช้เปลี่ยนภาษาระบบที่ dropdown ด้านบน)
     useEffect(() => {
         const matched = locales.find((l) => l.code === currentLocaleCode);
         if (matched && matched.id !== activeLocaleId) {
@@ -303,21 +326,19 @@ export default function ProductEdit({
         }
     }, [currentLocaleCode, locales]);
 
-    // The server preloads values for this (first) channel across all locales
-    // (see ProductController::edit()'s $defaultChannelId) in addition to the
-    // Default (All Channels) scope's own values, which are always preloaded
-    // — switching to any other channel triggers a re-fetch of scopable fields.
+    // ฝั่งเซิร์ฟเวอร์จะ preload ค่าของ channel นี้ (channel แรก) ให้ครบทุก locale
+    // (ดู $defaultChannelId ใน ProductController::edit()) นอกเหนือจากค่าของ scope
+    // Default (All Channels) ที่ preload มาให้เสมออยู่แล้ว — พอสลับไปช่องทางอื่นถึงจะ
+    // ยิง fetch ค่าฟิลด์ที่ scope ได้ใหม่
     const defaultChannelId = channels.length > 0 ? channels[0].id : null;
-    // Starts on Default (All Channels) rather than the first channel — most
-    // edits are meant to apply everywhere, so that's the safer thing to land
-    // on and edit by default; picking a specific channel is the deliberate
-    // per-channel override, not the common case.
+    // เริ่มต้นที่ Default (All Channels) แทนที่จะเป็น channel แรก — เพราะการแก้ไข
+    // ส่วนใหญ่ตั้งใจให้มีผลกับทุกช่องทาง เลยเป็นค่าเริ่มต้นที่ปลอดภัยกว่าให้แก้ไข
+    // ส่วนการเลือก channel เฉพาะเจาะจงคือการ override แบบตั้งใจ ไม่ใช่กรณีปกติทั่วไป
     const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
 
-    // Every platform group starts collapsed — the active scope on load is
-    // "Default (All Channels)" (see activeChannelId above), which doesn't
-    // belong to any platform group, so there's no longer a natural group to
-    // pre-expand as "the active one."
+    // ทุกกลุ่ม platform จะเริ่มแบบพับเก็บไว้ก่อน — เพราะ scope ที่ active ตอนโหลด
+    // หน้าคือ "Default (All Channels)" (ดู activeChannelId ด้านบน) ซึ่งไม่ได้
+    // อยู่ใน platform group ไหนเลย เลยไม่มีกลุ่มไหนที่ควรกางไว้เป็น "ตัวที่ active" อีกต่อไป
     const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(new Set());
     const togglePlatform = (platform: string) => {
         setExpandedPlatforms((prev) => {
@@ -331,15 +352,15 @@ export default function ProductEdit({
         });
     };
 
-    // Switching locale/channel re-renders every field in this large form. Deferring
-    // that update via a transition keeps the select itself responsive immediately
-    // and lets us show a pending indicator instead of the UI silently freezing.
+    // การสลับ locale/channel จะทำให้ทุกฟิลด์ในฟอร์มใหญ่นี้ re-render ใหม่หมด การเลื่อน
+    // อัปเดตนี้ออกไปผ่าน transition ช่วยให้ตัว select เองยัง responsive ทันทีอยู่
+    // และเราโชว์ indicator ว่ากำลังโหลดได้ แทนที่ UI จะค้างเงียบๆ
     const [isSwitchingScope, startScopeTransition] = useTransition();
     const handleChannelChange = (nextChannelId: number | null) => {
         startScopeTransition(() => setActiveChannelId(nextChannelId));
     };
 
-    // Collect initial values for all real attributes (already nested channel -> locale by the backend)
+    // รวบรวมค่าเริ่มต้นของ attribute จริงทั้งหมด (ฝั่ง backend จัดเป็น channel -> locale ให้แล้ว)
     const initialValues: Record<string, Record<string, Record<string | number, any>>> = {};
     assignedGroups.forEach((group) => {
         group.attributes.forEach((attr) => {
@@ -366,14 +387,11 @@ export default function ProductEdit({
 
     const toggleShopPublished = (shopId: number) => {
         const current = data.published_shop_ids;
-        setData(
-            'published_shop_ids',
-            current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId],
-        );
+        setData('published_shop_ids', current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId]);
     };
 
-    // Restrict the variant-attribute picker to attributes actually assigned to
-    // this product's family — same reasoning as the Create page's picker.
+    // จำกัดตัวเลือกใน variant-attribute picker ให้เหลือแค่ attribute ที่ผูกกับ
+    // family ของสินค้านี้จริงๆ — เหตุผลเดียวกับ picker ในหน้า Create
     const familyScopedVariantAttributes = configurableAttributes.filter(
         (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
     );
@@ -384,10 +402,9 @@ export default function ProductEdit({
         return opt?.admin_label || opt?.code || code;
     };
 
-    // Existing variants only ever carry a real attribute combination if they
-    // were generated through this picker (or the Create page's). A manually
-    // added row, or one from before this feature existed, falls back to
-    // guessing a label from its SKU suffix.
+    // variant ที่มีอยู่แล้วจะมีชุดค่าผสม attribute จริงก็ต่อเมื่อถูก generate มาจาก
+    // picker นี้ (หรือของหน้า Create) เท่านั้น ส่วนแถวที่เพิ่มเองด้วยมือ หรือแถวที่มี
+    // มาก่อนฟีเจอร์นี้จะเกิด ก็จะ fallback ไปเดา label จากส่วนท้ายของ SKU แทน
     const variantLabel = (v: VariantItem): string => {
         const attrs = v.attributes || {};
         const keys = Object.keys(attrs);
@@ -406,16 +423,13 @@ export default function ProductEdit({
         setVariantDialogOpen(true);
     };
 
-    const selectedVariantAttributeObjects = familyScopedVariantAttributes.filter((attr) =>
-        pendingVariantAttrIds.includes(attr.id),
-    );
+    const selectedVariantAttributeObjects = familyScopedVariantAttributes.filter((attr) => pendingVariantAttrIds.includes(attr.id));
 
-    // Regenerating replaces the whole variants table with a fresh cartesian
-    // product of the chosen attributes' options. Any combination that still
-    // exists (matched by its exact set of attribute_id -> option code) keeps
-    // its id/sku/price/qty; everything else becomes a brand-new row, and any
-    // existing variant whose combination is no longer generated is dropped
-    // (Save will then delete it, same as removing a row manually).
+    // การ regenerate จะแทนที่ตาราง variants ทั้งตารางด้วยชุดค่าผสมแบบ cartesian
+    // ใหม่จาก options ของ attribute ที่เลือก ชุดค่าผสมไหนที่ยังมีอยู่เหมือนเดิม
+    // (เทียบจากชุด attribute_id -> option code ที่ตรงกันเป๊ะ) จะคง id/sku/price/qty
+    // เดิมไว้ ส่วนที่เหลือกลายเป็นแถวใหม่หมด และ variant เดิมที่ชุดค่าผสมไม่ถูก
+    // generate ออกมาอีกแล้วก็จะถูกตัดทิ้ง (ตอนกด Save จะลบทิ้งจริง เหมือนลบแถวเอง)
     const applyVariantGeneration = () => {
         const selectedAttrs = familyScopedVariantAttributes.filter((attr) => pendingVariantAttrIds.includes(attr.id));
 
@@ -465,22 +479,28 @@ export default function ProductEdit({
     };
 
     const handleRemoveVariant = (index: number) => {
-        setData('variants', data.variants.filter((_, i) => i !== index));
+        setData(
+            'variants',
+            data.variants.filter((_, i) => i !== index),
+        );
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the variant label
-    // identifies the row and SKU is the required field the user must fill in,
-    // so both stay visible down to phone width (SKU as 'high' rather than
-    // 'always' so it still yields to the label first); price/qty are
-    // secondary editable fields that reflow into the pop-in area first; the
-    // remove action stays pinned like the identifying column.
+    // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
+    // label ของ variant เป็นตัวระบุแถว ส่วน SKU เป็นช่องที่ผู้ใช้ต้องกรอกเอง เลยให้
+    // โชว์ทั้งคู่แม้จอมือถือแคบๆ (SKU ตั้งเป็น 'high' ไม่ใช่ 'always' เพื่อให้ยอมหลบ
+    // ให้ label ก่อน) ส่วน price/qty เป็นฟิลด์แก้ไขรอง เลยซ่อนก่อนเพื่อน ส่วน action
+    // ลบก็ปักหมุดไว้เหมือนคอลัมน์ตัวระบุแถว
     type VariantRow = { v: VariantItem; index: number };
     const variantColumns: FioriResponsiveColumn<VariantRow>[] = [
         {
             key: 'option',
             header: 'ตัวเลือก',
             priority: 'always',
-            render: ({ v }) => <Typography component="span" fontWeight={600}>{variantLabel(v)}</Typography>,
+            render: ({ v }) => (
+                <Typography component="span" fontWeight={600}>
+                    {variantLabel(v)}
+                </Typography>
+            ),
         },
         {
             key: 'sku',
@@ -548,9 +568,9 @@ export default function ProductEdit({
         },
     ];
 
-    // Switching away from Configurable deletes every variant child on Save
-    // (see ProductController::update()) — confirm first since that's not
-    // reversible from here once saved.
+    // ถ้าเปลี่ยนประเภทออกจาก Configurable จะลบ variant ลูกทั้งหมดตอน Save
+    // (ดู ProductController::update()) เลยต้องให้ confirm ก่อน เพราะย้อนกลับไม่ได้
+    // แล้วเมื่อ save ไปแล้ว
     const [pendingSimpleConfirm, setPendingSimpleConfirm] = useState(false);
 
     const handleTypeChange = (newType: string) => {
@@ -566,14 +586,14 @@ export default function ProductEdit({
         setPendingSimpleConfirm(false);
     };
 
-    // Pushing sends a real, live create/update to the marketplace — a
-    // confirm step and explicit trigger (never automatic) are deliberate
-    // given that. Platform-generic (Lazada, Shopee, ...) — each shop's group
-    // carries its own platform name (group.platform), which picks the route.
-    // `delete` is optional and, for now, Shopee-only (see
-    // ShopeeProductSyncService::delete() / SyncProductToMarketplaceJob's
-    // method_exists() guard) — permanently removing a listing isn't wired
-    // up for the other platforms yet.
+    // การ push คือการยิง create/update จริงๆ ไปที่ marketplace แบบ live เลย —
+    // เลยตั้งใจให้ต้อง confirm ก่อนและต้องกดเองเสมอ (ไม่มีทำอัตโนมัติ) ออกแบบให้
+    // ใช้ได้กับทุก platform (Lazada, Shopee, ...) — แต่ละ group ของร้านจะมีชื่อ
+    // platform ของตัวเอง (group.platform) ซึ่งใช้เลือก route `delete` เป็น
+    // ออปชันเสริม ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู
+    // ShopeeProductSyncService::delete() / เงื่อนไข method_exists() ใน
+    // SyncProductToMarketplaceJob) — การลบ listing แบบถาวรยังไม่ได้เชื่อมกับ
+    // platform อื่นๆ
     const PLATFORM_ROUTES: Record<string, { push: string; deactivate: string; status: string; delete?: string }> = {
         lazada: { push: 'push-lazada', deactivate: 'deactivate-lazada', status: 'lazada-status' },
         shopee: { push: 'push-shopee', deactivate: 'deactivate-shopee', status: 'shopee-status', delete: 'delete-shopee' },
@@ -585,19 +605,18 @@ export default function ProductEdit({
     const [pushing, setPushing] = useState(false);
     const [pushResult, setPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
 
-    // WooCommerce-only: pushes just this product's English name into
-    // TranslatePress's dictionary — separate action from the listing push
-    // above, shown inside the same dialog. Gated on 100% translation
-    // completeness both here (button disabled) and server-side (real
-    // enforcement — see ProductController::fillWoocommerceTranslationsForProduct()).
+    // เฉพาะ WooCommerce เท่านั้น: push แค่ชื่อภาษาอังกฤษของสินค้านี้เข้า dictionary
+    // ของ TranslatePress — เป็นคนละ action กับการ push listing ด้านบน แต่โชว์อยู่
+    // ใน dialog เดียวกัน จะทำได้ก็ต่อเมื่อคำแปลครบ 100% เท่านั้น ทั้งฝั่งนี้ (disable
+    // ปุ่ม) และฝั่ง server (บังคับจริงๆ — ดู
+    // ProductController::fillWoocommerceTranslationsForProduct())
     const [fillingTranslation, setFillingTranslation] = useState(false);
     const [fillTranslationResult, setFillTranslationResult] = useState<{ severity: 'success' | 'error' | 'info'; message: string } | null>(null);
     const translationComplete = product.translation_completeness === 100;
-    // null means "nothing to measure" (e.g. only one active locale, or this
-    // product's family has no translatable attributes) — distinct from 0%,
-    // which means real, measurable translation work is still missing.
-    // Conflating the two would show a permanently-disabled button with a
-    // misleading "0%" instead of explaining there's simply nothing to push.
+    // ค่า null แปลว่า "ไม่มีอะไรให้วัด" (เช่น มี locale active แค่ตัวเดียว หรือ
+    // family ของสินค้านี้ไม่มี attribute ที่แปลได้เลย) — ต่างจาก 0% ที่แปลว่ายังมีงาน
+    // แปลที่วัดได้จริงๆ เหลืออยู่ ถ้าเอาสองกรณีนี้มารวมกันจะกลายเป็นปุ่มที่ disable
+    // ถาวรพร้อมข้อความ "0%" ที่ทำให้เข้าใจผิด แทนที่จะบอกตรงๆ ว่าไม่มีอะไรให้ push
     const translationBlockedReason =
         product.translation_completeness == null
             ? t('noTranslatableContentToPush')
@@ -652,11 +671,11 @@ export default function ProductEdit({
             .finally(() => setFillingTranslation(false));
     };
 
-    // Fired the moment Push/Deactivate's confirm dialog opens — checks the
-    // marketplace directly (not the cached "Live" badge, which is only as
-    // fresh as the last sync and may never have run for this product) so the
-    // dialog reflects the real current state right before committing to a
-    // live write. Shared by both dialogs since only one is ever open at once.
+    // จะทำงานทันทีที่ dialog confirm ของ Push/Deactivate เปิดขึ้นมา — เช็คกับ
+    // marketplace ตรงๆ เลย (ไม่ใช้ badge "Live" ที่ cache ไว้ ซึ่งอาจเก่าเท่าที่ sync
+    // ครั้งล่าสุด หรืออาจจะยังไม่เคย sync กับสินค้านี้เลยด้วยซ้ำ) เพื่อให้ dialog
+    // สะท้อนสถานะจริงล่าสุดก่อนที่จะยืนยันเขียนข้อมูลแบบ live ใช้ร่วมกันทั้งสอง
+    // dialog เพราะเปิดได้ทีละอันเท่านั้นอยู่แล้ว
     const [statusCheck, setStatusCheck] = useState<{
         shopId: number;
         loading: boolean;
@@ -684,14 +703,14 @@ export default function ProductEdit({
             .catch(() => setStatusCheck({ shopId, loading: false, error: t('networkErrorCheckingStatus', { platform }) }));
     };
 
-    // Push/deactivate now run as a background job (see
-    // ProductController::queueMarketplaceSync()) instead of inline in the
-    // request — a slow/hung Shopee or Lazada response used to hold the web
-    // worker open for the duration. The initial POST just returns a job id;
-    // this polls marketplaceSyncJobStatus() until the job leaves
-    // queued/processing. setTimeout-chained (not setInterval) so a slow poll
-    // response can't overlap with the next one. Capped at ~60s — past that
-    // the job is still running server-side, just not waited on here anymore.
+    // Push/deactivate ตอนนี้ทำงานเป็น background job (ดู
+    // ProductController::queueMarketplaceSync()) แทนที่จะรันตรงๆ ใน request เลย —
+    // เพราะแต่ก่อนถ้า Shopee หรือ Lazada ตอบช้า/ค้าง จะทำให้ web worker ถูกจองไว้
+    // นานตามนั้น ตอน POST แรกจะได้แค่ job id กลับมา แล้วฟังก์ชันนี้จะ poll
+    // marketplaceSyncJobStatus() ไปเรื่อยๆ จนกว่า job จะพ้นสถานะ queued/processing
+    // ใช้ setTimeout ต่อกันเป็นเชน (ไม่ใช้ setInterval) เพื่อไม่ให้ response ที่ตอบช้า
+    // มาซ้อนทับกับรอบถัดไป จำกัดไว้ที่ประมาณ 60 วินาที — เกินนั้น job ก็ยังรันอยู่ที่
+    // server ต่อไป แค่ไม่รอผลตรงนี้อีกแล้ว
     const POLL_INTERVAL_MS = 1500;
     const POLL_MAX_ATTEMPTS = 40;
 
@@ -747,9 +766,9 @@ export default function ProductEdit({
         if (!routes) return;
         setPushing(true);
 
-        // This app has no <meta name="csrf-token">; Laravel's VerifyCsrfToken
-        // also accepts the XSRF-TOKEN cookie it already sets on every
-        // response (mirrored back as a header), so read that instead.
+        // แอปนี้ไม่มี <meta name="csrf-token">; แต่ VerifyCsrfToken ของ Laravel
+        // ก็รับ cookie XSRF-TOKEN ที่มันเซ็ตมาให้ทุก response อยู่แล้ว (ส่งกลับมาเป็น
+        // header ด้วย) เลยอ่านจากตรงนั้นแทน
         const xsrfToken = decodeURIComponent(
             document.cookie
                 .split('; ')
@@ -787,9 +806,9 @@ export default function ProductEdit({
             });
     };
 
-    // Same real-write reasoning as push above — explicit confirm, never
-    // automatic. Reuses pushResult for the result snackbar (the response
-    // message itself distinguishes "Pushed" vs "Deactivated").
+    // เหตุผลเดียวกับ push ด้านบนเรื่องเขียนข้อมูลจริง — ต้อง confirm เอง ไม่มี
+    // ทำอัตโนมัติ ใช้ pushResult ตัวเดียวกันสำหรับ snackbar แจ้งผล (ข้อความจาก
+    // response จะบอกเองว่า "Pushed" หรือ "Deactivated")
     const [deactivateConfirmShop, setDeactivateConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
     const [deactivating, setDeactivating] = useState(false);
 
@@ -837,12 +856,10 @@ export default function ProductEdit({
             });
     };
 
-    // Permanent delete — a strictly more dangerous action than deactivate
-    // (can't be undone at all, not even by re-pushing), so on top of the
-    // same explicit-confirm dialog it also requires typing the product's
-    // own SKU before the confirm button enables (deleteConfirmText), reset
-    // whenever the dialog opens/closes so a stale value can't carry over
-    // to a different shop.
+    // ลบแบบถาวร — อันตรายกว่าการ deactivate ชัดเจน (ย้อนกลับไม่ได้เลยแม้แต่จะ
+    // push ใหม่) เลยนอกจากต้องผ่าน dialog confirm แบบเดิมแล้ว ยังบังคับให้พิมพ์
+    // SKU ของสินค้าเองก่อนถึงจะกดยืนยันได้ (deleteConfirmText) และจะรีเซ็ตทุกครั้ง
+    // ที่เปิด/ปิด dialog เพื่อไม่ให้ค่าเก่าค้างไปปนกับร้านอื่น
     const [deleteListingConfirmShop, setDeleteListingConfirmShop] = useState<{ id: number; name: string; platform: string } | null>(null);
     const [deletingListing, setDeletingListing] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -896,31 +913,30 @@ export default function ProductEdit({
             });
     };
 
-    // Narrowed views of statusCheck for each dialog — plain `statusCheck &&`
-    // (rather than the optional-chained comparison used to compute this)
-    // is what lets TypeScript actually narrow away the `null` case at every
-    // read site below.
+    // ตัวแปรย่อยของ statusCheck สำหรับแต่ละ dialog — การใช้ `statusCheck &&` แบบตรงๆ
+    // (แทนที่จะเทียบแบบ optional-chain ที่ใช้คำนวณค่านี้) คือสิ่งที่ทำให้ TypeScript
+    // narrow ตัด case `null` ออกได้จริงๆ ทุกจุดที่เอาไปใช้ด้านล่าง
     const pushStatusCheck = statusCheck && pushConfirmShop && statusCheck.shopId === pushConfirmShop.id ? statusCheck : null;
     const deactivateStatusCheck = statusCheck && deactivateConfirmShop && statusCheck.shopId === deactivateConfirmShop.id ? statusCheck : null;
-    const deleteListingStatusCheck = statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
+    const deleteListingStatusCheck =
+        statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
 
-    // Resolves which nested keys a given attribute's value lives under for the
-    // currently selected channel/locale, based on its own scoping flags.
+    // หาว่า value ของ attribute ตัวนี้อยู่ใต้ key ไหนบ้าง ตาม channel/locale ที่เลือก
+    // อยู่ตอนนี้ โดยดูจาก flag การ scope ของ attribute นั้นเอง
     const getValueKeys = (attr: AttributeItem) => ({
         channelKey: attr.is_channel_based && activeChannelId ? String(activeChannelId) : 'global',
         localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
     });
 
-    // useForm() doesn't document setData as identity-stable across renders,
-    // so it's captured in a ref rather than a useCallback dep — that keeps
-    // setAttributeValue's own identity permanently stable (empty deps)
-    // regardless of whether setData's is. That stability is the point:
-    // passing it down to a memoized field's onChange shouldn't by itself
-    // force that field to re-render — e.g. on a pure locale switch, where
-    // most fields' channelKey/localeKey/value don't change even though the
-    // surrounding form re-renders. Takes the resolved channelKey/localeKey
-    // rather than re-deriving them via getValueKeys(), so it doesn't need
-    // attr (and isn't invalidated by it) either.
+    // useForm() ไม่ได้การันตีว่า setData จะมี identity คงที่ทุก render เลยเก็บมันไว้
+    // ใน ref แทนที่จะเป็น dep ของ useCallback — วิธีนี้ทำให้ identity ของ
+    // setAttributeValue เองคงที่ตลอด (deps ว่างเปล่า) ไม่ว่า identity ของ setData
+    // จะเปลี่ยนหรือไม่ก็ตาม ความคงที่นี่แหละคือจุดสำคัญ: การส่งฟังก์ชันนี้ลงไปเป็น
+    // onChange ของฟิลด์ที่ memo ไว้ ไม่ควรทำให้ฟิลด์นั้น re-render เองโดยไม่จำเป็น —
+    // เช่นตอนสลับแค่ locale เฉยๆ ที่ channelKey/localeKey/value ของฟิลด์ส่วนใหญ่
+    // ไม่ได้เปลี่ยนเลย ถึงแม้ฟอร์มรอบๆ จะ re-render ก็ตาม ใช้ channelKey/localeKey
+    // ที่ resolve มาแล้วโดยตรง แทนที่จะไปคำนวณใหม่ผ่าน getValueKeys() เลยไม่ต้อง
+    // พึ่ง attr เลย (และไม่โดน invalidate เพราะ attr ด้วย)
     const setDataRef = useRef(setData);
     setDataRef.current = setData;
     const setAttributeValue = useCallback((attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
@@ -940,29 +956,27 @@ export default function ProductEdit({
                 },
             };
         });
-         
     }, []);
 
-    // Only channel/locale-based fields are re-fetched on switch; non-scopable
-    // fields always live under the constant 'global'/'default' keys and never change.
-    // Both the Default (All Channels) scope ('none' — always preloaded, no
-    // channel filter in ProductController::edit()'s initial query) and the
-    // first channel (preloaded alongside it) are covered here, for every
-    // locale, since the page now starts on Default rather than that first
-    // channel but both are already sitting in the initial payload either way.
+    // ตอนสลับ scope จะ re-fetch แค่ฟิลด์ที่เป็น channel/locale-based เท่านั้น
+    // ฟิลด์ที่ scope ไม่ได้จะอยู่ใต้ key คงที่ 'global'/'default' เสมอ ไม่มีวันเปลี่ยน
+    // ทั้ง scope Default (All Channels) ('none' — preload ไว้ให้เสมอ ไม่มีการกรอง
+    // channel ใน query เริ่มต้นของ ProductController::edit()) และ channel แรก
+    // (preload มาพร้อมกันเลย) ถูกครอบคลุมไว้ตรงนี้แล้ว ครบทุก locale เพราะตอนนี้
+    // หน้าเริ่มที่ Default แทนที่จะเป็น channel แรก แต่ทั้งสองอย่างก็มากับ payload
+    // เริ่มต้นอยู่แล้วทั้งคู่
     const visitedCombosRef = useRef<Set<string>>(
         new Set(locales.flatMap((l) => [`none:${l.id}`, ...(defaultChannelId ? [`${defaultChannelId}:${l.id}`] : [])])),
     );
     const [loadingValues, setLoadingValues] = useState(false);
 
-    // True while any part of the field area is showing stale data: values
-    // being re-fetched for a channel/locale combo (loadingValues), or the
-    // local re-render that triggers (isSwitchingScope). Attribute/group/
-    // family/category labels no longer depend on useLocale()'s background
-    // reload (switchingLocale) at all — they're resolved instantly from each
-    // entity's preloaded `translations`, so there's nothing left to wait for
-    // on a pure language switch; switchingLocale is intentionally not
-    // included here anymore.
+    // เป็น true ตลอดช่วงที่พื้นที่ฟิลด์ยังโชว์ข้อมูลเก่าค้างอยู่: ไม่ว่าจะเป็นตอนกำลัง
+    // fetch ค่าใหม่สำหรับคู่ channel/locale (loadingValues) หรือตอน re-render
+    // ในเครื่อง ที่มันไป trigger (isSwitchingScope) ส่วน label ของ attribute/group/
+    // family/category ตอนนี้ไม่ต้องพึ่งการโหลดเบื้องหลังของ useLocale()
+    // (switchingLocale) อีกแล้ว — เพราะ resolve ได้ทันทีจาก `translations` ที่
+    // preload มาแล้วของแต่ละ entity เลยไม่มีอะไรต้องรอตอนสลับแค่ภาษาเฉยๆ
+    // เลยตั้งใจไม่เอา switchingLocale มารวมไว้ตรงนี้อีกต่อไป
     const isFieldAreaBusy = loadingValues || isSwitchingScope;
 
     useEffect(() => {
@@ -1005,7 +1019,7 @@ export default function ProductEdit({
                 });
             })
             .catch(() => {
-                // best-effort re-fetch; leave already-loaded values untouched on failure
+                // แค่พยายาม fetch ใหม่ ถ้าพลาดก็ปล่อยค่าที่โหลดไว้แล้วไว้เหมือนเดิม ไม่ต้องทำอะไรเพิ่ม
             })
             .finally(() => setLoadingValues(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1015,8 +1029,8 @@ export default function ProductEdit({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        // PHP does not parse multipart/form-data bodies for PUT requests, so file
-        // uploads must go through POST with a spoofed _method for Laravel to route it as PUT.
+        // PHP ไม่รองรับการ parse body แบบ multipart/form-data สำหรับ request แบบ PUT
+        // เลยต้องส่งเป็น POST พร้อมปลอม _method ไว้ เพื่อให้ Laravel route เป็น PUT ให้
         transform((formData) => ({ ...formData, _method: 'put' }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/products/${product.id}`, {
@@ -1035,10 +1049,14 @@ export default function ProductEdit({
                 onSubmit={submit}
                 sx={{ bgcolor: 'background.default', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}
             >
-                {/* Top Tabs Bar */}
-                <Box sx={{ bgcolor: '#fff', 
-                    // borderBottom: `1px solid ${UI_BORDER}`, 
-                    px: { xs: 2, md: 4 } }}>
+                {/* แถบแท็บบนสุด */}
+                <Box
+                    sx={{
+                        bgcolor: '#fff',
+                        // borderBottom: `1px solid ${UI_BORDER}`,
+                        px: { xs: 2, md: 4 },
+                    }}
+                >
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
@@ -1053,7 +1071,7 @@ export default function ProductEdit({
                     </Tabs>
                 </Box>
 
-                {/* Sub-Header Toolbar */}
+                {/* แถบเครื่องมือย่อยใต้หัวข้อ */}
                 <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 0.5 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
                         <Typography variant="h5" fontWeight={700} color="text.primary">
@@ -1083,10 +1101,9 @@ export default function ProductEdit({
                                     disableUnderline
                                     value={activeLocaleId}
                                     onChange={(e) => {
-                                        // Changing this also switches the whole app's UI language —
-                                        // this page's "editing language" intentionally follows the
-                                        // same global locale (see useLocale()'s setLocale below), it
-                                        // isn't an independent per-page selector.
+                                        // เปลี่ยนตรงนี้จะเปลี่ยนภาษา UI ของทั้งแอปไปด้วย — "ภาษาที่กำลังแก้ไข"
+                                        // ของหน้านี้ตั้งใจให้ตาม global locale ตัวเดียวกันเลย (ดู setLocale
+                                        // ของ useLocale() ด้านล่าง) ไม่ได้เป็นตัวเลือกแยกเฉพาะหน้านี้
                                         const loc = locales.find((l) => l.id === Number(e.target.value));
                                         if (loc) setLocale(loc.code);
                                     }}
@@ -1132,589 +1149,790 @@ export default function ProductEdit({
                     </Stack>
                 </Box>
 
-                {/* Scrollable Body — the only part of this page that scrolls.
-                    Everything above (breadcrumb header from the layout, the
-                    General/History tabs, this SKU/Save toolbar) stays outside
-                    this box entirely, so it's simply always visible without
-                    any sticky positioning or runtime header-height math. */}
+                {/* Scrollable Body — พื้นที่เดียวในหน้านี้ที่ scroll ได้
+                    ทุกอย่างที่อยู่เหนือมัน (header breadcrumb จาก layout, แท็บ
+                    General/History, toolbar SKU/Save นี้) จะอยู่นอกกล่องนี้ทั้งหมด
+                    เลยโชว์ตลอดโดยไม่ต้องใช้ sticky positioning หรือคำนวณความสูง
+                    header ตอน runtime เลย */}
                 <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
-                {Object.keys(errors).length > 0 && (
-                    <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
-                        <Alert severity="error">
-                            <Typography variant="body2" fontWeight={700}>
-                                {t('correctErrorsBeforeSaving')}
-                            </Typography>
-                            {Object.values(errors).map((message, index) => (
-                                <Typography key={index} variant="body2">
-                                    {message}
+                    {Object.keys(errors).length > 0 && (
+                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                            <Alert severity="error">
+                                <Typography variant="body2" fontWeight={700}>
+                                    {t('correctErrorsBeforeSaving')}
                                 </Typography>
-                            ))}
-                        </Alert>
-                    </Box>
-                )}
+                                {Object.values(errors).map((message, index) => (
+                                    <Typography key={index} variant="body2">
+                                        {message}
+                                    </Typography>
+                                ))}
+                            </Alert>
+                        </Box>
+                    )}
 
-                {/* Main 2-Column Layout */}
-                {tabIndex === 0 && (
-                <Box sx={{ px: { xs: 2, md: 4 } }}>
-                    <Paper
-                        ref={groupTabBarRef}
-                        variant="outlined"
-                        sx={{
-                            mb: 3,
-                            borderRadius: 0,
-                            bgcolor: '#fff',
-                            position: 'sticky',
-                            // Sticks to the top of its own scroll container
-                            // (the "Scrollable Body" box above) — that box is
-                            // the only thing that scrolls on this page, so
-                            // top:0 here needs no header-height math.
-                            top: 0,
-                            zIndex: 1,
-                        }}
-                    >
-                        <Tabs
-                            value={groupTabIndex}
-                            onChange={(_, v) => scrollToGroup(v)}
-                            variant="scrollable"
-                            scrollButtons="auto"
-                            sx={{
-                                px: 2,
-                                '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, minHeight: 48 },
-                                '& .Mui-selected': { color: 'text.primary' },
-                                '& .MuiTabs-indicator': { bgcolor: 'grey.800' },
-                            }}
-                        >
-                            {assignedGroups.map((group) => (
-                                <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
-                            ))}
-                        </Tabs>
-                    </Paper>
-                    <Grid container spacing={3}>
-                        {/* Left Main Area: Real Attribute Groups from Database */}
-                        <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
-                            {isFieldAreaBusy && (
-                                <Box
-                                    sx={{
-                                        position: 'absolute',
-                                        inset: 0,
-                                        zIndex: 1,
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        justifyContent: 'center',
-                                        pt: 8,
-                                        bgcolor: 'rgba(255,255,255,0.6)',
-                                        borderRadius: 2,
-                                    }}
-                                >
-                                    <CircularProgress size={32} />
-                                </Box>
-                            )}
-                            <Stack
-                                spacing={3}
+                    {/* Layout หลักแบบ 2 คอลัมน์ */}
+                    {tabIndex === 0 && (
+                        <Box sx={{ px: { xs: 2, md: 4 } }}>
+                            <Paper
+                                ref={groupTabBarRef}
+                                variant="outlined"
                                 sx={{
-                                    opacity: isFieldAreaBusy ? 0.5 : 1,
-                                    pointerEvents: isFieldAreaBusy ? 'none' : 'auto',
-                                    transition: 'opacity 0.15s',
+                                    mb: 3,
+                                    borderRadius: 0,
+                                    bgcolor: '#fff',
+                                    position: 'sticky',
+                                    // ติดอยู่บนสุดของ scroll container ของตัวเอง (กล่อง
+                                    // "Scrollable Body" ด้านบน) — กล่องนั้นเป็นสิ่งเดียวที่
+                                    // scroll ได้ในหน้านี้ เลยตั้ง top:0 ตรงนี้ได้เลยโดยไม่ต้อง
+                                    // คำนวณความสูง header อะไรเพิ่ม
+                                    top: 0,
+                                    zIndex: 1,
                                 }}
                             >
-                                {/* One panel per real Attribute Group, stacked in the order the backend
-                                    already sorted them (ProductController::edit()'s canonical group
-                                    order) — every group renders at once (scroll-spy nav, not a
-                                    click-to-swap tab), so index-matching against the tabs above is exact
-                                    by construction. SKU is pinned into the 'general' group's panel
-                                    (there's no other natural home for it); the variants table is pinned
-                                    into the 'pricing_packaging' group's panel (sales/pricing data), for
-                                    configurable products only. */}
-                                {assignedGroups.map((group, idx) => {
-                                    const isGeneral = group.code.toLowerCase() === 'general';
-                                    const isSales = group.code.toLowerCase() === 'pricing_packaging';
-                                    const visibleAttrs = group.attributes.filter((attr) => {
-                                        if (data.type.toLowerCase() === 'configurable') {
-                                            return attr.code !== 'price' && attr.code !== 'qty';
-                                        }
-                                        return true;
-                                    });
-
-                                    return (
-                                        <Paper
-                                            key={group.id}
-                                            ref={(el: HTMLDivElement | null) => {
-                                                groupSectionRefs.current[idx] = el;
+                                <Tabs
+                                    value={groupTabIndex}
+                                    onChange={(_, v) => scrollToGroup(v)}
+                                    variant="scrollable"
+                                    scrollButtons="auto"
+                                    sx={{
+                                        px: 2,
+                                        '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, minHeight: 48 },
+                                        '& .Mui-selected': { color: 'text.primary' },
+                                        '& .MuiTabs-indicator': { bgcolor: 'grey.800' },
+                                    }}
+                                >
+                                    {assignedGroups.map((group) => (
+                                        <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
+                                    ))}
+                                </Tabs>
+                            </Paper>
+                            <Grid container spacing={3}>
+                                {/* พื้นที่หลักฝั่งซ้าย: กลุ่ม Attribute จริงจากฐานข้อมูล */}
+                                <Grid item xs={12} md={8.5} sx={{ position: 'relative' }}>
+                                    {isFieldAreaBusy && (
+                                        <Box
+                                            sx={{
+                                                position: 'absolute',
+                                                inset: 0,
+                                                zIndex: 1,
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                justifyContent: 'center',
+                                                pt: 8,
+                                                bgcolor: 'rgba(255,255,255,0.6)',
+                                                borderRadius: 2,
                                             }}
-                                            variant="outlined"
-                                            sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: '80px' }}
                                         >
-                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2.5 }}>
-                                                {localizedLabel(group, activeLocaleId)}
+                                            <CircularProgress size={32} />
+                                        </Box>
+                                    )}
+                                    <Stack
+                                        spacing={3}
+                                        sx={{
+                                            opacity: isFieldAreaBusy ? 0.5 : 1,
+                                            pointerEvents: isFieldAreaBusy ? 'none' : 'auto',
+                                            transition: 'opacity 0.15s',
+                                        }}
+                                    >
+                                        {/* หนึ่ง panel ต่อหนึ่ง Attribute Group จริง เรียงตามลำดับที่ฝั่ง
+                                    backend จัดมาให้แล้ว (ลำดับ group มาตรฐานจาก
+                                    ProductController::edit()) — ทุก group จะ render พร้อมกันหมด
+                                    (เป็น scroll-spy nav ไม่ใช่แท็บแบบคลิกสลับ) การจับคู่ index กับ
+                                    แท็บด้านบนเลยตรงกันเป๊ะโดยธรรมชาติของโค้ด SKU ถูกปักไว้ใน panel
+                                    ของ group 'general' (เพราะไม่มีที่อื่นที่เหมาะกว่านี้แล้ว)
+                                    ส่วนตาราง variants ถูกปักไว้ใน panel ของ group 'pricing_packaging'
+                                    (ข้อมูลราคา/การขาย) เฉพาะสินค้าแบบ configurable เท่านั้น */}
+                                        {assignedGroups.map((group, idx) => {
+                                            const isGeneral = group.code.toLowerCase() === 'general';
+                                            const isSales = group.code.toLowerCase() === 'pricing_packaging';
+                                            const visibleAttrs = group.attributes.filter((attr) => {
+                                                // pbrand มี panel แยกของตัวเองต่อจาก Categories เลย (ดูด้านล่าง)
+                                                // แทนที่จะไปอยู่ตรงไหนก็ได้ที่ลำดับ group ของ family นี้บังเอิญวางไว้
+                                                if (attr.code === 'pbrand') {
+                                                    return false;
+                                                }
+                                                if (data.type.toLowerCase() === 'configurable') {
+                                                    return attr.code !== 'price' && attr.code !== 'qty';
+                                                }
+                                                return true;
+                                            });
+
+                                            const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
+
+                                            return (
+                                                <Paper
+                                                    key={group.id}
+                                                    ref={(el: HTMLDivElement | null) => {
+                                                        groupSectionRefs.current[idx] = el;
+                                                    }}
+                                                    variant="outlined"
+                                                    sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: '80px' }}
+                                                >
+                                                    <Stack
+                                                        direction="row"
+                                                        alignItems="center"
+                                                        spacing={0.5}
+                                                        onClick={() => toggleGroupCollapse(group.id)}
+                                                        sx={{ mb: isGroupCollapsed ? 0 : 2.5, cursor: 'pointer', userSelect: 'none' }}
+                                                    >
+                                                        <IconButton size="small" sx={{ p: 0.5 }}>
+                                                            {isGroupCollapsed ? (
+                                                                <ChevronRightIcon fontSize="small" />
+                                                            ) : (
+                                                                <ExpandMoreIcon fontSize="small" />
+                                                            )}
+                                                        </IconButton>
+                                                        <Typography variant="h6" fontWeight={700} color="text.primary">
+                                                            {localizedLabel(group, activeLocaleId)}
+                                                        </Typography>
+                                                    </Stack>
+                                                    <Collapse in={!isGroupCollapsed}>
+                                                        <Stack spacing={2.5}>
+                                                            {isGeneral && (
+                                                                <TextField
+                                                                    label="SKU *"
+                                                                    required
+                                                                    fullWidth
+                                                                    size="small"
+                                                                    value={data.sku}
+                                                                    onChange={(e) => setData('sku', e.target.value)}
+                                                                    error={Boolean(errors.sku)}
+                                                                    helperText={errors.sku}
+                                                                />
+                                                            )}
+
+                                                            {visibleAttrs.length === 0 &&
+                                                                !isGeneral &&
+                                                                !(isSales && data.type.toLowerCase() === 'configurable') && (
+                                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                        No attributes assigned to this group yet.
+                                                                    </Typography>
+                                                                )}
+
+                                                            {visibleAttrs.map((attr) => {
+                                                                const { channelKey, localeKey } = getValueKeys(attr);
+                                                                // ถ้า locale นี้ยังไม่มีค่าของตัวเอง จะ fallback ไปใช้ bucket
+                                                                // global ('default') แทน — ฟิลด์ที่เป็น locale-based ที่ import
+                                                                // เข้ามาจะไปตกอยู่ตรงนั้นก่อน จนกว่าจะมีคนแปลทีละ locale
+                                                                // (ดู ProductRowImporter) ถ้าไม่มี fallback นี้ ฟิลด์ที่เพิ่ง
+                                                                // import มาจะดูเหมือนว่างเปล่า
+                                                                const val =
+                                                                    data.values[attr.id]?.[channelKey]?.[localeKey] ??
+                                                                    data.values[attr.id]?.[channelKey]?.['default'] ??
+                                                                    '';
+                                                                const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                                // activeChannelId เป็น null แปลว่า scope "Default (All Channels)"
+                                                                // กำลัง active อยู่ (ดูที่ panel Sales Channels) — ฟิลด์ที่เป็น
+                                                                // channel-based ที่บันทึกตรงนั้นจะ resolve เป็น channel_id = null
+                                                                // ซึ่ง ResolvesProductAttributeValues (ตัว sync Lazada/Shopee/TikTok)
+                                                                // จะ fallback มาใช้ค่านี้เมื่อ channel ไหนไม่มี override เป็นของ
+                                                                // ตัวเอง เลยถือเป็นค่า default จริงๆ ไม่ใช่ข้อมูลที่ไม่ได้ใช้
+                                                                const activeChannelName =
+                                                                    activeChannelId === null
+                                                                        ? 'Default (All Channels)'
+                                                                        : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
+                                                                return (
+                                                                    <RenderAttributeInput
+                                                                        key={attr.id}
+                                                                        attr={attr}
+                                                                        value={val}
+                                                                        channelKey={channelKey}
+                                                                        localeKey={localeKey}
+                                                                        onValueChange={setAttributeValue}
+                                                                        label={localizedLabel(attr, activeLocaleId)}
+                                                                        activeLocaleCode={activeLocaleCode}
+                                                                        activeChannelName={activeChannelName}
+                                                                        canAddOptions={canAddAttributeOptions}
+                                                                        sku={data.sku}
+                                                                    />
+                                                                );
+                                                            })}
+
+                                                            {isSales && data.type.toLowerCase() === 'configurable' && (
+                                                                <Box>
+                                                                    <Stack
+                                                                        direction={{ xs: 'column', sm: 'row' }}
+                                                                        justifyContent="space-between"
+                                                                        alignItems={{ sm: 'center' }}
+                                                                        spacing={1.5}
+                                                                        sx={{ mb: 2 }}
+                                                                    >
+                                                                        <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                                                                            ตัวเลือกสินค้าย่อย (Variants List)
+                                                                        </Typography>
+                                                                        <Stack direction="row" spacing={1}>
+                                                                            <Button
+                                                                                size="small"
+                                                                                variant="outlined"
+                                                                                startIcon={<AutorenewIcon fontSize="small" />}
+                                                                                onClick={openVariantDialog}
+                                                                            >
+                                                                                {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="small"
+                                                                                variant="text"
+                                                                                startIcon={<AddIcon fontSize="small" />}
+                                                                                onClick={handleAddBlankVariant}
+                                                                            >
+                                                                                เพิ่มแถวว่าง
+                                                                            </Button>
+                                                                        </Stack>
+                                                                    </Stack>
+
+                                                                    {data.variants.length === 0 ? (
+                                                                        <Typography
+                                                                            variant="body2"
+                                                                            color="text.secondary"
+                                                                            sx={{ fontStyle: 'italic' }}
+                                                                        >
+                                                                            ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น
+                                                                            สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
+                                                                        </Typography>
+                                                                    ) : (
+                                                                        <FioriResponsiveTable
+                                                                            variant="plain"
+                                                                            size="small"
+                                                                            columns={variantColumns}
+                                                                            rows={data.variants.map((v, index) => ({ v, index }))}
+                                                                            getRowKey={(row) => row.v.id ?? `new-${row.index}`}
+                                                                        />
+                                                                    )}
+                                                                </Box>
+                                                            )}
+                                                        </Stack>
+                                                    </Collapse>
+                                                </Paper>
+                                            );
+                                        })}
+                                    </Stack>
+                                </Grid>
+
+                                {/* Sidebar ฝั่งขวา */}
+                                <Grid item xs={12} md={3.5}>
+                                    <Stack spacing={3}>
+                                        {/* แผง Product Info */}
+                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                                Product Info
                                             </Typography>
-                                            <Stack spacing={2.5}>
-                                                {isGeneral && (
-                                                    <TextField
-                                                        label="SKU *"
-                                                        required
-                                                        fullWidth
-                                                        size="small"
-                                                        value={data.sku}
-                                                        onChange={(e) => setData('sku', e.target.value)}
-                                                        error={Boolean(errors.sku)}
-                                                        helperText={errors.sku}
-                                                    />
-                                                )}
-
-                                                {visibleAttrs.length === 0 && !isGeneral && !(isSales && data.type.toLowerCase() === 'configurable') && (
-                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                        No attributes assigned to this group yet.
+                                            <Stack spacing={2}>
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.secondary"
+                                                        display="block"
+                                                        sx={{ mb: 0.5 }}
+                                                    >
+                                                        Status
                                                     </Typography>
-                                                )}
+                                                    <Switch
+                                                        checked={data.enabled}
+                                                        onChange={(e) => setData('enabled', e.target.checked)}
+                                                        color="default"
+                                                    />
+                                                </Box>
 
-                                                {visibleAttrs.map((attr) => {
-                                                    const { channelKey, localeKey } = getValueKeys(attr);
-                                                    // Falls back to the global ('default') bucket when this locale has
-                                                    // no value of its own yet — imported locale-based fields land there
-                                                    // until someone translates them per locale (see ProductRowImporter),
-                                                    // so without this a freshly-imported field reads as empty.
-                                                    const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
+                                                <TextField
+                                                    select
+                                                    label="Family"
+                                                    value={data.family_id}
+                                                    onChange={(e) => setData('family_id', Number(e.target.value))}
+                                                    size="small"
+                                                    fullWidth
+                                                    error={Boolean(errors.family_id)}
+                                                    helperText={
+                                                        errors.family_id ||
+                                                        'Attribute groups below update the next time you open this product after saving.'
+                                                    }
+                                                >
+                                                    {families.map((fam) => (
+                                                        <MenuItem key={fam.id} value={fam.id}>
+                                                            {localizedLabel(fam, activeLocaleId)}
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
+
+                                                <TextField
+                                                    select
+                                                    label="Product Type"
+                                                    value={data.type}
+                                                    onChange={(e) => handleTypeChange(e.target.value)}
+                                                    size="small"
+                                                    fullWidth
+                                                    error={Boolean(errors.type)}
+                                                    helperText={errors.type}
+                                                >
+                                                    <MenuItem value="simple">Simple</MenuItem>
+                                                    <MenuItem value="configurable">Configurable</MenuItem>
+                                                </TextField>
+
+                                                <TextField
+                                                    label="Updated At"
+                                                    value={formatLocalDateTime(product.updated_at)}
+                                                    disabled
+                                                    size="small"
+                                                    fullWidth
+                                                    InputProps={{
+                                                        endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
+                                                    }}
+                                                />
+
+                                                <TextField
+                                                    label="Created At"
+                                                    value={formatLocalDateTime(product.created_at)}
+                                                    disabled
+                                                    size="small"
+                                                    fullWidth
+                                                    InputProps={{
+                                                        endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
+                                                    }}
+                                                />
+                                            </Stack>
+                                        </Paper>
+
+                                        {/* แผง Categories */}
+                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                                                <Typography variant="h6" fontWeight={700} color="text.primary">
+                                                    Categories
+                                                </Typography>
+                                                <Button
+                                                    component={Link}
+                                                    href="/catalog/categories/marketplace-sync"
+                                                    size="small"
+                                                    startIcon={<LinkIcon fontSize="small" />}
+                                                    sx={{ textTransform: 'none' }}
+                                                >
+                                                    {t('marketplaceMappingButton')}
+                                                </Button>
+                                            </Stack>
+                                            <CategoryCascadeSelect value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
+                                        </Paper>
+
+                                        {/* แผง Brand — คือ pbrand ที่แยกออกมาจากลูปของ attribute ทั่วไป (ดู
+                                    เงื่อนไข `attr.code === 'pbrand'` ที่กันออกด้านบน) เพื่อให้อยู่ต่อจาก
+                                    Categories ทันที และโชว์สถานะการผูก marketplace ของตัวเองได้แบบเดียว
+                                    กับที่ Categories ทำ */}
+                                        {brandAttr && (
+                                            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                                <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                                    Brand
+                                                </Typography>
+                                                {(() => {
+                                                    const { channelKey, localeKey } = getValueKeys(brandAttr);
+                                                    const val =
+                                                        data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
+                                                        data.values[brandAttr.id]?.[channelKey]?.['default'] ??
+                                                        '';
                                                     const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                    // null activeChannelId means the "Default (All Channels)" scope is
-                                                    // active (see the Sales Channels panel) — channel-based fields save
-                                                    // there resolve to channel_id = null, which ResolvesProductAttributeValues
-                                                    // (Lazada/Shopee/TikTok sync) falls back to for any channel that has
-                                                    // no override of its own, so it's a real default, not just unused data.
-                                                    const activeChannelName = activeChannelId === null ? 'Default (All Channels)' : channels.find((c) => c.id === activeChannelId)?.name ?? undefined;
+                                                    const activeChannelName =
+                                                        activeChannelId === null
+                                                            ? 'Default (All Channels)'
+                                                            : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
+                                                    const stringValue = typeof val === 'string' ? val : '';
+                                                    const selectedOption = brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
+                                                    const mapped = selectedOption?.mapped_platforms ?? [];
+
                                                     return (
-                                                        <RenderAttributeInput
-                                                            key={attr.id}
-                                                            attr={attr}
-                                                            value={val}
-                                                            channelKey={channelKey}
-                                                            localeKey={localeKey}
-                                                            onValueChange={setAttributeValue}
-                                                            label={localizedLabel(attr, activeLocaleId)}
-                                                            activeLocaleCode={activeLocaleCode}
-                                                            activeChannelName={activeChannelName}
-                                                            canAddOptions={canAddAttributeOptions}
-                                                            sku={data.sku}
-                                                        />
+                                                        <Stack spacing={1.5}>
+                                                            <RenderAttributeInput
+                                                                attr={brandAttr}
+                                                                value={val}
+                                                                channelKey={channelKey}
+                                                                localeKey={localeKey}
+                                                                onValueChange={setAttributeValue}
+                                                                label={localizedLabel(brandAttr, activeLocaleId)}
+                                                                activeLocaleCode={activeLocaleCode}
+                                                                activeChannelName={activeChannelName}
+                                                                canAddOptions={canAddAttributeOptions}
+                                                                sku={data.sku}
+                                                            />
+                                                            {selectedOption && (
+                                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        การผูก Marketplace:
+                                                                    </Typography>
+                                                                    {mapped.length > 0 ? (
+                                                                        <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                                                                            {BRAND_MAPPED_PLATFORMS.filter((p) => mapped.includes(p.value)).map(
+                                                                                (p) => (
+                                                                                    <Chip
+                                                                                        key={p.value}
+                                                                                        label={p.label}
+                                                                                        size="small"
+                                                                                        sx={{
+                                                                                            bgcolor: p.color,
+                                                                                            color: '#fff',
+                                                                                            fontWeight: 600,
+                                                                                            height: 20,
+                                                                                            fontSize: 11,
+                                                                                        }}
+                                                                                    />
+                                                                                ),
+                                                                            )}
+                                                                        </Stack>
+                                                                    ) : (
+                                                                        <Typography
+                                                                            variant="caption"
+                                                                            color="text.disabled"
+                                                                            sx={{ fontStyle: 'italic' }}
+                                                                        >
+                                                                            ยังไม่ผูก marketplace ใดๆ
+                                                                        </Typography>
+                                                                    )}
+                                                                </Stack>
+                                                            )}
+                                                        </Stack>
+                                                    );
+                                                })()}
+                                            </Paper>
+                                        )}
+
+                                        {/* แผง Associations */}
+                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                                Associations
+                                            </Typography>
+
+                                            <Stack spacing={2.5}>
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.secondary"
+                                                        sx={{ mb: 1, display: 'block' }}
+                                                    >
+                                                        Related Products
+                                                    </Typography>
+                                                    <ProductPicker
+                                                        value={relatedProducts}
+                                                        onChange={(next) => {
+                                                            setRelatedProducts(next);
+                                                            setData('associations', { ...data.associations, related: next.map((p) => p.id) });
+                                                        }}
+                                                    />
+                                                </Box>
+
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.secondary"
+                                                        sx={{ mb: 1, display: 'block' }}
+                                                    >
+                                                        Up-Sell Products
+                                                    </Typography>
+                                                    <ProductPicker
+                                                        value={upSellProducts}
+                                                        onChange={(next) => {
+                                                            setUpSellProducts(next);
+                                                            setData('associations', { ...data.associations, up_sell: next.map((p) => p.id) });
+                                                        }}
+                                                    />
+                                                </Box>
+
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.secondary"
+                                                        sx={{ mb: 1, display: 'block' }}
+                                                    >
+                                                        Cross-Sell Products
+                                                    </Typography>
+                                                    <ProductPicker
+                                                        value={crossSellProducts}
+                                                        onChange={(next) => {
+                                                            setCrossSellProducts(next);
+                                                            setData('associations', { ...data.associations, cross_sell: next.map((p) => p.id) });
+                                                        }}
+                                                    />
+                                                </Box>
+                                            </Stack>
+                                        </Paper>
+
+                                        {/* แผง Sales Channels */}
+                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
+                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                                Sales Channels
+                                            </Typography>
+                                            <Stack spacing={0.5}>
+                                                {/* การแก้ไขตรงนี้ (activeChannelId = null) คือการตั้งค่า fallback ของ
+                                            ฟิลด์ที่เป็น channel-based — channel ไหนด้านล่างที่ไม่มีค่าของตัวเอง
+                                            จะใช้ค่านี้แทน เลยไม่ต้องมากรอกซ้ำทีละ channel */}
+                                                <Box
+                                                    onClick={() => handleChannelChange(null)}
+                                                    sx={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        py: 0.5,
+                                                        px: 1.5,
+                                                        mb: 0.5,
+                                                        borderRadius: 1,
+                                                        cursor: 'pointer',
+                                                        bgcolor: activeChannelId === null ? 'grey.800' : 'transparent',
+                                                        color: activeChannelId === null ? '#fff' : 'text.primary',
+                                                        '&:hover': { bgcolor: activeChannelId === null ? 'grey.900' : 'action.hover' },
+                                                    }}
+                                                >
+                                                    <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                                                        Default (All Channels)
+                                                    </Typography>
+                                                </Box>
+                                                {channelGroups.map((group) => {
+                                                    const isExpanded = expandedPlatforms.has(group.platform);
+                                                    const groupShopIds = group.channels
+                                                        .map((c) => c.shop_id)
+                                                        .filter((id): id is number => id != null);
+                                                    const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
+                                                    const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
+                                                    const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
+
+                                                    return (
+                                                        <Box key={group.platform}>
+                                                            <Box
+                                                                onClick={() => togglePlatform(group.platform)}
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 0.5,
+                                                                    py: 0.75,
+                                                                    px: 1,
+                                                                    borderRadius: 1,
+                                                                    cursor: 'pointer',
+                                                                    '&:hover': { bgcolor: 'action.hover' },
+                                                                }}
+                                                            >
+                                                                {isExpanded ? (
+                                                                    <ExpandMoreIcon fontSize="small" />
+                                                                ) : (
+                                                                    <ChevronRightIcon fontSize="small" />
+                                                                )}
+                                                                {groupShopIds.length > 0 && (
+                                                                    <Checkbox
+                                                                        size="small"
+                                                                        checked={allInGroupChecked}
+                                                                        indeterminate={someInGroupChecked}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        onChange={() => {
+                                                                            setData(
+                                                                                'published_shop_ids',
+                                                                                allInGroupChecked
+                                                                                    ? data.published_shop_ids.filter(
+                                                                                          (id) => !groupShopIds.includes(id),
+                                                                                      )
+                                                                                    : Array.from(
+                                                                                          new Set([...data.published_shop_ids, ...groupShopIds]),
+                                                                                      ),
+                                                                            );
+                                                                        }}
+                                                                        sx={{ p: 0.5 }}
+                                                                    />
+                                                                )}
+                                                                <Typography variant="body2" fontWeight={700}>
+                                                                    {group.platform}
+                                                                </Typography>
+                                                                <Chip
+                                                                    label={group.channels.length}
+                                                                    size="small"
+                                                                    sx={{ height: 18, fontSize: '0.7rem' }}
+                                                                />
+                                                                {groupShopIds.length > 0 && (
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        ({checkedInGroup}/{groupShopIds.length} published)
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                            <Collapse in={isExpanded}>
+                                                                <Stack sx={{ pl: 4 }}>
+                                                                    {group.channels.map((ch) => {
+                                                                        const active = activeChannelId === ch.id;
+                                                                        const isShop = ch.shop_id != null;
+                                                                        const published =
+                                                                            isShop && data.published_shop_ids.includes(ch.shop_id as number);
+                                                                        // Push/Deactivate จะไปดู published_shop_ids ที่ *บันทึกไว้จริงๆ*
+                                                                        // ฝั่ง backend (product->platformShops() จะอัปเดตก็ต่อเมื่อกด Save
+                                                                        // Product เท่านั้น) — แต่ `published` ด้านบนสะท้อนสถานะ checkbox
+                                                                        // ที่ยังไม่ได้ save ในเครื่อง ถ้าโชว์ปุ่ม action ทันทีที่ติ๊กเสร็จ
+                                                                        // ก่อน save ผู้ใช้จะติ๊กร้านแล้วกด Push ได้ทันที ซึ่ง backend จะ
+                                                                        // ปฏิเสธด้วย "not marked as published" เพราะยังไม่ได้บันทึกอะไร
+                                                                        // เลย เลยต้องโชว์ action ก็ต่อเมื่อสถานะ checkbox ตรงกับที่บันทึก
+                                                                        // ไว้จริงเท่านั้น
+                                                                        const savedPublished =
+                                                                            isShop && publishedShopIds.includes(ch.shop_id as number);
+                                                                        // เฉพาะ platform ที่เชื่อมต่อจริง (มีอยู่ใน PLATFORM_ROUTES)
+                                                                        // เท่านั้นถึงจะมี Push/Deactivate — ร้านบน platform ที่ยังไม่ได้
+                                                                        // เชื่อมต่อ (หรือจะเชื่อมในอนาคต) ก็ยังตั้ง "published" ได้
+                                                                        // (แค่ติ๊ก checkbox) โดยไม่มี API จริงให้ push
+                                                                        const canPushOrDeactivate =
+                                                                            published &&
+                                                                            savedPublished &&
+                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES;
+                                                                        // มีแค่ทิศทาง "ติ๊กแล้วแต่ยังไม่ได้ save" เท่านั้นที่ควรมี hint เตือน
+                                                                        // — เพราะเป็นเคสเดียวที่ปุ่ม push/deactivate จะดูเหมือนใช้ได้แต่จริงๆ
+                                                                        // ยังใช้ไม่ได้ ส่วนทิศทางตรงข้าม (ติ๊กออก) ไม่มี action ไหนถูกบล็อก
+                                                                        // อยู่ แค่รอ save เฉยๆ
+                                                                        const hasUnsavedPublishChange = published && !savedPublished;
+                                                                        return (
+                                                                            <Box
+                                                                                key={ch.id}
+                                                                                onClick={() => handleChannelChange(ch.id)}
+                                                                                sx={{
+                                                                                    display: 'flex',
+                                                                                    alignItems: 'center',
+                                                                                    py: 0.25,
+                                                                                    pr: 1.5,
+                                                                                    pl: isShop ? 0.5 : 1.5,
+                                                                                    borderRadius: 1,
+                                                                                    cursor: 'pointer',
+                                                                                    bgcolor: active ? 'grey.800' : 'transparent',
+                                                                                    color: active ? '#fff' : 'text.primary',
+                                                                                    '&:hover': { bgcolor: active ? 'grey.900' : 'action.hover' },
+                                                                                }}
+                                                                            >
+                                                                                {isShop && (
+                                                                                    <Checkbox
+                                                                                        size="small"
+                                                                                        checked={published}
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        onChange={() => toggleShopPublished(ch.shop_id as number)}
+                                                                                        sx={{
+                                                                                            color: active ? '#fff' : undefined,
+                                                                                            '&.Mui-checked': { color: active ? '#fff' : undefined },
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                                <Typography variant="body2" sx={{ flex: 1 }}>
+                                                                                    {ch.name || ch.code}
+                                                                                </Typography>
+                                                                                {ch.is_live && (
+                                                                                    <Chip
+                                                                                        label="Live"
+                                                                                        size="small"
+                                                                                        title={
+                                                                                            ch.live_synced_at
+                                                                                                ? `Confirmed live as of ${new Date(ch.live_synced_at).toLocaleString()}`
+                                                                                                : 'Confirmed live on last sync'
+                                                                                        }
+                                                                                        sx={{
+                                                                                            ...mappedChipSx,
+                                                                                            height: 20,
+                                                                                            fontSize: '0.65rem',
+                                                                                            mr: 1,
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                                {hasUnsavedPublishChange && (
+                                                                                    <Typography
+                                                                                        variant="caption"
+                                                                                        sx={{
+                                                                                            color: active
+                                                                                                ? 'rgba(255,255,255,0.8)'
+                                                                                                : 'text.secondary',
+                                                                                            fontStyle: 'italic',
+                                                                                            whiteSpace: 'nowrap',
+                                                                                        }}
+                                                                                    >
+                                                                                        Save first
+                                                                                    </Typography>
+                                                                                )}
+                                                                                {canPushOrDeactivate && (
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        title={`Push to ${group.platform}`}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setPushConfirmShop({
+                                                                                                id: ch.shop_id as number,
+                                                                                                name: ch.name || ch.code,
+                                                                                                platform: group.platform,
+                                                                                            });
+                                                                                            checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                        }}
+                                                                                        sx={{ color: active ? '#fff' : 'grey.800' }}
+                                                                                    >
+                                                                                        <PublishIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                )}
+                                                                                {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
+                                                                            หรืออัปเดต) ปุ่ม Deactivate จะมีความหมายก็ต่อเมื่อมีของ
+                                                                            live อยู่จริงให้เอาลงเท่านั้น ถ้าไม่มีเช็ค ch.is_live
+                                                                            ปุ่มนี้จะโผล่มาแค่เพราะ "ติ๊กว่าจะ publish" เฉยๆ พอกดกับ
+                                                                            ร้านที่ติ๊กไว้แต่ไม่เคย push สำเร็จจริง ก็จะไปเจอ error
+                                                                            "never been pushed — nothing to deactivate" จาก
+                                                                            backend แทนที่จะไม่โชว์ปุ่มไปเลยตั้งแต่แรก */}
+                                                                                {canPushOrDeactivate && ch.is_live && (
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        title={`Deactivate on ${group.platform}`}
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setDeactivateConfirmShop({
+                                                                                                id: ch.shop_id as number,
+                                                                                                name: ch.name || ch.code,
+                                                                                                platform: group.platform,
+                                                                                            });
+                                                                                            checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                        }}
+                                                                                        sx={{ color: active ? '#fff' : 'text.secondary' }}
+                                                                                    >
+                                                                                        <UnpublishedIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                )}
+                                                                                {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
+                                                                            PLATFORM_ROUTES กับ ShopeeProductSyncService::delete()) —
+                                                                            แยกให้ดูต่างจาก Push/Deactivate ชัดๆ (สีแดง ไอคอนคนละแบบ)
+                                                                            เพราะเป็น action ที่อันตรายกว่าชัดเจน: ต่างจาก Deactivate
+                                                                            ตรงที่ย้อนกลับไม่ได้เลยแม้จะ push ใหม่ก็ตาม ต้องสร้าง
+                                                                            listing ใหม่ทั้งหมดเท่านั้น ใช้เงื่อนไข ch.is_live เดียวกับ
+                                                                            Deactivate ด้วยเหตุผลเดียวกัน (ไม่มีของ live ก็ไม่มีอะไรให้ลบ) */}
+                                                                                {canPushOrDeactivate &&
+                                                                                    ch.is_live &&
+                                                                                    group.platform.toLowerCase() === 'shopee' && (
+                                                                                        <IconButton
+                                                                                            size="small"
+                                                                                            title={t('deleteListingButton') + ` — ${group.platform}`}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setDeleteListingConfirmShop({
+                                                                                                    id: ch.shop_id as number,
+                                                                                                    name: ch.name || ch.code,
+                                                                                                    platform: group.platform,
+                                                                                                });
+                                                                                                checkPlatformStatus(
+                                                                                                    ch.shop_id as number,
+                                                                                                    group.platform,
+                                                                                                );
+                                                                                            }}
+                                                                                            sx={{ color: active ? '#fff' : 'error.main' }}
+                                                                                        >
+                                                                                            <DeleteForeverIcon fontSize="small" />
+                                                                                        </IconButton>
+                                                                                    )}
+                                                                            </Box>
+                                                                        );
+                                                                    })}
+                                                                </Stack>
+                                                            </Collapse>
+                                                        </Box>
                                                     );
                                                 })}
-
-                                                {isSales && data.type.toLowerCase() === 'configurable' && (
-                                                    <Box>
-                                                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mb: 2 }}>
-                                                            <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-                                                                ตัวเลือกสินค้าย่อย (Variants List)
-                                                            </Typography>
-                                                            <Stack direction="row" spacing={1}>
-                                                                <Button size="small" variant="outlined" startIcon={<AutorenewIcon fontSize="small" />} onClick={openVariantDialog}>
-                                                                    {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
-                                                                </Button>
-                                                                <Button size="small" variant="text" startIcon={<AddIcon fontSize="small" />} onClick={handleAddBlankVariant}>
-                                                                    เพิ่มแถวว่าง
-                                                                </Button>
-                                                            </Stack>
-                                                        </Stack>
-
-                                                        {data.variants.length === 0 ? (
-                                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                                ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
-                                                            </Typography>
-                                                        ) : (
-                                                            <FioriResponsiveTable
-                                                                variant="plain"
-                                                                size="small"
-                                                                columns={variantColumns}
-                                                                rows={data.variants.map((v, index) => ({ v, index }))}
-                                                                getRowKey={(row) => row.v.id ?? `new-${row.index}`}
-                                                            />
-                                                        )}
-                                                    </Box>
+                                                {channelGroups.length === 0 && (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                        No sales channels available.
+                                                    </Typography>
                                                 )}
                                             </Stack>
                                         </Paper>
-                                    );
-                                })}
-                            </Stack>
-                        </Grid>
-
-                        {/* Right Sidebar */}
-                        <Grid item xs={12} md={3.5}>
-                            <Stack spacing={3}>
-                                {/* Product Info Panel */}
-                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                        Product Info
-                                    </Typography>
-                                    <Stack spacing={2}>
-                                        <Box>
-                                            <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                Status
-                                            </Typography>
-                                            <Switch
-                                                checked={data.enabled}
-                                                onChange={(e) => setData('enabled', e.target.checked)}
-                                                color="default"
-                                            />
-                                        </Box>
-
-                                        <TextField
-                                            select
-                                            label="Family"
-                                            value={data.family_id}
-                                            onChange={(e) => setData('family_id', Number(e.target.value))}
-                                            size="small"
-                                            fullWidth
-                                            error={Boolean(errors.family_id)}
-                                            helperText={errors.family_id || 'Attribute groups below update the next time you open this product after saving.'}
-                                        >
-                                            {families.map((fam) => (
-                                                <MenuItem key={fam.id} value={fam.id}>
-                                                    {localizedLabel(fam, activeLocaleId)}
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-
-                                        <TextField
-                                            select
-                                            label="Product Type"
-                                            value={data.type}
-                                            onChange={(e) => handleTypeChange(e.target.value)}
-                                            size="small"
-                                            fullWidth
-                                            error={Boolean(errors.type)}
-                                            helperText={errors.type}
-                                        >
-                                            <MenuItem value="simple">Simple</MenuItem>
-                                            <MenuItem value="configurable">Configurable</MenuItem>
-                                        </TextField>
-
-                                        <TextField
-                                            label="Updated At"
-                                            value={formatLocalDateTime(product.updated_at)}
-                                            disabled
-                                            size="small"
-                                            fullWidth
-                                            InputProps={{
-                                                endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
-                                            }}
-                                        />
-
-                                        <TextField
-                                            label="Created At"
-                                            value={formatLocalDateTime(product.created_at)}
-                                            disabled
-                                            size="small"
-                                            fullWidth
-                                            InputProps={{
-                                                endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
-                                            }}
-                                        />
                                     </Stack>
-                                </Paper>
+                                </Grid>
+                            </Grid>
+                        </Box>
+                    )}
 
-                                {/* Categories Panel */}
-                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                                        <Typography variant="h6" fontWeight={700} color="text.primary">
-                                            Categories
-                                        </Typography>
-                                        <Button
-                                            component={Link}
-                                            href="/catalog/categories/marketplace-sync"
-                                            size="small"
-                                            startIcon={<LinkIcon fontSize="small" />}
-                                            sx={{ textTransform: 'none' }}
-                                        >
-                                            {t('marketplaceMappingButton')}
-                                        </Button>
-                                    </Stack>
-                                    <CategoryCascadeSelect value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
-                                </Paper>
-
-                                {/* Associations Panel */}
-                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                        Associations
-                                    </Typography>
-
-                                    <Stack spacing={2.5}>
-                                        <Box>
-                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                                                Related Products
-                                            </Typography>
-                                            <ProductPicker
-                                                value={relatedProducts}
-                                                onChange={(next) => {
-                                                    setRelatedProducts(next);
-                                                    setData('associations', { ...data.associations, related: next.map((p) => p.id) });
-                                                }}
-                                            />
-                                        </Box>
-
-                                        <Box>
-                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                                                Up-Sell Products
-                                            </Typography>
-                                            <ProductPicker
-                                                value={upSellProducts}
-                                                onChange={(next) => {
-                                                    setUpSellProducts(next);
-                                                    setData('associations', { ...data.associations, up_sell: next.map((p) => p.id) });
-                                                }}
-                                            />
-                                        </Box>
-
-                                        <Box>
-                                            <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                                                Cross-Sell Products
-                                            </Typography>
-                                            <ProductPicker
-                                                value={crossSellProducts}
-                                                onChange={(next) => {
-                                                    setCrossSellProducts(next);
-                                                    setData('associations', { ...data.associations, cross_sell: next.map((p) => p.id) });
-                                                }}
-                                            />
-                                        </Box>
-                                    </Stack>
-                                </Paper>
-
-                                {/* Sales Channels Panel */}
-                                <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                    <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                        Sales Channels
-                                    </Typography>
-                                    <Stack spacing={0.5}>
-                                        {/* Editing here (activeChannelId = null) sets the channel-based fields'
-                                            fallback value — any channel below that has no value of its own uses
-                                            this one instead, so it doesn't have to be re-entered per channel. */}
-                                        <Box
-                                            onClick={() => handleChannelChange(null)}
-                                            sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                py: 0.5,
-                                                px: 1.5,
-                                                mb: 0.5,
-                                                borderRadius: 1,
-                                                cursor: 'pointer',
-                                                bgcolor: activeChannelId === null ? 'grey.800' : 'transparent',
-                                                color: activeChannelId === null ? '#fff' : 'text.primary',
-                                                '&:hover': { bgcolor: activeChannelId === null ? 'grey.900' : 'action.hover' },
-                                            }}
-                                        >
-                                            <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-                                                Default (All Channels)
-                                            </Typography>
-                                        </Box>
-                                        {channelGroups.map((group) => {
-                                            const isExpanded = expandedPlatforms.has(group.platform);
-                                            const groupShopIds = group.channels
-                                                .map((c) => c.shop_id)
-                                                .filter((id): id is number => id != null);
-                                            const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
-                                            const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
-                                            const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
-
-                                            return (
-                                                <Box key={group.platform}>
-                                                    <Box
-                                                        onClick={() => togglePlatform(group.platform)}
-                                                        sx={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: 0.5,
-                                                            py: 0.75,
-                                                            px: 1,
-                                                            borderRadius: 1,
-                                                            cursor: 'pointer',
-                                                            '&:hover': { bgcolor: 'action.hover' },
-                                                        }}
-                                                    >
-                                                        {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-                                                        {groupShopIds.length > 0 && (
-                                                            <Checkbox
-                                                                size="small"
-                                                                checked={allInGroupChecked}
-                                                                indeterminate={someInGroupChecked}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                onChange={() => {
-                                                                    setData(
-                                                                        'published_shop_ids',
-                                                                        allInGroupChecked
-                                                                            ? data.published_shop_ids.filter((id) => !groupShopIds.includes(id))
-                                                                            : Array.from(new Set([...data.published_shop_ids, ...groupShopIds])),
-                                                                    );
-                                                                }}
-                                                                sx={{ p: 0.5 }}
-                                                            />
-                                                        )}
-                                                        <Typography variant="body2" fontWeight={700}>
-                                                            {group.platform}
-                                                        </Typography>
-                                                        <Chip label={group.channels.length} size="small" sx={{ height: 18, fontSize: '0.7rem' }} />
-                                                        {groupShopIds.length > 0 && (
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                ({checkedInGroup}/{groupShopIds.length} published)
-                                                            </Typography>
-                                                        )}
-                                                    </Box>
-                                                    <Collapse in={isExpanded}>
-                                                        <Stack sx={{ pl: 4 }}>
-                                                            {group.channels.map((ch) => {
-                                                                const active = activeChannelId === ch.id;
-                                                                const isShop = ch.shop_id != null;
-                                                                const published = isShop && data.published_shop_ids.includes(ch.shop_id as number);
-                                                                // Push/Deactivate hit the backend's *saved* published_shop_ids
-                                                                // (product->platformShops(), only updated on Save Product) —
-                                                                // but `published` above reflects unsaved local checkbox state.
-                                                                // Showing the action button as soon as the box is ticked, before
-                                                                // saving, let a user check a shop and immediately click Push,
-                                                                // which the backend then rejects with "not marked as published"
-                                                                // since nothing was persisted yet. Only offer the action once
-                                                                // the checkbox state actually matches what's saved.
-                                                                const savedPublished = isShop && publishedShopIds.includes(ch.shop_id as number);
-                                                                // Only platforms with an actual integration (PLATFORM_ROUTES)
-                                                                // get Push/Deactivate — a shop on some future/unintegrated
-                                                                // platform can still be "published" (checkbox-only) without
-                                                                // a live API to push to.
-                                                                const canPushOrDeactivate = published && savedPublished && group.platform.toLowerCase() in PLATFORM_ROUTES;
-                                                                // Only the "checked but not saved yet" direction is worth a
-                                                                // hint — that's the one where a push/deactivate button would
-                                                                // otherwise look available but isn't yet. The reverse
-                                                                // (unchecking) has no action being blocked, just a pending save.
-                                                                const hasUnsavedPublishChange = published && !savedPublished;
-                                                                return (
-                                                                    <Box
-                                                                        key={ch.id}
-                                                                        onClick={() => handleChannelChange(ch.id)}
-                                                                        sx={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            py: 0.25,
-                                                                            pr: 1.5,
-                                                                            pl: isShop ? 0.5 : 1.5,
-                                                                            borderRadius: 1,
-                                                                            cursor: 'pointer',
-                                                                            bgcolor: active ? 'grey.800' : 'transparent',
-                                                                            color: active ? '#fff' : 'text.primary',
-                                                                            '&:hover': { bgcolor: active ? 'grey.900' : 'action.hover' },
-                                                                        }}
-                                                                    >
-                                                                        {isShop && (
-                                                                            <Checkbox
-                                                                                size="small"
-                                                                                checked={published}
-                                                                                onClick={(e) => e.stopPropagation()}
-                                                                                onChange={() => toggleShopPublished(ch.shop_id as number)}
-                                                                                sx={{
-                                                                                    color: active ? '#fff' : undefined,
-                                                                                    '&.Mui-checked': { color: active ? '#fff' : undefined },
-                                                                                }}
-                                                                            />
-                                                                        )}
-                                                                        <Typography variant="body2" sx={{ flex: 1 }}>
-                                                                            {ch.name || ch.code}
-                                                                        </Typography>
-                                                                        {ch.is_live && (
-                                                                            <Chip
-                                                                                label="Live"
-                                                                                size="small"
-                                                                                title={
-                                                                                    ch.live_synced_at
-                                                                                        ? `Confirmed live as of ${new Date(ch.live_synced_at).toLocaleString()}`
-                                                                                        : 'Confirmed live on last sync'
-                                                                                }
-                                                                                sx={{ ...mappedChipSx, height: 20, fontSize: '0.65rem', mr: 1 }}
-                                                                            />
-                                                                        )}
-                                                                        {hasUnsavedPublishChange && (
-                                                                            <Typography
-                                                                                variant="caption"
-                                                                                sx={{ color: active ? 'rgba(255,255,255,0.8)' : 'text.secondary', fontStyle: 'italic', whiteSpace: 'nowrap' }}
-                                                                            >
-                                                                                Save first
-                                                                            </Typography>
-                                                                        )}
-                                                                        {canPushOrDeactivate && (
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                title={`Push to ${group.platform}`}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setPushConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
-                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                }}
-                                                                                sx={{ color: active ? '#fff' : 'grey.800' }}
-                                                                            >
-                                                                                <PublishIcon fontSize="small" />
-                                                                            </IconButton>
-                                                                        )}
-                                                                        {/* Unlike Push (safe to offer any time — it creates or
-                                                                            updates), Deactivate only makes sense once there's
-                                                                            actually something live to take down. Without the
-                                                                            ch.is_live check this showed up purely from "marked
-                                                                            to publish", so clicking it on a shop that was
-                                                                            marked but never actually pushed successfully hit
-                                                                            the backend's "never been pushed — nothing to
-                                                                            deactivate" error instead of just not being there. */}
-                                                                        {canPushOrDeactivate && ch.is_live && (
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                title={`Deactivate on ${group.platform}`}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setDeactivateConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
-                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                }}
-                                                                                sx={{ color: active ? '#fff' : 'text.secondary' }}
-                                                                            >
-                                                                                <UnpublishedIcon fontSize="small" />
-                                                                            </IconButton>
-                                                                        )}
-                                                                        {/* Shopee-only for now (see PLATFORM_ROUTES' `delete` key
-                                                                            and ShopeeProductSyncService::delete()) — separated
-                                                                            visually from Push/Deactivate (error color, distinct
-                                                                            icon) since it's a strictly more dangerous action:
-                                                                            unlike Deactivate this can never be undone, not even
-                                                                            by pushing again — a brand-new listing would be
-                                                                            required. Same ch.is_live gate as Deactivate, for the
-                                                                            same reason (nothing live means nothing to delete). */}
-                                                                        {canPushOrDeactivate && ch.is_live && group.platform.toLowerCase() === 'shopee' && (
-                                                                            <IconButton
-                                                                                size="small"
-                                                                                title={t('deleteListingButton') + ` — ${group.platform}`}
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setDeleteListingConfirmShop({ id: ch.shop_id as number, name: ch.name || ch.code, platform: group.platform });
-                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                }}
-                                                                                sx={{ color: active ? '#fff' : 'error.main' }}
-                                                                            >
-                                                                                <DeleteForeverIcon fontSize="small" />
-                                                                            </IconButton>
-                                                                        )}
-                                                                    </Box>
-                                                                );
-                                                            })}
-                                                        </Stack>
-                                                    </Collapse>
-                                                </Box>
-                                            );
-                                        })}
-                                        {channelGroups.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                No sales channels available.
-                                            </Typography>
-                                        )}
-                                    </Stack>
-                                </Paper>
-                            </Stack>
-                        </Grid>
-                    </Grid>
-                </Box>
-                )}
-
-                {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
+                    {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
                 </Box>
             </Box>
 
@@ -1729,16 +1947,29 @@ export default function ProductEdit({
                             {pushStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: pushConfirmShop?.platform })}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {t('checkingStatusOn', { platform: pushConfirmShop?.platform })}
+                                    </Typography>
                                 </Stack>
                             ) : pushStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: pushStatusCheck.error })}</Alert>
+                                <Alert severity="warning" sx={{ py: 0 }}>
+                                    {t('statusCheckFailed', { error: pushStatusCheck.error })}
+                                </Alert>
                             ) : pushStatusCheck.never_pushed ? (
-                                <Alert severity="info" sx={{ py: 0 }}>{t('neverPushedCreateNew')}</Alert>
+                                <Alert severity="info" sx={{ py: 0 }}>
+                                    {t('neverPushedCreateNew')}
+                                </Alert>
                             ) : pushStatusCheck.is_live ? (
-                                <Alert severity="success" sx={{ py: 0 }}>{t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>
+                                    {t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}
+                                </Alert>
                             ) : (
-                                <Alert severity="info" sx={{ py: 0 }}>{t('existsNotActiveWillUpdate', { platform: pushConfirmShop?.platform, status: pushStatusCheck.status ?? t('statusUnknown') })}</Alert>
+                                <Alert severity="info" sx={{ py: 0 }}>
+                                    {t('existsNotActiveWillUpdate', {
+                                        platform: pushConfirmShop?.platform,
+                                        status: pushStatusCheck.status ?? t('statusUnknown'),
+                                    })}
+                                </Alert>
                             )}
                         </Box>
                     )}
@@ -1806,16 +2037,29 @@ export default function ProductEdit({
                             {deactivateStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {t('checkingStatusOn', { platform: deactivateConfirmShop?.platform })}
+                                    </Typography>
                                 </Stack>
                             ) : deactivateStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: deactivateStatusCheck.error })}</Alert>
+                                <Alert severity="warning" sx={{ py: 0 }}>
+                                    {t('statusCheckFailed', { error: deactivateStatusCheck.error })}
+                                </Alert>
                             ) : deactivateStatusCheck.never_pushed ? (
-                                <Alert severity="error" sx={{ py: 0 }}>{t('neverPushedNothingToDeactivate')}</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                    {t('neverPushedNothingToDeactivate')}
+                                </Alert>
                             ) : !deactivateStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>{t('alreadyNotActiveNothingToDeactivate', { platform: deactivateConfirmShop?.platform, status: deactivateStatusCheck.status ?? t('statusUnknown') })}</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                    {t('alreadyNotActiveNothingToDeactivate', {
+                                        platform: deactivateConfirmShop?.platform,
+                                        status: deactivateStatusCheck.status ?? t('statusUnknown'),
+                                    })}
+                                </Alert>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>{t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>
+                                    {t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}
+                                </Alert>
                             )}
                         </Box>
                     )}
@@ -1852,31 +2096,47 @@ export default function ProductEdit({
                             {deleteListingStatusCheck.loading ? (
                                 <Stack direction="row" spacing={1} alignItems="center">
                                     <CircularProgress size={14} />
-                                    <Typography variant="body2" color="text.secondary">{t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {t('checkingStatusOn', { platform: deleteListingConfirmShop?.platform })}
+                                    </Typography>
                                 </Stack>
                             ) : deleteListingStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>{t('statusCheckFailed', { error: deleteListingStatusCheck.error })}</Alert>
+                                <Alert severity="warning" sx={{ py: 0 }}>
+                                    {t('statusCheckFailed', { error: deleteListingStatusCheck.error })}
+                                </Alert>
                             ) : deleteListingStatusCheck.never_pushed ? (
-                                <Alert severity="error" sx={{ py: 0 }}>{t('neverPushedNothingToDelete')}</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                    {t('neverPushedNothingToDelete')}
+                                </Alert>
                             ) : !deleteListingStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>{t('alreadyNotActiveNothingToDelete', { platform: deleteListingConfirmShop?.platform, status: deleteListingStatusCheck.status ?? t('statusUnknown') })}</Alert>
+                                <Alert severity="error" sx={{ py: 0 }}>
+                                    {t('alreadyNotActiveNothingToDelete', {
+                                        platform: deleteListingConfirmShop?.platform,
+                                        status: deleteListingStatusCheck.status ?? t('statusUnknown'),
+                                    })}
+                                </Alert>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>{t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}</Alert>
+                                <Alert severity="success" sx={{ py: 0 }}>
+                                    {t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}
+                                </Alert>
                             )}
                         </Box>
                     )}
-                    {deleteListingStatusCheck && !deleteListingStatusCheck.loading && !deleteListingStatusCheck.error && deleteListingStatusCheck.is_live && (
-                        <TextField
-                            fullWidth
-                            size="small"
-                            sx={{ mt: 2.5 }}
-                            label={t('deleteListingTypeToConfirm', { sku: product.sku })}
-                            placeholder={t('deleteListingConfirmPlaceholder')}
-                            value={deleteConfirmText}
-                            onChange={(e) => setDeleteConfirmText(e.target.value)}
-                            autoComplete="off"
-                        />
-                    )}
+                    {deleteListingStatusCheck &&
+                        !deleteListingStatusCheck.loading &&
+                        !deleteListingStatusCheck.error &&
+                        deleteListingStatusCheck.is_live && (
+                            <TextField
+                                fullWidth
+                                size="small"
+                                sx={{ mt: 2.5 }}
+                                label={t('deleteListingTypeToConfirm', { sku: product.sku })}
+                                placeholder={t('deleteListingConfirmPlaceholder')}
+                                value={deleteConfirmText}
+                                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                autoComplete="off"
+                            />
+                        )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={closeDeleteListingDialog} color="inherit" disabled={deletingListing}>
@@ -1904,8 +2164,8 @@ export default function ProductEdit({
                 <DialogTitle>เปลี่ยนเป็น Simple?</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
-                        สินค้านี้มี <strong>{data.variants.length}</strong> variant อยู่ — เปลี่ยน Product Type เป็น Simple แล้วกด Save
-                        จะ<strong>ลบ variant ทั้งหมด</strong>ออกจากระบบ การกระทำนี้ย้อนกลับไม่ได้
+                        สินค้านี้มี <strong>{data.variants.length}</strong> variant อยู่ — เปลี่ยน Product Type เป็น Simple แล้วกด Save จะ
+                        <strong>ลบ variant ทั้งหมด</strong>ออกจากระบบ การกระทำนี้ย้อนกลับไม่ได้
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
@@ -1918,7 +2178,13 @@ export default function ProductEdit({
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={variantDialogOpen} onClose={() => setVariantDialogOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2 } }}>
+            <Dialog
+                open={variantDialogOpen}
+                onClose={() => setVariantDialogOpen(false)}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={700}>
                         เลือก Attribute สำหรับสร้าง Variant
@@ -1942,12 +2208,7 @@ export default function ProductEdit({
                         onChange={(_, newValue) => setPendingVariantAttrIds(newValue.map((item) => item.id))}
                         renderTags={(value, getTagProps) =>
                             value.map((option, index) => (
-                                <Chip
-                                    label={option.name || option.code}
-                                    {...getTagProps({ index })}
-                                    key={option.id}
-                                    sx={mappedChipSx}
-                                />
+                                <Chip label={option.name || option.code} {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
                             ))
                         }
                         renderInput={(params) => <TextField {...params} placeholder="เลือก attribute เช่น สี, ไซส์" variant="outlined" />}
@@ -1957,11 +2218,7 @@ export default function ProductEdit({
                     <Button onClick={() => setVariantDialogOpen(false)} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
                         ยกเลิก
                     </Button>
-                    <Button
-                        onClick={applyVariantGeneration}
-                        variant="contained"
-                        sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}
-                    >
+                    <Button onClick={applyVariantGeneration} variant="contained" sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}>
                         Generate
                     </Button>
                 </DialogActions>
@@ -1981,9 +2238,10 @@ export default function ProductEdit({
     );
 }
 
-// Normalizes a gallery attribute's value — the raw JSON-encoded path array
-// loaded from the backend, or a (string | File)[] once the user has edited
-// it in this session — into a flat list of kept paths / newly picked files.
+// แปลง value ของ attribute แบบ gallery ให้เป็นรูปแบบเดียวกัน — ไม่ว่าจะเป็น array
+// ของ path ที่ encode เป็น JSON ดิบๆ ที่โหลดมาจาก backend หรือจะเป็น
+// (string | File)[] หลังจากผู้ใช้แก้ไขในเซสชันนี้แล้วก็ตาม ให้กลายเป็น list
+// แบบแบนๆ ของ path เดิมที่เก็บไว้ / ไฟล์ที่เพิ่งเลือกใหม่
 function parseGalleryItems(value: AttributeValue): (string | File)[] {
     if (Array.isArray(value)) {
         return value;
@@ -1995,25 +2253,17 @@ function parseGalleryItems(value: AttributeValue): (string | File)[] {
                 return parsed.filter((p): p is string => typeof p === 'string' && p !== '');
             }
         } catch {
-            // Not JSON — a legacy single-path string; treat it as one existing image.
+            // ไม่ใช่ JSON — เป็น string path เดี่ยวๆ แบบเก่า ให้ถือว่าเป็นรูปที่มีอยู่แล้วหนึ่งรูป
             return [value];
         }
     }
     return [];
 }
 
-// Renders one gallery thumbnail — an existing stored path or a locally
-// picked File pending upload — with a remove button. Object URLs for File
-// previews are created/revoked per item so they don't leak across renders.
-function GalleryThumb({
-    item,
-    disabled,
-    onRemove,
-}: {
-    item: string | File;
-    disabled?: boolean;
-    onRemove: () => void;
-}) {
+// render thumbnail ของแกลเลอรีทีละรูป — ไม่ว่าจะเป็น path ที่เก็บไว้อยู่แล้ว
+// หรือ File ที่เพิ่งเลือกในเครื่องรอ upload — พร้อมปุ่มลบ Object URL ของแต่ละ
+// File จะถูกสร้าง/revoke ทีละรูป เพื่อไม่ให้ leak ข้ามการ render
+function GalleryThumb({ item, disabled, onRemove }: { item: string | File; disabled?: boolean; onRemove: () => void }) {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
@@ -2026,12 +2276,7 @@ function GalleryThumb({
         return () => URL.revokeObjectURL(url);
     }, [item]);
 
-    const src =
-        typeof item === 'string'
-            ? /^https?:\/\//.test(item) || item.startsWith('/')
-                ? item
-                : `/storage/${item}`
-            : previewUrl;
+    const src = typeof item === 'string' ? (/^https?:\/\//.test(item) || item.startsWith('/') ? item : `/storage/${item}`) : previewUrl;
 
     return (
         <Box sx={{ position: 'relative', width: 64, height: 64 }}>
@@ -2068,10 +2313,10 @@ function GalleryThumb({
     );
 }
 
-// Component to dynamically render appropriate form control based on real system attribute definition
-// Pure and stateless, so it's hoisted out of RenderAttributeInput instead
-// of redefined every render — SelectControl below needs it to hold a
-// stable identity to stay memoizable.
+// component ที่ render form control ให้เหมาะกับ attribute นั้นๆ แบบไดนามิก
+// ตาม definition จริงของระบบ เป็น pure function ไม่มี state เลยแยกออกมาไว้
+// นอก RenderAttributeInput แทนที่จะสร้างใหม่ทุกครั้งที่ render — SelectControl
+// ด้านล่างต้องการให้ฟังก์ชันนี้มี identity คงที่เพื่อให้ memoize ได้
 function optionValue(opt: AttributeOption) {
     return opt.code || opt.admin_label || String(opt.id);
 }
@@ -2083,13 +2328,12 @@ type FieldControlProps = {
     onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
 };
 
-// Autocomplete (options popper, virtualization, filtering) is one of the
-// heaviest controls in this form, and most attributes aren't locale-scoped
-// — their value/options don't change on a pure language switch even though
-// every field's *label* does (attribute names are translated). Splitting
-// it out from the label/chip chrome around it and memoizing on props that
-// only change when the value/options genuinely do lets it skip that
-// re-render instead of rebuilding on every switch.
+// Autocomplete (popper ของ options, virtualization, filtering) เป็นหนึ่งใน
+// control ที่หนักที่สุดในฟอร์มนี้ และ attribute ส่วนใหญ่ไม่ได้ scope ตาม locale
+// — value/options ของมันไม่เปลี่ยนตอนสลับแค่ภาษาเฉยๆ ถึงแม้ *label* ของทุกฟิลด์
+// จะเปลี่ยน (ชื่อ attribute ถูกแปลไว้) การแยกส่วนนี้ออกจาก label/chip ที่ห่อ
+// อยู่รอบๆ แล้ว memoize ด้วย props ที่เปลี่ยนก็ต่อเมื่อ value/options เปลี่ยนจริงๆ
+// เท่านั้น ทำให้มันข้าม re-render ได้ แทนที่จะต้องสร้างใหม่ทุกครั้งที่สลับ
 const SelectControl = memo(function SelectControl({
     attributeId,
     channelKey,
@@ -2119,9 +2363,9 @@ const SelectControl = memo(function SelectControl({
     );
 });
 
-// Same rationale as SelectControl: a rich-text editor is expensive to
-// re-render, and most attributes' values don't change on a pure locale
-// switch — only their (separately rendered) label does.
+// เหตุผลเดียวกับ SelectControl: rich-text editor ตัวหนึ่ง render ใหม่แต่ละครั้ง
+// มีต้นทุนสูง และ value ของ attribute ส่วนใหญ่ก็ไม่เปลี่ยนตอนสลับแค่ locale เฉยๆ
+// — เปลี่ยนแค่ label (ที่ render แยกต่างหาก) เท่านั้น
 const RichTextControl = memo(function RichTextControl({
     attributeId,
     channelKey,
@@ -2168,11 +2412,11 @@ function RenderAttributeInput({
     canAddOptions?: boolean;
     sku: string;
 }) {
-    // Used by every field type below except the memoized SelectControl /
-    // RichTextControl (they call onValueChange directly with the resolved
-    // attributeId/channelKey/localeKey instead) — those two are the fields
-    // expensive enough that a fresh closure identity here would defeat
-    // their memoization on every parent re-render (e.g. a locale switch).
+    // ใช้กับทุกประเภทฟิลด์ด้านล่าง ยกเว้น SelectControl / RichTextControl ที่
+    // memoize ไว้ (สองตัวนี้เรียก onValueChange ตรงๆ พร้อม
+    // attributeId/channelKey/localeKey ที่ resolve แล้วแทน) — เพราะสองฟิลด์นี้
+    // มีต้นทุนสูงพอที่ closure identity ใหม่ตรงนี้จะทำลายการ memoize ของมันทุกครั้ง
+    // ที่ parent re-render (เช่น ตอนสลับ locale)
     const onChange = (val: AttributeValue) => onValueChange(attr.id, channelKey, localeKey, val);
     const stringValue = typeof value === 'string' ? value : '';
     const isReadOnly = attr.editable === false;
@@ -2203,13 +2447,12 @@ function RenderAttributeInput({
                         sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.600', color: '#fff', fontWeight: 700 }}
                     />
                 ) : attr.is_channel_based ? (
-                    // Previously always showed "DEFAULT" here regardless of
-                    // which channel was actually active — a channel-based
-                    // field (e.g. price_std) gave zero visual confirmation of
-                    // which shop you were editing, so switching the active
-                    // channel and typing a value looked identical to typing
-                    // it for the wrong (or no) channel. Show the real channel
-                    // name so that's no longer silently ambiguous.
+                    // แต่ก่อนตรงนี้จะโชว์ "DEFAULT" ตลอด ไม่ว่า channel ไหนจะ
+                    // active อยู่จริง — ฟิลด์ที่เป็น channel-based (เช่น price_std)
+                    // เลยไม่มีการยืนยันด้วยภาพเลยว่ากำลังแก้ไขร้านไหนอยู่ พอสลับ
+                    // channel active แล้วพิมพ์ค่า ก็จะดูเหมือนกันเป๊ะกับตอนพิมพ์ให้
+                    // channel ผิด (หรือไม่มี channel เลย) เลยเปลี่ยนมาโชว์ชื่อ
+                    // channel จริงแทน จะได้ไม่คลุมเครือแบบเงียบๆ อีกต่อไป
                     <>
                         <Chip
                             label={activeChannelName ? activeChannelName.toUpperCase() : 'CHANNEL'}
@@ -2343,7 +2586,11 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Switch disabled={isReadOnly} checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />
+                <Switch
+                    disabled={isReadOnly}
+                    checked={stringValue === '1' || stringValue === 'true'}
+                    onChange={(e) => onChange(e.target.checked ? '1' : '0')}
+                />
             </Box>
         );
     }
@@ -2353,7 +2600,13 @@ function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <FormControlLabel
-                        control={<Checkbox disabled={isReadOnly} checked={stringValue === '1' || stringValue === 'true'} onChange={(e) => onChange(e.target.checked ? '1' : '0')} />}
+                        control={
+                            <Checkbox
+                                disabled={isReadOnly}
+                                checked={stringValue === '1' || stringValue === 'true'}
+                                onChange={(e) => onChange(e.target.checked ? '1' : '0')}
+                            />
+                        }
                         label={
                             <Typography variant="caption" fontWeight={600} color="#334155">
                                 {label} {attr.is_required && '*'}
@@ -2392,11 +2645,11 @@ function RenderAttributeInput({
         const MAX_GALLERY_IMAGES = 8;
         const MIN_GALLERY_DIMENSION = 300;
 
-        // Existing images arrive as a JSON-encoded array of paths (the raw
-        // ProductValue string); once the user touches this field it becomes
-        // a real (string | File)[] array mixing kept paths with newly picked
-        // files, which the backend merges back together on save instead of
-        // replacing the whole set (see ProductController::update()).
+        // รูปที่มีอยู่แล้วจะมาในรูป array ของ path ที่ encode เป็น JSON (คือ string
+        // ProductValue ดิบๆ) พอผู้ใช้แตะฟิลด์นี้ปุ๊บ มันจะกลายเป็น array
+        // (string | File)[] จริงๆ ที่ผสมทั้ง path เดิมกับไฟล์ที่เพิ่งเลือกเข้ามาใหม่
+        // ซึ่ง backend จะ merge กลับเข้าด้วยกันตอน save แทนที่จะแทนที่ทั้งชุด
+        // (ดู ProductController::update())
         const items = parseGalleryItems(value);
         const atLimit = items.length >= MAX_GALLERY_IMAGES;
 
@@ -2405,10 +2658,10 @@ function RenderAttributeInput({
             onChange(items.filter((_, i) => i !== index));
         };
 
-        // Mirrors the video field's handleVideoSelect() below — same "fast,
-        // no-round-trip" reasoning; ProductController::validateImageConstraints()
-        // is what a request made directly against the endpoint (bypassing
-        // this UI) can't get past.
+        // ทำงานคล้าย handleVideoSelect() ของฟิลด์ video ด้านล่าง — เหตุผลเดียวกัน
+        // คือ "เร็ว ไม่ต้อง round-trip" ส่วน
+        // ProductController::validateImageConstraints() คือด่านที่ request ที่
+        // ยิงตรงไปที่ endpoint เอง (ข้าม UI นี้ไปเลย) จะผ่านไปไม่ได้
         const probeDimensions = (file: File) =>
             new Promise<{ width: number; height: number }>((resolve, reject) => {
                 const url = URL.createObjectURL(file);
@@ -2470,7 +2723,8 @@ function RenderAttributeInput({
                     {renderChips()}
                 </Stack>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Up to {MAX_GALLERY_IMAGES} images ({items.length}/{MAX_GALLERY_IMAGES}) · Minimum size {MIN_GALLERY_DIMENSION}×{MIN_GALLERY_DIMENSION}px
+                    Up to {MAX_GALLERY_IMAGES} images ({items.length}/{MAX_GALLERY_IMAGES}) · Minimum size {MIN_GALLERY_DIMENSION}×
+                    {MIN_GALLERY_DIMENSION}px
                 </Typography>
                 {items.length > 0 && (
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
@@ -2525,18 +2779,16 @@ function RenderAttributeInput({
         let existingVideoUrl = '';
         if (!selectedName && stringValue) {
             existingLabel = stringValue.split('/').pop() || stringValue;
-            existingVideoUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
-                ? stringValue
-                : `/storage/${stringValue}`;
+            existingVideoUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/') ? stringValue : `/storage/${stringValue}`;
         }
 
         const previewSrc = filePreviewUrl || existingVideoUrl;
 
-        // Mirrors the server-side getID3 check in ProductController
-        // (validateVideoConstraints()) — this is the fast, no-round-trip
-        // path that catches most bad files before a 100MB upload even
-        // starts; the server check is what a request made directly against
-        // the endpoint (bypassing this UI) can't get past.
+        // ทำงานคล้ายการเช็ค getID3 ฝั่ง server ใน ProductController
+        // (validateVideoConstraints()) — เป็นด่านที่เร็ว ไม่ต้อง round-trip
+        // ไปเซิร์ฟเวอร์ ช่วยดักไฟล์เสียส่วนใหญ่ได้ก่อนที่จะเริ่ม upload 100MB ด้วยซ้ำ
+        // ส่วนการเช็คฝั่ง server คือด่านที่ request ที่ยิงตรงไปที่ endpoint เอง
+        // (ข้าม UI นี้ไปเลย) จะผ่านไปไม่ได้
         const handleVideoSelect = (file: File) => {
             setVideoError(null);
 
@@ -2606,9 +2858,9 @@ function RenderAttributeInput({
                                 const files = e.target.files;
                                 if (!files || files.length === 0) return;
                                 handleVideoSelect(files[0]);
-                                // Reset so re-selecting the same (rejected) file still
-                                // fires this handler again — browsers skip the change
-                                // event otherwise since the input's value didn't change.
+                                // ต้องรีเซ็ตค่า เพื่อให้เลือกไฟล์เดิม (ที่โดนปฏิเสธไปแล้ว) ซ้ำแล้ว
+                                // ยังยิง handler นี้ได้อีก — ไม่งั้น browser จะไม่ยิง event change
+                                // ให้ เพราะ value ของ input ไม่ได้เปลี่ยน
                                 e.target.value = '';
                             }}
                         />
@@ -2643,9 +2895,7 @@ function RenderAttributeInput({
         if (!selectedName && stringValue) {
             existingLabel = stringValue.split('/').pop() || stringValue;
             if (isImage) {
-                existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/')
-                    ? stringValue
-                    : `/storage/${stringValue}`;
+                existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/') ? stringValue : `/storage/${stringValue}`;
             }
         }
 

@@ -8,11 +8,11 @@ interface ProductRef {
 }
 
 /**
- * "Which products does leaving this category unmapped actually affect?" —
- * shown per row on the Lazada/Shopee mapping review pages. The count comes
- * pre-loaded with the page (cheap withCount); the actual SKU list is fetched
- * lazily on first expand via CategoryController::categoryProducts(), since
- * pulling every row's full product list up front doesn't scale with page size.
+ * ตอบคำถามว่า "ถ้าปล่อย category นี้ไว้แบบไม่ได้ map จะกระทบสินค้าตัวไหนบ้าง?"
+ * — แสดงอยู่ในแต่ละแถวของหน้าตรวจสอบการ map Lazada/Shopee ตัวเลขจำนวนสินค้า
+ * จะโหลดมาพร้อมหน้าเลย (ใช้ withCount ซึ่งเบามาก) ส่วนลิสต์ SKU จริงๆ จะโหลด
+ * แบบ lazy ตอนกดขยายครั้งแรกผ่าน CategoryController::categoryProducts()
+ * เพราะถ้าโหลดลิสต์สินค้าเต็มๆ ของทุกแถวมาตั้งแต่แรก จะรับโหลดไม่ไหวเมื่อข้อมูลเยอะ
  */
 export function CategoryProductsExpander({ categoryId, count }: { categoryId: number; count: number }) {
     const { t } = useTranslation('catalog');

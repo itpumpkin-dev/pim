@@ -4,13 +4,13 @@ import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-ta
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
 
-// v1 supports free-value Lazada attributes (input_type text/numeric) and
-// richText fields (e.g. description/short_description, which accept real
-// HTML) — see LazadaAttributeMappingController::update(), which rejects a
-// mapping to any other input_type. singleSelect/multiSelect/enumInput
-// attributes are still listed (so an admin can see they exist) but
-// disabled, since Lazada needs a specific predefined option for those
-// rather than an arbitrary value.
+// v1 รองรับ Lazada attribute แบบใส่ค่าอิสระ (input_type text/numeric) และ
+// ฟิลด์ richText (เช่น description/short_description ที่รับ HTML จริงๆ ได้)
+// — ดูที่ LazadaAttributeMappingController::update() ซึ่งจะปฏิเสธการ mapping
+// ไปยัง input_type แบบอื่น ส่วน attribute แบบ singleSelect/multiSelect/
+// enumInput ยังคงแสดงในลิสต์อยู่ (เพื่อให้แอดมินเห็นว่ามีอยู่จริง) แต่จะกด
+// เลือกไม่ได้ เพราะ Lazada ต้องการตัวเลือกที่กำหนดไว้ล่วงหน้าเฉพาะเจาะจง
+// ไม่ใช่ค่าอิสระ
 const MAPPABLE_INPUT_TYPES = ['text', 'numeric', 'richText'];
 
 type TargetField =
@@ -25,25 +25,25 @@ type TargetField =
     | 'lazada_attribute'
     | '';
 
-// Single-value, "first mapped attribute with a value wins" fields feeding
-// Lazada's own payload directly (SellerSku/quantity/price/package_*/
-// attributes.video) — see LazadaProductSyncService::resolveMappedField().
-// Distinct from `lazada_attribute` below, which feeds one Lazada category
-// attribute instead (payload.attributes or payload.skus[0], depending on
-// that attribute's own attribute_type) — a structurally different
-// destination, kept in its own dropdown group (and its own status caption).
+// ฟิลด์แบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่าจะชนะ"
+// ส่งค่าตรงเข้า payload ของ Lazada เอง (SellerSku/quantity/price/package_*/
+// attributes.video) — ดูที่ LazadaProductSyncService::resolveMappedField()
+// ต่างจาก `lazada_attribute` ด้านล่างนี้ ซึ่งจะไปลงที่ category attribute
+// ของ Lazada แทน (payload.attributes หรือ payload.skus[0] แล้วแต่
+// attribute_type ของตัว attribute นั้นๆ) — ปลายทางต่างกันโดยโครงสร้าง
+// เลยแยกกลุ่ม dropdown ออกจากกัน (และมี status caption ของตัวเอง)
 const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'video'];
 
-// The target Select's value is a plain TargetField string for every fixed
-// payload field, but a Lazada category-attribute mapping needs to also
-// carry *which* attribute — encoded as this prefix + its name (Lazada
-// attributes are identified by name, not a numeric id) — e.g.
-// "lazada_attribute:product_warranty".
+// ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับฟิลด์
+// payload ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป Lazada category attribute
+// ต้องแนบด้วยว่า *attribute ไหน* — เลยเข้ารหัสเป็น prefix นี้ + ชื่อ (attribute
+// ของ Lazada ระบุด้วยชื่อ ไม่ใช่ id ตัวเลข) เช่น
+// "lazada_attribute:product_warranty"
 const LAZADA_ATTRIBUTE_PREFIX = 'lazada_attribute:';
 
-// Field identifiers are snake_case (matching the backend's target_field
-// values) but this app's i18n keys are camelCase — same keys
-// woocommerce-/shopee-attribute-mapping-panel.tsx use for the same fields.
+// ชื่อฟิลด์เป็น snake_case (ตรงกับค่า target_field ฝั่ง backend) แต่ i18n key
+// ของแอปนี้เป็น camelCase — คีย์เดียวกับที่
+// woocommerce-/shopee-attribute-mapping-panel.tsx ใช้กับฟิลด์เดียวกัน
 const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'lazada_attribute'>, string> = {
     name: 'name',
     price: 'price',
@@ -102,8 +102,8 @@ export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes, cove
         }),
     });
 
-    // Backend reports payloadFields.missing as raw target_field keys — same
-    // translation the picker's own dropdown uses, so the tooltip matches.
+    // Backend ส่ง payloadFields.missing มาเป็น target_field key ดิบๆ — ใช้
+    // ชุดคำแปลเดียวกับที่ dropdown ของตัว picker เองใช้ เพื่อให้ tooltip ตรงกัน
     const payloadFieldsCoverage = {
         ...coverage.payloadFields,
         missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>])),
@@ -151,9 +151,9 @@ export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes, cove
                         <MenuItem
                             key={field}
                             value={field}
-                            // Lazada rejects external video URLs (see this field's
-                            // backend guard) — only a PIM attribute of type `video`
-                            // (an uploaded file) may ever target the Video field.
+                            // Lazada ไม่รับ URL วิดีโอจากภายนอก (ดู backend guard ของ
+                            // ฟิลด์นี้) — จะมีแค่ PIM attribute ประเภท `video`
+                            // (ไฟล์ที่อัปโหลดจริง) เท่านั้นที่ map มาที่ฟิลด์ Video ได้
                             disabled={field === 'video' && row.type !== 'video'}
                         >
                             {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>])}

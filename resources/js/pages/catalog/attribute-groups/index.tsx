@@ -127,10 +127,10 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
         router.get('/catalog/attributeGroups', { search, per_page: perPage, filters: next }, { preserveState: true });
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): id is the least
-    // useful thing to a human on a narrow screen so it pops in first; code
-    // identifies the row and stays pinned; name follows as space allows.
-    // Row actions stay pinned like the identifying column.
+    // ลำดับความสำคัญของคอลัมน์เวลาจอแคบ (ตาราง responsive แบบ SAP Fiori): id คือสิ่งที่
+    // มีประโยชน์น้อยสุดสำหรับคนดูบนจอแคบ เลยโดนซ่อนก่อนเป็นอันดับแรก ส่วน code
+    // ใช้ระบุแถวเลยตรึงไว้ตลอด ส่วน name จะโชว์ตามพื้นที่ที่เหลือ
+    // คอลัมน์ actions ก็ตรึงไว้เหมือนคอลัมน์ที่ใช้ระบุแถวเช่นกัน
     const columns: FioriResponsiveColumn<AttributeGroupRow>[] = [
         { key: 'id', header: t('fields.id'), priority: 'low', render: (row) => row.id },
         { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography> },
@@ -161,7 +161,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributeGroupsTitle')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {/* Header Title & Create Button */}
+                {/* หัวข้อและปุ่มสร้างใหม่ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
@@ -182,9 +182,9 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                     )}
                 </Stack>
 
-                {/* Table Card: toolbar + head + rows on one Fiori "Table" surface */}
+                {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
                 <Paper elevation={0} sx={fioriCardSx}>
-                    {/* Toolbar */}
+                    {/* แถบเครื่องมือ */}
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
                         <TextField
                             value={search}
@@ -263,7 +263,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    {/* Table */}
+                    {/* ตาราง */}
                     <FioriResponsiveTable
                         variant="plain"
                         columns={columns}
@@ -274,7 +274,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                 </Paper>
             </Box>
 
-            {/* Delete Dialog */}
+            {/* ไดอะล็อกยืนยันการลบ */}
             <Dialog open={deleteGroupId !== null} onClose={() => setDeleteGroupId(null)}>
                 <DialogTitle>{t('confirmDeletion')}</DialogTitle>
                 <DialogContent>

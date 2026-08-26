@@ -8,12 +8,11 @@ export interface CategoryOption {
 }
 
 /**
- * Search-by-name picker over the PIM's own leaf categories (see
- * CategoryController::searchCategories) — the mirror image of
- * ShopeeCategoryPicker, which searches Shopee's leaf tree instead. Backs the
- * "assign a PIM category to this Shopee node" action on
- * categories/shopee-mapping.tsx, where mapping now starts from a Shopee row
- * and asks "which of our categories is this", not the other way around.
+ * ตัวค้นหา category ของ PIM เองจากชื่อ (ดูที่ CategoryController::searchCategories)
+ * — เป็นด้านตรงข้ามของ ShopeeCategoryPicker ที่ค้นหาจาก tree ของ Shopee แทน
+ * ใช้รองรับ action "กำหนด PIM category ให้กับ node ของ Shopee นี้" ในหน้า
+ * categories/shopee-mapping.tsx ซึ่งตอนนี้การ map จะเริ่มจากแถวของ Shopee ก่อน
+ * แล้วถามว่า "อันนี้ตรงกับ category ไหนของเรา" ไม่ใช่กลับกันแบบเดิม
  */
 export function CategoryPicker({
     value,

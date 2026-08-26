@@ -4,11 +4,11 @@ import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-ta
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
 
-// v1 only supports free-text Shopee attributes (input_type 3) — see
-// ShopeeAttributeMappingController::update(), which rejects a mapping to
-// any other input_type. Select/dropdown attributes are still listed (so an
-// admin can see they exist) but disabled, since Shopee needs a specific
-// value_id for those rather than free text.
+// v1 รองรับแค่ Shopee attribute แบบพิมพ์ข้อความเอง (input_type 3) เท่านั้น — ดูที่
+// ShopeeAttributeMappingController::update() ซึ่งจะปฏิเสธการ mapping ไปยัง
+// input_type แบบอื่น ส่วน attribute แบบ select/dropdown ยังคงแสดงในลิสต์อยู่
+// (เพื่อให้แอดมินเห็นว่ามีอยู่จริง) แต่จะกดเลือกไม่ได้ เพราะ Shopee ต้องการ
+// value_id เฉพาะเจาะจงสำหรับแบบนั้น ไม่ใช่ข้อความอิสระ
 const MAPPABLE_INPUT_TYPE = 3;
 
 type TargetField =
@@ -24,26 +24,26 @@ type TargetField =
     | 'shopee_attribute'
     | '';
 
-// All nine of these are single-value, "first mapped attribute with a value
-// wins" fields feeding Shopee's own add_item/update_item payload directly
+// ทั้ง 9 ฟิลด์นี้เป็นแบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่า
+// จะชนะ" ส่งค่าตรงเข้า payload ของ Shopee เอง (add_item/update_item)
 // (item_name/original_price/seller_stock/weight/dimension/description/
-// video_upload_id) — see ShopeeProductSyncService::resolveMappedField().
-// Distinct from `shopee_attribute` below, which feeds one entry of
-// Shopee's own `attribute_list[]` instead — a structurally different
-// destination, kept in its own dropdown group (and its own status caption)
-// so the two are never confused for each other.
+// video_upload_id) — ดูที่ ShopeeProductSyncService::resolveMappedField()
+// ต่างจาก `shopee_attribute` ด้านล่างนี้ ซึ่งจะไปลงที่ entry หนึ่งใน
+// `attribute_list[]` ของ Shopee แทน — ปลายทางต่างกันโดยโครงสร้าง เลยแยก
+// กลุ่ม dropdown ออกจากกัน (และมี status caption ของตัวเอง) เพื่อไม่ให้
+// สับสนกันระหว่างสองแบบนี้
 const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video'];
 
-// The target Select's value is a plain TargetField string for every fixed
-// payload field, but a Shopee attribute_list mapping needs to also carry
-// *which* Shopee attribute — encoded as this prefix + its id (e.g.
-// "shopee_attribute:7") so one MUI Select can represent both without a
-// second control.
+// ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับฟิลด์
+// payload ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป Shopee attribute_list
+// ต้องแนบด้วยว่า *attribute ไหน* ของ Shopee — เลยเข้ารหัสเป็น prefix นี้ + id
+// (เช่น "shopee_attribute:7") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้
+// โดยไม่ต้องมี control ตัวที่สอง
 const SHOPEE_ATTRIBUTE_PREFIX = 'shopee_attribute:';
 
-// Field identifiers are snake_case (matching the backend's target_field
-// values) but this app's i18n keys are camelCase — these are the same keys
-// woocommerce-attribute-mapping-panel.tsx uses for the same fields.
+// ชื่อฟิลด์เป็น snake_case (ตรงกับค่า target_field ฝั่ง backend) แต่ i18n key
+// ของแอปนี้เป็น camelCase — คีย์พวกนี้เป็นคีย์เดียวกับที่
+// woocommerce-attribute-mapping-panel.tsx ใช้กับฟิลด์เดียวกัน
 const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'shopee_attribute'>, string> = {
     name: 'name',
     price: 'price',
@@ -103,8 +103,8 @@ export function ShopeeAttributeMappingPanel({ attributes, shopeeAttributes, cove
         }),
     });
 
-    // Backend reports payloadFields.missing as raw target_field keys — same
-    // translation the picker's own dropdown uses, so the tooltip matches.
+    // Backend ส่ง payloadFields.missing มาเป็น target_field key ดิบๆ — ใช้
+    // ชุดคำแปลเดียวกับที่ dropdown ของตัว picker เองใช้ เพื่อให้ tooltip ตรงกัน
     const payloadFieldsCoverage = {
         ...coverage.payloadFields,
         missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'shopee_attribute'>])),
@@ -152,9 +152,9 @@ export function ShopeeAttributeMappingPanel({ attributes, shopeeAttributes, cove
                         <MenuItem
                             key={field}
                             value={field}
-                            // Shopee's video field expects an uploaded file, not an
-                            // external URL (see this field's backend guard) — only a
-                            // PIM attribute of type `video` may ever target it.
+                            // ฟิลด์วิดีโอของ Shopee ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
+                            // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
+                            // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
                             disabled={field === 'video' && row.type !== 'video'}
                         >
                             {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'shopee_attribute'>])}

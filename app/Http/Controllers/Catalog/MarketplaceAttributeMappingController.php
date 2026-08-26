@@ -22,25 +22,25 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * Single entry point ("จับคู่เนื้อหา Marketplace") bundling all four
- * platform attribute-mapping datasets into one Inertia response, rendered
- * as tabs by resources/js/pages/catalog/attributes/marketplace-mapping.tsx
- * — replaces what used to be four separate hub tiles/pages/controllers'
- * own index() actions (WooCommerceAttributeMappingController,
+ * จุดเข้าเดียว ("จับคู่เนื้อหา Marketplace") ที่รวมข้อมูล attribute-mapping ของ
+ * ทั้ง 4 แพลตฟอร์มไว้ใน Inertia response เดียว แสดงผลเป็นแท็บผ่าน
+ * resources/js/pages/catalog/attributes/marketplace-mapping.tsx
+ * — แทนที่หน้า hub tile/page/controller ที่แยกกัน 4 อันเดิม ซึ่งต่างก็มี
+ * index() action ของตัวเอง (WooCommerceAttributeMappingController,
  * ShopeeAttributeMappingController, LazadaAttributeMappingController,
- * TikTokAttributeMappingController — each still owns its own update()/
- * syncXAttributes() write actions, called from within its tab's panel;
- * only the four read-only index() actions were consolidated here).
+ * TikTokAttributeMappingController — แต่ละตัวยังคง update()/syncXAttributes()
+ * ที่เป็น action เขียนข้อมูลไว้เหมือนเดิม เรียกใช้จากในแผงแท็บของตัวเอง
+ * มีแค่ index() ที่เป็น read-only ของทั้ง 4 ตัวเท่านั้นที่ถูกรวมมาไว้ที่นี่)
  */
 class MarketplaceAttributeMappingController extends Controller
 {
-    // Every fixed payload target_field each platform's sync service reads
-    // via resolveMappedField()/buildContentFields() — mirrors each
-    // *AttributeMappingController::TARGET_FIELDS minus the custom-attribute
-    // bucket ('wc_attribute'/'shopee_attribute'/'lazada_attribute'/
-    // 'tiktok_attribute'), which is covered separately by
-    // platformAttributeCoverage() below. Used to report which payload
-    // fields no PIM attribute currently feeds at all.
+    // target_field ตายตัวทั้งหมดที่ sync service ของแต่ละแพลตฟอร์มอ่านผ่าน
+    // resolveMappedField()/buildContentFields() — เหมือนกับ
+    // *AttributeMappingController::TARGET_FIELDS ของแต่ละตัว แค่ตัดกลุ่ม
+    // custom attribute ออก ('wc_attribute'/'shopee_attribute'/'lazada_attribute'/
+    // 'tiktok_attribute') เพราะกลุ่มนั้นมี platformAttributeCoverage() ด้านล่าง
+    // คอยเช็คแยกต่างหากอยู่แล้ว ใช้ตัวนี้ไว้รายงานว่าฟิลด์ payload ไหนบ้างที่
+    // ยังไม่มี attribute ของ PIM ตัวไหนป้อนเข้าไปเลย
     private const PAYLOAD_FIELDS = [
         'woocommerce' => ['description', 'short_description', 'name', 'price', 'image', 'qty', 'weight', 'length', 'width', 'height', 'video'],
         'shopee' => ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video'],
@@ -48,13 +48,12 @@ class MarketplaceAttributeMappingController extends Controller
         'tiktok' => ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video'],
     ];
 
-    // Lazada's live category-attribute schema (lazada_attributes) can
-    // contain entries with these exact names — they're always already
-    // covered by the fixed payload fields above (see
-    // LazadaProductSyncService::buildPayload()'s SellerSku/quantity/price/
-    // name/video/package_* fields), so counting them again as "unmapped
-    // Lazada attributes" would double-count a gap that doesn't actually
-    // exist and isn't fillable through the lazada_attribute bucket anyway.
+    // schema ของ category-attribute ตัวจริงบน Lazada (lazada_attributes) อาจมี
+    // entry ที่ชื่อตรงกับพวกนี้เป๊ะๆ — ซึ่งจริงๆ แล้วถูกครอบคลุมด้วยฟิลด์ payload
+    // ตายตัวด้านบนอยู่แล้ว (ดูฟิลด์ SellerSku/quantity/price/name/video/package_*
+    // ใน LazadaProductSyncService::buildPayload()) ถ้านับซ้ำเป็น "Lazada attribute
+    // ที่ยังไม่ได้ map" อีก จะกลายเป็นนับช่องว่างที่จริงๆ ไม่มีอยู่จริง แถมยังเติมผ่าน
+    // กลุ่ม lazada_attribute ไม่ได้อยู่ดี
     private const LAZADA_RESERVED_ATTRIBUTE_NAMES = [
         'SellerSku', 'name', 'price', 'quantity', 'video',
         'package_weight', 'package_length', 'package_width', 'package_height',
@@ -80,9 +79,9 @@ class MarketplaceAttributeMappingController extends Controller
                 'wooCommerceAttributes' => $wooCommerceAttributes,
                 'coverage' => [
                     'payloadFields' => $this->payloadFieldCoverage($wooMappings, self::PAYLOAD_FIELDS['woocommerce']),
-                    // No input_type restriction on wc_attribute (see
-                    // WooCommerceAttributeMappingController) — every synced
-                    // WooCommerce attribute is a valid mapping target.
+                    // wc_attribute ไม่มีการจำกัด input_type (ดูที่
+                    // WooCommerceAttributeMappingController) — WooCommerce
+                    // attribute ที่ sync มาแล้วทุกตัวใช้เป็นเป้าหมาย mapping ได้หมด
                     'platformAttributes' => $this->platformAttributeCoverage(
                         $wooCommerceAttributes,
                         $wooMappings->where('target_field', 'wc_attribute')->pluck('woocommerce_attribute_id')->all(),
@@ -95,7 +94,7 @@ class MarketplaceAttributeMappingController extends Controller
                 'coverage' => [
                     'payloadFields' => $this->payloadFieldCoverage($shopeeMappings, self::PAYLOAD_FIELDS['shopee']),
                     'platformAttributes' => $this->platformAttributeCoverage(
-                        $shopeeAttributes->where('input_type', 3), // FREE_TEXT_FILED — the only mappable kind
+                        $shopeeAttributes->where('input_type', 3), // FREE_TEXT_FILED — ชนิดเดียวที่ map ได้
                         $shopeeMappings->where('target_field', 'shopee_attribute')->pluck('shopee_attribute_id')->all(),
                     ),
                 ],
@@ -129,10 +128,10 @@ class MarketplaceAttributeMappingController extends Controller
         ]);
     }
 
-    // The custom-attribute-bucket target_field value for each platform (see
-    // self::PAYLOAD_FIELDS's comment) — this is what a row's `target_field`
-    // equals when it's mapped to one specific platform attribute (looked up
-    // via the id/name key below) rather than one of the fixed payload fields.
+    // ค่า target_field ของกลุ่ม custom-attribute ในแต่ละแพลตฟอร์ม (ดูคอมเมนต์ของ
+    // self::PAYLOAD_FIELDS ด้านบน) — นี่คือค่าที่ `target_field` ของแถวจะเป็น
+    // เมื่อถูก map เข้ากับ attribute เฉพาะตัวของแพลตฟอร์มนั้น (หาด้วย id/name key
+    // ด้านล่าง) แทนที่จะเป็นหนึ่งในฟิลด์ payload ตายตัว
     private const CUSTOM_TARGET_FIELD = [
         'woocommerce' => 'wc_attribute',
         'shopee' => 'shopee_attribute',
@@ -141,12 +140,12 @@ class MarketplaceAttributeMappingController extends Controller
     ];
 
     /**
-     * Exports one platform's attribute-mapping tab as CSV/XLS/XLSX — the
-     * same rows index() feeds that tab (so it reflects the last *saved*
-     * mapping, not a tab's unsaved pending edits, which only ever exist
-     * client-side), honoring whatever search/status filter is currently
-     * applied in that tab (passed explicitly since that filter is
-     * client-only state, never round-tripped to the server otherwise).
+     * ส่งออกแท็บ attribute-mapping ของแพลตฟอร์มหนึ่งเป็น CSV/XLS/XLSX — ใช้
+     * แถวข้อมูลชุดเดียวกับที่ index() ป้อนให้แท็บนั้น (เพราะงั้นจะสะท้อน mapping
+     * ล่าสุดที่ *เซฟแล้ว* เท่านั้น ไม่ใช่การแก้ไขที่ยังไม่เซฟในแท็บ ซึ่งมีอยู่แค่ฝั่ง
+     * client เท่านั้น) และยังเคารพ filter search/status ที่แท็บนั้นเลือกอยู่ตอนนี้
+     * (ต้องส่งมาตรงๆ เพราะ filter นี้เป็น state ฝั่ง client ล้วนๆ ไม่เคยถูกส่งกลับ
+     * ไปที่ server ด้วยวิธีอื่น)
      */
     public function export(Request $request): BinaryFileResponse
     {
@@ -158,9 +157,9 @@ class MarketplaceAttributeMappingController extends Controller
             'locale' => ['nullable', 'string', Rule::exists('locales', 'code')->where('enabled', true)],
         ]);
 
-        // Forced explicitly rather than left to resolve from the session/
-        // cookie — see AttributeController::export()'s identical comment for
-        // why that can silently disagree with what the tab is showing.
+        // บังคับตั้งค่าตรงๆ แทนที่จะปล่อยให้ดึงจาก session/cookie เอง — ดูคอมเมนต์
+        // แบบเดียวกันที่ AttributeController::export() ว่าทำไมปล่อยแบบนั้นแล้ว
+        // อาจได้ค่าที่ไม่ตรงกับที่แท็บกำลังแสดงอยู่แบบเงียบๆ
         if (! empty($validated['locale'])) {
             app()->setLocale($validated['locale']);
         }
@@ -252,11 +251,11 @@ class MarketplaceAttributeMappingController extends Controller
     }
 
     /**
-     * Which of a platform's fixed payload target fields (self::PAYLOAD_FIELDS)
-     * have zero PIM attributes mapped to them — e.g. WooCommerce's
-     * short_description, if nothing feeds it, the composed HTML sent on
-     * push is empty. `missing` is a list of raw target_field keys; the
-     * frontend translates each into a label via its own FIELD_LABEL_KEYS.
+     * เช็คว่าฟิลด์ payload ตายตัวของแพลตฟอร์ม (self::PAYLOAD_FIELDS) ตัวไหนบ้าง
+     * ที่ยังไม่มี attribute ของ PIM ถูก map เข้าไปเลยสักตัว — เช่น short_description
+     * ของ WooCommerce ถ้าไม่มีอะไรป้อนเข้าไป ตอน push จะได้ HTML ที่ประกอบขึ้นมา
+     * เป็นค่าว่างเปล่า `missing` คือลิสต์ของ target_field key ดิบๆ ส่วนฝั่ง
+     * frontend จะแปลแต่ละตัวเป็น label เองผ่าน FIELD_LABEL_KEYS ของมัน
      */
     private function payloadFieldCoverage(\Illuminate\Support\Collection $mappings, array $fields): array
     {
@@ -271,10 +270,10 @@ class MarketplaceAttributeMappingController extends Controller
     }
 
     /**
-     * Which of a marketplace's own native attributes (the ones an admin
-     * could map a PIM attribute into via the custom-attribute bucket —
-     * already filtered to only mappable ones, e.g. free-text/customizable)
-     * currently have no PIM attribute feeding them at all.
+     * เช็คว่า attribute ดั้งเดิมของ marketplace เอง (ตัวที่แอดมิน map attribute
+     * ของ PIM เข้าไปได้ผ่านกลุ่ม custom-attribute — กรองมาแล้วว่าเป็นตัวที่ map
+     * ได้จริงเท่านั้น เช่น free-text/customizable) ตัวไหนบ้างที่ยังไม่มี attribute
+     * ของ PIM ป้อนเข้าไปเลยสักตัว
      */
     private function platformAttributeCoverage(\Illuminate\Support\Collection $allMappable, array $mappedIdentifiers, string $idKey = 'id', string $labelKey = 'name'): array
     {

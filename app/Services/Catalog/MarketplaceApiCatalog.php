@@ -3,18 +3,17 @@
 namespace App\Services\Catalog;
 
 /**
- * Static inventory of every external marketplace API operation this
- * codebase actually calls, grouped by platform — backs the "API Usage"
- * view under Sales Channels > Sales Platforms (SalesPlatformController::
- * apiUsage()). This is documentation-as-data, not a live health check: it
- * describes what the integration *does*, sourced from the real
- * *Client/*ProductSyncService classes, and is meant to be updated by hand
- * whenever a new API call is added to one of those classes.
+ * รายการ operation ของ API มาร์เก็ตเพลสภายนอกทั้งหมดที่โค้ดในระบบนี้เรียกใช้จริง
+ * แบบ static เก็บไว้ (ไม่ได้ query สด) แยกตามแพลตฟอร์ม — เป็นข้อมูลที่ใช้แสดงใน
+ * หน้า "API Usage" ใต้เมนู Sales Channels > Sales Platforms
+ * (SalesPlatformController::apiUsage()) เป็นเอกสารที่เก็บในรูปแบบข้อมูล
+ * (documentation-as-data) ไม่ใช่การเช็คสถานะแบบ live: มันอธิบายว่า integration
+ * แต่ละตัว *ทำอะไรบ้าง* โดยอ้างอิงมาจากคลาส *Client/*ProductSyncService ตัวจริง
+ * และต้องอัปเดตด้วยมือทุกครั้งที่มีการเพิ่มการเรียก API ใหม่ในคลาสพวกนั้น
  *
- * Deliberately never calls any of these APIs itself — several are
- * real, customer-visible writes (create/update/deactivate a listing), so a
- * page whose whole point is "what do we call" must never call them just to
- * render.
+ * ตั้งใจไม่เรียก API พวกนี้เองเลยแม้แต่ตัวเดียว — เพราะหลายตัวเป็นการเขียนข้อมูล
+ * จริงที่ลูกค้าเห็นผลด้วย (สร้าง/อัปเดต/ปิด listing) หน้าที่มีจุดประสงค์แค่บอกว่า
+ * "เราเรียกอะไรบ้าง" จึงต้องไม่เรียก API พวกนี้จริงๆ แค่เพื่อ render หน้า
  */
 class MarketplaceApiCatalog
 {

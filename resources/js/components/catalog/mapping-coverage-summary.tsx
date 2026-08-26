@@ -13,9 +13,9 @@ interface MappingCoverageSummaryProps {
     platformAttributes: CoverageStat;
 }
 
-// Long enough to be useful, short enough that the tooltip never turns into
-// an unscrollable wall of text — Lazada's platform-attribute list alone can
-// run past 60 entries (most of it category-specific specs/certifications).
+// ตั้งไว้ให้ยาวพอจะมีประโยชน์ แต่สั้นพอที่ tooltip จะไม่กลายเป็นกำแพงข้อความ
+// ที่เลื่อนดูไม่ได้ — แค่ลิสต์ platform-attribute ของ Lazada อย่างเดียวก็มี
+// ได้เกิน 60 รายการแล้ว (ส่วนใหญ่เป็น spec/ใบรับรองเฉพาะ category)
 const MAX_TOOLTIP_ITEMS = 15;
 
 function CoverageChip({ label, stat }: { label: string; stat: CoverageStat }) {
@@ -61,7 +61,7 @@ function CoverageChip({ label, stat }: { label: string; stat: CoverageStat }) {
     );
 }
 
-/** Two small stat chips ("Payload fields: 8/9", "Platform attributes: 3/12") — each with a tooltip listing what's still unmapped, when anything is. */
+/** ชิปสถิติเล็กๆ 2 อัน ("Payload fields: 8/9", "Platform attributes: 3/12") — แต่ละอันมี tooltip แสดงรายการที่ยังไม่ได้ map ไว้ ถ้ามี */
 export function MappingCoverageSummary({ payloadFields, platformAttributes }: MappingCoverageSummaryProps) {
     const { t } = useTranslation('catalog');
 

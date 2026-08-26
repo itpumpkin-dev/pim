@@ -9,16 +9,17 @@ use App\Models\Product;
 use App\Models\ProductValue;
 
 /**
- * Bridges the two parallel category systems: ERP imports only ever set the
- * flat pcatname/psubcatname/productgroupname attribute values, never the
- * `categories` tree (product_category pivot) that Lazada category mapping
- * and the Edit Product tree picker rely on. categories.code happens to use
- * the exact same coding scheme as those attribute values (e.g. 'a025001'),
- * so this links products into the tree by matching on that code.
+ * เชื่อมระบบหมวดหมู่สองระบบที่วิ่งขนานกันอยู่เข้าด้วยกัน: การ import จาก ERP
+ * จะตั้งค่าให้แค่ attribute value แบบ flat (pcatname/psubcatname/productgroupname)
+ * เท่านั้น ไม่เคยแตะต้นไม้ `categories` (product_category pivot) ที่ระบบจับคู่
+ * หมวดหมู่ Lazada และตัวเลือกต้นไม้หมวดหมู่ในหน้า Edit Product ใช้งานอยู่เลย
+ * บังเอิญว่า categories.code ใช้ scheme การเข้ารหัสเดียวกันเป๊ะกับ attribute
+ * value พวกนั้น (เช่น 'a025001') คลาสนี้เลยอาศัยจุดนี้เชื่อมสินค้าเข้ากับต้นไม้
+ * หมวดหมู่ โดยจับคู่กันที่ code
  */
 class ProductCategoryLinker
 {
-    /** attribute code => how many ancestor-chain levels deep (0 = root) it represents */
+    /** attribute code => ลึกลงไปกี่ level ในสาย ancestor (0 = root) */
     private const LEGACY_CODE_LEVELS = [
         'pcatid' => 0,
         'pcatname' => 0,
@@ -27,9 +28,9 @@ class ProductCategoryLinker
     ];
 
     /**
-     * Additive only — never removes a category link, since an admin may
-     * have manually curated the tree (e.g. cross-listed in an extra
-     * category) beyond what the ERP codes alone would produce.
+     * เพิ่มอย่างเดียว ไม่มีการลบ — จะไม่มีวันลบการเชื่อมโยงหมวดหมู่ทิ้ง เพราะแอดมิน
+     * อาจจะจัดต้นไม้เอาไว้เองด้วยมือ (เช่น ตั้งใจให้อยู่หลายหมวดหมู่พร้อมกัน)
+     * มากกว่าที่ code จาก ERP อย่างเดียวจะสร้างให้ได้
      */
     public static function linkFromCodes(Product $product, array $codes): void
     {
@@ -47,17 +48,17 @@ class ProductCategoryLinker
     }
 
     /**
-     * Reverse of linkFromCodes(): the `categories` tree is now the single
-     * place an admin picks a category on the Edit Product page (the old
-     * pcatid/pcatname/psubcatname/productgroupname dropdowns were dropped
-     * from the form to stop double entry), so whenever the tree assignment
-     * changes this derives those legacy attribute values back from it —
-     * every existing consumer that still reads them (ProductPresenter's
-     * fallback, WooCommerce export, Lazada mapping) keeps working unchanged.
+     * ทำงานตรงข้ามกับ linkFromCodes(): ตอนนี้ต้นไม้ `categories` คือที่เดียวที่
+     * แอดมินใช้เลือกหมวดหมู่ในหน้า Edit Product (dropdown เก่าอย่าง
+     * pcatid/pcatname/psubcatname/productgroupname ถูกเอาออกจากฟอร์มไปแล้ว
+     * เพื่อไม่ให้ต้องกรอกซ้ำซ้อน) ดังนั้นทุกครั้งที่การ assign หมวดหมู่ในต้นไม้
+     * เปลี่ยนไป เมธอดนี้จะคำนวณค่า attribute แบบเก่ากลับมาจากต้นไม้ให้ — ทำให้ทุก
+     * ส่วนที่ยังอ่านค่าพวกนี้อยู่ (fallback ของ ProductPresenter, การ export
+     * WooCommerce, การจับคู่ Lazada) ยังทำงานได้ตามปกติโดยไม่ต้องแก้อะไร
      *
-     * Authoritative, not additive: an admin clearing a product's categories
-     * clears the derived codes too, so a product never ends up advertising a
-     * category it's no longer tagged with.
+     * เป็นตัวกำหนดค่าจริง ไม่ใช่แค่เพิ่ม: ถ้าแอดมินล้างหมวดหมู่ของสินค้าออก
+     * code ที่คำนวณไว้ก็จะถูกล้างตามไปด้วย เพื่อไม่ให้สินค้าไปโฆษณาว่าอยู่ใน
+     * หมวดหมู่ที่จริงๆ แล้วไม่ได้ถูก tag ไว้แล้ว
      */
     public static function deriveLegacyCodesFromCategories(Product $product, array $categoryIds): void
     {
@@ -77,10 +78,10 @@ class ProductCategoryLinker
             $category = $chain[$level] ?? null;
             $code = $category ? strtolower(trim($category->code)) : null;
 
-            // Only write a code that's actually a valid option for this
-            // attribute (e.g. a category created by hand after the CSV seed,
-            // with no matching pcatname/psubcatname/productgroupname option,
-            // should leave the field unset rather than store an orphan code).
+            // เขียนเฉพาะ code ที่เป็นตัวเลือกที่ใช้ได้จริงของ attribute ตัวนี้เท่านั้น
+            // (เช่น หมวดหมู่ที่สร้างขึ้นเองทีหลังจาก CSV seed แล้วไม่มีตัวเลือก
+            // pcatname/psubcatname/productgroupname ที่ตรงกัน ก็ควรปล่อยให้ฟิลด์
+            // ว่างไว้ ดีกว่าไปเก็บ code ที่ไม่มีที่มาที่ไป)
             $optionExists = $code && AttributeOption::where('attribute_id', $attributeId)->where('code', $code)->exists();
 
             if ($optionExists) {
@@ -95,12 +96,12 @@ class ProductCategoryLinker
     }
 
     /**
-     * Among the product's assigned categories, picks the most specific one
-     * (longest `code`, ties broken by lowest id for determinism) and returns
-     * its root-to-leaf ancestor chain, indexed by depth (0 = root). The tree
-     * is only 3 levels deep and small (~1,000 rows), so loading it whole is
-     * simpler than walking parent_id with per-level queries — same tradeoff
-     * ProductPresenter::rootCategoryNames() makes.
+     * จากหมวดหมู่ที่สินค้านี้ถูก assign ไว้ทั้งหมด เลือกหมวดหมู่ที่เจาะจงที่สุด
+     * (code ยาวที่สุด ถ้าเท่ากันให้ใช้ id น้อยสุดเพื่อให้ผลลัพธ์คงที่แน่นอน)
+     * แล้วคืนสายบรรพบุรุษของมันตั้งแต่ root ถึง leaf โดย index ตามความลึก
+     * (0 = root) ต้นไม้นี้ลึกแค่ 3 level และมีขนาดเล็ก (~1,000 แถว) การโหลดมา
+     * ทั้งหมดเลยง่ายกว่าการไล่ parent_id ทีละ query ต่อ level — เป็น tradeoff
+     * แบบเดียวกับที่ ProductPresenter::rootCategoryNames() ใช้
      *
      * @return array<int, Category>
      */

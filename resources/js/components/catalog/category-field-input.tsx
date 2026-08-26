@@ -13,9 +13,9 @@ export interface CategoryFieldItem {
 }
 
 /**
- * Renders the correct input control for a dynamic Category field, based on
- * its `type` (one of the 10 UnoPim-documented CategoryField types). Used by
- * both the category create and edit forms so the switch only lives once.
+ * เรนเดอร์อินพุตที่เหมาะกับ Category field แบบไดนามิก โดยดูจาก `type`
+ * (เป็นหนึ่งใน 10 ชนิดของ CategoryField ที่ UnoPim เอกสารไว้) ใช้ร่วมกันทั้ง
+ * ฟอร์มสร้างและแก้ไข category เพื่อให้ switch นี้มีอยู่ที่เดียว ไม่ต้องเขียนซ้ำ
  */
 export function CategoryFieldInput({
     field,

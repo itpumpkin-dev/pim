@@ -35,9 +35,9 @@ interface Props {
     platforms: Record<string, PlatformApi>;
 }
 
-// Same 4-color rotation used elsewhere for platform avatars (dashboard info
-// boxes, salesPlatforms/index.tsx) — fixed order here since these platform
-// keys are hardcoded (unlike salesPlatforms/index.tsx's admin-created ones).
+// ใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับที่ใช้กับ avatar ของ platform ที่อื่น (กล่องข้อมูลใน
+// dashboard, salesPlatforms/index.tsx) — ที่นี่กำหนดลำดับตายตัวไว้เลยเพราะ key
+// ของ platform พวกนี้ hardcode ไว้แล้ว (ต่างจาก salesPlatforms/index.tsx ที่ admin สร้างเอง)
 const PLATFORM_COLORS: Record<string, string> = {
     shopee: PALETTE.highlight,
     lazada: PALETTE.accent,

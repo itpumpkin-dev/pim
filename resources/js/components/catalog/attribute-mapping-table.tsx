@@ -26,7 +26,7 @@ import { encodeQueryParams } from '@/lib/query-string';
 import { mappedChipSx, naChipSx, pendingRowSx } from '@/lib/ui-style';
 
 export interface AttributeMappingTableProps {
-    /** Which marketplace tab this is — identifies the dataset to `MarketplaceAttributeMappingController::export()`. */
+    /** แท็บของตลาดไหนอยู่ — ใช้ระบุว่าจะ export ชุดข้อมูลไหนใน `MarketplaceAttributeMappingController::export()` */
     platform: 'woocommerce' | 'shopee' | 'lazada' | 'tiktok';
     helpTextKey: string;
     syncLabelKey: string;
@@ -40,9 +40,9 @@ export interface AttributeMappingTableProps {
     filtered: MappingAttributeRow[];
     isMapped: (row: MappingAttributeRow) => boolean;
     hasPendingChange: (row: MappingAttributeRow) => boolean;
-    /** Text under the status chip naming which kind of mapping it is ("Payload field" / "Shopee attribute" / ...) — null renders nothing (WooCommerce's non-payload content fields have no such distinction). */
+    /** ข้อความใต้ chip สถานะที่บอกว่าเป็น mapping แบบไหน ("Payload field" / "Shopee attribute" / ...) — ถ้าเป็น null จะไม่แสดงอะไรเลย (ฟิลด์ content ของ WooCommerce ที่ไม่ใช่ payload ไม่มีความต่างแบบนี้ให้บอก) */
     statusCaption: (row: MappingAttributeRow) => string | null;
-    /** The platform-specific <Select> for this row's "Map to" cell — groups/prefix-encoding differ enough per platform (structured fields, content fields, custom-attribute list with its own disabled rules) that this stays a render prop rather than shared config. */
+    /** <Select> เฉพาะแต่ละแพลตฟอร์มสำหรับ cell "Map to" ของแถวนี้ — เพราะกลุ่ม/รูปแบบการเข้ารหัส prefix ต่างกันมากพอในแต่ละแพลตฟอร์ม (structured fields, content fields, ลิสต์ custom-attribute ที่มีกฎ disabled ของตัวเอง) เลยให้เป็น render prop แทนที่จะทำเป็น config กลาง */
     renderMapToCell: (row: MappingAttributeRow) => ReactNode;
     sortOrderFor: (row: MappingAttributeRow) => number;
     onSortOrderChange: (row: MappingAttributeRow, value: number) => void;
@@ -55,12 +55,12 @@ export interface AttributeMappingTableProps {
 }
 
 /**
- * Shared table shell for every "จับคู่เนื้อหา <Platform>" mapping panel —
- * search/status filter, the coverage summary, and the attribute table
- * itself. Each platform's own thin panel component supplies the "Map to"
- * Select (via `renderMapToCell`, since the dropdown's groups/prefix-encoding
- * genuinely differ per platform) and the save/sync wiring (via
- * `useAttributeMapping`).
+ * เชลล์ตารางกลางที่ใช้ร่วมกันของทุกหน้า mapping panel แบบ "จับคู่เนื้อหา <Platform>"
+ * — มีตัวกรอง search/status, สรุป coverage และตัวตารางแอตทริบิวต์เอง
+ * ส่วน panel component บางๆ ของแต่ละแพลตฟอร์มจะเป็นคนส่ง Select "Map to"
+ * เข้ามาเอง (ผ่าน `renderMapToCell` เพราะกลุ่ม/รูปแบบการเข้ารหัส prefix ของ
+ * dropdown ต่างกันจริงๆ ในแต่ละแพลตฟอร์ม) และส่วน save/sync ก็ต่อเข้ามาเอง
+ * (ผ่าน `useAttributeMapping`)
  */
 export function AttributeMappingTable({
     platform,
@@ -88,10 +88,10 @@ export function AttributeMappingTable({
     const { locale } = useLocale();
     const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
 
-    // Column pop-in priority (SAP Fiori responsive table): the identifying
-    // column and the "Map to" select — the field actually being edited here
-    // — stay visible down to phone width; Status and Sort order reflow into
-    // the label/value pop-in area beneath each row as space runs out.
+    // ลำดับความสำคัญของคอลัมน์ตอนจอเล็ก (SAP Fiori responsive table): คอลัมน์
+    // ที่ใช้ระบุตัวตน กับ select "Map to" — ฟิลด์ที่กำลังแก้ไขจริงๆ ตรงนี้ — จะ
+    // ยังคงแสดงอยู่แม้จอเล็กระดับมือถือ ส่วน Status กับ Sort order จะไหลไป
+    // อยู่ในพื้นที่ label/value ใต้แต่ละแถวเมื่อพื้นที่ไม่พอ
     const columns: FioriResponsiveColumn<MappingAttributeRow>[] = [
         {
             key: 'attribute',
@@ -154,10 +154,10 @@ export function AttributeMappingTable({
     ];
 
     const handleExport = (format: 'csv' | 'xlsx') => {
-        // search/status are passed explicitly since this tab's filter is
-        // client-only state (see useAttributeMapping), never round-tripped
-        // to the server otherwise; locale for the same reason as
-        // AttributeController::export() — see its comment.
+        // ส่ง search/status ตรงๆ แบบนี้เพราะตัวกรองของแท็บนี้เป็น state ฝั่ง
+        // client ล้วนๆ (ดู useAttributeMapping) ปกติจะไม่ถูกส่งไปเซิร์ฟเวอร์เลย
+        // ส่วน locale ก็ด้วยเหตุผลเดียวกับ AttributeController::export() —
+        // ดูคอมเมนต์ที่นั่น
         const params = encodeQueryParams({ platform, format, search, status, locale });
         window.location.href = `/catalog/attributes/marketplace-mapping/export?${params.join('&')}`;
         setExportAnchor(null);

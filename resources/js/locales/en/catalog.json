@@ -394,6 +394,7 @@
     "idColumn": "ID",
     "nameColumn": "Name",
     "pathColumn": "Path",
+    "noThaiName": "No Thai name synced yet",
     "marketplaceColumn": "Marketplace",
     "manageColumn": "Manage",
     "assignPimCategory": "Assign PIM category",

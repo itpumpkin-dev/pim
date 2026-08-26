@@ -23,18 +23,17 @@ export interface ExistingOption {
 }
 
 /**
- * Lets a user add a new option to a select/multiselect attribute without
- * leaving the product form — opened from the attribute's field on the
- * product edit page. Posts to the same endpoint as the full options CRUD
- * panel on the attribute edit page (attribute-options-panel.tsx), so
- * permissions and validation stay identical; this is just a narrower,
- * single-option entry point into it.
+ * ให้ผู้ใช้เพิ่ม option ใหม่ให้ attribute แบบ select/multiselect ได้โดยไม่ต้อง
+ * ออกจากฟอร์มสินค้า — เปิดจาก field ของ attribute นั้นในหน้าแก้ไขสินค้า ยิง
+ * ไปที่ endpoint เดียวกับหน้า CRUD options เต็มรูปแบบในหน้าแก้ไข attribute
+ * (attribute-options-panel.tsx) เพื่อให้สิทธิ์การใช้งานและ validation
+ * เหมือนกันเป๊ะๆ ตัวนี้แค่เป็นทางเข้าแบบแคบๆ สำหรับเพิ่มทีละ option เท่านั้น
  *
- * Only collects a label for the locale currently being edited on the
- * product page (not every locale at once) — other locales can still be
- * filled in later from the full options panel. `code` isn't collected at
- * all: the backend always generates it (see CodeGenerator), ignoring
- * anything a caller sends, so asking for one here was a dead field.
+ * เก็บ label แค่ของ locale ที่กำลังแก้อยู่ในหน้าสินค้าตอนนั้น (ไม่เก็บทุก
+ * locale พร้อมกัน) — locale อื่นค่อยไปกรอกทีหลังจากหน้า options panel เต็ม
+ * ส่วน `code` ไม่ได้เก็บเลย เพราะ backend จะ generate ให้เองเสมอ (ดูที่
+ * CodeGenerator) ไม่สนใจค่าที่ส่งมาจาก client อยู่แล้ว ดังนั้นถ้าจะให้กรอกตรงนี้
+ * ก็ไม่มีประโยชน์อะไร
  */
 export function QuickAddOptionDialog({
     open,
@@ -118,8 +117,8 @@ export function QuickAddOptionDialog({
         }
     };
 
-    // Only 2 columns (Code, Label) in this quick reference list — both stay
-    // always visible, there's nothing worth deprioritizing here.
+    // ลิสต์ดูอย่างเร็วนี้มีแค่ 2 คอลัมน์ (Code, Label) — โชว์ตลอดทั้งคู่เลย
+    // ไม่มีอะไรต้องลดความสำคัญลง
     const existingOptionColumns: FioriResponsiveColumn<ExistingOption>[] = [
         {
             key: 'code',

@@ -16,37 +16,34 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each Lazada push field,
- * without a code change — see LazadaProductSyncService::buildPayload()/
- * resolveMappedField() (structured fields) and resolveMappedAttributes()
- * (`lazada_attribute` — payload.attributes when attribute_type=normal / the
- * SKU fields when attribute_type=sku, the old behavior), which read this
- * table instead of the old hardcoded pname/price_std/qty/attribute_6/
- * SKU_FIELD_SOURCE lookups. v1 only supports free-value attributes
- * (input_type text/numeric) for the `lazada_attribute` target —
- * singleSelect/multiSelect need a specific predefined option, not an
- * arbitrary value, so they're synced for visibility but rejected as a
- * mapping target here (same scope decision already made for Shopee's
- * equivalent page).
+ * ให้แอดมินเลือกได้ว่าจะเอา PIM attribute ตัวไหนมาเติมลงฟิลด์ที่จะส่งไป Lazada
+ * โดยไม่ต้องแก้โค้ด — ดูที่ LazadaProductSyncService::buildPayload()/
+ * resolveMappedField() (สำหรับฟิลด์ที่มีโครงสร้างชัดเจน) และ resolveMappedAttributes()
+ * (`lazada_attribute` — คือ payload.attributes ตอน attribute_type=normal /
+ * ฟิลด์ SKU ตอน attribute_type=sku ซึ่งเป็นพฤติกรรมเดิม) ซึ่งจะอ่านจากตารางนี้แทนที่
+ * จะไป lookup แบบ hardcode เดิมอย่าง pname/price_std/qty/attribute_6/
+ * SKU_FIELD_SOURCE เวอร์ชัน 1 รองรับแค่ attribute ที่กรอกค่าอิสระได้
+ * (input_type เป็น text/numeric) สำหรับ target แบบ `lazada_attribute` เท่านั้น —
+ * ส่วน singleSelect/multiSelect ต้องเลือกจากตัวเลือกที่กำหนดไว้ล่วงหน้า ไม่ใช่ค่า
+ * อิสระ เลยแค่ sync มาโชว์ให้เห็น แต่ยังเลือกมาเป็น target การแมปตรงนี้ไม่ได้
+ * (ตัดสินใจแบบเดียวกับที่เคยทำไว้ในหน้าของ Shopee)
  *
- * The read-only index() this used to own now lives in
- * MarketplaceAttributeMappingController (bundled with WooCommerce/Shopee/
- * TikTok's equivalents into one Inertia response for the combined
- * "จับคู่เนื้อหา Marketplace" tabbed page) — this controller keeps only the
- * write actions.
+ * index() แบบ read-only ที่เคยอยู่ในนี้ ตอนนี้ย้ายไปอยู่ที่
+ * MarketplaceAttributeMappingController แล้ว (รวมกับของ WooCommerce/Shopee/
+ * TikTok ไว้ใน Inertia response เดียวกัน สำหรับหน้าแท็บรวม
+ * "จับคู่เนื้อหา Marketplace") — controller นี้เลยเหลือแค่ action ที่เขียนข้อมูลเท่านั้น
  */
 class LazadaAttributeMappingController extends Controller
 {
-    // Allowlist (reject anything not explicitly known-safe), same
-    // conservative default used throughout this app's marketplace
-    // integrations. richText fields (e.g. description/short_description —
-    // confirmed live, 2026-08-21, via a real synced category schema) accept
-    // real HTML, same as this app's own `textarea` PIM attributes already
-    // verified to store — see LazadaProductSyncService, which passes a
-    // mapped value straight through either way. enumInput/singleSelect/
-    // multiSelect/multiEnumInput/img/date remain unmappable: they need a
-    // specific predefined option or a non-string shape this page doesn't
-    // support yet.
+    // ใช้แบบ allowlist (ปฏิเสธทุกอย่างที่ยังไม่ได้ยืนยันชัดๆ ว่าปลอดภัย) เป็นค่าเริ่มต้น
+    // แบบระมัดระวังแบบเดียวกับที่ใช้ทั่วทั้งแอปในส่วน integration ของ marketplace
+    // ฟิลด์ richText (เช่น description/short_description — เช็คจากของจริงแล้วเมื่อ
+    // 2026-08-21 ผ่าน category schema ที่ sync มาจริง) รับ HTML จริงๆ ได้
+    // เหมือนกับ PIM attribute แบบ `textarea` ของแอปนี้เองที่ตรวจสอบแล้วว่าเก็บได้ —
+    // ดู LazadaProductSyncService ซึ่งจะส่งค่าที่แมปไว้ผ่านตรงๆ ทั้งสองแบบอยู่ดี ส่วน
+    // enumInput/singleSelect/multiSelect/multiEnumInput/img/date ยังแมปไม่ได้:
+    // เพราะต้องใช้ตัวเลือกที่กำหนดไว้ล่วงหน้า หรือมีรูปแบบที่ไม่ใช่ string ซึ่งหน้านี้
+    // ยังไม่รองรับ
     private const MAPPABLE_INPUT_TYPES = ['text', 'numeric', 'richText'];
 
     private const TARGET_FIELDS = [
@@ -72,12 +69,12 @@ class LazadaAttributeMappingController extends Controller
                 collect($entries)->pluck('lazada_attribute_name')->filter()
             )->get()->keyBy('name');
 
-            // Lazada rejects any external video URL (confirmed live,
-            // BIZ_CHECK_EXTERNAL_VIDEO_IS_FORBIDDEN) — only a PIM attribute
-            // of type `video` (an uploaded file, e.g. attribute_6) may ever
-            // be mapped to target_field='video', never a plain-text/URL
-            // attribute like youtube_url. See this controller's class
-            // docblock and the migration that reopened this field for why.
+            // Lazada จะปฏิเสธ URL วิดีโอจากภายนอกเสมอ (เช็คจากของจริงแล้ว เจอ error
+            // BIZ_CHECK_EXTERNAL_VIDEO_IS_FORBIDDEN) — มีแค่ PIM attribute ประเภท
+            // `video` เท่านั้น (คือไฟล์ที่อัปโหลดไว้ เช่น attribute_6) ที่จะแมปเข้ากับ
+            // target_field='video' ได้ ห้ามแมป attribute ที่เป็นข้อความ/URL ธรรมดา
+            // อย่าง youtube_url เด็ดขาด ดูเหตุผลเพิ่มเติมได้ที่ docblock ของ class นี้
+            // และ migration ที่เปิดฟิลด์นี้ขึ้นมาใหม่
             $attributesById = Attribute::whereIn(
                 'id',
                 collect($entries)->pluck('attribute_id')->filter()
@@ -141,11 +138,11 @@ class LazadaAttributeMappingController extends Controller
 
         LazadaAttributeMapping::bumpListVersion();
 
-        // The embedded per-category picker on categories/lazada-mapping.tsx
-        // calls this same endpoint via plain fetch (Accept: application/json)
-        // instead of an Inertia visit — see
-        // ShopeeAttributeMappingController::update()'s identical branch for
-        // why. Every other caller is a real Inertia POST, unaffected.
+        // ตัวเลือกรายหมวดหมู่ที่ฝังอยู่ในหน้า categories/lazada-mapping.tsx จะเรียก
+        // endpoint นี้ผ่าน fetch ธรรมดา (Accept: application/json) แทนที่จะเป็นการ
+        // visit แบบ Inertia — ดูเหตุผลได้ที่ branch แบบเดียวกันใน
+        // ShopeeAttributeMappingController::update() ส่วนตัวเรียกอื่นๆ ที่เหลือเป็น
+        // Inertia POST จริงๆ ไม่ได้รับผลกระทบ
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
@@ -154,16 +151,16 @@ class LazadaAttributeMappingController extends Controller
     }
 
     /**
-     * Pulls Lazada's real category attribute schema in (read-only against
-     * Lazada) for every PIM category currently mapped to a
-     * lazada_category_id, one /category/attributes/get call per distinct
-     * category (unlike Shopee's get_attribute_tree, this endpoint takes a
-     * single primary_category_id, not a batch list). Deduped globally by
-     * attribute `name`. Paced with a short sleep between calls — Lazada's
-     * per-account rate limit ("901: too frequent") was confirmed live to
-     * trigger from a handful of back-to-back calls (see
-     * LazadaProductSyncService::syncLiveStatus()'s docblock for that same
-     * finding), and this can call once per mapped category.
+     * ดึงโครงสร้าง attribute ของหมวดหมู่จริงจาก Lazada เข้ามา (แค่อ่านอย่างเดียว
+     * ไม่ได้เขียนกลับไป) สำหรับทุกหมวดหมู่ PIM ที่แมปกับ lazada_category_id ไว้แล้ว
+     * โดยเรียก /category/attributes/get ทีละ 1 ครั้งต่อ 1 หมวดหมู่ (ต่างจาก
+     * get_attribute_tree ของ Shopee ตรงที่ endpoint นี้รับ primary_category_id
+     * เดียวเท่านั้น ไม่ใช่ list แบบ batch) ตัดตัวซ้ำด้วย `name` ของ attribute รวมทุก
+     * หมวดหมู่ มีการหน่วงเวลาสั้นๆ ระหว่างแต่ละ call — rate limit ต่อ account ของ
+     * Lazada (error "901: too frequent") เคยเจอมาแล้วจริงๆ ว่าเกิดขึ้นได้แค่จาก
+     * การเรียกติดๆ กันไม่กี่ครั้ง (ดูข้อค้นพบเดียวกันที่ docblock ของ
+     * LazadaProductSyncService::syncLiveStatus()) และตรงนี้จะเรียก 1 ครั้งต่อ 1
+     * หมวดหมู่ที่แมปไว้
      */
     public function syncLazadaAttributes(): RedirectResponse
     {
@@ -216,14 +213,13 @@ class LazadaAttributeMappingController extends Controller
     }
 
     /**
-     * Same idea as syncLazadaAttributes() above, but scoped to exactly one
-     * Lazada category — the "Sync attributes" action on
-     * categories/lazada-mapping.tsx, next to that page's Categories table
-     * (see ShopeeAttributeMappingController::syncShopeeAttributesForCategory()
-     * for the Shopee equivalent this mirrors). Runs synchronously — a single
-     * /category/attributes/get call, same as the per-category loop iteration
-     * above, just without the multi-category rate-limit pacing since there's
-     * only one call here.
+     * แนวคิดเดียวกับ syncLazadaAttributes() ด้านบน แต่ทำแค่หมวดหมู่ Lazada เดียว —
+     * เป็น action "Sync attributes" บนหน้า categories/lazada-mapping.tsx ที่อยู่ข้างๆ
+     * กับตาราง Categories ของหน้านั้น (ดู
+     * ShopeeAttributeMappingController::syncShopeeAttributesForCategory()
+     * ที่เป็นแบบเดียวกันฝั่ง Shopee ที่ตัวนี้เลียนแบบมา) รันแบบ synchronous — เรียก
+     * /category/attributes/get แค่ครั้งเดียว เหมือนกับแต่ละรอบ loop ต่อหมวดหมู่ด้านบน
+     * แค่ไม่ต้องหน่วงเวลากันเรียกถี่เกินหลายหมวดหมู่ เพราะตรงนี้เรียกแค่ครั้งเดียว
      */
     public function syncLazadaAttributesForCategory(Request $request): JsonResponse
     {
@@ -263,15 +259,14 @@ class LazadaAttributeMappingController extends Controller
     }
 
     /**
-     * Lazada attributes cached for one category (see the migration's
-     * "informational, not a real FK" caveat on that column — this lists
-     * whatever the most recent sync for that category actually saw), each
-     * annotated with whichever PIM attribute currently maps to it, if any.
-     * Backs the "จับคู่แอตทริบิวต์กับ PIM" column's table on
-     * categories/lazada-mapping.tsx — mirrors
-     * ShopeeAttributeMappingController::shopeeAttributesForCategory()
-     * exactly, keyed by `name` instead of a numeric id (see LazadaAttribute's
-     * docblock for why).
+     * Lazada attribute ที่แคชไว้สำหรับหมวดหมู่หนึ่งๆ (ดูหมายเหตุใน migration ที่บอกว่า
+     * คอลัมน์นี้ "ใช้บอกข้อมูลเฉยๆ ไม่ใช่ FK จริง" — ที่ list ออกมาก็คือสิ่งที่ sync ล่าสุด
+     * ของหมวดหมู่นั้นเจอจริงๆ) แต่ละตัวจะแนบมาด้วยว่า PIM attribute ไหนแมปอยู่ (ถ้ามี)
+     * เป็นข้อมูลหนุนหลังตารางคอลัมน์ "จับคู่แอตทริบิวต์กับ PIM" บนหน้า
+     * categories/lazada-mapping.tsx — ทำงานเหมือนกับ
+     * ShopeeAttributeMappingController::shopeeAttributesForCategory() เป๊ะๆ
+     * แค่ใช้ `name` เป็น key แทนที่จะเป็น id ตัวเลข (ดูเหตุผลได้ที่ docblock ของ
+     * LazadaAttribute)
      */
     public function lazadaAttributesForCategory(int $lazadaCategoryId): JsonResponse
     {

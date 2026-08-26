@@ -16,24 +16,22 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each TikTok push field,
- * without a code change — see TikTokProductSyncService::buildPayload()/
- * resolveMappedField() (structured fields) and resolveProductAttributes()
- * (`tiktok_attribute`, the old behavior), which read this table instead of
- * the old hardcoded pname/price_std/qty/weight_pcs/product_details_features/
- * attribute_6/DIMENSION_FIELD_SOURCE lookups. v1 only supports attributes
- * TikTok itself marks `is_customizable` (the seller may type a free value)
- * for the `tiktok_attribute` target — attributes without that flag need a
- * specific predefined value from TikTok's own `values[]` list, not an
- * arbitrary one, so they're synced for visibility but rejected as a mapping
- * target here (same scope decision already made for Shopee/Lazada's
- * equivalent pages).
+ * ให้แอดมินเลือกได้ว่าจะเอา PIM attribute ตัวไหนมาเติมลงฟิลด์ที่จะส่งไป TikTok
+ * โดยไม่ต้องแก้โค้ด — ดูที่ TikTokProductSyncService::buildPayload()/
+ * resolveMappedField() (สำหรับฟิลด์ที่มีโครงสร้างชัดเจน) และ resolveProductAttributes()
+ * (`tiktok_attribute` พฤติกรรมเดิม) ซึ่งจะอ่านจากตารางนี้แทนที่จะไป lookup แบบ
+ * hardcode เดิมอย่าง pname/price_std/qty/weight_pcs/product_details_features/
+ * attribute_6/DIMENSION_FIELD_SOURCE เวอร์ชัน 1 รองรับแค่ attribute ที่ TikTok
+ * เองติดแฟล็ก `is_customizable` ไว้ (คือผู้ขายพิมพ์ค่าเองได้อิสระ) สำหรับ target แบบ
+ * `tiktok_attribute` เท่านั้น — attribute ที่ไม่มีแฟล็กนี้ต้องเลือกค่าจาก list
+ * `values[]` ของ TikKok เองเท่านั้น ไม่ใช่ค่าอิสระ เลยแค่ sync มาโชว์ให้เห็น
+ * แต่ยังเลือกมาเป็น target การแมปตรงนี้ไม่ได้ (ตัดสินใจแบบเดียวกับที่เคยทำไว้ในหน้า
+ * ของ Shopee/Lazada)
  *
- * The read-only index() this used to own now lives in
- * MarketplaceAttributeMappingController (bundled with WooCommerce/Shopee/
- * Lazada's equivalents into one Inertia response for the combined
- * "จับคู่แอตทริบิวต์ Marketplace" tabbed page) — this controller keeps only the
- * write actions.
+ * index() แบบ read-only ที่เคยอยู่ในนี้ ตอนนี้ย้ายไปอยู่ที่
+ * MarketplaceAttributeMappingController แล้ว (รวมกับของ WooCommerce/Shopee/
+ * Lazada ไว้ใน Inertia response เดียวกัน สำหรับหน้าแท็บรวม
+ * "จับคู่แอตทริบิวต์ Marketplace") — controller นี้เลยเหลือแค่ action ที่เขียนข้อมูลเท่านั้น
  */
 class TikTokAttributeMappingController extends Controller
 {
@@ -60,10 +58,10 @@ class TikTokAttributeMappingController extends Controller
                 collect($entries)->pluck('tiktok_attribute_id')->filter()
             )->get()->keyBy('id');
 
-            // Same external-video restriction as Lazada's video field (see
-            // LazadaAttributeMappingController's docblock for the live
-            // incident this prevents a repeat of) — only a PIM attribute of
-            // type `video` may ever be mapped to target_field='video'.
+            // ข้อจำกัดเรื่อง URL วิดีโอจากภายนอกแบบเดียวกับฟิลด์วิดีโอของ Lazada
+            // (ดู docblock ของ LazadaAttributeMappingController สำหรับเหตุการณ์จริง
+            // ที่ตรงนี้ป้องกันไม่ให้เกิดซ้ำ) — มีแค่ PIM attribute ประเภท `video`
+            // เท่านั้นที่จะแมปเข้ากับ target_field='video' ได้
             $attributesById = Attribute::whereIn(
                 'id',
                 collect($entries)->pluck('attribute_id')->filter()
@@ -127,11 +125,11 @@ class TikTokAttributeMappingController extends Controller
 
         TikTokAttributeMapping::bumpListVersion();
 
-        // The embedded per-category picker on categories/tiktok-mapping.tsx
-        // calls this same endpoint via plain fetch (Accept: application/json)
-        // instead of an Inertia visit — see
-        // ShopeeAttributeMappingController::update()'s identical branch for
-        // why. Every other caller is a real Inertia POST, unaffected.
+        // ตัวเลือกรายหมวดหมู่ที่ฝังอยู่ในหน้า categories/tiktok-mapping.tsx จะเรียก
+        // endpoint นี้ผ่าน fetch ธรรมดา (Accept: application/json) แทนที่จะเป็นการ
+        // visit แบบ Inertia — ดูเหตุผลได้ที่ branch แบบเดียวกันใน
+        // ShopeeAttributeMappingController::update() ส่วนตัวเรียกอื่นๆ ที่เหลือเป็น
+        // Inertia POST จริงๆ ไม่ได้รับผลกระทบ
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
@@ -140,14 +138,14 @@ class TikTokAttributeMappingController extends Controller
     }
 
     /**
-     * Pulls TikTok's real category attribute schema in (read-only against
-     * TikTok) for every PIM category currently mapped to a
-     * tiktok_category_id, one getAttributes() call per distinct category
-     * (TikTok's endpoint takes a single category_id, not a batch list, same
-     * as Lazada's /category/attributes/get). Deduped globally by attribute
-     * `id` — see the migration's docblock for the caveat on that. Paced
-     * with a short sleep between calls, same defensive precaution as
-     * LazadaAttributeMappingController::syncLazadaAttributes().
+     * ดึงโครงสร้าง attribute ของหมวดหมู่จริงจาก TikTok เข้ามา (แค่อ่านอย่างเดียว
+     * ไม่ได้เขียนกลับไป) สำหรับทุกหมวดหมู่ PIM ที่แมปกับ tiktok_category_id ไว้แล้ว
+     * โดยเรียก getAttributes() ทีละ 1 ครั้งต่อ 1 หมวดหมู่ (endpoint ของ TikTok รับ
+     * category_id เดียวเท่านั้น ไม่ใช่ list แบบ batch เหมือนกับ /category/attributes/get
+     * ของ Lazada) ตัดตัวซ้ำด้วย `id` ของ attribute รวมทุกหมวดหมู่ — ดูข้อควรระวัง
+     * เรื่องนี้ได้ที่ docblock ของ migration มีการหน่วงเวลาสั้นๆ ระหว่างแต่ละ call
+     * เป็นมาตรการป้องกันแบบเดียวกับ
+     * LazadaAttributeMappingController::syncLazadaAttributes()
      */
     public function syncTikTokAttributes(): RedirectResponse
     {
@@ -204,14 +202,13 @@ class TikTokAttributeMappingController extends Controller
     }
 
     /**
-     * Same idea as syncTikTokAttributes() above, but scoped to exactly one
-     * TikTok category — the "Sync attributes" action on
-     * categories/tiktok-mapping.tsx, mirroring
+     * แนวคิดเดียวกับ syncTikTokAttributes() ด้านบน แต่ทำแค่หมวดหมู่ TikTok เดียว —
+     * เป็น action "Sync attributes" บนหน้า categories/tiktok-mapping.tsx เลียนแบบ
      * ShopeeAttributeMappingController::syncShopeeAttributesForCategory()/
-     * LazadaAttributeMappingController::syncLazadaAttributesForCategory().
-     * Runs synchronously — a single getAttributes() call, same as the
-     * multi-category loop iteration above, just without the rate-limit
-     * pacing since there's only one call here.
+     * LazadaAttributeMappingController::syncLazadaAttributesForCategory()
+     * รันแบบ synchronous — เรียก getAttributes() แค่ครั้งเดียว เหมือนกับแต่ละรอบ
+     * loop ต่อหมวดหมู่ด้านบน แค่ไม่ต้องหน่วงเวลากันเรียกถี่เกิน เพราะตรงนี้เรียกแค่
+     * ครั้งเดียว
      */
     public function syncTikTokAttributesForCategory(Request $request): JsonResponse
     {
@@ -258,14 +255,13 @@ class TikTokAttributeMappingController extends Controller
     }
 
     /**
-     * TikTok attributes cached for one category (see the migration's
-     * "informational, not a real FK" caveat on that column — this lists
-     * whatever the most recent sync for that category actually saw), each
-     * annotated with whichever PIM attribute currently maps to it, if any.
-     * Backs the "จับคู่ Attribute กับ PIM" column's table on
-     * categories/tiktok-mapping.tsx — mirrors
-     * ShopeeAttributeMappingController::shopeeAttributesForCategory()
-     * exactly, keyed by `id` (a string, per TikTokAttribute's own PK type).
+     * TikTok attribute ที่แคชไว้สำหรับหมวดหมู่หนึ่งๆ (ดูหมายเหตุใน migration ที่บอกว่า
+     * คอลัมน์นี้ "ใช้บอกข้อมูลเฉยๆ ไม่ใช่ FK จริง" — ที่ list ออกมาก็คือสิ่งที่ sync ล่าสุด
+     * ของหมวดหมู่นั้นเจอจริงๆ) แต่ละตัวจะแนบมาด้วยว่า PIM attribute ไหนแมปอยู่ (ถ้ามี)
+     * เป็นข้อมูลหนุนหลังตารางคอลัมน์ "จับคู่ Attribute กับ PIM" บนหน้า
+     * categories/tiktok-mapping.tsx — ทำงานเหมือนกับ
+     * ShopeeAttributeMappingController::shopeeAttributesForCategory() เป๊ะๆ
+     * แค่ใช้ `id` เป็น key (เป็น string ตามชนิด PK ของ TikTokAttribute เอง)
      */
     public function tiktokAttributesForCategory(int $tiktokCategoryId): JsonResponse
     {

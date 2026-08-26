@@ -15,6 +15,7 @@ import {
     Button,
     Chip,
     CircularProgress,
+    Divider,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -35,15 +36,14 @@ import { xsrfToken } from '@/lib/csrf';
 import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
 import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
-// Same marketplace-tree-row-centric table as categories/shopee-mapping.tsx/
-// categories/lazada-mapping.tsx/categories/tiktok-mapping.tsx (see
-// CategoryController::woocommerceMapping()'s docblock), plus the same
-// "Brands" detail section (global — WooCommerce's own "Product Brands"
-// taxonomy has no category dimension, same as Lazada's/TikTok's). No
-// "Attributes" section here — unlike Shopee/Lazada/TikTok, WooCommerce's
-// custom attributes aren't scoped to a category schema at all (see
-// WooCommerceAttributeMappingController — syncWoocommerceAttributes() is
-// global, no per-category concept exists to mirror).
+// ใช้ตารางแบบ marketplace-tree-row-centric เหมือนกับ categories/shopee-mapping.tsx/
+// categories/lazada-mapping.tsx/categories/tiktok-mapping.tsx (ดู docblock ของ
+// CategoryController::woocommerceMapping()) รวมถึงส่วน detail "Brands" แบบเดียวกัน
+// (global — เพราะ taxonomy "Product Brands" ของ WooCommerce เองไม่มีมิติหมวดหมู่
+// เหมือนกับของ Lazada/TikTok) แต่ไม่มีส่วน "Attributes" ในหน้านี้ — ต่างจาก
+// Shopee/Lazada/TikTok ตรงที่ custom attributes ของ WooCommerce ไม่ได้ผูกกับ
+// schema หมวดหมู่เลย (ดู WooCommerceAttributeMappingController —
+// syncWoocommerceAttributes() ทำงานแบบ global ไม่มีแนวคิดแยกตามหมวดหมู่ให้เลียนแบบ)
 type WoocommerceFilter = 'all' | 'leaf' | 'parent' | 'flagged';
 
 interface MappedCategory {
@@ -80,7 +80,7 @@ interface Props {
     filters: { filter: WoocommerceFilter; search: string; per_page: number };
 }
 
-/** What a pending edit stages for one PIM category id: `null` clears its WooCommerce mapping; an object points it at a (possibly different) WooCommerce node. Keyed by PIM category id, not WooCommerce id — that's what bulkMapWoocommerce() actually persists. */
+/** สิ่งที่การแก้ไขที่ยังไม่บันทึกเตรียมไว้สำหรับ PIM category id หนึ่งตัว: `null` คือล้าง mapping กับ WooCommerce ทิ้ง ส่วนถ้าเป็น object คือชี้ไปที่ WooCommerce node ตัวใหม่ (อาจเป็นคนละตัวกับเดิม) ใช้ PIM category id เป็น key ไม่ใช่ WooCommerce id — เพราะนั่นคือสิ่งที่ bulkMapWoocommerce() บันทึกจริงๆ */
 interface PendingAssignment {
     woocommerceId: number;
     pimName: string;
@@ -104,7 +104,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     ];
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [filter, setFilter] = useState<WoocommerceFilter>(filters.filter ?? 'all');
+    const [filter, setFilter] = useState<WoocommerceFilter>(filters.filter ?? 'leaf');
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 25);
     const [pending, setPending] = useState<Record<number, PendingAssignment | null>>({});
     const [assigningFor, setAssigningFor] = useState<number | null>(null);
@@ -117,7 +117,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         router.post('/catalog/categories/sync-woocommerce', {}, { preserveScroll: true, onFinish: () => setSyncingCategories(false) });
     };
 
-    // ---- WooCommerce Brands (global — see WoocommerceBrandRow's docblock) ----
+    // ---- WooCommerce Brands (global — ดู docblock ของ WoocommerceBrandRow ประกอบ) ----
     const [woocommerceBrands, setWoocommerceBrands] = useState<PaginatedData<WoocommerceBrandRow> | null>(null);
     const [loadingWoocommerceBrands, setLoadingWoocommerceBrands] = useState(false);
     const [woocommerceBrandSearch, setWoocommerceBrandSearch] = useState('');
@@ -141,8 +141,8 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
             .finally(() => setLoadingWoocommerceBrands(false));
     };
 
-    // Loads once on mount — WooCommerce's brand catalog has no category
-    // dimension at all, same as Lazada's/TikTok's.
+    // โหลดครั้งเดียวตอน mount — brand catalog ของ WooCommerce ไม่มีมิติหมวดหมู่เลย
+    // เหมือนกับของ Lazada/TikTok
     useEffect(() => {
         if (canEditBrands) loadWoocommerceBrands({ page: 1 });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,11 +168,11 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         loadWoocommerceBrands({ page });
     };
 
-    // WooCommerce's own brand sync runs synchronously (mode: 'sync' — its
-    // Product Brands endpoint returns everything in a couple of pages,
-    // confirmed live: 4 brands total) — a plain POST + Inertia-style
-    // onFinish is enough, no JobTracker/polling needed the way Shopee/
-    // Lazada/TikTok's queued brand syncs do.
+    // การ sync แบรนด์ของ WooCommerce เองทำงานแบบ synchronous (mode: 'sync' —
+    // endpoint Product Brands ของมัน return ข้อมูลทั้งหมดมาแค่ไม่กี่หน้า เจอจริง
+    // มาแล้ว: มีแบรนด์รวม 4 อัน) — แค่ POST ธรรมดา + onFinish สไตล์ Inertia ก็พอ
+    // ไม่ต้องมี JobTracker/polling แบบที่ queued brand sync ของ Shopee/Lazada/
+    // TikTok ใช้
     const triggerWoocommerceBrandSync = () => {
         setWoocommerceBrandSyncing(true);
         setWoocommerceBrandSyncMessage('');
@@ -185,12 +185,11 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         });
     };
 
-    // `optionId` is which PIM AttributeOption row actually gets written to
-    // (attribute_options.woocommerce_brand_id) — for a fresh assignment
-    // that's the newly-picked PIM brand's own id; for clearing an existing
-    // one it's that existing mapping's PIM id, not anything derived from
-    // `woocommerceBrandId`. `display` is what the row should show
-    // afterward. Same shape as the other 3 platforms' persistBrand().
+    // `optionId` คือแถว PIM AttributeOption ที่จะถูกเขียนค่าลงไปจริงๆ
+    // (attribute_options.woocommerce_brand_id) — ถ้าเป็นการจับคู่ใหม่ ก็คือ id ของ
+    // แบรนด์ PIM ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping
+    // เดิมนั้น ไม่ใช่อะไรที่คำนวณมาจาก `woocommerceBrandId` ส่วน `display` คือสิ่งที่จะ
+    // โชว์ในแถวหลังจากนั้น รูปแบบเดียวกับ persistBrand() ของอีก 3 แพลตฟอร์ม
     const persistWoocommerceBrand = (woocommerceBrandId: number, optionId: number, newWoocommerceId: number | null, display: { id: number; name: string } | null) => {
         setSavingWoocommerceBrandId(woocommerceBrandId);
         fetch('/catalog/brands/woocommerce-mapping', {
@@ -215,10 +214,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         persistWoocommerceBrand(woocommerceBrandId, currentPimOptionId, null, null);
     };
 
-    // Any navigation (page/filter/search change, or a completed save) hands
-    // us a fresh `categories` prop — pending picks made against the previous
-    // set of rows no longer apply, so drop them rather than let them leak
-    // into a future save.
+    // ทุกครั้งที่มีการ navigate (เปลี่ยนหน้า/filter/search หรือบันทึกเสร็จ) เราจะได้
+    // prop `categories` ชุดใหม่มา — การเลือกที่ยังค้างอยู่จากชุดแถวเดิมใช้ไม่ได้แล้ว
+    // เลยต้องล้างทิ้ง ไม่งั้นมันจะหลุดไปปนกับการบันทึกครั้งถัดไป
     useEffect(() => {
         setPending({});
         setAssigningFor(null);
@@ -288,10 +286,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         router.post('/catalog/categories/woocommerce-mapping', { mappings }, { preserveScroll: true, onFinish: () => setSaving(false) });
     };
 
-    // A row counts as "pending" (for the dashed row highlight) in either
-    // direction: one of its existing PIM mappings is being cleared/moved
-    // away, or a fresh assignment is landing on it from a different PIM
-    // category.
+    // แถวหนึ่งจะถูกนับเป็น "pending" (ไฮไลต์ด้วยเส้นประ) ได้ทั้งสองทาง: กำลังจะล้าง/
+    // ย้าย mapping PIM เดิมของมันออกไป หรือกำลังจะมีการจับคู่ใหม่จาก PIM category
+    // อื่นเข้ามาลงตรงนี้
     const rowHasPendingChange = (row: WoocommerceRow) =>
         row.mapped_categories.some((pc) => pc.id in pending) || Object.values(pending).some((assignment) => assignment?.woocommerceId === row.id);
 
@@ -358,10 +355,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
 
                 const existingIds = new Set(row.mapped_categories.map((c) => c.id));
 
-                // Everything currently mapped to this WooCommerce node,
-                // folded together with any pending edit against that same
-                // PIM category — including one that moves it elsewhere,
-                // which has to render here as "will clear" too.
+                // ทุกอย่างที่ mapping กับ WooCommerce node นี้อยู่ตอนนี้ รวมเข้ากับ
+                // การแก้ไขที่ยังค้างอยู่ของ PIM category เดียวกัน — รวมถึงกรณีที่ย้าย
+                // ไปที่อื่นด้วย ซึ่งต้อง render ตรงนี้เป็น "will clear" เหมือนกัน
                 const existingChips = row.mapped_categories.map((pc) => {
                     const staged = pending[pc.id];
                     if (staged === undefined) {
@@ -391,8 +387,8 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                     );
                 });
 
-                // A PIM category not currently listed here, but staged (from
-                // its own row elsewhere on this page) to move onto this one.
+                // PIM category ที่ยังไม่อยู่ในลิสต์นี้ แต่ถูกเตรียมไว้ (จากแถวของมันเองที่
+                // อื่นในหน้านี้) ให้ย้ายมาอยู่ตรงนี้
                 const newlyAssigned = Object.entries(pending)
                     .filter((entry): entry is [string, PendingAssignment] => {
                         const [pimId, assignment] = entry;
@@ -504,7 +500,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         >
                             {t('marketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('woocommerceMappingTitle')}</Typography>
+                        <Typography variant="h4" fontWeight={700}>{t('woocommerceMappingTitle')}</Typography><Divider sx={{ my: 2 }} />
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}

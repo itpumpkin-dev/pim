@@ -67,8 +67,8 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        // Same PUT-can't-carry-multipart reasoning as CategoryController's
-        // edit page — the thumbnail upload forces this into multipart.
+        // เหตุผลเดียวกับหน้า edit ของ CategoryController ที่ PUT ส่ง multipart ไม่ได้ —
+        // พอมีอัปโหลดรูป thumbnail ก็เลยต้องบังคับใช้ multipart แทน
         transform((formData) => ({ ...formData, _method: 'put' }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/brands/${brand.id}`, {

@@ -9,13 +9,13 @@ import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
- * "จัดการ" hub — a single sidebar entry consolidating three pages that
- * previously only lived one level down inside their own entities
- * (Products' missing-translations list, and the Categories/Brands
- * marketplace-sync tabs) so they're reachable in one click from Catalog's
- * sidebar instead. Each card just navigates to the real page — all
- * permission checks and actions still live there, this is purely a
- * launcher, so it needs no server-side props of its own.
+ * หน้า hub "จัดการ" — เป็นเมนู sidebar จุดเดียวที่รวมหน้าย่อย 3 หน้าเข้าไว้ด้วยกัน
+ * ซึ่งแต่ก่อนหน้าพวกนี้จะซ่อนอยู่ลึกในแต่ละ entity ของตัวเอง
+ * (list คำแปลที่ขาดของ Products, และแท็บ marketplace-sync ของ Categories/Brands)
+ * เลยย้ายมาไว้ตรงนี้ให้กดคลิกเดียวถึงจาก sidebar ของ Catalog เลย
+ * แต่ละการ์ดแค่พาไปหน้าจริงเท่านั้น — การเช็ค permission และ action ต่างๆ
+ * ยังอยู่ที่หน้าปลายทางเหมือนเดิม หน้านี้เป็นแค่ตัวพาไป (launcher)
+ * เลยไม่ต้องมี props จาก server เลย
  */
 export default function CatalogManagement() {
     const { t } = useTranslation('catalog');
@@ -39,11 +39,10 @@ export default function CatalogManagement() {
             permission: 'product_translations.list_product_translations',
         },
         {
-            // Combines what used to be two separate tiles ("ซิงค์
-            // Marketplace" for Categories, "จัดการ Ecommerce" for Brands)
-            // into one entry point — visible to anyone who can reach either
-            // destination, since the page it links to (management/marketplace)
-            // shows only the cards the viewer actually has permission for.
+            // รวมสองการ์ดเดิมเข้าด้วยกัน ("ซิงค์ Marketplace" ของ Categories
+            // กับ "จัดการ Ecommerce" ของ Brands) ให้เหลือทางเข้าจุดเดียว —
+            // ใครที่มีสิทธิ์เข้าถึงอย่างใดอย่างหนึ่งก็จะเห็นการ์ดนี้ เพราะหน้าที่ลิงก์ไป
+            // (management/marketplace) จะโชว์เฉพาะการ์ดที่คนดูมีสิทธิ์จริงๆ เท่านั้น
             key: 'ecommerce-marketplace',
             icon: StorefrontOutlinedIcon,
             title: t('manageEcommerceMarketplaceTab'),

@@ -26,8 +26,8 @@ class ChannelController extends Controller
     {
         $search = $request->input('search');
 
-        // Only `code` is a real, simple-typed column on `channels` — `name` is
-        // a translation-based accessor, not filterable via a plain where clause.
+        // มีแค่ `code` เท่านั้นที่เป็นคอลัมน์จริงแบบ simple-type ใน `channels` — ส่วน `name`
+        // เป็น accessor ที่ดึงมาจากตาราง translation เลยใช้ where clause ธรรมดากรองไม่ได้
         $filterColumns = [
             'code' => ['label' => 'Code', 'type' => 'string', 'filterable' => true],
         ];
@@ -179,8 +179,8 @@ class ChannelController extends Controller
     }
 
     /**
-     * Fresh (uncached) locale_id => name map for the channel's current
-     * translations — used to snapshot before/after state for audit diffs.
+     * ดึง locale_id => name ของ translation ปัจจุบันของ channel แบบสดๆ (ไม่ผ่าน cache)
+     * เอาไว้เก็บสแนปช็อตก่อน/หลังสำหรับเทียบความต่างตอนทำ audit log
      */
     private function currentTranslations(Channel $channel): array
     {

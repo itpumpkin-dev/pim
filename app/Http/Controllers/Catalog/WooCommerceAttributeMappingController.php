@@ -13,20 +13,19 @@ use Illuminate\Validation\Rule;
 use RuntimeException;
 
 /**
- * Lets an admin pick which PIM attributes feed into every field
- * WooCommerce push sends, in what order, without a code change — see
- * WooCommerceProductSyncService::buildPayload(), which reads this table
- * for the composed content fields (description/short_description, every
- * mapped attribute concatenated), the structured fields (name/price/
- * image/qty/weight/length/width/height, first mapped attribute with a
- * value wins), and WooCommerce's own Product Attributes (`wc_attribute`,
- * targeting a specific woocommerce_attributes row — see
- * syncWoocommerceAttributes() below for how that list gets populated).
+ * ให้แอดมินเลือกได้ว่าจะเอา attribute ไหนของ PIM ไปใส่ในแต่ละฟิลด์ที่ส่งไป
+ * WooCommerce ตอน push โดยไม่ต้องแก้โค้ด — ดูที่ WooCommerceProductSyncService::buildPayload()
+ * ที่อ่านตารางนี้ไปใช้ ทั้งฟิลด์เนื้อหาที่เอามาต่อกัน (description/short_description
+ * เอา attribute ที่ map ไว้ทุกตัวมาต่อกัน), ฟิลด์แบบมีโครงสร้าง (name/price/
+ * image/qty/weight/length/width/height เอา attribute ตัวแรกที่มีค่ามาใช้)
+ * และ Product Attributes ของ WooCommerce เอง (`wc_attribute` ที่ชี้ไปยังแถวใน
+ * woocommerce_attributes โดยตรง — ดู syncWoocommerceAttributes() ด้านล่างว่า
+ * ลิสต์นั้นถูกดึงมายังไง)
  *
- * The read-only index() this used to own now lives in
- * MarketplaceAttributeMappingController (bundled with Shopee/Lazada/TikTok's
- * equivalents into one Inertia response for the combined "จับคู่เนื้อหา
- * Marketplace" tabbed page) — this controller keeps only the write actions.
+ * ส่วน index() แบบ read-only ที่เคยอยู่ในคลาสนี้ ตอนนี้ย้ายไปอยู่ที่
+ * MarketplaceAttributeMappingController แล้ว (รวมกับของ Shopee/Lazada/TikTok
+ * เป็น Inertia response เดียวสำหรับหน้า "จับคู่เนื้อหา Marketplace" แบบแท็บ)
+ * — คลาสนี้เหลือแค่ action ที่เขียนข้อมูลเท่านั้น
  */
 class WooCommerceAttributeMappingController extends Controller
 {
@@ -85,11 +84,11 @@ class WooCommerceAttributeMappingController extends Controller
     }
 
     /**
-     * Pulls WooCommerce's real global Product Attributes list in (read-only
-     * against WooCommerce — this never writes anything there) so the
-     * mapping page above has real targets to pick from instead of guessed
-     * ones. Mirrors BrandController::syncWoocommerceBrands() exactly,
-     * swapped to WooCommerceAttribute/WooCommerceClient::getAttributes().
+     * ดึงลิสต์ Product Attributes ตัวจริงของ WooCommerce เข้ามา (อ่านอย่างเดียว
+     * ไม่มีการเขียนอะไรกลับไปที่ WooCommerce เลย) เพื่อให้หน้า mapping ด้านบนมี
+     * ตัวเลือกจริงๆ ให้เลือก ไม่ใช่เดาเอาเอง โครงสร้างเหมือนกับ
+     * BrandController::syncWoocommerceBrands() เป๊ะ แค่เปลี่ยนไปใช้
+     * WooCommerceAttribute/WooCommerceClient::getAttributes() แทน
      */
     public function syncWoocommerceAttributes(): RedirectResponse
     {

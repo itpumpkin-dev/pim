@@ -21,7 +21,7 @@ class CategoryFieldController extends Controller
 
 
     /**
-     * Display a listing of the category fields.
+     * แสดงรายการ category field ทั้งหมด
      */
     public function index(Request $request): Response
     {
@@ -60,7 +60,7 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Show the form for creating a new category field.
+     * แสดงฟอร์มสำหรับสร้าง category field ใหม่
      */
     public function create(): Response
     {
@@ -68,7 +68,7 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Store a newly created category field in storage.
+     * บันทึก category field ที่สร้างใหม่ลงฐานข้อมูล
      */
     public function store(Request $request): RedirectResponse
     {
@@ -98,7 +98,7 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Show the form for editing the specified category field.
+     * แสดงฟอร์มสำหรับแก้ไข category field ที่ระบุ
      */
     public function edit(CategoryField $categoryField): Response
     {
@@ -114,7 +114,7 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Update the specified category field in storage.
+     * อัปเดต category field ที่ระบุในฐานข้อมูล
      */
     public function update(Request $request, CategoryField $categoryField): RedirectResponse
     {
@@ -142,11 +142,11 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * When "AI translate" is enabled, queues a job to pre-fill every other
-     * active locale's label that doesn't already have one — same pattern as
-     * AttributeController/AttributeOptionController, but writing into the
-     * `labels` JSON column instead of a related translations table (see
-     * AttributeAutoTranslator::fillMissingJsonColumn()).
+     * ถ้าเปิด "AI translate" ไว้ จะ queue job ไปเติม label ให้ทุก locale
+     * ที่ active อยู่แล้วยังไม่มีค่า — ใช้ pattern เดียวกับ
+     * AttributeController/AttributeOptionController แต่เขียนลงคอลัมน์
+     * JSON `labels` แทนที่จะเป็นตาราง translations แยกต่างหาก (ดู
+     * AttributeAutoTranslator::fillMissingJsonColumn())
      */
     private function autoTranslate(CategoryField $field, array $labels): void
     {
@@ -170,11 +170,11 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Picks which locale to translate FROM. Prefers the app's default locale
-     * when it was filled in, but falls back to whichever locale actually has
-     * a label otherwise — see AttributeController::resolveAutoTranslateSource()
-     * for why requiring the default locale specifically silently skips
-     * auto-translation for a field filled in only in another language.
+     * เลือกว่าจะแปลจาก locale ไหน จะพยายามใช้ locale default ของแอปก่อน
+     * ถ้ามีค่ากรอกไว้ แต่ถ้าไม่มีก็ fallback ไปใช้ locale ไหนก็ได้ที่มี
+     * label อยู่ — ดู AttributeController::resolveAutoTranslateSource()
+     * ประกอบว่าทำไมการบังคับให้ต้องมี locale default เท่านั้นถึงทำให้
+     * auto-translation ถูกข้ามไปเงียบๆ สำหรับ field ที่กรอกไว้แค่ภาษาอื่น
      *
      * @param  array<int|string, mixed>  $labels
      * @return array{0: int|null, 1: string}
@@ -199,7 +199,7 @@ class CategoryFieldController extends Controller
     }
 
     /**
-     * Remove the specified category field from storage.
+     * ลบ category field ที่ระบุออกจากฐานข้อมูล
      */
     public function destroy(CategoryField $categoryField): RedirectResponse
     {

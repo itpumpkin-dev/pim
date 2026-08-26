@@ -4,13 +4,13 @@ import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-ta
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
 
-// v1 only supports TikTok attributes marked is_customizable (the seller may
-// type a free value) — see TikTokAttributeMappingController::update(),
-// which rejects a mapping to any other attribute. Non-customizable
-// (select-only) attributes are still listed (so an admin can see they
-// exist) but disabled, since TikTok needs a specific predefined value for
-// those rather than an arbitrary one — same scope decision already made
-// for the Shopee/Lazada mapping pages.
+// v1 รองรับแค่ TikTok attribute ที่ติดแฟล็ก is_customizable เท่านั้น (ผู้ขาย
+// พิมพ์ค่าเองได้อิสระ) — ดูที่ TikTokAttributeMappingController::update()
+// ซึ่งจะปฏิเสธการ mapping ไป attribute แบบอื่น ส่วน attribute ที่ไม่ใช่
+// customizable (เลือกจากลิสต์อย่างเดียว) ยังคงแสดงในลิสต์อยู่ (เพื่อให้แอดมิน
+// เห็นว่ามีอยู่จริง) แต่จะกดเลือกไม่ได้ เพราะ TikTok ต้องการค่าที่กำหนดไว้
+// ล่วงหน้าเฉพาะเจาะจง ไม่ใช่ค่าอิสระ — เป็น scope decision เดียวกับที่ใช้
+// กับหน้า mapping ของ Shopee/Lazada อยู่แล้ว
 
 type TargetField =
     | 'name'
@@ -25,25 +25,25 @@ type TargetField =
     | 'tiktok_attribute'
     | '';
 
-// Single-value, "first mapped attribute with a value wins" fields feeding
-// TikTok's own create/update product payload directly (title/price/
-// inventory/package_*/description/video) — see
-// TikTokProductSyncService::resolveMappedField(). Distinct from
-// `tiktok_attribute` below, which feeds one entry of TikTok's own
-// `product_attributes[]` instead — a structurally different destination,
-// kept in its own dropdown group (and its own status caption).
+// ฟิลด์แบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่าจะชนะ"
+// ส่งค่าตรงเข้า payload สร้าง/อัปเดตสินค้าของ TikTok เอง (title/price/
+// inventory/package_*/description/video) — ดูที่
+// TikTokProductSyncService::resolveMappedField() ต่างจาก `tiktok_attribute`
+// ด้านล่างนี้ ซึ่งจะไปลงที่ entry หนึ่งใน `product_attributes[]` ของ TikTok
+// แทน — ปลายทางต่างกันโดยโครงสร้าง เลยแยกกลุ่ม dropdown ออกจากกัน
+// (และมี status caption ของตัวเอง)
 const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video'];
 
-// The target Select's value is a plain TargetField string for every fixed
-// payload field, but a TikTok product-attribute mapping needs to also carry
-// *which* one — encoded as this prefix + its id (e.g. "tiktok_attribute:100335")
-// so one MUI Select can represent both without a second control.
+// ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับฟิลด์
+// payload ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป TikTok product-attribute
+// ต้องแนบด้วยว่า *ตัวไหน* — เลยเข้ารหัสเป็น prefix นี้ + id (เช่น
+// "tiktok_attribute:100335") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้
+// โดยไม่ต้องมี control ตัวที่สอง
 const TIKTOK_ATTRIBUTE_PREFIX = 'tiktok_attribute:';
 
-// Field identifiers are snake_case (matching the backend's target_field
-// values) but this app's i18n keys are camelCase — same keys
-// woocommerce-/shopee-/lazada-attribute-mapping-panel.tsx use for the same
-// fields.
+// ชื่อฟิลด์เป็น snake_case (ตรงกับค่า target_field ฝั่ง backend) แต่ i18n key
+// ของแอปนี้เป็น camelCase — คีย์เดียวกับที่
+// woocommerce-/shopee-/lazada-attribute-mapping-panel.tsx ใช้กับฟิลด์เดียวกัน
 const FIELD_LABEL_KEYS: Record<Exclude<TargetField, '' | 'tiktok_attribute'>, string> = {
     name: 'name',
     price: 'price',
@@ -103,8 +103,8 @@ export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes, cove
         }),
     });
 
-    // Backend reports payloadFields.missing as raw target_field keys — same
-    // translation the picker's own dropdown uses, so the tooltip matches.
+    // Backend ส่ง payloadFields.missing มาเป็น target_field key ดิบๆ — ใช้
+    // ชุดคำแปลเดียวกับที่ dropdown ของตัว picker เองใช้ เพื่อให้ tooltip ตรงกัน
     const payloadFieldsCoverage = {
         ...coverage.payloadFields,
         missing: coverage.payloadFields.missing.map((field) => t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>])),
@@ -152,9 +152,9 @@ export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes, cove
                         <MenuItem
                             key={field}
                             value={field}
-                            // TikTok's video field expects an uploaded file, not an
-                            // external URL (see this field's backend guard) — only a
-                            // PIM attribute of type `video` may ever target it.
+                            // ฟิลด์วิดีโอของ TikTok ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
+                            // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
+                            // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
                             disabled={field === 'video' && row.type !== 'video'}
                         >
                             {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>])}

@@ -45,7 +45,7 @@ export default function AttributeGroupCreate() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('addAttributeGroupTitle')} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {/* Header Title & Actions */}
+                {/* หัวข้อและปุ่มต่างๆ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         {t('addAttributeGroupTitle')}

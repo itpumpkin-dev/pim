@@ -36,18 +36,17 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * "Brands" is a dedicated, WooCommerce-styled screen over the `pbrand`
- * Attribute's existing AttributeOption rows — not a new taxonomy. A
- * product's brand is stored as `ProductValue.value = AttributeOption.code`
- * (see ProductPresenter::resolveSelectOptionLabels() and the
- * master_products view for the same join), which is what the "Count"
- * column below queries against.
+ * "Brands" เป็นหน้าจอเฉพาะทางสไตล์ WooCommerce ที่สร้างขึ้นมาบนแถว AttributeOption
+ * ที่มีอยู่แล้วของ Attribute ชื่อ `pbrand` — ไม่ใช่ taxonomy ใหม่ แบรนด์ของสินค้าจะถูก
+ * เก็บในรูป `ProductValue.value = AttributeOption.code` (ดู
+ * ProductPresenter::resolveSelectOptionLabels() และ view master_products ที่ join
+ * แบบเดียวกันนี้) ซึ่งเป็นสิ่งที่คอลัมน์ "Count" ด้านล่างใช้ query หาข้อมูล
  *
- * Deliberately a separate controller from AttributeOptionController rather
- * than reusing its nested `/attributes/{attribute}/options` routes — this
- * screen's list/search/sort/count shape doesn't fit that generic inline
- * panel, but every translation/audit/code-generation helper below mirrors
- * that controller's proven behavior.
+ * ตั้งใจแยก controller นี้ออกจาก AttributeOptionController แทนที่จะใช้ route
+ * `/attributes/{attribute}/options` ที่ซ้อนอยู่ในนั้น เพราะรูปแบบ list/search/sort/count
+ * ของหน้าจอนี้ไม่เข้ากับ panel แบบ inline ทั่วไปนั้น แต่ helper ทุกตัวเรื่อง
+ * translation/audit/code-generation ด้านล่างนี้ก็เลียนแบบพฤติกรรมที่พิสูจน์แล้วว่าใช้ได้
+ * ของ controller นั้นมาทั้งหมด
  */
 class BrandController extends Controller
 {
@@ -57,14 +56,13 @@ class BrandController extends Controller
     }
 
     /**
-     * value(brand option code) => count of distinct products, for the
-     * "products_count" badge on index(). This scans product_values for
-     * every load, so it's cached with a short TTL rather than left
-     * uncached — a plain TTL rather than event-based invalidation because
-     * ProductValue rows for pbrand are written from many places (product
-     * create/update, bulk import, marketplace sync), so a few minutes of
-     * staleness on a count badge is a safer trade than missing an
-     * invalidation call site somewhere.
+     * value (code ของ brand option) => จำนวนสินค้าที่ไม่ซ้ำกัน สำหรับ badge
+     * "products_count" บน index() เพราะต้อง scan product_values ทุกครั้งที่โหลด
+     * เลยแคชไว้ด้วย TTL สั้นๆ แทนที่จะไม่แคชเลย — เลือกใช้ TTL ธรรมดาแทนการ
+     * invalidate ตาม event เพราะแถว ProductValue ของ pbrand ถูกเขียนจากหลายจุด
+     * มาก (สร้าง/แก้ไขสินค้า, import จำนวนมาก, sync กับ marketplace) ดังนั้นยอมให้
+     * ตัวเลขบน badge เก่าไปสักไม่กี่นาทีปลอดภัยกว่าการพลาดจุดที่ต้อง invalidate
+     * ตรงไหนสักที่
      */
     private function brandProductCounts(int $attributeId): \Illuminate\Support\Collection
     {
@@ -90,7 +88,7 @@ class BrandController extends Controller
             $perPage = 15;
         }
 
-        // Same shape as CategoryController::index()'s platform filter.
+        // รูปแบบเดียวกับตัวกรอง platform ของ CategoryController::index()
         $platformFilter = $request->input('platform');
         $platformColumns = [
             'shopee' => 'shopee_brand_id',
@@ -124,10 +122,10 @@ class BrandController extends Controller
             })
             ->get();
 
-        // Brand lists are small (dozens, not thousands) — counting/sorting
-        // in PHP after one fetch is simpler and plenty fast, and avoids a
-        // SQL-level count subquery for a join that isn't a real Eloquent
-        // relation (ProductValue.value = AttributeOption.code, not an FK).
+        // ลิสต์แบรนด์มีขนาดเล็ก (หลักสิบ ไม่ใช่หลักพัน) — นับ/เรียงลำดับใน PHP หลังจาก
+        // fetch มาครั้งเดียวง่ายกว่าและเร็วพอ แถมยังเลี่ยง SQL subquery สำหรับนับที่
+        // ต้อง join กับสิ่งที่ไม่ใช่ Eloquent relation จริงๆ ได้ด้วย
+        // (ProductValue.value = AttributeOption.code ไม่ใช่ FK)
         $counts = $this->brandProductCounts($attribute->id);
 
         $labelById = $options->pluck('admin_label', 'id');
@@ -298,22 +296,22 @@ class BrandController extends Controller
         return back()->with('success', 'Brand deleted successfully.');
     }
 
-    // The old marketplaceSync() hub page/method (brands/marketplace-sync.tsx)
-    // is gone — its two props (lastSyncedAt/activeSyncJobs) and everything it
-    // linked to now live on CategoryController::marketplaceSync() /
-    // categories/marketplace-sync.tsx instead.
+    // หน้า/เมธอด marketplaceSync() แบบฮับเดิม (brands/marketplace-sync.tsx)
+    // ถูกลบไปแล้ว — props ทั้งสองตัวของมัน (lastSyncedAt/activeSyncJobs) และทุกอย่าง
+    // ที่มันลิงก์ไป ตอนนี้ย้ายไปอยู่ที่ CategoryController::marketplaceSync() /
+    // categories/marketplace-sync.tsx แทนแล้ว
 
     /**
-     * Queues the local shopee_brands cache refresh rather than running it
-     * inline — unlike CategoryController::syncShopeeCategories() (one call,
-     * Shopee's whole category tree at once), Shopee's get_brand_list is
-     * scoped to one category_id per call, and at least one real mapped
-     * category in this shop has 10,000+ brands under it (has_next_page was
-     * still true past offset 9950 in a live test), so a full sync is many
-     * minutes of network-bound work — far past any web request timeout.
-     * SyncShopeeBrandsJob does the actual fetch loop; this just does the
-     * fast precondition checks and hands back a JobTracker id for the
-     * frontend to poll via shopeeBrandSyncStatus().
+     * เข้าคิว (queue) การรีเฟรชแคช shopee_brands แทนที่จะรันตรงๆ ทันที — ต่างจาก
+     * CategoryController::syncShopeeCategories() (เรียกครั้งเดียวได้ต้นไม้หมวดหมู่
+     * ทั้งหมดของ Shopee เลย) ตรงที่ get_brand_list ของ Shopee จะจำกัดแค่ 1
+     * category_id ต่อการเรียก 1 ครั้ง แถมอย่างน้อยก็มีหมวดหมู่ที่แมปไว้จริงในร้านนี้
+     * ที่มีแบรนด์อยู่ข้างใต้เกิน 10,000 แบรนด์ (ทดสอบจริงแล้ว has_next_page ยังเป็น
+     * true อยู่แม้เลย offset 9950 ไปแล้ว) ดังนั้นการ sync แบบเต็มรูปแบบจึงเป็นงาน
+     * ที่ต้องรอ network หลายนาที เกินเวลา timeout ของ web request ไปมาก
+     * SyncShopeeBrandsJob เป็นตัวที่ทำ loop ดึงข้อมูลจริงๆ ส่วนตรงนี้แค่เช็คเงื่อนไข
+     * เบื้องต้นแบบเร็วๆ แล้วส่ง JobTracker id กลับไปให้ frontend เอาไป poll ผ่าน
+     * shopeeBrandSyncStatus()
      */
     public function syncShopeeBrands(Request $request): JsonResponse
     {
@@ -341,12 +339,12 @@ class BrandController extends Controller
     }
 
     /**
-     * Queues the local lazada_brands cache refresh — SyncLazadaBrandsJob
-     * does the actual fetch loop, this just hands back a JobTracker id.
-     * Unlike syncShopeeBrands(), there's no "must map categories first"
-     * precondition: Lazada's /category/brands/query isn't scoped to any
-     * category at all (confirmed live: no category param exists on this
-     * endpoint), so the whole 153k+ brand catalog is fetched unconditionally.
+     * เข้าคิว (queue) การรีเฟรชแคช lazada_brands — SyncLazadaBrandsJob เป็นตัวที่
+     * ทำ loop ดึงข้อมูลจริงๆ ตรงนี้แค่ส่ง JobTracker id กลับไป ต่างจาก
+     * syncShopeeBrands() ตรงที่ไม่มีเงื่อนไข "ต้องแมปหมวดหมู่ก่อน" เลย เพราะ
+     * /category/brands/query ของ Lazada ไม่ได้ผูกกับหมวดหมู่ไหนเลย (เช็คจากของจริง
+     * แล้ว endpoint นี้ไม่มี parameter หมวดหมู่ให้ใส่) เลยดึงแคตตาล็อกแบรนด์ทั้งหมด
+     * กว่า 153,000 รายการมาแบบไม่มีเงื่อนไขใดๆ
      */
     public function syncLazadaBrands(Request $request): JsonResponse
     {
@@ -369,12 +367,11 @@ class BrandController extends Controller
     }
 
     /**
-     * Queues the local tiktok_brands cache refresh — SyncTikTokBrandsJob
-     * does the actual fetch loop. Same "no category precondition" shape as
-     * Lazada: TikTokClient::getBrands()'s category_id is optional, and
-     * omitting it returns the shop's whole brand list — confirmed live,
-     * 2026-08-21, that's still 10,000 records for this account, so it's
-     * queued rather than synchronous.
+     * เข้าคิว (queue) การรีเฟรชแคช tiktok_brands — SyncTikTokBrandsJob เป็นตัวที่
+     * ทำ loop ดึงข้อมูลจริงๆ ไม่มีเงื่อนไข "ต้องแมปหมวดหมู่ก่อน" แบบเดียวกับ Lazada:
+     * category_id ของ TikTokClient::getBrands() เป็น optional ถ้าไม่ใส่ก็จะได้
+     * ลิสต์แบรนด์ทั้งหมดของร้านกลับมา — เช็คจากของจริงแล้วเมื่อ 2026-08-21 ยังมี
+     * ถึง 10,000 รายการสำหรับ account นี้ เลยต้องเข้าคิวแทนที่จะรันแบบ synchronous
      */
     public function syncTiktokBrands(Request $request): JsonResponse
     {
@@ -397,15 +394,14 @@ class BrandController extends Controller
     }
 
     /**
-     * Polled by the marketplace-sync page while a queued sync (Shopee,
-     * Lazada, or TikTok) is running — kept scoped to this controller
-     * (rather than reusing the generic import/export
-     * JobTrackerController::status() route) since this job isn't tied to an
-     * ImportConfig/ExportConfig and shouldn't show up mixed into that
-     * unrelated jobs list. Generic on job_type rather than a specific
-     * platform — was named shopeeBrandSyncStatus() when Shopee was the only
-     * queued platform, but the body never actually checked which one, so
-     * every other queued platform reuses this unchanged.
+     * ถูก poll จากหน้า marketplace-sync ตอนมี sync ที่เข้าคิวไว้ (Shopee, Lazada,
+     * หรือ TikTok) กำลังรันอยู่ — ตั้งใจให้อยู่ใน controller นี้ (แทนที่จะใช้ route
+     * JobTrackerController::status() แบบทั่วไปของ import/export) เพราะ job นี้
+     * ไม่ได้ผูกกับ ImportConfig/ExportConfig และไม่ควรไปปนอยู่ในลิสต์ job ที่ไม่
+     * เกี่ยวข้องกันนั้น ทำแบบ generic ตาม job_type แทนที่จะเจาะจงแพลตฟอร์มใดแพลตฟอร์ม
+     * หนึ่ง — เดิมชื่อ shopeeBrandSyncStatus() ตอนที่ Shopee เป็นแพลตฟอร์มเดียวที่
+     * เข้าคิว แต่ตัวโค้ดจริงๆ ไม่เคยเช็คเลยว่าเป็นแพลตฟอร์มไหน เลยให้ทุกแพลตฟอร์มอื่น
+     * ที่เข้าคิวใช้ตัวนี้ร่วมกันได้เลยโดยไม่ต้องแก้อะไร
      */
     public function brandSyncStatus(JobTracker $jobTracker): JsonResponse
     {
@@ -421,12 +417,12 @@ class BrandController extends Controller
     }
 
     /**
-     * Requests that a still-running sync (Shopee, Lazada, or TikTok) stop —
-     * mirrors JobTrackerController::cancel()'s cancel_requested_at
-     * signalling, but kept as its own JSON endpoint for the same reason as
-     * brandSyncStatus() above. Only takes effect between pages (see each
-     * job's progress-flush interval), so the tracker can keep showing
-     * 'processing' for a moment after this is called.
+     * ขอให้ sync ที่กำลังรันอยู่ (Shopee, Lazada, หรือ TikTok) หยุดทำงาน — ทำงาน
+     * เหมือนกับการส่งสัญญาณ cancel_requested_at ของ
+     * JobTrackerController::cancel() แต่แยกเป็น JSON endpoint ของตัวเองด้วยเหตุผล
+     * เดียวกับ brandSyncStatus() ด้านบน จะมีผลจริงก็ต่อเมื่อ job เช็คสถานะรอบถัดไป
+     * เท่านั้น (ดู progress-flush interval ของแต่ละ job) เพราะฉะนั้น tracker อาจยัง
+     * โชว์สถานะ 'processing' ต่อไปอีกสักครู่หลังจากเรียกตัวนี้แล้ว
      */
     public function cancelBrandSync(JobTracker $jobTracker): JsonResponse
     {
@@ -441,13 +437,13 @@ class BrandController extends Controller
     }
 
     /**
-     * Refreshes the local woocommerce_brands cache — unlike Shopee, this
-     * runs synchronously (no JobTracker/queued job): WooCommerce's Product
-     * Brands endpoint returns everything in a small number of pages
-     * (confirmed live, 2026-08-21: the real store has only 4 brands total),
-     * so it's nowhere near the scale that forced SyncShopeeBrandsJob to
-     * exist. Mirrors CategoryController::syncWoocommerceCategories() exactly
-     * — same do/while-until-a-short-page pagination shape.
+     * รีเฟรชแคช woocommerce_brands ในระบบ — ต่างจาก Shopee ตรงที่ตัวนี้รันแบบ
+     * synchronous เลย (ไม่ต้องใช้ JobTracker/queued job): endpoint Product
+     * Brands ของ WooCommerce จะคืนข้อมูลทั้งหมดมาในไม่กี่หน้า (เช็คจากของจริงแล้ว
+     * เมื่อ 2026-08-21 ร้านจริงมีแบรนด์แค่ 4 แบรนด์เท่านั้น) เลยห่างไกลจากขนาดที่
+     * เคยบังคับให้ต้องสร้าง SyncShopeeBrandsJob ขึ้นมามาก ทำงานเหมือนกับ
+     * CategoryController::syncWoocommerceCategories() เป๊ะๆ — ใช้รูปแบบ
+     * pagination แบบ do/while-จนกว่าจะได้หน้าที่มีข้อมูลน้อยลงเหมือนกัน
      */
     public function syncWoocommerceBrands(): RedirectResponse
     {
@@ -483,19 +479,18 @@ class BrandController extends Controller
         return back()->with('success', 'Synced '.count($rows).' WooCommerce brands.');
     }
 
-    // No searchWoocommerceBrands()/WooCommerceBrandPicker,
-    // searchLazadaBrands()/LazadaBrandPicker, or searchTiktokBrands()/
-    // TikTokBrandPicker anymore — every platform's Brands table now maps in
-    // the opposite direction (pick a PIM brand for a given marketplace
-    // brand row, via PimBrandPicker → searchPimBrands() below), same as
-    // Shopee's was first.
+    // ไม่มี searchWoocommerceBrands()/WooCommerceBrandPicker,
+    // searchLazadaBrands()/LazadaBrandPicker, หรือ searchTiktokBrands()/
+    // TikTokBrandPicker แล้ว — ตอนนี้ตาราง Brands ของทุกแพลตฟอร์มแมปกลับด้าน
+    // (เลือก PIM brand ให้กับแถวแบรนด์ของ marketplace ผ่าน PimBrandPicker →
+    // searchPimBrands() ด้านล่าง) เหมือนกับที่ Shopee ทำเป็นเจ้าแรก
 
-    // No searchMarketplaceBrands()/serializeMarketplaceBrands() anymore —
-    // every platform's marketplace-brand-by-name search picker is gone (see
-    // the comment above). TikTok's own 19-digit-id-as-string handling
-    // (JS's JSON.parse silently rounds anything past Number.MAX_SAFE_INTEGER
-    // — confirmed live, 7417026736480880390 becomes 7417026736480881000 once
-    // parsed) now lives directly in tiktokBrandsList() below instead.
+    // ไม่มี searchMarketplaceBrands()/serializeMarketplaceBrands() แล้วเช่นกัน —
+    // ตัวค้นหาแบรนด์ของ marketplace ตามชื่อของทุกแพลตฟอร์มถูกลบไปแล้ว (ดูคอมเมนต์
+    // ด้านบน) ส่วนการจัดการ id 19 หลักของ TikTok แบบเก็บเป็น string
+    // (JSON.parse ของ JS จะปัดเศษเงียบๆ เมื่อค่าเกิน Number.MAX_SAFE_INTEGER —
+    // เช็คจากของจริงแล้ว 7417026736480880390 จะกลายเป็น 7417026736480881000
+    // หลัง parse) ตอนนี้ย้ายไปอยู่ใน tiktokBrandsList() ด้านล่างโดยตรงแทน
 
     public function bulkMapShopeeBrand(Request $request): RedirectResponse|JsonResponse
     {
@@ -503,12 +498,11 @@ class BrandController extends Controller
     }
 
     /**
-     * Same as syncShopeeBrands() below, but scoped to exactly one Shopee
-     * category — the "Sync brand" row action on categories/shopee-mapping.tsx
-     * now that category mapping and brand mapping live on the same page (see
-     * that page's docblock for why: get_brand_list is category-scoped, so
-     * reviewing a category's brands makes the most sense right where you're
-     * already looking at that category).
+     * เหมือนกับ syncShopeeBrands() ด้านล่าง แต่ทำแค่หมวดหมู่ Shopee เดียว — เป็น
+     * action ของแถว "Sync brand" บนหน้า categories/shopee-mapping.tsx ตอนนี้ที่
+     * การแมปหมวดหมู่กับการแมปแบรนด์อยู่หน้าเดียวกันแล้ว (ดูเหตุผลได้ที่ docblock
+     * ของหน้านั้น: get_brand_list ผูกกับหมวดหมู่อยู่แล้ว การดูแบรนด์ของหมวดหมู่นั้น
+     * ก็เลยสมเหตุสมผลที่สุดตรงจุดที่กำลังดูหมวดหมู่นั้นอยู่พอดี)
      */
     public function syncShopeeBrandsForCategory(Request $request): JsonResponse
     {
@@ -535,13 +529,12 @@ class BrandController extends Controller
     }
 
     /**
-     * Shopee brands cached for one category (see ShopeeCategory's
-     * "informational, not a real FK" caveat on that column — this lists
-     * whatever the most recent sync for that category actually saw), each
-     * annotated with whichever PIM brand currently maps to it, if any.
-     * Backs the "จับคู่แบรนด์กับ PIM" column on the Shopee Brands detail
-     * table on categories/shopee-mapping.tsx (driven by whichever category
-     * row is selected above it).
+     * แบรนด์ Shopee ที่แคชไว้สำหรับหมวดหมู่หนึ่งๆ (ดูหมายเหตุของ ShopeeCategory ที่
+     * บอกว่าคอลัมน์นี้ "ใช้บอกข้อมูลเฉยๆ ไม่ใช่ FK จริง" — ที่ list ออกมาก็คือสิ่งที่
+     * sync ล่าสุดของหมวดหมู่นั้นเจอจริงๆ) แต่ละตัวจะแนบมาด้วยว่า PIM brand ไหนแมป
+     * อยู่ (ถ้ามี) เป็นข้อมูลหนุนหลังคอลัมน์ "จับคู่แบรนด์กับ PIM" บนตาราง Shopee
+     * Brands แบบละเอียดในหน้า categories/shopee-mapping.tsx (จะเปลี่ยนตามแถว
+     * หมวดหมู่ที่เลือกไว้ด้านบนมัน)
      */
     public function shopeeBrandsForCategory(Request $request, int $shopeeCategoryId): JsonResponse
     {
@@ -553,12 +546,11 @@ class BrandController extends Controller
             $perPage = 25;
         }
 
-        // Paginated, not a single get() — a category's brand list can run
-        // into five figures (confirmed live: 12,102 for one real category
-        // after the pagination-cursor fix in SyncShopeeBrandsJob started
-        // actually reaching all of it). Sending and rendering that many rows
-        // at once is what made this table slow to load; the frontend now
-        // asks for one page at a time, same as the categories table above it.
+        // ใช้ paginate ไม่ได้ get() มาทีเดียว — ลิสต์แบรนด์ของหมวดหมู่หนึ่งๆ อาจมีถึง
+        // หลักหมื่น (เช็คจากของจริงแล้ว 12,102 รายการสำหรับหมวดหมู่จริงหมวดหนึ่ง
+        // หลังจากแก้ pagination-cursor ใน SyncShopeeBrandsJob ให้ดึงมาได้ครบจริงๆ)
+        // การส่งและ render ข้อมูลเยอะขนาดนั้นทีเดียวเป็นสาเหตุที่ทำให้ตารางนี้โหลดช้า
+        // ตอนนี้ frontend เลยขอทีละหน้า เหมือนกับตาราง categories ด้านบนมัน
         $query = ShopeeBrand::where('category_id', $shopeeCategoryId);
 
         if ($search !== '') {
@@ -590,15 +582,14 @@ class BrandController extends Controller
     }
 
     /**
-     * Search endpoint backing the PIM brand Autocomplete on both Shopee's
-     * and Lazada's Brands tables (categories/shopee-mapping.tsx,
-     * categories/lazada-mapping.tsx) — the mirror image of
-     * searchTiktokBrands()/searchWoocommerceBrands() below: those search a
-     * marketplace's brand cache by name, this searches our own `pbrand`
-     * attribute options by name, since those two tables map in the opposite
-     * direction (pick a PIM brand for a given marketplace brand row, not the
-     * other way around — TikTok/WooCommerce's own brand mapping pages still
-     * go the other way).
+     * endpoint สำหรับค้นหาที่หนุนหลัง Autocomplete ของ PIM brand ทั้งบนตาราง Brands
+     * ของ Shopee และ Lazada (categories/shopee-mapping.tsx,
+     * categories/lazada-mapping.tsx) — เป็นภาพสะท้อนกลับด้านของ
+     * searchTiktokBrands()/searchWoocommerceBrands() ด้านล่าง: ตัวเหล่านั้นค้นหา
+     * แคชแบรนด์ของ marketplace ตามชื่อ ส่วนตัวนี้ค้นหา attribute option `pbrand`
+     * ของเราเองตามชื่อ เพราะสองตารางนั้นแมปกลับด้าน (เลือก PIM brand ให้กับแถว
+     * แบรนด์ของ marketplace ไม่ใช่กลับด้านกัน — ส่วนหน้าแมปแบรนด์ของ
+     * TikTok/WooCommerce เองยังทำแบบเดิมอยู่)
      */
     public function searchPimBrands(Request $request): JsonResponse
     {
@@ -620,12 +611,12 @@ class BrandController extends Controller
     }
 
     /**
-     * WooCommerce brands, paginated + searched, each annotated with
-     * whichever PIM brand currently maps to it, if any. Backs the Brands
-     * table on categories/woocommerce-mapping.tsx — mirrors
-     * lazadaBrandsList() exactly. WooCommerce's own brand list is tiny
-     * (confirmed live: 4 total for this shop) so pagination barely matters
-     * here, but kept for the same shape every other platform's list uses.
+     * แบรนด์ของ WooCommerce แบบ paginate + ค้นหาได้ แต่ละตัวจะแนบมาด้วยว่า PIM
+     * brand ไหนแมปอยู่ (ถ้ามี) เป็นข้อมูลหนุนหลังตาราง Brands บนหน้า
+     * categories/woocommerce-mapping.tsx — ทำงานเหมือนกับ lazadaBrandsList()
+     * เป๊ะๆ ลิสต์แบรนด์ของ WooCommerce เองมีขนาดเล็กมาก (เช็คจากของจริงแล้วมีแค่
+     * 4 แบรนด์สำหรับร้านนี้) pagination เลยแทบไม่มีผลอะไร แต่ก็ยังคงรูปแบบไว้
+     * เหมือนกับลิสต์ของทุกแพลตฟอร์มอื่น
      */
     public function woocommerceBrandsList(Request $request): JsonResponse
     {
@@ -673,21 +664,21 @@ class BrandController extends Controller
     }
 
     /**
-     * Lazada brands, paginated + searched, each annotated with whichever PIM
-     * brand currently maps to it, if any. Backs the "จับคู่กับแบรนด์ PIM"
-     * column on the Lazada Brands table on categories/lazada-mapping.tsx —
-     * mirrors BrandController::shopeeBrandsForCategory() exactly (row =
-     * marketplace brand, PimBrandPicker in the mapping column), just without
-     * the category scoping: Lazada's brand catalog isn't category-scoped at
-     * all (see syncLazadaBrands()'s docblock), so this can't be driven by a
-     * route param — its own search/pagination round trips instead.
+     * แบรนด์ของ Lazada แบบ paginate + ค้นหาได้ แต่ละตัวจะแนบมาด้วยว่า PIM brand
+     * ไหนแมปอยู่ (ถ้ามี) เป็นข้อมูลหนุนหลังคอลัมน์ "จับคู่กับแบรนด์ PIM" บนตาราง
+     * Lazada Brands ในหน้า categories/lazada-mapping.tsx — ทำงานเหมือนกับ
+     * BrandController::shopeeBrandsForCategory() เป๊ะๆ (แถว = แบรนด์ของ
+     * marketplace, มี PimBrandPicker อยู่ในคอลัมน์ mapping) แค่ไม่มีการจำกัดขอบเขต
+     * ด้วยหมวดหมู่: แคตตาล็อกแบรนด์ของ Lazada ไม่ได้ผูกกับหมวดหมู่เลย (ดู docblock
+     * ของ syncLazadaBrands()) ตัวนี้เลยขับเคลื่อนด้วย route param ไม่ได้ — ใช้การ
+     * search/pagination round trip ของตัวเองแทน
      *
-     * Row-centric this way (not the old PIM-option-centric shape the now-gone
-     * buildBrandMappingData() used to produce) — that shared helper's
-     * "browse the PIM brand list, pick a marketplace brand for each" shape
-     * read backwards next to Shopee's own Brands table right above it on the
-     * same page, which goes the other way around (every platform's Brands
-     * table shares this row-centric shape now).
+     * ใช้รูปแบบยึดแถว (row-centric) แบบนี้ (ไม่ใช่รูปแบบยึด PIM-option แบบเดิมที่
+     * buildBrandMappingData() ซึ่งตอนนี้ลบไปแล้วเคยสร้าง) — เพราะรูปแบบเดิมของ
+     * helper ตัวนั้นที่ "ไล่ดูลิสต์ PIM brand แล้วเลือกแบรนด์ของ marketplace ให้แต่ละตัว"
+     * มันอ่านย้อนกลับด้านเมื่อวางไว้ข้างๆ ตาราง Brands ของ Shopee เองที่อยู่ด้านบนใน
+     * หน้าเดียวกัน ซึ่งไปคนละทางกัน (ตอนนี้ตาราง Brands ของทุกแพลตฟอร์มใช้รูปแบบ
+     * ยึดแถวแบบนี้เหมือนกันหมดแล้ว)
      */
     public function lazadaBrandsList(Request $request): JsonResponse
     {
@@ -735,11 +726,11 @@ class BrandController extends Controller
     }
 
     /**
-     * TikTok brands, paginated + searched, each annotated with whichever PIM
-     * brand currently maps to it, if any. Backs the Brands table on
-     * categories/tiktok-mapping.tsx — mirrors lazadaBrandsList() exactly
-     * (TikTokBrand is flat, no category_id, same as LazadaBrand — see that
-     * model's docblock).
+     * แบรนด์ของ TikTok แบบ paginate + ค้นหาได้ แต่ละตัวจะแนบมาด้วยว่า PIM brand
+     * ไหนแมปอยู่ (ถ้ามี) เป็นข้อมูลหนุนหลังตาราง Brands บนหน้า
+     * categories/tiktok-mapping.tsx — ทำงานเหมือนกับ lazadaBrandsList() เป๊ะๆ
+     * (TikTokBrand เป็นโครงสร้างแบน ไม่มี category_id เหมือนกับ LazadaBrand —
+     * ดู docblock ของ model นั้น)
      */
     public function tiktokBrandsList(Request $request): JsonResponse
     {
@@ -759,11 +750,10 @@ class BrandController extends Controller
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
 
-        // TikTok's own brand ids are large enough (19 digits, confirmed
-        // live) that PHP's native int still round-trips them losslessly,
-        // but JS's JSON.parse doesn't (confirmed live: 7417026736480880390
-        // becomes 7417026736480881000 once parsed) — sent as strings here
-        // to dodge that.
+        // brand id ของ TikTok เองมีขนาดใหญ่พอ (19 หลัก เช็คจากของจริงแล้ว) จนต้อง
+        // ระวัง — PHP native int ยังเก็บ/คืนค่าได้ครบถ้วนไม่มีปัดเศษ แต่ JSON.parse
+        // ของ JS ทำไม่ได้ (เช็คจากของจริงแล้ว 7417026736480880390 จะกลายเป็น
+        // 7417026736480881000 หลัง parse) เลยส่งเป็น string ตรงนี้เพื่อเลี่ยงปัญหานั้น
         $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
             ->whereIn('tiktok_brand_id', $paginated->getCollection()->pluck('id'))
             ->get(['id', 'admin_label', 'tiktok_brand_id'])
@@ -816,15 +806,14 @@ class BrandController extends Controller
                 continue;
             }
 
-            // Cast to int before comparing/storing — for TikTok specifically
-            // the frontend sends this as a numeric string (see
-            // tiktokBrandsList()'s docblock on why), which would never
-            // strictly-equal the int PHP/Postgres already returns for this
-            // column, making the "already mapped to this value" skip below
-            // never fire. PHP's native int is exact for these ids (confirmed
-            // live: a 19-digit TikTok id round-trips losslessly), so this is
-            // a safe normalization for every platform, not just TikTok — the
-            // other 3 already send/receive plain ints today.
+            // แปลงเป็น int ก่อนเทียบ/บันทึก — โดยเฉพาะ TikTok ที่ frontend ส่งค่านี้มา
+            // เป็น numeric string (ดูเหตุผลที่ docblock ของ tiktokBrandsList())
+            // ซึ่งถ้าไม่แปลงจะไม่มีวันเท่ากับ int แบบ strict ที่ PHP/Postgres คืนมา
+            // ให้คอลัมน์นี้อยู่แล้ว ทำให้เงื่อนไข skip "แมปค่านี้อยู่แล้ว" ด้านล่างไม่มีวัน
+            // ทำงาน PHP native int เก็บค่า id พวกนี้ได้แม่นยำ (เช็คจากของจริงแล้ว
+            // id 19 หลักของ TikTok เก็บ/คืนค่าได้ครบไม่มีปัดเศษ) เพราะฉะนั้นการ
+            // normalize แบบนี้ปลอดภัยสำหรับทุกแพลตฟอร์ม ไม่ใช่แค่ TikTok — ส่วนอีก
+            // 3 แพลตฟอร์มที่เหลือก็ส่ง/รับเป็น int ธรรมดาอยู่แล้วทุกวันนี้
             $newId = isset($mapping['marketplace_brand_id']) ? (int) $mapping['marketplace_brand_id'] : null;
             if ($option->{$fkColumn} === $newId) {
                 continue;
@@ -842,12 +831,12 @@ class BrandController extends Controller
             $updated++;
         }
 
-        // The embedded per-category brand picker on categories/shopee-mapping.tsx
-        // calls this same endpoint via plain fetch (Accept: application/json)
-        // instead of an Inertia visit — it saves one pick at a time inline in a
-        // table cell, where a full-page redirect/flash-toast round trip would
-        // be jarring. Every other caller is a real Inertia POST (no explicit
-        // json Accept header), so this doesn't change their response at all.
+        // ตัวเลือกแบรนด์รายหมวดหมู่ที่ฝังอยู่ในหน้า categories/shopee-mapping.tsx
+        // จะเรียก endpoint นี้ผ่าน fetch ธรรมดา (Accept: application/json) แทนที่จะ
+        // เป็นการ visit แบบ Inertia — เพราะมันบันทึกทีละตัวเลือกแบบ inline อยู่ใน
+        // cell ของตาราง ถ้าต้อง redirect ทั้งหน้า/แสดง toast แบบ round trip เต็มรูปแบบ
+        // จะดูสะดุดเกินไป ส่วนตัวเรียกอื่นๆ ที่เหลือเป็น Inertia POST จริงๆ
+        // (ไม่มี Accept header เป็น json ชัดเจน) เลยไม่กระทบ response ของพวกนั้นเลย
         if ($request->wantsJson()) {
             return response()->json(['updated' => $updated]);
         }
@@ -869,9 +858,9 @@ class BrandController extends Controller
     }
 
     /**
-     * Mirrors AttributeOptionController::optionAuditFields() — same
-     * option#{id}.* prefixed shape, extended with the new brand columns so
-     * they show up in the parent Attribute's History tab too.
+     * ทำงานเหมือนกับ AttributeOptionController::optionAuditFields() — ใช้
+     * รูปแบบ prefix option#{id}.* แบบเดียวกัน ขยายเพิ่มด้วยคอลัมน์แบรนด์ใหม่ๆ
+     * เพื่อให้ไปโชว์ในแท็บ History ของ Attribute แม่ด้วย
      */
     private function optionAuditFields(AttributeOption $option): array
     {
@@ -883,9 +872,9 @@ class BrandController extends Controller
     }
 
     /**
-     * Copied from AttributeOptionController::resolveAdminLabel() — keeps
-     * the raw `admin_label` column in sync with the app's default locale
-     * translation, same fallback-through-translations priority.
+     * คัดลอกมาจาก AttributeOptionController::resolveAdminLabel() — ทำให้คอลัมน์
+     * `admin_label` ดิบๆ ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ ใช้ลำดับความ
+     * สำคัญแบบ fallback ผ่าน translations แบบเดียวกัน
      */
     private function resolveAdminLabel(array $translations, ?string $adminLabel): ?string
     {
@@ -904,9 +893,9 @@ class BrandController extends Controller
     }
 
     /**
-     * Copied from AttributeOptionController::autoTranslate() — keyed off
-     * the parent (pbrand) attribute's "AI translate" flag, same as every
-     * other option under it.
+     * คัดลอกมาจาก AttributeOptionController::autoTranslate() — ยึดตามแฟล็ก
+     * "AI translate" ของ attribute แม่ (pbrand) เหมือนกับ option อื่นๆ ทุกตัวที่
+     * อยู่ข้างใต้มัน
      */
     private function autoTranslate(Attribute $attribute, AttributeOption $option, array $translations): void
     {
@@ -930,7 +919,7 @@ class BrandController extends Controller
     }
 
     /**
-     * Copied from AttributeOptionController::resolveAutoTranslateSource().
+     * คัดลอกมาจาก AttributeOptionController::resolveAutoTranslateSource()
      *
      * @param  array<int|string, mixed>  $translations
      * @return array{0: int|null, 1: string}
@@ -955,7 +944,7 @@ class BrandController extends Controller
     }
 
     /**
-     * Copied from AttributeOptionController::syncTranslations().
+     * คัดลอกมาจาก AttributeOptionController::syncTranslations()
      */
     private function syncTranslations(AttributeOption $option, array $translations): void
     {

@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
- * CRUD for select/multiselect attribute options, including their swatch
- * value (hex color, uploaded image, or plain text label depending on the
- * parent attribute's `swatch_type`). Nested under the attribute rather than
- * a top-level resource since options only ever make sense in that context.
- * Redirects back to the attribute edit page like every other catalog
- * controller, rather than returning JSON, so Inertia's normal form-submit
- * flow (CSRF, validation error bag, etc.) just works.
+ * จัดการ CRUD ของตัวเลือก (option) แบบ select/multiselect ของ attribute
+ * รวมถึงค่า swatch ของมันด้วย (สีแบบ hex, รูปที่อัปโหลด หรือข้อความล้วน
+ * แล้วแต่ค่า `swatch_type` ของ attribute แม่) ออกแบบให้ซ้อนอยู่ใต้ attribute
+ * ไม่ใช่ resource แยกต่างหาก เพราะ option จะมีความหมายก็ต่อเมื่ออยู่ใน
+ * บริบทของ attribute เท่านั้น พอทำเสร็จจะ redirect กลับไปหน้าแก้ไข attribute
+ * เหมือน controller อื่นๆ ใน catalog แทนที่จะ return JSON เพื่อให้ flow
+ * การ submit ฟอร์มปกติของ Inertia (CSRF, validation error bag ฯลฯ) ทำงานได้เลย
  */
 class AttributeOptionController extends Controller
 {
@@ -62,9 +62,9 @@ class AttributeOptionController extends Controller
 
         AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
-        // Server-generated (see CodeGenerator) — flashed back so the quick-add
-        // dialog on the product edit page can select this option immediately
-        // without asking the caller to guess or supply a code of its own.
+        // โค้ดนี้ server เป็นคนสร้างให้ (ดู CodeGenerator) — flash กลับไปด้วย
+        // เพื่อให้ dialog quick-add ในหน้าแก้ไขสินค้าเลือก option นี้ได้ทันที
+        // โดยไม่ต้องให้ฝั่งเรียกเดาหรือใส่โค้ดเอง
         return back()->with('success', 'Option added successfully.')->with('created_option_code', $option->code);
     }
 
@@ -106,16 +106,15 @@ class AttributeOptionController extends Controller
     }
 
     /**
-     * Saves every option row in one request instead of the usual one-PUT-per-row
-     * flow — needed once an attribute has more than a handful of options (some
-     * of these lists run into the hundreds), where clicking Save on each row
-     * individually isn't practical.
+     * เซฟ option ทุกแถวในคำขอเดียว แทนที่จะยิง PUT ทีละแถวแบบปกติ — จำเป็น
+     * เมื่อ attribute หนึ่งมี option เยอะเกินกว่าจะจัดการทีละอัน (บาง list
+     * มีเป็นร้อยรายการ) ซึ่งถ้าให้กด Save ทีละแถวคงไม่ไหว
      *
-     * Deliberately does not run auto-translation (see store()/update()'s
-     * autoTranslate()): with rows potentially in the hundreds, firing one
-     * translation-provider call per missing locale per row synchronously here
-     * would risk timing out the request. Options saved through this path keep
-     * whatever labels were typed and are left for a manual translate pass.
+     * ตั้งใจไม่ให้รัน auto-translation ตรงนี้ (ดู autoTranslate() ใน
+     * store()/update()) เพราะถ้ามีเป็นร้อยแถว การยิง call ไปยัง translation
+     * provider ทีละ locale ที่ขาดในแต่ละแถวแบบ synchronous จะเสี่ยงทำให้
+     * request timeout ได้ ดังนั้น option ที่เซฟผ่านทางนี้จะเก็บ label ตามที่
+     * พิมพ์มา แล้วปล่อยให้ไปแปลเองทีหลังแบบ manual
      */
     public function batchUpdate(Request $request, Attribute $attribute): RedirectResponse
     {
@@ -180,11 +179,11 @@ class AttributeOptionController extends Controller
     }
 
     /**
-     * Option create/update/delete are recorded against the parent attribute
-     * (not the option itself) since options only ever get viewed via the
-     * attribute's edit page — this is what shows up in its History tab.
-     * Keys are prefixed by option id so a rename doesn't get mistaken for a
-     * different option going missing.
+     * การสร้าง/แก้ไข/ลบ option จะถูกบันทึกไว้ที่ attribute แม่ (ไม่ใช่ที่ตัว
+     * option เอง) เพราะ option จะถูกดูผ่านหน้าแก้ไขของ attribute เท่านั้น
+     * — นี่คือสิ่งที่ไปโผล่ในแท็บ History ของ attribute นั้น key จะใส่
+     * option id นำหน้าไว้ เพื่อไม่ให้การเปลี่ยนชื่อ option ถูกเข้าใจผิดว่า
+     * เป็น option อื่นที่หายไป
      */
     private function optionAuditFields(AttributeOption $option): array
     {
@@ -196,12 +195,12 @@ class AttributeOptionController extends Controller
     }
 
     /**
-     * The raw `admin_label` column doubles as the fallback shown wherever a
-     * translation is missing (see AttributeOption::adminLabel()) and as the
-     * plain value read by callers that bypass the accessor entirely (e.g.
-     * ProductPresenter's `pluck('admin_label', ...)`). Keep it in sync with
-     * whatever the app's default locale is set to, same as
-     * AttributeGroupController::resolveName().
+     * คอลัมน์ `admin_label` ดิบๆ นี้ทำหน้าที่สองอย่าง คือเป็นค่า fallback
+     * ที่โชว์เวลาไม่มี translation (ดู AttributeOption::adminLabel()) และ
+     * เป็นค่าตรงๆ ที่ฝั่งเรียกซึ่งข้าม accessor ไปอ่านโดยตรง (เช่น
+     * ProductPresenter ที่ใช้ `pluck('admin_label', ...)`) ต้องคอยทำให้
+     * ค่านี้ตรงกับ locale ที่เป็นค่า default ของแอปอยู่เสมอ เหมือนกับที่
+     * AttributeGroupController::resolveName() ทำ
      */
     private function resolveAdminLabel(array $translations, ?string $adminLabel): ?string
     {
@@ -220,10 +219,11 @@ class AttributeOptionController extends Controller
     }
 
     /**
-     * Same pre-fill behavior as AttributeController::autoTranslate(), keyed
-     * off the parent attribute's "AI translate" flag since options don't
-     * carry their own — an option only ever exists under one attribute, so
-     * that flag is the natural place for the admin to opt in.
+     * ทำงานเหมือน AttributeController::autoTranslate() คือ pre-fill label
+     * ให้อัตโนมัติ แต่จะอิงจากค่า flag "AI translate" ของ attribute แม่
+     * เพราะ option เองไม่มี flag ของตัวเอง — option มีอยู่ได้ก็แค่ภายใต้
+     * attribute เดียวเท่านั้น ดังนั้น flag นี้จึงเป็นจุดที่เหมาะสมให้แอดมิน
+     * เลือกเปิดใช้งาน
      */
     private function autoTranslate(Attribute $attribute, AttributeOption $option, array $translations): void
     {
@@ -247,13 +247,13 @@ class AttributeOptionController extends Controller
     }
 
     /**
-     * Picks which locale to translate FROM. Prefers the app's default
-     * locale when it was filled in (matching resolveAdminLabel()'s
-     * priority), but falls back to whichever locale actually has a label
-     * otherwise — e.g. the product edit page's quick-add-option dialog only
-     * ever submits the locale currently being edited, which is frequently
-     * not the app default, so requiring the default locale specifically
-     * silently skipped auto-translation for every option added that way.
+     * เลือกว่าจะแปลจาก locale ไหน จะพยายามใช้ locale default ของแอปก่อน
+     * ถ้ามีค่ากรอกไว้ (ให้ priority เหมือนกับ resolveAdminLabel()) แต่ถ้า
+     * ไม่มีก็จะ fallback ไปใช้ locale ไหนก็ได้ที่มี label อยู่ — เช่น
+     * dialog quick-add-option ในหน้าแก้ไขสินค้าจะส่งมาแค่ locale ที่กำลัง
+     * แก้อยู่ตอนนั้นเท่านั้น ซึ่งบ่อยครั้งไม่ใช่ locale default ของแอป
+     * ถ้าบังคับให้ต้องมี locale default เท่านั้นจะทำให้ auto-translation
+     * เงียบๆ ไม่ทำงานเลยสำหรับ option ที่เพิ่มผ่านทางนี้
      *
      * @param  array<int|string, mixed>  $translations
      * @return array{0: int|null, 1: string}

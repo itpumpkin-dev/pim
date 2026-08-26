@@ -9,16 +9,15 @@ import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
- * "จัดการ Ecommerce/Marketplace" — sits between the Management hub and the
- * real sync pages, which used to be separate tiles on that hub. Purely a
- * launcher like the hub itself: each card just navigates to the existing
- * page, which still owns all of its own sync/mapping actions and permission
- * checks.
+ * หน้า "จัดการ Ecommerce/Marketplace" — อยู่ระหว่างหน้า hub Management กับ
+ * หน้า sync จริงๆ ซึ่งแต่ก่อนเป็นการ์ดแยกอยู่บนหน้า hub นั้นเลย
+ * เป็นแค่ launcher เหมือนหน้า hub: แต่ละการ์ดก็แค่พาไปหน้าที่มีอยู่แล้ว
+ * ซึ่งยังคุม action การ sync/mapping และการเช็ค permission ของตัวเองอยู่เหมือนเดิม
  *
- * No separate "brands" tile anymore — brands/marketplace-sync.tsx is gone;
- * every brand sync/mapping action it linked to now lives on the "categories"
- * tile's own destination page (categories/marketplace-sync.tsx), alongside
- * category actions. See that page's docblock for why.
+ * ไม่มีการ์ด "brands" แยกแล้ว — ไฟล์ brands/marketplace-sync.tsx ถูกลบไปแล้ว
+ * action การ sync/mapping ของ brand ที่เคยลิงก์ไปตรงนั้น ตอนนี้ย้ายมาอยู่ในหน้าปลายทาง
+ * ของการ์ด "categories" แทน (categories/marketplace-sync.tsx) รวมกับ action ของ category เลย
+ * ดูเหตุผลเพิ่มเติมได้ที่ docblock ของหน้านั้น
  */
 export default function CatalogManagementMarketplace() {
     const { t } = useTranslation('catalog');

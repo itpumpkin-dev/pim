@@ -7,20 +7,20 @@ export interface PimBrandOption {
 }
 
 /**
- * Search-by-name picker over the PIM's own `pbrand` attribute options (see
- * BrandController::searchPimBrands) — the mirror image of the old
- * ShopeeBrandPicker (which searched Shopee's brand cache by name). Backs the
- * "pick a PIM brand for this Shopee brand" column on the Shopee Brands table
- * on categories/shopee-mapping.tsx, where mapping starts from a Shopee brand
- * row (scoped to whichever category is selected above) rather than a global
- * PIM brand list.
+ * ตัว picker ค้นหาด้วยชื่อ บน options ของแอตทริบิวต์ `pbrand` ของ PIM เอง (ดู
+ * BrandController::searchPimBrands) — เป็นภาพสะท้อนกลับด้านของ
+ * ShopeeBrandPicker ตัวเก่า (ที่ค้นหาแบรนด์จาก cache ของ Shopee ด้วยชื่อ)
+ * ใช้รองรับคอลัมน์ "เลือกแบรนด์ PIM ให้แบรนด์ Shopee ตัวนี้" บนตาราง Shopee
+ * Brands ที่ categories/shopee-mapping.tsx ซึ่งการ mapping ที่นี่เริ่มจากแถว
+ * แบรนด์ของ Shopee (ตามหมวดหมู่ที่เลือกไว้ด้านบน) ไม่ใช่เริ่มจากลิสต์แบรนด์
+ * PIM ทั้งหมด
  *
- * Unlike a typical debounced Autocomplete, fetching is gated on the dropdown
- * actually being open (`open`/`onOpen`/`onClose` below) rather than firing on
- * mount — that table renders one of these per brand row (routinely dozens at
- * once, all visible at the same time, select-style), so an unconditional
- * fetch-on-mount would fire that many simultaneous empty-query requests the
- * moment a category's brands load, before the user has touched any of them.
+ * ต่างจาก Autocomplete แบบ debounce ทั่วไป ตรงที่การ fetch จะทำงานก็ต่อเมื่อ
+ * dropdown ถูกเปิดอยู่จริงๆ (`open`/`onOpen`/`onClose` ด้านล่าง) ไม่ใช่ยิงตอน
+ * mount — เพราะตารางนั้น render ตัวนี้หนึ่งตัวต่อหนึ่งแถวแบรนด์ (ปกติเป็น
+ * สิบๆ ตัวพร้อมกัน มองเห็นทุกตัวพร้อมกันแบบ select) ถ้ายิง fetch ตอน mount
+ * แบบไม่มีเงื่อนไข จะยิง request query ว่างพร้อมกันเยอะขนาดนั้นทันทีที่
+ * แบรนด์ของหมวดหมู่โหลดเสร็จ ทั้งที่ผู้ใช้ยังไม่ได้แตะตัวไหนเลย
  */
 export function PimBrandPicker({
     value,
@@ -69,15 +69,14 @@ export function PimBrandPicker({
             isOptionEqualToValue={(opt, val) => opt.id === val.id}
             value={value}
             onChange={(_, val) => onChange(val)}
-            // `inputValue` deliberately left uncontrolled — this component
-            // stays mounted permanently (one per brand row, select-style)
-            // rather than being unmounted right after a pick like the
-            // category pickers, so it has to keep displaying `value`'s label
-            // while closed. Controlling `inputValue` to `query` would pin
-            // the field to whatever was last typed (empty, for a row nobody
-            // has searched in yet) and show blank instead of the mapped
-            // brand's name. `onInputChange` alone is enough to capture what
-            // the user types for the debounced search below.
+            // ตั้งใจไม่ควบคุม `inputValue` เอง — component นี้จะ mount ค้างอยู่
+            // ถาวร (หนึ่งตัวต่อหนึ่งแถวแบรนด์ แบบ select) ไม่ได้ unmount ทันที
+            // หลังเลือกเหมือน category picker ตัวอื่น เลยต้องคงแสดง label ของ
+            // `value` ไว้ตอนที่ปิดอยู่ ถ้าไปควบคุม `inputValue` ให้ผูกกับ
+            // `query` จะทำให้ field ค้างอยู่กับค่าที่พิมพ์ล่าสุด (ว่างเปล่า
+            // สำหรับแถวที่ยังไม่มีใครค้นหาเลย) แล้วโชว์เป็นช่องว่างแทนที่จะ
+            // เป็นชื่อแบรนด์ที่ map ไว้ แค่ `onInputChange` อย่างเดียวก็พอแล้ว
+            // สำหรับจับสิ่งที่ผู้ใช้พิมพ์ไปใช้กับการค้นหาแบบ debounce ด้านล่าง
             onInputChange={(_, val, reason) => {
                 if (reason === 'input') setQuery(val);
             }}

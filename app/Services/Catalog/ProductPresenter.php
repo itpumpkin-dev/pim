@@ -13,9 +13,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Maps EAV-backed Product/ProductValue rows to the plain shape the public
- * home page and the internal staff products/show preview expect, matching
- * the `Product` interface in resources/js/data/products.ts.
+ * แปลงข้อมูล Product/ProductValue แบบ EAV ให้อยู่ในรูปแบบธรรมดาที่หน้าแรกฝั่ง
+ * สาธารณะและหน้า preview products/show ฝั่งสตาฟฟ์ต้องการใช้ ให้ตรงกับ
+ * interface `Product` ใน resources/js/data/products.ts
  */
 class ProductPresenter
 {
@@ -28,21 +28,21 @@ class ProductPresenter
         'how_to_use', 'warnings',
     ];
 
-    /** Select-type codes among CODES whose stored value is an AttributeOption code, not a display label — see resolveSelectOptionLabels(). */
+    /** code แบบ select ใน CODES ที่ค่าที่เก็บไว้เป็น code ของ AttributeOption ไม่ใช่ label ที่ใช้แสดงผล — ดู resolveSelectOptionLabels() */
     private const SELECT_CODES_TO_RESOLVE = ['pcatname', 'pbaseunit', 'pbrand'];
 
     /**
-     * @param  string  $localeCode  Which locale's ProductValue rows (pname, spec_*, ...)
-     *                              to prefer. Defaults to 'th', but every current caller
-     *                              (StorefrontController's home()/show(), admin-facing
-     *                              callers like the dashboard) explicitly passes
-     *                              app()->getLocale() instead, so the result follows
-     *                              whatever locale the visitor/admin has switched to.
-     * @param  ?User  $viewer  When given, fields whose attribute belongs to an Attribute
-     *                         Group the viewer's role can't view (Attribute Access
-     *                         permissions) are blanked out — same rule as the product
-     *                         edit page and export/import. Null (the default, used by
-     *                         the public home() page) means no restriction.
+     * @param  string  $localeCode  จะเอาแถว ProductValue (pname, spec_*, ...) ของ locale
+     *                              ไหนมาแสดง ค่า default คือ 'th' แต่ผู้เรียกทุกตัวใน
+     *                              ปัจจุบัน (home()/show() ของ StorefrontController,
+     *                              ผู้เรียกฝั่งแอดมินอย่างหน้า dashboard) จะส่ง
+     *                              app()->getLocale() มาแทนอย่างชัดเจนทุกครั้ง ผลลัพธ์
+     *                              เลยจะตาม locale ที่ผู้เข้าชม/แอดมินสลับไว้เสมอ
+     * @param  ?User  $viewer  ถ้าส่งมา ฟิลด์ที่ attribute อยู่ใน Attribute Group ที่
+     *                         role ของผู้ดูนั้นดูไม่ได้ (สิทธิ์ Attribute Access) จะถูก
+     *                         เคลียร์ค่าออกเป็นว่าง — กฎเดียวกับหน้าแก้ไขสินค้าและ
+     *                         export/import ถ้าเป็น null (ค่า default ที่หน้า home()
+     *                         ฝั่งสาธารณะใช้) แปลว่าไม่มีการจำกัดใดๆ
      */
     public static function mapMany(Collection $products, string $localeCode = 'th', ?User $viewer = null): array
     {
@@ -53,17 +53,17 @@ class ProductPresenter
         $attributesByCode = Attribute::whereIn('code', self::CODES)->get(['id', 'code', 'name'])->keyBy('id');
         $allowedCodes = app(AttributeAccessPolicy::class)->filterAttributeCodes($viewer, self::CODES, 'view');
 
-        // Attribute::name resolves through its translations relation to
-        // whatever label an admin actually configured (Attribute management),
-        // in the current app locale — used so the specs table shows real,
-        // admin-editable headings instead of text hardcoded here.
+        // Attribute::name จะ resolve ผ่านความสัมพันธ์ translations ไปเป็น label
+        // ที่แอดมินตั้งค่าไว้จริงๆ (ในหน้าจัดการ Attribute) ตาม locale ปัจจุบันของแอป —
+        // ใช้เพื่อให้ตาราง specs โชว์หัวข้อที่แอดมินแก้ไขได้จริง แทนที่จะเป็น
+        // ข้อความที่ hardcode ไว้ในคลาสนี้
         $labelsByCode = $attributesByCode->values()->pluck('name', 'code');
 
-        // Locale-based attributes (pname, spec_*, ...) store one ProductValue
-        // row per locale. Only ever display $localeCode, and order null-locale
-        // (global) rows before it so a locale-specific row always wins when
-        // both exist for the same attribute — otherwise whichever row the DB
-        // happens to return last would win at random.
+        // Attribute ที่แยกตาม locale (pname, spec_*, ...) จะเก็บ ProductValue หนึ่งแถว
+        // ต่อ locale โชว์แค่ $localeCode เท่านั้น และเรียงให้แถวแบบ null-locale
+        // (global) มาก่อนแถวที่ระบุ locale ชัดเจน เพื่อให้แถวเฉพาะ locale ชนะเสมอ
+        // เวลามีทั้งสองแบบสำหรับ attribute เดียวกัน — ไม่งั้นจะกลายเป็นว่า DB
+        // คืนแถวไหนมาทีหลังก็ชนะแบบสุ่มๆ
         $defaultLocaleId = Locale::where('code', $localeCode)->value('id');
 
         $values = ProductValue::whereIn('product_id', $products->pluck('id'))
@@ -100,14 +100,14 @@ class ProductPresenter
     }
 
     /**
-     * pcatname/pbaseunit/pbrand are select fields backed by AttributeOption,
-     * whose stored value is the option's `code` (not its label — codes have
-     * to be unique per attribute, and several labels collide across
-     * attributes, so the label can't double as the code). Resolve each back
-     * to its real admin_label here so every consumer of the mapped product
-     * sees "พัมคิน"/"ชิ้น" instead of a bare code like "option_1". Values
-     * from before a field became a dropdown (plain free-typed text) won't
-     * match any option code and pass through unchanged.
+     * pcatname/pbaseunit/pbrand เป็นฟิลด์แบบ select ที่อิงกับ AttributeOption
+     * ซึ่งค่าที่เก็บไว้จะเป็น `code` ของตัวเลือก (ไม่ใช่ label — code ต้อง unique
+     * ต่อ attribute หนึ่งตัว แต่ label หลายอันมันซ้ำกันข้าม attribute ได้ เลยเอา
+     * label มาใช้แทน code ไม่ได้) เมธอดนี้จะ resolve กลับไปเป็น admin_label
+     * ตัวจริง เพื่อให้ทุกที่ที่ใช้ผลลัพธ์จาก mapping นี้เห็น "พัมคิน"/"ชิ้น" แทนที่จะ
+     * เห็น code เปล่าๆ อย่าง "option_1" ค่าที่มีมาก่อนฟิลด์จะกลายเป็น dropdown
+     * (พิมพ์เป็นข้อความอิสระ) จะไม่ตรงกับ option code ไหนเลย ก็จะปล่อยผ่านไป
+     * โดยไม่แก้ไข
      *
      * @return Collection<int, Collection<string, string>>
      */
@@ -140,13 +140,13 @@ class ProductPresenter
     }
 
     /**
-     * Real category assignment (product_category pivot) takes precedence
-     * over the legacy `pcatname` free-text attribute. Products are typically
-     * tagged at the most specific (product-group) level, so this walks each
-     * one up to its top-level ancestor — the storefront's category filter
-     * shows the ~19 root categories, not hundreds of product groups.
+     * การ assign หมวดหมู่จริง (product_category pivot) จะมาก่อน attribute
+     * แบบ free-text แบบเก่าอย่าง `pcatname` เสมอ สินค้าส่วนใหญ่มักถูก tag ไว้ที่
+     * level เจาะจงที่สุด (product-group) เมธอดนี้เลยไล่แต่ละหมวดหมู่ขึ้นไปหา
+     * บรรพบุรุษระดับบนสุด — เพราะตัวกรองหมวดหมู่บนหน้า storefront จะโชว์แค่
+     * ~19 หมวดหมู่ root เท่านั้น ไม่ใช่ product group เป็นร้อยๆ ตัว
      *
-     * @return Collection<int, string> keyed by product id
+     * @return Collection<int, string> คีย์ด้วย product id
      */
     private static function rootCategoryNames(Collection $products): Collection
     {
@@ -160,8 +160,8 @@ class ProductPresenter
             return collect();
         }
 
-        // The tree is only 3 levels deep and small (~1,000 rows) — loading it
-        // whole is simpler than walking parent_id with per-level queries.
+        // ต้นไม้นี้ลึกแค่ 3 level และมีขนาดเล็ก (~1,000 แถว) — โหลดมาทั้งหมดเลย
+        // ง่ายกว่าไล่ parent_id ทีละ query ต่อ level
         $categoriesById = Category::all(['id', 'name', 'parent_id'])->keyBy('id');
 
         return $assignedCategoryId->map(function (int $categoryId) use ($categoriesById) {
@@ -175,9 +175,9 @@ class ProductPresenter
     }
 
     /**
-     * Falls back to the original hardcoded Thai text only if the attribute
-     * itself (or its name) is somehow missing — the real label always comes
-     * from $labelsByCode (Attribute::name, i.e. Attribute management) below.
+     * จะใช้ข้อความไทยที่ hardcode ไว้เป็น fallback ก็ต่อเมื่อตัว attribute เอง
+     * (หรือชื่อของมัน) หายไปแบบผิดปกติเท่านั้น — label จริงจะมาจาก $labelsByCode
+     * (Attribute::name คือหน้าจัดการ Attribute) ด้านล่างเสมอ
      */
     private const SPEC_LABEL_FALLBACKS = [
         'spec_specifications' => 'ข้อมูลจำเพาะ',
@@ -189,18 +189,16 @@ class ProductPresenter
     ];
 
     /**
-     * @param  array<int, string>  $allowedCodes  Codes from self::CODES the viewer is
-     *                                             permitted to see (see mapMany()'s
-     *                                             $viewer doc). Values for any other
-     *                                             code are blanked out below, so the
-     *                                             restricted data never reaches the
-     *                                             mapped result at all — not just hidden
-     *                                             client-side.
-     * @param  Collection<string, string>  $labelsByCode  code => Attribute::name, used for
-     *                                                     the specs table's row labels so
-     *                                                     they reflect whatever an admin
-     *                                                     actually configured, not text
-     *                                                     baked into this class.
+     * @param  array<int, string>  $allowedCodes  code จาก self::CODES ที่ผู้ดูมีสิทธิ์เห็น
+     *                                             (ดูคำอธิบาย $viewer ใน mapMany()) ค่าของ
+     *                                             code อื่นๆ นอกเหนือจากนี้จะถูกเคลียร์เป็นว่าง
+     *                                             ด้านล่าง เพื่อไม่ให้ข้อมูลที่ถูกจำกัดไปถึง
+     *                                             ผลลัพธ์ที่ map แล้วเลยแม้แต่นิดเดียว — ไม่ใช่
+     *                                             แค่ซ่อนไว้ฝั่ง client เท่านั้น
+     * @param  Collection<string, string>  $labelsByCode  code => Attribute::name ใช้สำหรับ
+     *                                                     label ของแถวในตาราง specs เพื่อให้
+     *                                                     สะท้อนสิ่งที่แอดมินตั้งค่าไว้จริงๆ
+     *                                                     ไม่ใช่ข้อความที่ฝังไว้ในคลาสนี้
      */
     private static function mapOne(Product $product, Collection $values, ?string $categoryName, array $allowedCodes, Collection $labelsByCode): array
     {
@@ -231,11 +229,10 @@ class ProductPresenter
             'description' => self::plainText($get('product_details_features')) ?? '-',
             'highlights' => self::toLines($get('spec_features')),
             'specs' => $specs,
-            // price_std and packaging_box now live in separate Attribute Groups
-            // (Pricing vs Packaging, split from the original combined group) and
-            // can be restricted independently — each flag tells the frontend
-            // whether to render that tile at all, rather than showing the
-            // placeholder 0/1 fallback values.
+            // price_std กับ packaging_box ตอนนี้อยู่คนละ Attribute Group กันแล้ว
+            // (Pricing กับ Packaging ถูกแยกออกมาจาก group รวมเดิม) และจำกัดสิทธิ์
+            // แยกกันได้อิสระ — แต่ละ flag จะบอกฝั่ง frontend ว่าควร render tile นั้น
+            // เลยไหม แทนที่จะโชว์ค่า fallback หลอกๆ อย่าง 0/1
             'canViewPricing' => in_array('price_std', $allowedCodes, true),
             'canViewPackaging' => in_array('packaging_box', $allowedCodes, true),
         ];

@@ -89,17 +89,16 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
 
-    // Group/attribute assignment lives in local state (assignedGroups) above,
-    // not in useForm's data, so isDirty alone would miss drag-and-drop-only
-    // changes — starting from empty on this Create page, any assigned group
-    // is itself a sign of real, losable progress.
+    // ข้อมูลการจับคู่กลุ่ม/แอตทริบิวต์ เก็บไว้ใน local state (assignedGroups) ด้านบน
+    // ไม่ได้อยู่ใน data ของ useForm ดังนั้นถ้าเช็คแค่ isDirty อย่างเดียวจะจับการเปลี่ยนแปลง
+    // ที่เกิดจากการลากวาง (drag-and-drop) ไม่ได้ — เพราะหน้า Create เริ่มจากค่าว่างๆ
+    // แค่มีกลุ่มถูกกำหนดขึ้นมา ก็ถือว่าเป็นความคืบหน้าจริงที่เสียไปได้แล้ว
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty || assignedGroups.length > 0);
 
-    // Dragging (or clicking) an attribute only means anything once at least
-    // one group exists to receive it — with none yet, there's nowhere to
-    // drop it at all (the group column just shows the empty-state
-    // placeholder). Warn instead of letting the drag/click silently do
-    // nothing, which otherwise looks like a bug rather than a missing step.
+    // การลาก (หรือคลิก) แอตทริบิวต์จะมีความหมายก็ต่อเมื่อมีกลุ่มให้ตกลงไปแล้วอย่างน้อยหนึ่งกลุ่ม
+    // ถ้ายังไม่มีกลุ่มเลยก็ไม่มีที่ให้วาง (คอลัมน์กลุ่มจะโชว์แค่ placeholder ว่างๆ)
+    // เลยต้องเตือนผู้ใช้แทนที่จะปล่อยให้ลาก/คลิกแล้วไม่มีอะไรเกิดขึ้นแบบเงียบๆ
+    // เพราะแบบนั้นมันดูเหมือนบั๊กมากกว่าจะรู้ว่ายังขาดขั้นตอนอยู่
     const requireGroupBeforeAssigning = (): boolean => {
         if (assignedGroups.length === 0) {
             setNoGroupWarningOpen(true);
@@ -211,7 +210,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createAttributeFamily')} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {/* Header Title & Actions */}
+                {/* หัวข้อและปุ่มต่างๆ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         {t('createAttributeFamily')}
@@ -238,7 +237,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                 </Stack>
 
                 <Grid container spacing={3}>
-                    {/* Left Column: Groups & Unassigned Attributes */}
+                    {/* คอลัมน์ซ้าย: กลุ่มและแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
                     <Grid item xs={12} md={8}>
                         <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
@@ -268,7 +267,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                             </Stack>
 
                             <Grid container spacing={3} sx={{ mt: 1 }}>
-                                {/* Main Column section */}
+                                {/* ส่วนคอลัมน์หลัก */}
                                 <Grid item xs={12} sm={6}>
                                     <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1.5 }}>
                                         {t('mainColumn')}
@@ -308,7 +307,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                             '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
                                                         }}
                                                     >
-                                                        {/* Group Header */}
+                                                        {/* หัวข้อกลุ่ม */}
                                                         <Stack
                                                             direction="row"
                                                             alignItems="center"
@@ -339,7 +338,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                             </IconButton>
                                                         </Stack>
 
-                                                        {/* Group Attributes List */}
+                                                        {/* รายการแอตทริบิวต์ในกลุ่ม */}
                                                         <Collapse in={group.expanded} timeout="auto" unmountOnExit>
                                                             <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
                                                                 {group.attributes.map((attr) => (
@@ -389,7 +388,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                     </Box>
                                 </Grid>
 
-                                {/* Unassigned Attributes list Drop Area */}
+                                {/* พื้นที่วางสำหรับแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
                                 <Grid item xs={12} sm={6}>
                                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                                         <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
@@ -480,7 +479,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                         </Paper>
                     </Grid>
 
-                    {/* Right Column: General & Label panels */}
+                    {/* คอลัมน์ขวา: ส่วนข้อมูลทั่วไปและป้ายชื่อ */}
                     <Grid item xs={12} md={4}>
                         <Stack spacing={3}>
                             <LocaleLabelFields
@@ -499,7 +498,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                 )}
             </Box>
 
-            {/* Assign Attribute Group Dialog */}
+            {/* ไดอะล็อกสำหรับกำหนดกลุ่มแอตทริบิวต์ */}
             <Dialog
                 open={assignDialogOpen}
                 onClose={() => setAssignDialogOpen(false)}

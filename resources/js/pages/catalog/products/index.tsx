@@ -160,7 +160,7 @@ interface Props {
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
 const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete', 'translation_complete', 'created_at', 'updated_at'];
 
-/** UI column key -> real, sortable `products` column (per resources/grids/product_grid.yml). */
+/** map key คอลัมน์ที่โชว์ใน UI -> คอลัมน์จริงในตาราง `products` ที่ sort ได้ (อ้างอิงจาก resources/grids/product_grid.yml) */
 const SORTABLE_FIELDS: Record<string, string> = {
     sku: 'sku',
     status: 'enabled',
@@ -239,13 +239,12 @@ interface ColumnDef {
 }
 
 /**
- * Column pop-in priority (SAP Fiori responsive table) for the products grid.
- * Columns here are user-configurable (see ManageColumnsDialog) rather than a
- * fixed set, so priority is derived from the column key instead of position:
- * image/name identify the row and stay pinned; sku/family are the next most
- * useful thing to see; status/type/completeness are secondary state; the
- * rest (ids, dates, translation completeness, sales channels, attribute
- * columns) are least useful on a narrow screen and pop in first.
+ * ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table) สำหรับตาราง products
+ * เนื่องจากคอลัมน์ในหน้านี้ผู้ใช้ปรับเองได้ (ดูที่ ManageColumnsDialog) ไม่ได้ตายตัว
+ * เลยต้องคำนวณ priority จาก key ของคอลัมน์แทนตำแหน่ง:
+ * image/name เป็นตัวระบุแถวเลยปักหมุดไว้ตลอด, sku/family เป็นข้อมูลที่มีประโยชน์รองลงมา,
+ * status/type/completeness เป็นสถานะรอง ส่วนที่เหลือ (id, วันที่, ความสมบูรณ์ของคำแปล,
+ * ช่องทางขาย, คอลัมน์ attribute ต่างๆ) มีประโยชน์น้อยสุดตอนจอแคบเลยซ่อนก่อนเพื่อน
  */
 function productColumnPriority(key: string): FioriColumnPriority {
     if (key === 'image' || key === 'name') return 'always';
@@ -273,9 +272,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [deleteProductId, setDeleteProductId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
-    // Confirm-then-act, same shape as deleteProductId/deleting above — the
-    // dialog being modal means only one duplicate can ever be in flight at a
-    // time, so a single id (not a Set) is enough here.
+    // ต้อง confirm ก่อนถึงจะทำงานจริง เหมือนแพทเทิร์น deleteProductId/deleting ด้านบน —
+    // เพราะ dialog เป็น modal ทำให้ทำการ duplicate ได้ทีละอันเท่านั้น เลยใช้แค่ id เดี่ยวๆ
+    // (ไม่ต้องเป็น Set) ก็พอ
     const [duplicateProductId, setDuplicateProductId] = useState<number | null>(null);
     const [duplicating, setDuplicating] = useState(false);
 
@@ -292,23 +291,21 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         );
     };
 
-    // Bulk "Share" — publishes + pushes every selected product to every
-    // checked sales channel in one request (ProductController::pushBulk()).
-    // Fire-and-forget like translateSelected() in missing-translations.tsx:
-    // the flash message just confirms how many jobs were queued, real
-    // per-product/per-channel success or failure shows up afterwards on
-    // that product's Edit page (Sales Channels panel already has live
-    // status badges for this).
+    // ปุ่ม "Share" แบบ bulk — publish + push สินค้าที่เลือกทั้งหมดไปยังทุกช่องทางขาย
+    // ที่ติ๊กไว้ในคำขอเดียว (ProductController::pushBulk()) ทำงานแบบยิงแล้วไม่รอผล
+    // เหมือน translateSelected() ใน missing-translations.tsx: flash message แค่บอก
+    // ว่า queue job ไปกี่งาน ส่วนผลจริงว่าแต่ละสินค้า/แต่ละช่องทางสำเร็จหรือพลาด
+    // จะไปโชว์ทีหลังที่หน้า Edit ของสินค้านั้นๆ (แผง Sales Channels มี badge สถานะ
+    // แบบเรียลไทม์อยู่แล้ว)
     const [shareDialogOpen, setShareDialogOpen] = useState(false);
     const [selectedShopIds, setSelectedShopIds] = useState<number[]>([]);
     const [sharing, setSharing] = useState(false);
     const [deactivating, setDeactivating] = useState(false);
 
-    // 'all' = every selected product is already published there, 'some' =
-    // a mix, 'none' = none of them. Computed from published_shop_ids
-    // (added to each grid row by ProductController::index()) against
-    // whichever selected rows are actually present on the current page —
-    // no extra request needed to open the dialog.
+    // 'all' = สินค้าที่เลือกทั้งหมด publish ไปที่ร้านนี้แล้ว, 'some' = publish ไปแค่
+    // บางส่วน, 'none' = ยังไม่มีตัวไหน publish เลย คำนวณจาก published_shop_ids
+    // (ที่ ProductController::index() แนบมาให้ในแต่ละแถวของ grid) เทียบกับแถวที่
+    // เลือกไว้ซึ่งอยู่ในหน้าปัจจุบัน — ไม่ต้องยิง request เพิ่มตอนเปิด dialog เลย
     const shopPublishStatus = (shopId: number): 'all' | 'some' | 'none' => {
         const selectedRows = gridData.data.filter((row) => selectedIds.includes(row.id));
         if (selectedRows.length === 0) return 'none';
@@ -364,14 +361,13 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         );
     };
 
-    // "Check Live Status" — asks each marketplace directly (real API calls via
-    // ProductController::checkLiveStatus()), not router.post(), since that
-    // endpoint returns plain JSON rather than an Inertia response. Same
-    // per-row Set(...) pattern as duplicatingIds above, for the same reason:
-    // multiple rows can be checking concurrently without clobbering each
-    // other's spinner/disabled state. Results are kept in a local override
-    // map rather than triggering a full grid reload, so the rest of the
-    // list (scroll position, other rows) is undisturbed.
+    // "Check Live Status" — ยิงถาม marketplace แต่ละที่ตรงๆ (เรียก API จริงผ่าน
+    // ProductController::checkLiveStatus()) ไม่ใช้ router.post() เพราะ endpoint นี้
+    // คืนค่าเป็น JSON ธรรมดา ไม่ใช่ Inertia response ใช้แพทเทิร์น Set(...) แบบเดียวกับ
+    // duplicatingIds ด้านบน ด้วยเหตุผลเดียวกัน: หลายแถวเช็คสถานะพร้อมกันได้
+    // โดยไม่ทับ spinner/disabled ของกันและกัน ผลลัพธ์เก็บไว้ใน map แยกต่างหาก
+    // (override) แทนที่จะโหลด grid ใหม่ทั้งหมด เพื่อไม่ให้กระทบส่วนอื่นของลิสต์
+    // (ตำแหน่ง scroll, แถวอื่นๆ)
     const [checkingLiveIds, setCheckingLiveIds] = useState<Set<number>>(new Set());
     const [liveStatusOverrides, setLiveStatusOverrides] = useState<Record<number, { total: number; platforms: Record<string, number> }>>({});
     const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
@@ -379,9 +375,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const checkLiveStatus = (productId: number) => {
         setCheckingLiveIds((prev) => new Set(prev).add(productId));
 
-        // This app has no <meta name="csrf-token">; Laravel's VerifyCsrfToken
-        // also accepts the XSRF-TOKEN cookie it already sets on every
-        // response (mirrored back as a header), so read that instead.
+        // แอปนี้ไม่มี <meta name="csrf-token">; แต่ VerifyCsrfToken ของ Laravel
+        // ก็รับ cookie XSRF-TOKEN ที่มันเซ็ตมาให้ทุก response อยู่แล้ว (ส่งกลับมาเป็น
+        // header ด้วย) เลยอ่านจากตรงนั้นแทน
         const xsrfToken = decodeURIComponent(
             document.cookie
                 .split('; ')
@@ -421,20 +417,19 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const [exportCategoryOptions, setExportCategoryOptions] = useState<ExportCategoryOption[]>([]);
     const [activeFilters, setActiveFilters] = useState<ProductFilters>(filters.filters ?? {});
     const [activeAttributeFilters, setActiveAttributeFilters] = useState<AttributeFilterRow[]>(filters.attribute_filters ?? []);
-    // Arrived via the Categories list's clickable product count (see
-    // resources/js/pages/catalog/categories/index.tsx) — not part of
-    // activeFilters/ProductFilterDrawer since it's a one-off link-in, not a
-    // filter a user builds through that drawer's UI.
+    // มาจากการคลิกตัวเลขจำนวนสินค้าในหน้า Categories list (ดู
+    // resources/js/pages/catalog/categories/index.tsx) — ไม่ได้เป็นส่วนหนึ่งของ
+    // activeFilters/ProductFilterDrawer เพราะเป็นแค่ลิงก์เข้ามาครั้งเดียว ไม่ใช่
+    // filter ที่ผู้ใช้ตั้งเองผ่าน UI ของ drawer
     const [categoryId, setCategoryId] = useState(filters.category_id ? String(filters.category_id) : '');
     const [categoryName] = useState(filters.category_name ?? '');
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-    // filters.sort/dir are only ever non-empty once the user has actually
-    // clicked a column — the backend applies its own default ORDER BY
-    // (gridConfig.default_sort, e.g. "updated_at desc" for products) when
-    // neither is set, but doesn't echo that choice back into filters. Fall
-    // back to the same config here so the sorted column's header shows the
-    // right active/direction state on first load instead of no column
-    // appearing sorted at all.
+    // filters.sort/dir จะมีค่าก็ต่อเมื่อผู้ใช้คลิกที่คอลัมน์เองแล้วเท่านั้น — ฝั่ง backend
+    // จะใช้ ORDER BY ค่า default ของตัวเอง (gridConfig.default_sort เช่น
+    // "updated_at desc" สำหรับ products) เมื่อไม่ได้ตั้งค่าไว้ทั้งคู่ แต่ไม่ได้ส่งค่านั้น
+    // กลับมาใน filters ด้วย เลยต้อง fallback มาใช้ config ตัวเดียวกันตรงนี้ เพื่อให้
+    // header ของคอลัมน์ที่ sort อยู่โชว์สถานะ active/ทิศทางที่ถูกต้องตั้งแต่โหลดครั้งแรก
+    // แทนที่จะไม่มีคอลัมน์ไหนโชว์ว่ากำลัง sort อยู่เลย
     const requestedSort = typeof filters.sort === 'string' ? filters.sort : '';
     const defaultSort = gridConfig.default_sort;
     const [sortField, setSortField] = useState(requestedSort || defaultSort?.field || '');
@@ -561,9 +556,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         [allColumns],
     );
 
-    // Matches ProductRowExporter::columns() (sku, family_code, type, enabled,
-    // then every viewable attribute) — the export CSV's actual column set,
-    // distinct from the grid's own display columnsCatalog above.
+    // ตรงกับ ProductRowExporter::columns() (sku, family_code, type, enabled,
+    // แล้วตามด้วยทุก attribute ที่ view ได้) — เป็นชุดคอลัมน์จริงของไฟล์ export CSV
+    // คนละชุดกับ columnsCatalog ที่ใช้แสดงผลใน grid ด้านบน
     const exportColumnCatalog: ExportColumnOption[] = useMemo(
         () => [
             { code: 'sku', label: t('sku') },
@@ -584,7 +579,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 if (Array.isArray(parsed) && parsed.every((k) => typeof k === 'string')) return parsed;
             }
         } catch {
-            // ignore malformed storage
+            // ข้อมูลใน storage เพี้ยน ก็ข้ามไปเลย
         }
         return DEFAULT_SELECTED_COLUMNS;
     });
@@ -703,10 +698,10 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         params.set('format', exportFormat.toLowerCase());
         exportColumns.forEach((col) => params.append('columns[]', col.code));
         if (selectedIds.length > 0) {
-            // Explicit row selection means exactly these products — the
-            // type/category pickers below are disabled in this state (see
-            // the Autocomplete `disabled` props), so don't send them even if
-            // stale values are still sitting in state from before selection.
+            // ถ้าเลือกแถวไว้ชัดเจนแล้ว หมายความว่าต้องการแค่สินค้าเหล่านี้เท่านั้น —
+            // ตัวเลือก type/category ด้านล่างจะถูก disable ไว้ในสถานะนี้ (ดู prop
+            // `disabled` ของ Autocomplete) เลยไม่ต้องส่งไปด้วย ถึงแม้จะยังมีค่าเก่า
+            // ค้างอยู่ใน state ก่อนหน้าที่จะเลือกก็ตาม
             selectedIds.forEach((id) => params.append('ids[]', String(id)));
         } else {
             if (search) {
@@ -804,7 +799,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('products')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                {/* Page Header: Title & Actions */}
+                {/* หัวหน้า: ชื่อหน้า + ปุ่ม action ต่างๆ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
@@ -848,9 +843,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     </Stack>
                 </Stack>
 
-                {/* Table Card: toolbar + head + rows on one Fiori "Table" surface */}
+                {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
                 <Paper elevation={0} sx={fioriCardSx}>
-                    {/* Toolbar */}
+                    {/* แถบเครื่องมือ (Toolbar) */}
                     <Stack
                         direction={{ xs: 'column', md: 'row' }}
                         justifyContent="space-between"
@@ -955,7 +950,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
 
                     <Divider sx={{ borderColor: FIORI.border }} />
 
-                    {/* Table */}
+                    {/* ตารางข้อมูล */}
                     <FioriResponsiveTable
                         variant="plain"
                         columns={tableColumns}
@@ -967,7 +962,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 </Paper>
             </Box>
 
-            {/* Quick Export Dialog */}
+            {/* Dialog สำหรับ Export แบบด่วน */}
             <Dialog open={quickExportOpen} onClose={() => setQuickExportOpen(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
                     {t('quickExport')}
@@ -1056,7 +1051,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 </DialogActions>
             </Dialog>
 
-            {/* Share (bulk push to sales channels) Dialog */}
+            {/* Dialog Share (push สินค้าไปหลายช่องทางขายพร้อมกัน) */}
             <Dialog open={shareDialogOpen} onClose={() => (sharing || deactivating ? null : setShareDialogOpen(false))} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
                     {t('shareToChannels')}
@@ -1150,7 +1145,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 onApply={handleApplyColumns}
             />
 
-            {/* Delete Confirmation Dialog */}
+            {/* Dialog ยืนยันการลบ */}
             <Dialog open={deleteProductId !== null} onClose={() => setDeleteProductId(null)}>
                 <DialogTitle>{t('confirmDeletion')}</DialogTitle>
                 <DialogContent>
@@ -1182,7 +1177,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 </DialogActions>
             </Dialog>
 
-            {/* Duplicate Confirmation Dialog */}
+            {/* Dialog ยืนยันการทำสำเนา (Duplicate) */}
             <Dialog open={duplicateProductId !== null} onClose={() => setDuplicateProductId(null)}>
                 <DialogTitle>{t('confirmDuplication')}</DialogTitle>
                 <DialogContent>

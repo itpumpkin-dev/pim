@@ -1,11 +1,53 @@
-import { MenuItem, Stack, TextField, Typography } from '@mui/material';
+import { Chip, MenuItem, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import { PALETTE } from '@/theme';
 
 interface CategoryNode {
     id: number;
     code: string;
     name: string;
+    mapped_platforms?: string[];
     children: CategoryNode[];
+}
+
+// Same 4-color rotation as categories/index.tsx's MAPPED_PLATFORMS /
+// marketplace-sync.tsx's PLATFORM_ACCENT_COLORS (Lazada, Shopee, TikTok,
+// WooCommerce) — kept as its own copy here rather than importing from the
+// list page, same "small enough to duplicate" precedent that pairing
+// already follows.
+const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
+    { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
+    { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
+    { value: 'tiktok', label: 'TikTok', color: PALETTE.primary },
+    { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
+];
+
+const LEVEL_LABELS = ['หมวดหมู่สินค้า', 'หมวดย่อยสินค้า', 'กลุ่มสินค้า'];
+
+/** Small chip strip showing which marketplace(s) one selected category level is mapped to. */
+function MappedPlatformsRow({ node }: { node: CategoryNode }) {
+    const mapped = node.mapped_platforms ?? [];
+
+    return (
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ pl: 0.5 }}>
+            {mapped.length > 0 ? (
+                <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                    {MAPPED_PLATFORMS.filter((p) => mapped.includes(p.value)).map((p) => (
+                        <Chip
+                            key={p.value}
+                            label={p.label}
+                            size="small"
+                            sx={{ bgcolor: p.color, color: '#fff', fontWeight: 600, height: 20, fontSize: 11 }}
+                        />
+                    ))}
+                </Stack>
+            ) : (
+                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    ยังไม่ผูก marketplace ใดๆ
+                </Typography>
+            )}
+        </Stack>
+    );
 }
 
 /** Root-to-node path (inclusive) if `targetId` exists somewhere in the tree, else null. */
@@ -141,6 +183,22 @@ export function CategoryCascadeSelect({ value, onChange }: { value: number[]; on
                     </MenuItem>
                 ))}
             </TextField>
+
+            {currentPath.length > 0 && (
+                <Stack spacing={0.5} sx={{ pt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        การผูก Marketplace ของหมวดหมู่ที่เลือก
+                    </Typography>
+                    {currentPath.map((node, i) => (
+                        <Stack key={node.id} direction="row" spacing={1} alignItems="center">
+                            <Typography variant="caption" color="text.secondary" sx={{ minWidth: 96, flexShrink: 0 }}>
+                                {LEVEL_LABELS[i]}:
+                            </Typography>
+                            <MappedPlatformsRow node={node} />
+                        </Stack>
+                    ))}
+                </Stack>
+            )}
         </Stack>
     );
 }

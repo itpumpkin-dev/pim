@@ -54,15 +54,15 @@ class ProductController extends Controller
 {
     use HasVersionHistory;
 
-    // Matches TikTok's own main_images cap (9, but 1 slot is implicitly the
-    // "main" image in most marketplace UIs) — enforced here at the PIM's own
-    // upload step so the limit is visible while editing instead of only
-    // surfacing later as a marketplace push failure.
+    // ตั้งให้ตรงกับเพดาน main_images ของ TikTok เอง (9 รูป แต่ 1 ช่องถือเป็นรูป
+    // "main" โดยปริยายในหน้า UI ของ marketplace ส่วนใหญ่) — บังคับตรงนี้ตั้งแต่
+    // ขั้นตอนอัปโหลดของ PIM เอง เพื่อให้เห็นข้อจำกัดตั้งแต่ตอนแก้ไข แทนที่จะไป
+    // เจอทีหลังตอน push ไป marketplace แล้วพัง
     private const MAX_GALLERY_IMAGES = 8;
 
-    // Marketplace image requirements (TikTok's Create Product API among
-    // them) specify a 300x300px minimum — enforced here for the same reason
-    // as MAX_GALLERY_IMAGES above.
+    // ข้อกำหนดรูปของ marketplace (รวมถึง Create Product API ของ TikTok) กำหนด
+    // ขั้นต่ำไว้ที่ 300x300px — บังคับตรงนี้ด้วยเหตุผลเดียวกับ MAX_GALLERY_IMAGES
+    // ด้านบน
     private const MIN_IMAGE_DIMENSION = 300;
 
     public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
@@ -73,10 +73,10 @@ class ProductController extends Controller
 
         $nameAttributeId = Attribute::idForCode('pname');
 
-        // `name` and any dynamic "Add Filter" attribute filters are EAV
-        // (ProductValue), not real columns on `products`, so GridManager's
-        // plain column-based applyFilters() can't express them — apply them
-        // as an extra query constraint before pagination instead.
+        // `name` และ filter attribute แบบไดนามิกจาก "Add Filter" เป็นแบบ EAV
+        // (ProductValue) ไม่ใช่คอลัมน์จริงบน `products` เพราะงั้น applyFilters()
+        // ของ GridManager ที่ทำงานกับคอลัมน์ธรรมดาจะจัดการให้ไม่ได้ — เลยต้อง
+        // เพิ่มเป็นเงื่อนไข query แยกก่อน paginate แทน
         $filtersInput = $request->input('filters', []);
         $attributeFilters = $request->input('attribute_filters', []);
         $categoryId = $request->input('category_id');
@@ -101,10 +101,11 @@ class ProductController extends Controller
                 });
             }
 
-            // Arrived via the Categories list's clickable product count (see
-            // resources/js/pages/catalog/categories/index.tsx) — not a
-            // GridManager column filter since `categories` is a many-to-many
-            // relation (product_category pivot), not a real `products` column.
+            // มาจากตัวเลขจำนวนสินค้าที่กดได้ในหน้ารายการ Categories (ดู
+            // resources/js/pages/catalog/categories/index.tsx) — ไม่ใช่
+            // column filter ของ GridManager เพราะ `categories` เป็นความสัมพันธ์
+            // many-to-many (pivot table product_category) ไม่ใช่คอลัมน์จริงบน
+            // `products`
             if ($categoryId) {
                 $query->whereHas('categories', fn ($q) => $q->where('categories.id', $categoryId));
             }
@@ -115,10 +116,10 @@ class ProductController extends Controller
             ->where('attributes.type', 'image')
             ->pluck('attributes.id', 'family_attributes.family_id');
 
-        // Completeness = share of every attribute assigned to a product's
-        // family (not just the required ones) that already has a value.
-        // Grouped by family up front so every product on the page reuses the
-        // same lookup instead of re-querying per row.
+        // ความสมบูรณ์ (Completeness) = สัดส่วนของ attribute ทั้งหมดที่ family ของ
+        // สินค้าถูกกำหนดไว้ (ไม่ใช่แค่ตัวที่ required) ที่มีค่าใส่ไว้แล้ว จัดกลุ่มตาม
+        // family ไว้ล่วงหน้า เพื่อให้สินค้าทุกตัวในหน้าเดียวกันใช้ lookup ชุดเดียวกัน
+        // ได้เลย ไม่ต้อง query ซ้ำทีละแถว
         $familyIds = $gridData->getCollection()->pluck('family_id')->filter()->unique();
         $familyAttributeIdsByFamily = FamilyAttribute::query()
             ->whereIn('family_id', $familyIds)
@@ -135,15 +136,14 @@ class ProductController extends Controller
 
         $allAttributes = Attribute::cachedList();
 
-        // Locale-based attributes (pname, spec_*, ...) store one ProductValue
-        // row per locale, and channel-based ones store one per channel. This
-        // grid has no locale/channel picker, so it only ever wants the
-        // globally-scoped value (channel_id IS NULL) in the admin's current
-        // UI locale — restrict to that up front and order the active
-        // locale's row before the locale-less fallback, so the `->first()`
-        // lookups below land on it instead of an arbitrary row whichever
-        // order the DB happened to return them in (which is what silently
-        // ignored the locale switcher before this fix).
+        // attribute แบบอิงตาม locale (pname, spec_* ฯลฯ) จะเก็บ ProductValue
+        // ไว้แถวละ 1 locale ส่วนแบบอิงตาม channel ก็เก็บแถวละ 1 channel เหมือนกัน
+        // grid นี้ไม่มีตัวเลือก locale/channel ให้เลือก เลยต้องการแค่ค่าที่เป็น
+        // global scope (channel_id IS NULL) ใน locale ปัจจุบันของแอดมินเท่านั้น
+        // — กรองแค่นี้ไว้ล่วงหน้า แล้วเรียงให้แถวของ locale ที่ active มาก่อนแถว
+        // fallback ที่ไม่มี locale เพื่อให้ `->first()` ด้านล่างได้แถวที่ต้องการจริงๆ
+        // แทนที่จะได้แถวมั่วๆ ตามลำดับที่ DB คืนมา (ซึ่งเป็นสาเหตุที่ตัวสลับ locale
+        // เคยถูกเมินเฉยแบบเงียบๆ ก่อนจะแก้ตรงนี้)
         $activeLocaleId = Locale::idForCode(app()->getLocale());
 
         $values = ProductValue::whereIn('product_id', $productIds)
@@ -160,14 +160,13 @@ class ProductController extends Controller
             )
             ->get(['product_id', 'attribute_id', 'value']);
 
-        // Indexed by "product_id-attribute_id" so each row below is an O(1)
-        // lookup instead of a fresh linear scan of $values per product per
-        // attribute (that scan was O(products × attributes) and dominated
-        // this action's time on any catalog of meaningful size). Rows are
-        // already ordered active-locale-first (see orderByRaw above), and
-        // this only keeps the first value seen per key, so the active
-        // locale's row still wins over the locale-less fallback exactly as
-        // ->first() did.
+        // ทำ index ด้วย "product_id-attribute_id" เพื่อให้แต่ละแถวด้านล่างเป็น
+        // lookup แบบ O(1) แทนที่จะต้องสแกน $values แบบ linear ใหม่ทุกครั้งต่อ
+        // สินค้าต่อ attribute (สแกนแบบนั้นคือ O(products × attributes) ซึ่งกิน
+        // เวลาส่วนใหญ่ของ action นี้เมื่อ catalog มีขนาดใหญ่พอสมควร) แถวถูกเรียง
+        // ให้ active-locale มาก่อนอยู่แล้ว (ดู orderByRaw ด้านบน) และโค้ดนี้จะเก็บ
+        // แค่ค่าแรกที่เจอต่อ key เท่านั้น ทำให้แถวของ locale ที่ active ยังชนะแถว
+        // fallback ที่ไม่มี locale เหมือนกับที่ ->first() เคยทำ
         $valueByKey = [];
         foreach ($values as $value) {
             $key = $value->product_id.'-'.$value->attribute_id;
@@ -176,12 +175,12 @@ class ProductController extends Controller
             }
         }
 
-        // "Sales Channels" column data — confirmed-live status only
-        // (product_platform_shops.status = 'live', populated by
-        // LazadaProductSyncService::syncLiveStatus(); a row existing without
-        // status='live' just means "marked to publish", not actually
-        // pushed). Grouped by platform name, not hardcoded to Lazada, so a
-        // future platform's sync needs no change here.
+        // ข้อมูลคอลัมน์ "Sales Channels" — เอาแค่สถานะที่ยืนยันแล้วว่า live จริง
+        // เท่านั้น (product_platform_shops.status = 'live' ซึ่งถูกเติมโดย
+        // LazadaProductSyncService::syncLiveStatus() แถวที่มีอยู่แต่ยัง
+        // ไม่ใช่ status='live' แปลว่าแค่ "ทำเครื่องหมายไว้ให้ publish" ยังไม่ได้
+        // push จริง) จัดกลุ่มตามชื่อแพลตฟอร์ม ไม่ได้ hardcode ไว้แค่ Lazada
+        // เพื่อให้ sync ของแพลตฟอร์มใหม่ในอนาคตไม่ต้องแก้ตรงนี้
         $salesChannelRows = DB::table('product_platform_shops')
             ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
             ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
@@ -194,14 +193,14 @@ class ProductController extends Controller
             'platforms' => $rows->groupBy('platform_name')->map->count(),
         ]);
 
-        // Every shop a product is marked "published" for, live or not — the
-        // same set Edit's Sales Channels panel checkboxes and
-        // queueMarketplaceSync()'s "published" guard use (product_
-        // platformShops()). Lets the product list's bulk Share dialog
-        // pre-check channels the selected product(s) are already published
-        // to, instead of always opening blank. Deliberately not scoped to
-        // status='live' like $salesChannelRows above — "published" and
-        // "confirmed live" are different states here.
+        // ทุก shop ที่สินค้าถูกทำเครื่องหมาย "published" ไว้ ไม่ว่าจะ live จริง
+        // หรือไม่ก็ตาม — เป็นชุดข้อมูลเดียวกับที่ checkbox ในแผง Sales Channels
+        // ของหน้า Edit และตัวเช็ค "published" ใน queueMarketplaceSync() ใช้
+        // (product_platformShops()) ทำให้ dialog Share แบบเลือกหลายรายการใน
+        // หน้ารายการสินค้า ติ๊กช่องของ channel ที่สินค้าที่เลือกไว้ publish ไปแล้ว
+        // ให้อัตโนมัติ แทนที่จะเปิดมาว่างเปล่าทุกครั้ง จงใจไม่กรองด้วย status='live'
+        // เหมือน $salesChannelRows ด้านบน เพราะ "published" กับ "ยืนยันว่า live
+        // จริง" เป็นคนละสถานะกันในที่นี้
         $publishedShopRows = DB::table('product_platform_shops')
             ->whereIn('product_id', $productIds)
             ->get(['product_id', 'sales_platform_shop_id']);
@@ -216,9 +215,9 @@ class ProductController extends Controller
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
             if ($familyAttributeIds->isEmpty()) {
-                // Family has no attributes assigned at all — nothing to
-                // measure completeness against, so "N/A" rather than a
-                // misleading 100%.
+                // family นี้ไม่มี attribute ถูกกำหนดไว้เลย — ไม่มีอะไรให้วัดความ
+                // สมบูรณ์เทียบด้วย เลยให้เป็น "N/A" แทนที่จะขึ้น 100% ซึ่งจะทำให้
+                // เข้าใจผิด
                 $product->completeness = null;
             } else {
                 $filledCount = $familyAttributeIds->filter(function ($attributeId) use ($product, $valueByKey) {
@@ -264,11 +263,12 @@ class ProductController extends Controller
         return Inertia::render('catalog/products/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
-            // Explicit keys (not $request->only(), which omits absent ones) so this
-            // always serializes as a JSON object, never `[]` — an empty array's
-            // `.sort` resolves to Array.prototype.sort, which breaks `filters.sort
-            // ?? ''` on the frontend (a truthy function slips past `??`, and
-            // useState() then calls it unbound as a lazy initializer and throws).
+            // ใช้ key แบบระบุตรงๆ (ไม่ใช้ $request->only() ที่จะข้าม key ที่ไม่มีค่าไป)
+            // เพื่อให้ตรงนี้ serialize เป็น JSON object เสมอ ไม่มีทางกลายเป็น `[]`
+            // — เพราะ `.sort` ของ array ว่างจะไปตรงกับ Array.prototype.sort ซึ่งทำให้
+            // `filters.sort ?? ''` ฝั่ง frontend พังได้ (function ที่เป็น truthy หลุด
+            // ผ่าน `??` ไปได้ แล้ว useState() ก็จะเรียกมันแบบ unbound ในฐานะ lazy
+            // initializer แล้ว throw error)
             'filters' => [
                 'search' => $request->input('search', ''),
                 'sort' => $request->input('sort', ''),
@@ -319,13 +319,13 @@ class ProductController extends Controller
                     'code' => $product->family->code,
                     'name' => $product->family->name,
                 ] : null,
-                // toIso8601String(), not toDateTimeString() — the naive
-                // string toDateTimeString() produces has no timezone marker,
-                // so the frontend's `new Date(value)` misreads it as local
-                // time instead of UTC (this app's APP_TIMEZONE), showing a
-                // time offset by however far the viewer's clock is from UTC
-                // (7 hours early for a Thai browser, confirmed live). Same
-                // fix already applied on the edit page (see edit() below).
+                // ใช้ toIso8601String() ไม่ใช่ toDateTimeString() — เพราะ string
+                // แบบ naive ที่ toDateTimeString() คืนมาไม่มี timezone marker
+                // ทำให้ `new Date(value)` ฝั่ง frontend อ่านผิดเป็นเวลา local แทนที่
+                // จะเป็น UTC (ซึ่งเป็น APP_TIMEZONE ของแอปนี้) เลยแสดงเวลาคลาดเคลื่อน
+                // ไปตามที่นาฬิกาของผู้ดูห่างจาก UTC เท่าไหร่ (เร็วไป 7 ชั่วโมงสำหรับ
+                // browser ที่ตั้งเวลาไทย เช็คจากของจริงแล้ว) แก้แบบเดียวกันนี้ไปแล้ว
+                // ที่หน้า edit ด้วย (ดู edit() ด้านล่าง)
                 'created_at' => $product->created_at?->toIso8601String(),
                 'updated_at' => $product->updated_at?->toIso8601String(),
                 'attributes' => $attributes->map(function (Attribute $attribute) use ($product, $values) {
@@ -351,11 +351,11 @@ class ProductController extends Controller
     }
 
     /**
-     * Lightweight product search for the "Add related/up-sell/cross-sell
-     * product" picker on the edit page — matches by SKU or by the `pname`
-     * attribute value (across every locale — a broader net than the display
-     * name below, deliberately, so e.g. a SKU-like number embedded in any
-     * locale's name still matches), excluding whatever's already picked.
+     * ค้นหาสินค้าแบบเบาๆ สำหรับตัวเลือก "Add related/up-sell/cross-sell product"
+     * ในหน้า edit — หาโดย match กับ SKU หรือค่าของ attribute `pname` (ค้นทุก
+     * locale เลย ตั้งใจให้ครอบคลุมกว้างกว่าชื่อที่แสดงผลด้านล่าง เผื่อกรณีมีเลขคล้าย
+     * SKU ฝังอยู่ในชื่อของ locale ไหนก็ตามให้ยัง match ได้) และตัดตัวที่เลือกไว้
+     * แล้วออก
      */
     public function search(Request $request): JsonResponse
     {
@@ -392,18 +392,18 @@ class ProductController extends Controller
     }
 
     /**
-     * Resolves the `pname` attribute's value for each given product id in
-     * the admin's current UI locale (app()->getLocale()), falling back to
-     * the global (locale_id=null) scope when that locale has no row of its
-     * own — same locale-preference index() already applies to its grid.
-     * Without this, a plain `ProductValue::pluck('value', 'product_id')`
-     * has no ORDER BY across a product's several locale rows, so pluck()
-     * keeps whichever one the DB happened to return last — arbitrary, and
-     * not necessarily the viewing admin's language at all (confirmed live:
-     * a Thai-locale admin's product picker was showing Chinese names).
+     * หาค่า attribute `pname` ของแต่ละ product id ตาม locale ปัจจุบันที่แอดมินใช้อยู่
+     * (app()->getLocale()) ถ้า locale นั้นไม่มีแถวของตัวเอง ก็ fallback ไปใช้
+     * scope แบบ global (locale_id=null) แทน — ใช้ลำดับความสำคัญของ locale
+     * แบบเดียวกับที่ index() ใช้กับกริดของมันอยู่แล้ว
+     * ถ้าไม่ทำแบบนี้ การใช้ `ProductValue::pluck('value', 'product_id')` ตรงๆ
+     * จะไม่มี ORDER BY คุมลำดับแถว locale หลายๆ อันของ product เดียวกัน เลยทำให้
+     * pluck() สุ่มเอาแถวไหนก็ได้ที่ DB คืนมาล่าสุด — ไม่แน่นอน แล้วก็ไม่ใช่ภาษา
+     * ของแอดมินคนที่กำลังดูอยู่จริงๆ ด้วย (เจอเคสจริงมาแล้ว: แอดมิน locale ไทย
+     * เปิด product picker แล้วเจอชื่อเป็นภาษาจีน)
      *
      * @param  \Illuminate\Support\Collection<int, int>  $productIds
-     * @return array<int, string|null> product_id => name
+     * @return array<int, string|null> product_id => ชื่อ
      */
     private function resolveProductNamesInCurrentLocale(Collection $productIds): array
     {
@@ -430,12 +430,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Read-only report of products still missing a real, translated product
-     * name (`pname`) for one or more enabled locales. A locale counts as
-     * "missing" when its value is empty, or still equal to the SKU —
-     * Product::applySmartDefaults() bootstraps every locale's `pname` to the
-     * SKU on create/duplicate as a placeholder, so an untouched locale reads
-     * as "= SKU", not as a genuinely empty value.
+     * รายงานแบบ read-only ของ product ที่ยังไม่มีชื่อ (`pname`) ที่แปลจริงๆ
+     * ในหนึ่ง locale ขึ้นไปที่เปิดใช้งานอยู่ ถือว่า locale ไหน "missing" เมื่อ
+     * ค่าว่างเปล่า หรือยังเท่ากับ SKU อยู่ — เพราะ Product::applySmartDefaults()
+     * จะตั้งค่า `pname` เริ่มต้นของทุก locale เป็น SKU ตอนสร้าง/duplicate
+     * (เป็นแค่ placeholder) ดังนั้น locale ที่ยังไม่ถูกแตะเลยจะอ่านได้ว่า
+     * "= SKU" ไม่ใช่ค่าว่างเปล่าจริงๆ
      */
     public function missingTranslations(): Response
     {
@@ -445,10 +445,10 @@ class ProductController extends Controller
         $nameAttributeId = Attribute::idForCode('pname');
         $thaiLocaleId = Locale::idForCode('th');
 
-        // Every attribute flagged "value per locale" (pname, warranty_*,
-        // spec_*, ...) — not just pname — since a product can have its name
-        // translated but still be missing content like warranty notes or
-        // specifications in a given language.
+        // เอาทุก attribute ที่ติดแฟล็ก "value per locale" (pname, warranty_*,
+        // spec_*, ...) ไม่ใช่แค่ pname เพราะ product อาจจะแปลชื่อแล้ว
+        // แต่ยังขาดเนื้อหาอื่น เช่น หมายเหตุการรับประกันหรือสเปก
+        // ในบาง locale อยู่ก็ได้
         $localeBasedAttributes = Attribute::where('is_locale_based', true)->orderBy('code')->get(['id', 'code', 'name']);
         $attributesById = $localeBasedAttributes->keyBy('id');
         $localeBasedAttributeIds = $localeBasedAttributes->pluck('id')->all();
@@ -457,36 +457,34 @@ class ProductController extends Controller
             ->orderBy('sku')
             ->get(['id', 'sku', 'family_id', 'enabled']);
 
-        // Restrict to whichever of those locale-based attributes are
-        // actually assigned to a product's family — same source edit()
-        // groups its attribute tabs from, so this never flags a field the
-        // product's own Edit page has nowhere to show/fix. A family with no
-        // FamilyAttribute rows at all falls back to every locale-based
-        // attribute, mirroring edit()'s "no assignments -> show all system
-        // attributes" fallback.
+        // จำกัดเฉพาะ locale-based attribute ที่ถูก assign ให้กับ family ของ
+        // product นั้นจริงๆ — ใช้แหล่งข้อมูลเดียวกับที่ edit() ใช้จัดกลุ่ม
+        // แท็บ attribute เลยไม่มีทางที่รายงานนี้จะไปเตือนฟิลด์ที่หน้า Edit
+        // ของ product เองไม่มีที่ให้แสดง/แก้ได้ ส่วน family ที่ไม่มีแถว
+        // FamilyAttribute เลยสักแถว จะ fallback ไปใช้ทุก locale-based
+        // attribute แทน เหมือนกับ fallback "ไม่มีการ assign -> โชว์ system
+        // attribute ทั้งหมด" ของ edit()
         $familyAttributeIdsByFamily = FamilyAttribute::whereIn('attribute_id', $localeBasedAttributeIds)
             ->get(['family_id', 'attribute_id'])
             ->groupBy('family_id')
             ->map(fn ($rows) => $rows->pluck('attribute_id')->all());
         $familiesWithAnyAssignment = FamilyAttribute::pluck('family_id')->unique()->all();
 
-        // Grouped by product then attribute — sparse on purpose: most of
-        // this catalog's 17 locale-based attributes are actually used by a
-        // handful of products (or one), so building this from the rows that
-        // actually exist (rather than probing all 17 attributes x 3 locales
-        // for every product regardless) is both the realistic shape of the
-        // data and what makes the loop below fast. Raw query-builder rows
-        // (stdClass), not hydrated ProductValue models, since nothing here
-        // needs more than the four raw column values — Eloquent's per-row
-        // model boot (casts, accessors, event machinery) was the dominant
-        // cost on this page for tens of thousands of rows.
+        // จัดกลุ่มตาม product แล้วก็ attribute — ตั้งใจให้ sparse เพราะ
+        // attribute แบบ locale-based ทั้ง 17 ตัวของ catalog นี้ ส่วนใหญ่ถูกใช้
+        // จริงแค่ไม่กี่ product (หรือแค่ตัวเดียว) การสร้างจากแถวที่มีอยู่จริง
+        // (แทนที่จะไล่เช็คทั้ง 17 attribute x 3 locale ของทุก product แบบ
+        // เหมารวม) จึงตรงกับสภาพข้อมูลจริงและทำให้ loop ด้านล่างเร็วขึ้นด้วย
+        // ใช้แถวดิบจาก query-builder (stdClass) ไม่ใช่ hydrate เป็น model
+        // ProductValue เพราะตรงนี้ไม่ต้องการอะไรมากไปกว่า 4 คอลัมน์ดิบๆ —
+        // ตอน boot ของ Eloquent model แต่ละแถว (casts, accessors, event
+        // machinery) คือตัวกินเวลาหลักของหน้านี้ตอนมีเป็นหมื่นแถว
         //
-        // Also includes locale_id IS NULL rows (grouped under the 'global'
-        // key below) — see foldGlobalValueIntoThai()'s docblock for why
-        // those aren't actually "no locale", and skipping them here was
-        // exactly why a bulk-imported field like spec_specifications never
-        // showed up on this report at all despite never having been split
-        // into EN/ZH.
+        // รวมแถวที่ locale_id เป็น NULL ด้วย (จัดไว้ใต้ key 'global' ด้านล่าง)
+        // — ดู docblock ของ foldGlobalValueIntoThai() ว่าทำไมแถวพวกนี้ถึงไม่ใช่
+        // "ไม่มี locale" จริงๆ และถ้าข้ามแถวพวกนี้ไป จะทำให้ฟิลด์ที่ bulk-import
+        // มา เช่น spec_specifications ไม่โผล่ในรายงานนี้เลย ทั้งที่ไม่เคยถูก
+        // แยกเป็น EN/ZH เลยสักครั้ง
         $rowsByProductAttribute = [];
         if (! empty($localeBasedAttributeIds)) {
             foreach (
@@ -502,10 +500,10 @@ class ProductController extends Controller
             }
         }
 
-        // Applicable attribute ids depend only on family_id, and a catalog
-        // has far fewer distinct families than products — resolved once per
-        // family and cached here, instead of re-filtering the attribute
-        // list from scratch for every single product below.
+        // attribute id ที่เกี่ยวข้องขึ้นอยู่กับ family_id เท่านั้น และ catalog
+        // นี้มีจำนวน family ที่ต่างกันน้อยกว่าจำนวน product เยอะมาก เลย
+        // resolve แค่ครั้งเดียวต่อ family แล้ว cache ไว้ตรงนี้ แทนที่จะกรอง
+        // list attribute ใหม่ทุกครั้งสำหรับแต่ละ product ด้านล่าง
         $applicableAttributeIdsByFamily = [];
 
         $rows = [];
@@ -527,11 +525,11 @@ class ProductController extends Controller
             $missingAttributesByLocaleId = [];
             $productRows = $rowsByProductAttribute[$product->id] ?? [];
 
-            // pname is always checked, even with zero rows — its "still
-            // just the SKU" placeholder (Product::applySmartDefaults())
-            // means a product nobody has ever named in any language is
-            // exactly the case this report most needs to surface, unlike
-            // every other locale-based attribute below.
+            // pname ถูกเช็คเสมอ ต่อให้ไม่มีแถวเลยก็ตาม — เพราะ placeholder
+            // "ยังเป็นแค่ SKU" (Product::applySmartDefaults()) หมายความว่า
+            // product ที่ไม่เคยถูกตั้งชื่อในภาษาไหนเลย คือเคสที่รายงานนี้
+            // ต้องการโชว์ให้เห็นมากที่สุด ต่างจาก locale-based attribute
+            // ตัวอื่นๆ ด้านล่างที่ไม่ได้เป็นแบบนี้
             if (isset($applicableAttributeIds[$nameAttributeId])) {
                 $this->collectMissingLocalesForAttribute(
                     $attributesById[$nameAttributeId],
@@ -545,14 +543,13 @@ class ProductController extends Controller
                 );
             }
 
-            // Every other locale-based attribute: only ones with at least
-            // one existing row are worth even considering (an attribute
-            // with zero rows anywhere for this product has never been
-            // filled in in any language — that's missing content, not a
-            // translation gap), and only flagged when at least one locale
-            // actually holds real text to translate FROM (requireSource) —
-            // otherwise it's the same "nothing to translate" case, just
-            // spread across every locale instead of none.
+            // ส่วน locale-based attribute ตัวอื่นๆ: จะพิจารณาก็ต่อเมื่อมี
+            // แถวอยู่จริงอย่างน้อยหนึ่งแถว (attribute ที่ไม่มีแถวเลยของ
+            // product นี้ แปลว่าไม่เคยถูกกรอกในภาษาไหนเลย — นั่นคือขาดเนื้อหา
+            // ไม่ใช่ปัญหาการแปล) และจะถูกเตือนก็ต่อเมื่อมีอย่างน้อยหนึ่ง
+            // locale ที่มีข้อความจริงให้แปลออกไปได้ (requireSource) — ไม่งั้น
+            // ก็เป็นเคส "ไม่มีอะไรให้แปล" เหมือนกัน แค่กระจายไปทุก locale
+            // แทนที่จะไม่มีเลยสักตัว
             foreach ($productRows as $attributeId => $valuesByLocale) {
                 if ($attributeId === $nameAttributeId || ! isset($applicableAttributeIds[$attributeId])) {
                     continue;
@@ -597,25 +594,24 @@ class ProductController extends Controller
     }
 
     /**
-     * Bulk import (ProductRowImporter) — and any other write path that
-     * doesn't target a specific locale — always lands a locale-based
-     * attribute's value in the global (channel_id=null, locale_id=null)
-     * scope, and that global value is always Thai by convention, not a
-     * genuine "no locale" value: see ProductRowImporter::sourceLocaleId()'s
-     * own docblock, which hardcodes Thai as the source language for exactly
-     * this scope when fanning a bulk-imported value out to other locales.
+     * การ bulk import (ProductRowImporter) — และ path การเขียนข้อมูลอื่นๆ
+     * ที่ไม่ได้เจาะจง locale ใดเป็นพิเศษ — จะเอาค่าของ locale-based attribute
+     * ไปลงที่ scope แบบ global เสมอ (channel_id=null, locale_id=null) และ
+     * ค่า global นั้นก็เป็นภาษาไทยตามธรรมเนียมของระบบ ไม่ใช่ค่าที่ "ไม่มี
+     * locale" จริงๆ: ดู docblock ของ ProductRowImporter::sourceLocaleId()
+     * ที่ hardcode ภาษาไทยเป็น source language สำหรับ scope นี้เวลากระจาย
+     * ค่าที่ bulk import มาไปยัง locale อื่นๆ
      *
-     * Folds it into the Thai slot whenever Thai doesn't already have its
-     * own real row, so every check downstream (missing detection, source
-     * resolution for the Translate action) sees it exactly as if it were a
-     * real Thai-locale row. Without this, an attribute that's only ever
-     * been bulk-imported — never split into per-locale rows — reads as
-     * having no content in any locale at all: invisible to the report, and
-     * starving the Translate action of a source to translate from, even
-     * though there's a perfectly good source sitting right there.
+     * ฟังก์ชันนี้จะเอาค่านั้นไปใส่ในช่องภาษาไทยเมื่อภาษาไทยยังไม่มีแถวของ
+     * ตัวเองอยู่แล้ว เพื่อให้การเช็คทุกจุดถัดไป (การหา missing, การหา source
+     * ให้ action Translate) มองเห็นมันเหมือนเป็นแถวภาษาไทยจริงๆ ถ้าไม่ทำแบบนี้
+     * attribute ที่ถูก bulk-import มาอย่างเดียว — ไม่เคยถูกแยกเป็นแถวต่อ
+     * locale เลย — จะอ่านได้ว่าไม่มีเนื้อหาในภาษาไหนเลย ทำให้มองไม่เห็นใน
+     * รายงาน แล้วก็ทำให้ action Translate ไม่มี source ให้แปล ทั้งที่จริงๆ
+     * มี source ดีๆ อยู่ตรงนั้นแหละ
      *
-     * @param  array<int|string, string|null>  $valuesByLocale locale_id (or 'global') => raw value
-     * @return array<int, string|null> locale_id => raw value, 'global' key removed
+     * @param  array<int|string, string|null>  $valuesByLocale locale_id (หรือ 'global') => ค่าดิบ
+     * @return array<int, string|null> locale_id => ค่าดิบ, เอา key 'global' ออกแล้ว
      */
     private function foldGlobalValueIntoThai(array $valuesByLocale, ?int $thaiLocaleId): array
     {
@@ -635,17 +631,16 @@ class ProductController extends Controller
     }
 
     /**
-     * Evaluates one attribute's per-locale values for a single product and
-     * appends it to $missingAttributesByLocaleId[$localeId] for every
-     * locale where it's missing. When $requireSource is true, an attribute
-     * with no usable source anywhere (nothing to translate FROM) is dropped
-     * entirely rather than flagged — see the two call sites in
-     * missingTranslations() for why pname passes false and every other
-     * locale-based attribute passes true.
+     * ประเมินค่าของ attribute ตัวหนึ่งในแต่ละ locale สำหรับ product เดียว
+     * แล้วเติมเข้าไปใน $missingAttributesByLocaleId[$localeId] สำหรับทุก
+     * locale ที่ขาดอยู่ ถ้า $requireSource เป็น true attribute ที่ไม่มี
+     * source ที่ใช้ได้เลยสักที่ (ไม่มีอะไรให้แปลออกไปได้) จะถูกตัดทิ้งไปเลย
+     * ไม่ถูกเตือน — ดูจุดที่เรียกใช้ทั้งสองจุดใน missingTranslations() ว่า
+     * ทำไม pname ถึงส่ง false ส่วน locale-based attribute ตัวอื่นส่ง true
      *
-     * @param  array<int, string|null>  $valuesByLocale locale_id => raw value
+     * @param  array<int, string|null>  $valuesByLocale locale_id => ค่าดิบ
      * @param  array<int, array{id: int, code: string, display_name: string|null}>  $localeList
-     * @param  array<int, array<int, array{id: int, code: string, name: string|null}>>  $missingAttributesByLocaleId  locale_id => attribute list, by reference
+     * @param  array<int, array<int, array{id: int, code: string, name: string|null}>>  $missingAttributesByLocaleId  locale_id => รายการ attribute, ส่งโดยอ้างอิง (by reference)
      */
     private function collectMissingLocalesForAttribute(
         Attribute $attribute,
@@ -670,14 +665,13 @@ class ProductController extends Controller
     }
 
     /**
-     * A locale-based attribute value counts as "missing" when it's empty,
-     * or — for pname only — still equal to the SKU that
-     * Product::applySmartDefaults() bootstraps every locale with on
-     * create/duplicate (a placeholder, not an actual translation). This
-     * alone doesn't catch a locale whose value is just a verbatim copy of
-     * another locale's real text — see resolveAttributeCoverage(), which
-     * wraps this with that additional check and is what callers should
-     * actually use.
+     * ค่าของ locale-based attribute จะถือว่า "missing" เมื่อมันว่างเปล่า
+     * หรือ — เฉพาะ pname เท่านั้น — ยังเท่ากับ SKU ที่
+     * Product::applySmartDefaults() ตั้งให้ทุก locale ตอนสร้าง/duplicate
+     * (เป็นแค่ placeholder ไม่ใช่การแปลจริง) แค่นี้อย่างเดียวยังจับไม่ได้ว่า
+     * locale ไหนมีค่าที่แค่ copy ข้อความจริงจาก locale อื่นมาตรงๆ —
+     * ดู resolveAttributeCoverage() ที่ห่อฟังก์ชันนี้ไว้พร้อมเช็คเพิ่มเติม
+     * ตัวนั้นแหละที่ผู้เรียกควรใช้จริงๆ
      */
     private function isProductValueMissing(?string $value, string $sku, bool $isNameAttribute): bool
     {
@@ -690,26 +684,25 @@ class ProductController extends Controller
     }
 
     /**
-     * Resolves which locale holds an attribute's real source content and
-     * determines every other active locale that still needs translating —
-     * empty, (pname only) still just the SKU placeholder, or a byte-for-
-     * byte copy of the source text that was never actually translated.
+     * หาว่า locale ไหนมี source content จริงๆ ของ attribute นั้น แล้วก็
+     * ระบุ locale อื่นๆ ที่เปิดใช้งานอยู่ทั้งหมดที่ยังต้องแปล — ไม่ว่าจะว่าง
+     * เปล่า, (เฉพาะ pname) ยังเป็นแค่ placeholder ที่เท่ากับ SKU, หรือเป็นค่า
+     * ที่ copy ข้อความ source มาเป๊ะๆ ทุกตัวอักษรโดยไม่เคยถูกแปลจริง
      *
-     * Both the source-locale priority and the "copy, not a translation"
-     * check follow ProductRowImporter::sourceLocaleId()'s established
-     * convention for this catalog: despite config('app.locale') being
-     * 'en' (just Laravel's untouched default), the real content — names,
-     * specifications, everything imported — is overwhelmingly authored in
-     * Thai, and a large share of this catalog's "English" values turned
-     * out to just be that same Thai text copied verbatim into the EN slot,
-     * never actually translated (confirmed empirically: ~96% of products
-     * have an identical `pname` in en and th). Treating config('app.locale')
-     * as the source, or treating any non-empty value as "already
-     * translated", both silently miss this — which is exactly why the
-     * Translate action was skipping the product name on nearly everything
-     * despite the report/action agreeing there was "nothing missing".
+     * ทั้งลำดับความสำคัญของ source locale และการเช็ค "copy มา ไม่ใช่แปล"
+     * ใช้ธรรมเนียมเดียวกับที่ ProductRowImporter::sourceLocaleId() วางไว้
+     * สำหรับ catalog นี้: ถึงแม้ config('app.locale') จะเป็น 'en' (ค่า
+     * default ของ Laravel ที่ไม่มีใครไปแตะ) แต่เนื้อหาจริง — ชื่อ, สเปก,
+     * ทุกอย่างที่ import เข้ามา — ส่วนใหญ่เขียนเป็นภาษาไทย และค่า "English"
+     * ของ catalog นี้จำนวนมากก็คือข้อความไทยตัวเดียวกันที่ถูก copy ไปใส่
+     * ช่อง EN ตรงๆ ไม่เคยถูกแปลจริงเลย (เช็คจากข้อมูลจริงแล้ว: ~96% ของ
+     * product มี `pname` เหมือนกันเป๊ะทั้ง en และ th) ถ้าใช้
+     * config('app.locale') เป็น source หรือถือว่าค่าที่ไม่ว่างเปล่า = "แปล
+     * แล้ว" ทั้งสองแบบจะพลาดเคสนี้ไปเงียบๆ — นี่แหละคือสาเหตุที่ action
+     * Translate ข้ามชื่อ product ไปเกือบทุกตัว ทั้งที่รายงาน/action บอกว่า
+     * "ไม่มีอะไรขาด"
      *
-     * @param  array<int, string|null>  $valuesByLocale locale_id => raw value
+     * @param  array<int, string|null>  $valuesByLocale locale_id => ค่าดิบ
      * @param  array<int, array{id: int}>  $localeList
      * @return array{sourceLocaleId: int|null, sourceValue: string, missingLocaleIds: int[]}
      */
@@ -751,20 +744,19 @@ class ProductController extends Controller
     }
 
     /**
-     * Per-product translation-completeness percentage for the product
-     * grid's "Translation" column — same coverage rules as
-     * missingTranslations() (every locale-based attribute assigned to the
-     * product's family; pname always counted even with no source anywhere,
-     * every other attribute only counted when it has at least one real
-     * value to translate FROM; Thai's global/bulk-import scope treated as
-     * a real Thai value). Kept as a separate, page-scoped pass rather than
-     * reusing missingTranslations()'s own loop, since that one is built to
-     * batch-scan the *entire* catalog — cheap there because it runs once
-     * per report view, but wasteful here where index() already re-runs on
-     * every grid page load/sort/filter for only ~25-100 rows at a time.
+     * คำนวณเปอร์เซ็นต์ความครบถ้วนของการแปลของแต่ละ product สำหรับคอลัมน์
+     * "Translation" ในกริด product — ใช้กฎเดียวกับ missingTranslations()
+     * (locale-based attribute ทุกตัวที่ถูก assign ให้ family ของ product นั้น;
+     * pname นับเสมอต่อให้ไม่มี source เลยก็ตาม, attribute ตัวอื่นนับก็ต่อเมื่อ
+     * มีค่าจริงอย่างน้อยหนึ่งค่าให้แปลออกไปได้; scope global/bulk-import ของ
+     * ภาษาไทยถือเป็นค่าไทยจริง) แยกเป็น pass ของหน้านี้เองต่างหาก แทนที่จะ
+     * ใช้ loop เดิมของ missingTranslations() ซ้ำ เพราะตัวนั้นถูกออกแบบมาให้
+     * สแกน catalog *ทั้งหมด* แบบ batch — ซึ่งถูกตรงนั้นเพราะรันแค่ครั้งเดียว
+     * ต่อการเปิดดูรายงาน แต่จะสิ้นเปลืองถ้ามาใช้ตรงนี้ที่ index() รันซ้ำทุก
+     * ครั้งที่โหลด/sort/filter กริด สำหรับแค่ ~25-100 แถวต่อครั้งเท่านั้น
      *
      * @param  \Illuminate\Support\Collection<int, Product>  $products
-     * @return array<int, int|null> product_id => percent translated (0-100), or null when there's nothing to measure (only one locale enabled, or the family has no applicable locale-based attributes)
+     * @return array<int, int|null> product_id => เปอร์เซ็นต์ที่แปลแล้ว (0-100) หรือ null ถ้าไม่มีอะไรให้วัด (เปิดใช้แค่ locale เดียว หรือ family ไม่มี locale-based attribute ที่เกี่ยวข้องเลย)
      */
     private function translationCompletenessByProduct(Collection $products): array
     {
@@ -823,10 +815,10 @@ class ProductController extends Controller
                 $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $product->sku, $isNameAttribute, $thaiLocaleId);
 
                 if (! $isNameAttribute && $coverage['sourceLocaleId'] === null) {
-                    // No source anywhere for this attribute — not a
-                    // translation gap (there's nothing to translate FROM),
-                    // so it doesn't count toward the denominator either,
-                    // same requireSource skip as missingTranslations().
+                    // ไม่มี source ให้ attribute นี้เลยสักที่ — ไม่ใช่ปัญหา
+                    // การแปล (ไม่มีอะไรให้แปลออกไปตั้งแต่แรก) เลยไม่นับรวม
+                    // เข้าตัวหารด้วย เหมือนกับที่ missingTranslations() ข้าม
+                    // ด้วย requireSource
                     continue;
                 }
 
@@ -842,15 +834,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Locale-based attribute ids that apply to $familyId — same restriction
-     * missingTranslations() applies (batched there for its whole-catalog
-     * scan): only attributes actually assigned to the family via
-     * FamilyAttribute, falling back to every locale-based attribute when
-     * the family has no attribute assignments at all, mirroring edit()'s
-     * "no assignments -> show all system attributes" fallback. Queried
-     * per-family (not batched) since the translate actions below only ever
-     * touch one or a handful of explicitly chosen products, not the whole
-     * catalog.
+     * locale-based attribute id ที่เกี่ยวข้องกับ $familyId — ใช้ข้อจำกัด
+     * เดียวกับที่ missingTranslations() ใช้ (แต่ตัวนั้น batch ไว้สำหรับสแกน
+     * ทั้ง catalog): เอาเฉพาะ attribute ที่ถูก assign ให้ family นั้นจริงๆ
+     * ผ่าน FamilyAttribute โดย fallback ไปใช้ทุก locale-based attribute เมื่อ
+     * family ไม่มีการ assign attribute เลยสักตัว เหมือนกับ fallback
+     * "ไม่มีการ assign -> โชว์ system attribute ทั้งหมด" ของ edit() ตรงนี้
+     * query แยกเป็นรายตัว family (ไม่ batch) เพราะ action translate ด้านล่าง
+     * แตะแค่ product เดียวหรือไม่กี่ตัวที่เลือกไว้ชัดเจน ไม่ใช่ทั้ง catalog
      */
     private function applicableLocaleBasedAttributeIds(?int $familyId, Collection $localeBasedAttributeIds): Collection
     {
@@ -868,21 +859,21 @@ class ProductController extends Controller
     }
 
     /**
-     * Queues AI translation for every locale-based attribute (applicable to
-     * each product's family) that's missing a real value in one or more
-     * locales — one AutoTranslateProductValueJob per attribute, not per
-     * locale, since AttributeAutoTranslator::fillMissingProductValue()
-     * already fills every missing locale for that attribute in one go.
-     * Shared by the single-product and bulk "Translate" actions on the
-     * Missing Translations report.
+     * สั่งคิวการแปลด้วย AI ให้กับทุก locale-based attribute (ที่เกี่ยวข้องกับ
+     * family ของแต่ละ product) ที่ยังขาดค่าจริงในหนึ่ง locale ขึ้นไป — สั่ง
+     * AutoTranslateProductValueJob หนึ่งงานต่อหนึ่ง attribute ไม่ใช่ต่อ
+     * locale เพราะ AttributeAutoTranslator::fillMissingProductValue() เติม
+     * ทุก locale ที่ขาดของ attribute นั้นให้ในคราวเดียวอยู่แล้ว ใช้ร่วมกัน
+     * ระหว่าง action "Translate" แบบทีละ product และแบบ bulk บนรายงาน
+     * Missing Translations
      *
      * @param  Collection<int, Product>  $products
-     * @return array{queued: int, missingWithNoSource: int} queued = jobs actually
-     *         dispatched; missingWithNoSource = attributes that had a missing
-     *         locale but no other locale held a real value to translate from
-     *         (every locale-based attribute is empty/placeholder) — callers
-     *         use this to tell "already fully translated" apart from "stuck,
-     *         needs a value typed in by hand first" when queued is 0.
+     * @return array{queued: int, missingWithNoSource: int} queued = จำนวนงานที่
+     *         ถูกสั่งจริงๆ; missingWithNoSource = จำนวน attribute ที่มี
+     *         locale ขาดอยู่ แต่ไม่มี locale ไหนถืออยู่ที่มีค่าจริงให้แปล
+     *         ออกไปได้เลย (locale-based attribute ทุกตัวว่างเปล่า/เป็นแค่
+     *         placeholder) — ผู้เรียกใช้ค่านี้แยกกรณี "แปลครบแล้ว" ออกจาก
+     *         "ติดอยู่ ต้องพิมพ์ค่าใส่เองก่อน" ตอนที่ queued เป็น 0
      */
     private function queueProductTranslationJobs(Collection $products): array
     {
@@ -899,9 +890,10 @@ class ProductController extends Controller
                 continue;
             }
 
-            // Includes locale_id IS NULL rows (the global/bulk-import
-            // scope, folded into Thai below) — not just the active
-            // locales' own rows. See foldGlobalValueIntoThai()'s docblock.
+            // รวมแถวที่ locale_id เป็น NULL ด้วย (scope global/bulk-import
+            // ที่จะถูก fold เข้ากับภาษาไทยด้านล่าง) — ไม่ใช่แค่แถวของ
+            // locale ที่เปิดใช้งานอยู่เท่านั้น ดู docblock ของ
+            // foldGlobalValueIntoThai()
             $valuesByAttribute = ProductValue::where('product_id', $product->id)
                 ->whereIn('attribute_id', $applicableAttributeIds)
                 ->whereNull('channel_id')
@@ -936,7 +928,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Per-product "Translate" action on the Missing Translations report.
+     * แอ็กชัน "Translate" ของแต่ละสินค้า บนหน้ารายงาน Missing Translations
      */
     public function queueMissingTranslations(Product $product): RedirectResponse
     {
@@ -955,9 +947,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Bulk "Translate selected" action on the Missing Translations report —
-     * the report's checkbox selection posts here with whichever product ids
-     * are checked.
+     * แอ็กชัน "Translate selected" แบบ bulk บนหน้ารายงาน Missing Translations —
+     * เวลาติ๊กเลือกสินค้าในรายงานแล้วกดปุ่มนี้ จะส่ง product id ที่ติ๊กไว้มาที่นี่
      */
     public function queueMissingTranslationsBulk(Request $request): RedirectResponse
     {
@@ -973,10 +964,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Look up which category (or categories) a product belongs to by its
-     * (partial) SKU — for every product whose `sku` matches, returns the
-     * full root->leaf path for each category it's attached to via
-     * `product_category`, not just the top-level parent.
+     * ค้นหาว่าสินค้าอยู่ในหมวดหมู่ไหนบ้าง โดยใช้ SKU (หรือบางส่วนของ SKU) —
+     * ทุกสินค้าที่ `sku` ตรงกับที่ค้นหา จะคืนพาธเต็มตั้งแต่ root ไปจนถึง leaf
+     * ของทุกหมวดหมู่ที่ผูกอยู่ผ่าน `product_category` ไม่ใช่แค่หมวดแม่ตัวบนสุด
      */
     public function categoryPathBySku(Request $request): JsonResponse
     {
@@ -1007,11 +997,11 @@ class ProductController extends Controller
             return $path;
         };
 
-        // A product tagged at multiple levels of the same branch (the category
-        // picker auto-checks every ancestor up to the root) would otherwise show
-        // one path per level here — growing prefixes of the same path. Only the
-        // deepest pick per branch is worth a row; its path already contains
-        // every ancestor, so drop any assigned id that's an ancestor of another.
+        // ถ้าสินค้าถูกติ๊กหลายระดับในหมวดหมู่สายเดียวกัน (ตัวเลือกหมวดหมู่จะ
+        // auto-check ทุกหมวดแม่ขึ้นไปจนถึง root ให้เอง) ถ้าไม่กรองออกก็จะโชว์
+        // พาธซ้ำๆ หลายบรรทัด ซึ่งเป็นแค่พาธเดิมที่สั้นกว่ากันไปเรื่อยๆ เอาจริงๆ
+        // แค่หมวดที่ลึกที่สุดในแต่ละสายก็พอแล้ว เพราะพาธของมันมีหมวดแม่ครบอยู่แล้ว
+        // เลยต้องตัด id ที่เป็นหมวดแม่ของหมวดอื่นทิ้งไป
         $ancestorIdsOf = function (int $categoryId) use ($categoriesById): array {
             $ids = [];
             $category = $categoriesById->get($categoryId);
@@ -1043,9 +1033,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Synchronous "quick export" for the product grid — downloads immediately
-     * instead of going through the export-config/job-tracker workflow. Exports
-     * the selected rows if any are checked, otherwise the current search filter.
+     * "quick export" แบบ synchronous สำหรับตาราง product — ดาวน์โหลดไฟล์ทันที
+     * ไม่ต้องผ่านขั้นตอน export-config/job-tracker เหมือนปกติ จะ export
+     * เฉพาะแถวที่ติ๊กเลือกไว้ถ้ามี ไม่งั้นก็ export ตามฟิลเตอร์ค้นหาปัจจุบัน
      */
     public function quickExport(Request $request): BinaryFileResponse
     {
@@ -1065,10 +1055,10 @@ class ProductController extends Controller
         $ids = $validated['ids'] ?? [];
 
         $allColumns = (new ProductRowExporter($request->user()))->columns();
-        // "Which columns should be exported?" left blank/unset means every
-        // column, same as ProductRowExporter's own full set — otherwise only
-        // the intersection (in $allColumns' order, sku always kept so every
-        // exported row still has an identity even if the admin deselects it).
+        // ถ้าไม่ได้เลือกคอลัมน์มา (ว่างหรือไม่ส่งมาเลย) ก็ถือว่าเอาทุกคอลัมน์
+        // เหมือนชุดเต็มของ ProductRowExporter — ถ้าเลือกมาก็เอาแค่ที่ตรงกัน
+        // (เรียงตามลำดับใน $allColumns โดย sku จะถูกเก็บไว้เสมอ เพื่อให้ทุกแถว
+        // ที่ export ออกมายังมี identity อยู่ ถึงแม้แอดมินจะไม่ได้ติ๊ก sku ไว้)
         $selectedColumns = ! empty($validated['columns'])
             ? array_values(array_intersect($allColumns, $validated['columns']))
             : $allColumns;
@@ -1081,12 +1071,12 @@ class ProductController extends Controller
 
         $query = Product::with('family')->orderBy('id');
         if (! empty($ids)) {
-            // Explicit row selection means exactly these products — search
-            // and the type/category filters below are dialog-level ways to
-            // pick a product *set*, not extra constraints layered on top of
-            // an already-explicit one, so all of them are skipped once IDs
-            // are given (matches the frontend, which stops sending them too
-            // — see handleQuickExport()).
+            // ถ้ามีการติ๊กเลือกแถวมาชัดเจน หมายความว่าเอาแค่สินค้ากลุ่มนี้เท่านั้น —
+            // search กับฟิลเตอร์ type/category ด้านล่างเป็นแค่วิธีเลือก "ชุด"
+            // สินค้าอีกแบบหนึ่งในระดับ dialog ไม่ใช่เงื่อนไขเสริมที่ซ้อนทับกับ
+            // การเลือกที่ชัดเจนอยู่แล้ว เลยข้ามทั้งหมดไปเมื่อมี IDs ส่งมา
+            // (ตรงกับฝั่ง frontend ที่จะหยุดส่งค่าพวกนี้ด้วยเช่นกัน
+            // — ดูที่ handleQuickExport())
             $query->whereIn('id', $ids);
         } else {
             if (! empty($validated['search'])) {
@@ -1102,9 +1092,9 @@ class ProductController extends Controller
             }
         }
 
-        // Chunked instead of one ProductValue query per product (N+1 that made
-        // large exports crawl) — batches the value lookup per 500 products
-        // while `cursor()` still keeps the outer product stream memory-bounded.
+        // ใช้วิธี chunk แทนการ query ProductValue ทีละสินค้า (ปัญหา N+1 ที่ทำให้
+        // export ไฟล์ใหญ่ๆ ช้ามาก) — ดึงค่ามาเป็นแบทช์ครั้งละ 500 สินค้า
+        // ในขณะที่ `cursor()` ยังช่วยคุมไม่ให้สินค้าทั้งหมดโหลดเข้า memory รวดเดียว
         $rows = (function () use ($query, $attributesByCode, $selectedColumns) {
             foreach ($query->cursor()->chunk(500) as $products) {
                 $valuesByProduct = ProductValue::whereIn('product_id', $products->pluck('id'))
@@ -1151,12 +1141,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Deletes whichever public-disk file(s) a value change actually dropped.
-     * Image/file values are a single path string, so any change drops the
-     * old one outright. Gallery values are a JSON-encoded array of paths,
-     * and the frontend now lets users keep most of the set while adding or
-     * removing individual images — so only the paths present in $oldValue
-     * but absent from $newValue get deleted, instead of the whole old set.
+     * ลบไฟล์บน public disk ที่ถูกตัดออกจากการเปลี่ยนแปลงค่าจริงๆ
+     * ค่าแบบ image/file เป็น path string เดี่ยวๆ ดังนั้นแค่มีการเปลี่ยนค่าก็ลบ
+     * ไฟล์เก่าทิ้งไปเลย ส่วนค่าแบบ gallery เป็น array ของ path เข้ารหัสแบบ JSON
+     * และตอนนี้ frontend เปิดให้ผู้ใช้เก็บรูปเดิมส่วนใหญ่ไว้ พร้อมเพิ่ม/ลบทีละรูป
+     * ได้ — เลยจะลบเฉพาะ path ที่มีอยู่ใน $oldValue แต่ไม่มีใน $newValue เท่านั้น
+     * แทนที่จะลบชุดเก่าทั้งหมด
      */
     private function deleteRemovedAttributeFiles(Attribute $attribute, string $oldValue, ?string $newValue): void
     {
@@ -1178,17 +1168,17 @@ class ProductController extends Controller
     }
 
     /**
-     * Duration (≤5 min) and dimension (≥480×480px) checks for the `video`
-     * attribute type — Laravel's validator has no built-in rule for either,
-     * and reading them requires actually parsing the MP4's metadata, which
-     * getID3 (james-heinrich/getid3, pure PHP, no ffmpeg binary needed) does
-     * directly from the file on disk. Returns a user-facing message for the
-     * first constraint violated, or null if the file is within bounds.
+     * เช็คความยาว (≤5 นาที) และขนาด (≥480×480px) ของไฟล์สำหรับ attribute type
+     * `video` — Laravel validator ไม่มี rule สำเร็จรูปให้ทั้งสองอย่างนี้ และการ
+     * จะอ่านค่าพวกนี้ได้ต้องแกะ metadata ของไฟล์ MP4 จริงๆ ซึ่ง getID3
+     * (james-heinrich/getid3 เป็น PHP ล้วนๆ ไม่ต้องพึ่ง ffmpeg binary) อ่านให้
+     * โดยตรงจากไฟล์บนดิสก์เลย จะคืนข้อความแจ้งผู้ใช้ตามเงื่อนไขแรกที่ผิดพลาด
+     * หรือคืน null ถ้าไฟล์ผ่านเกณฑ์ทั้งหมด
      *
-     * Mirrors the equivalent client-side check in edit.tsx (browser
-     * <video> metadata) — that one is enforced first and catches most bad
-     * uploads before they're even sent, but this is what a request made
-     * directly against the endpoint (bypassing the UI) can't get past.
+     * ทำงานคู่กับการเช็คฝั่ง client ใน edit.tsx (ใช้ metadata จาก <video> ของ
+     * browser) ซึ่งจะเช็คก่อนและดักไฟล์ที่ผิดเงื่อนไขได้ส่วนใหญ่ก่อนที่จะถูกส่งมา
+     * ด้วยซ้ำ แต่ตัวนี้คือด่านสุดท้ายที่ดักรีเควสต์ที่ยิงตรงมาที่ endpoint
+     * (ข้าม UI ไปเลย) ไม่ให้หลุดผ่านไปได้
      */
     private function validateVideoConstraints(UploadedFile $file): ?string
     {
@@ -1209,12 +1199,11 @@ class ProductController extends Controller
     }
 
     /**
-     * Minimum-dimension check for the `image`/`gallery` attribute types —
-     * same reasoning and pattern as validateVideoConstraints() above, using
-     * getimagesize() (built into PHP, no extra dependency needed for a
-     * dimension-only check) instead of getID3. Only called once Laravel's
-     * own `image` rule has already passed, so $file is always a real,
-     * readable image here.
+     * เช็คขนาดขั้นต่ำของไฟล์สำหรับ attribute type `image`/`gallery` —
+     * ใช้แนวคิดและรูปแบบเดียวกับ validateVideoConstraints() ด้านบน แต่ใช้
+     * getimagesize() (มีมากับ PHP อยู่แล้ว ไม่ต้องพึ่ง dependency เพิ่มแค่เพื่อ
+     * เช็คขนาด) แทน getID3 ฟังก์ชันนี้จะถูกเรียกก็ต่อเมื่อ rule `image` ของ
+     * Laravel ผ่านมาแล้วเท่านั้น ดังนั้น $file ที่ได้จะเป็นไฟล์รูปจริงที่อ่านได้เสมอ
      */
     private function validateImageConstraints(UploadedFile $file): ?string
     {
@@ -1229,12 +1218,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Attributes eligible to define a configurable product's variant axes
-     * (must have selectable options), each carrying family_ids so the
-     * Create/Edit variant-attribute picker can restrict itself to whichever
-     * attributes are actually assigned to the selected family — otherwise a
-     * choice unrelated to the product's family would silently never surface
-     * in Edit's family-scoped attribute groups.
+     * รายการ attribute ที่ใช้กำหนดแกน variant ของสินค้าแบบ configurable ได้
+     * (ต้องมี options ให้เลือก) แต่ละตัวจะพ่วง family_ids มาด้วย เพื่อให้ตัวเลือก
+     * variant-attribute ในหน้า Create/Edit จำกัดตัวเองให้เหลือแค่ attribute ที่
+     * ถูก assign ให้ family ที่เลือกไว้จริงๆ — ไม่งั้นจะมีตัวเลือกที่ไม่เกี่ยวกับ
+     * family ของสินค้าโผล่มาแบบเงียบๆ และไม่โผล่ในกลุ่ม attribute ที่กรองตาม
+     * family ของหน้า Edit
      */
     private function configurableAttributeOptions()
     {
@@ -1251,10 +1240,9 @@ class ProductController extends Controller
 
     public function create(): Response
     {
-        // Ordered most-used family first, so the create form's default
-        // selection (families[0]) is the family products are actually
-        // assigned to most often, instead of an arbitrary DB-insertion
-        // order that happened to come back first.
+        // เรียง family ที่ถูกใช้บ่อยที่สุดไว้อันดับแรก เพื่อให้ค่าเริ่มต้นของฟอร์ม
+        // create (families[0]) เป็น family ที่สินค้าถูก assign ไปมากที่สุดจริงๆ
+        // แทนที่จะเป็นลำดับสุ่มๆ ตามที่ถูก insert ลง DB ก่อนหลัง
         $families = AttributeFamily::withCount('products')
             ->orderByDesc('products_count')
             ->orderBy('name')
@@ -1278,12 +1266,12 @@ class ProductController extends Controller
             'configurable_attributes' => ['nullable', 'array'],
             'configurable_attributes.*' => ['integer', 'exists:attributes,id'],
             'variants' => ['nullable', 'array'],
-            // 'distinct' catches two generated variant rows colliding with each
-            // other, and notIn catches a variant SKU colliding with the parent's
-            // own SKU — both previously slipped past `unique:products,sku` (which
-            // only checks already-persisted rows) and hit the DB's unique
-            // constraint directly inside the loop below, raising a raw
-            // QueryException (500) instead of a clean validation error.
+            // 'distinct' ดัก SKU ของ variant สองแถวที่ generate มาชนกันเอง ส่วน
+            // notIn ดัก SKU ของ variant ที่ไปชนกับ SKU ของสินค้าแม่เอง — ทั้งสอง
+            // เคสนี้เมื่อก่อนหลุดผ่าน `unique:products,sku` ไปได้ (เพราะมันเช็ค
+            // แค่แถวที่บันทึกลง DB ไปแล้ว) แล้วไปชนกับ unique constraint ของ DB
+            // ตรงๆ ในลูปด้านล่าง ทำให้เกิด QueryException ดิบๆ (500) แทนที่จะเป็น
+            // validation error ที่อ่านรู้เรื่อง
             'variants.*.sku' => [
                 'required_if:type,configurable',
                 'string',
@@ -1297,11 +1285,11 @@ class ProductController extends Controller
             'variants.*.attributes' => ['nullable', 'array'],
         ]);
 
-        // variants.*.attributes is an associative map keyed by attribute id
-        // (`{attributeId: value}`), which Laravel's dot-notation rules can't
-        // validate the *keys* of — a bogus attribute id here previously hit
-        // product_values.attribute_id's FK constraint and raised a raw 500
-        // instead of a validation error.
+        // variants.*.attributes เป็น associative map ที่ key คือ attribute id
+        // (`{attributeId: value}`) ซึ่ง rule แบบ dot-notation ของ Laravel เช็คแค่
+        // "value" ไม่ได้เช็ค "key" — ถ้า attribute id ที่ส่งมาไม่มีจริง เมื่อก่อน
+        // จะไปชนกับ FK constraint ของ product_values.attribute_id ตรงๆ ทำให้
+        // เกิด raw 500 แทนที่จะเป็น validation error
         $validator->after(function ($validator) use ($request) {
             $validAttributeIds = null;
 
@@ -1354,7 +1342,7 @@ class ProductController extends Controller
 
                     $childProduct->applySmartDefaults();
 
-                    // Save price
+                    // บันทึกราคา
                     if ($priceAttr && isset($variantData['price']) && $variantData['price'] !== '') {
                         ProductValue::create([
                             'product_id' => $childProduct->id,
@@ -1363,7 +1351,7 @@ class ProductController extends Controller
                         ]);
                     }
 
-                    // Save qty
+                    // บันทึกจำนวน
                     if ($qtyAttr && isset($variantData['qty']) && $variantData['qty'] !== '') {
                         ProductValue::create([
                             'product_id' => $childProduct->id,
@@ -1372,7 +1360,7 @@ class ProductController extends Controller
                         ]);
                     }
 
-                    // Save combination attributes (e.g. color, size option codes/IDs)
+                    // บันทึก attribute ของ combination (เช่น รหัส/ID ของสี, ไซซ์)
                     if (! empty($variantData['attributes'])) {
                         foreach ($variantData['attributes'] as $attrId => $attrVal) {
                             if ($attrVal !== null && $attrVal !== '') {
@@ -1391,17 +1379,16 @@ class ProductController extends Controller
             }
         });
 
-        // Unlike update()/destroy(), creation has no ProductDataChanged
-        // websocket push (a new product only matters once it's actually
-        // findable/edited), but the storefront cache still needs to know
-        // about it — see Product::bumpStorefrontVersion().
+        // ต่างจาก update()/destroy() ตรงที่ตอนสร้างสินค้าใหม่จะไม่มีการยิง
+        // websocket push ของ ProductDataChanged (สินค้าที่เพิ่งสร้างจะมีความ
+        // หมายก็ต่อเมื่อค้นเจอ/แก้ไขได้จริงๆ เท่านั้น) แต่ storefront cache
+        // ก็ยังต้องรู้เรื่องนี้อยู่ดี — ดูที่ Product::bumpStorefrontVersion()
         Product::bumpStorefrontVersion();
 
-        // Land the user straight in Edit — the Create form only captures
-        // SKU/family/type/variants, so without this they'd have to manually
-        // find the product they just made in the grid before they could add
-        // any real content (name, images, categories, ...). Falls back to the
-        // index only for a role that can create but can't edit products.
+        // พาผู้ใช้ไปหน้า Edit เลย — เพราะฟอร์ม Create เก็บแค่ SKU/family/type/
+        // variants เท่านั้น ถ้าไม่ทำแบบนี้ผู้ใช้ต้องไปหาสินค้าที่เพิ่งสร้างเองในตาราง
+        // ก่อนถึงจะเริ่มใส่เนื้อหาจริงๆ ได้ (ชื่อ, รูป, หมวดหมู่, ...) จะกลับไปหน้า
+        // index แทนก็ต่อเมื่อ role นั้นสร้างสินค้าได้แต่แก้ไขไม่ได้เท่านั้น
         $user = $request->user();
         if ($user && $user->hasPermission('products', 'edit_products')) {
             return to_route('catalog.products.edit', $parentProduct)->with('success', 'Product created successfully.');
@@ -1411,13 +1398,13 @@ class ProductController extends Controller
     }
 
     /**
-     * Seeds a new product from an existing one: same family/type/attribute
-     * values/categories, under a fresh, auto-generated SKU. Starts disabled
-     * (regardless of the source's status) so a not-yet-reviewed duplicate
-     * never accidentally goes live under a second SKU — the user is expected
-     * to review/adjust it on the Edit page (where they land next) and enable
-     * it themselves. Configurable products bring their variants along too,
-     * each duplicated the same way and re-parented to the new product.
+     * สร้างสินค้าใหม่โดย copy จากสินค้าเดิม: family/type/ค่า attribute/หมวดหมู่
+     * เหมือนกันหมด แต่ใช้ SKU ใหม่ที่ auto-generate ขึ้นมา จะเริ่มต้นเป็นสถานะ
+     * disabled เสมอ (ไม่ว่าตัวต้นฉบับจะเปิดหรือปิดอยู่ก็ตาม) เพื่อไม่ให้สินค้า
+     * ที่ยังไม่ได้ตรวจสอบดันไปออนไลน์โดยไม่ตั้งใจภายใต้ SKU ที่สอง — ผู้ใช้ต้อง
+     * ไปตรวจสอบ/ปรับแก้ที่หน้า Edit เอง (ซึ่งจะพาไปที่นั่นต่อ) แล้วค่อยเปิดใช้งาน
+     * เอง ถ้าเป็นสินค้าแบบ configurable ก็จะ copy variant ไปด้วย โดยแต่ละตัว
+     * ถูก duplicate ด้วยวิธีเดียวกันแล้วผูก parent ใหม่ให้เป็นสินค้าที่เพิ่งสร้าง
      */
     public function duplicate(Request $request, Product $product): RedirectResponse
     {
@@ -1473,14 +1460,13 @@ class ProductController extends Controller
     }
 
     /**
-     * Copies $source's attribute values and category assignments onto
-     * $target. `is_unique`-flagged attributes (barcode_*, `pid`, ...) are
-     * deliberately skipped — copying them verbatim would give the duplicate
-     * the exact same "unique" value as the original, which is either
-     * meaningless (two products sharing one barcode) or actively wrong.
-     * `pid` self-heals via applySmartDefaults() (called first, so the
-     * subsequent copy of non-unique values like `pname` can still overwrite
-     * its bootstrap "= SKU" default with the source's real name).
+     * Copy ค่า attribute และการ assign หมวดหมู่จาก $source ไปยัง $target
+     * attribute ที่ตั้ง flag `is_unique` ไว้ (barcode_*, `pid`, ...) จะถูก
+     * ข้ามไปโดยตั้งใจ — ถ้า copy ค่าไปตรงๆ จะทำให้ตัว duplicate มีค่า "unique"
+     * เหมือนตัวต้นฉบับเป๊ะ ซึ่งไม่ว่าจะไม่มีความหมาย (สินค้าสองชิ้นใช้บาร์โค้ด
+     * เดียวกัน) หรือผิดไปเลยก็ตาม ส่วน `pid` จะซ่อมตัวเองผ่าน applySmartDefaults()
+     * (เรียกก่อน เพื่อให้การ copy ค่าที่ไม่ unique อย่าง `pname` ในขั้นตอนถัดไป
+     * ยังเขียนทับค่าเริ่มต้น "= SKU" ของมันด้วยชื่อจริงจากต้นฉบับได้)
      */
     private function copyProductData(Product $source, Product $target): void
     {
@@ -1509,8 +1495,8 @@ class ProductController extends Controller
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
-        // Load pivot family_attributes for this product's family, in the
-        // curated order set on the Attribute Family edit page.
+        // ดึง pivot family_attributes ของ family ของสินค้านี้ ตามลำดับที่ตั้งไว้
+        // ในหน้าแก้ไข Attribute Family
         $familyAttributes = FamilyAttribute::with(['attribute.options', 'attributeGroup'])
             ->where('family_id', $product->family_id)
             ->orderBy('sort_order')
@@ -1518,7 +1504,7 @@ class ProductController extends Controller
 
         $user = auth()->user();
 
-        // Group attributes dynamically by attributeGroup
+        // จัดกลุ่ม attribute แบบไดนามิกตาม attributeGroup
         $groupsData = [];
         foreach ($familyAttributes as $fa) {
             $group = $fa->attributeGroup;
@@ -1527,12 +1513,12 @@ class ProductController extends Controller
                 continue;
             }
 
-            // Check if user has permission to view this attribute group
+            // เช็คว่า user มีสิทธิ์ดูกลุ่ม attribute นี้หรือเปล่า
             if ($user && ! $this->canUserViewAttributeGroup($user, $group)) {
                 continue;
             }
 
-            // Check if user has permission to view this specific attribute
+            // เช็คว่า user มีสิทธิ์ดู attribute ตัวนี้โดยเฉพาะหรือเปล่า
             if ($user && ! $this->canUserViewAttribute($user, $attr)) {
                 continue;
             }
@@ -1543,34 +1529,37 @@ class ProductController extends Controller
                     'id' => $group->id,
                     'code' => $group->code,
                     'name' => $group->name ?: ucfirst($group->code),
-                    // Every locale's label, so the frontend can switch the
-                    // displayed language instantly (picking from this) instead
-                    // of waiting on a server round-trip to re-resolve `name`
-                    // above for the new locale.
+                    // เก็บ label ของทุกภาษาไว้เลย เพื่อให้ frontend สลับภาษาที่แสดง
+                    // ได้ทันที (หยิบจากตรงนี้) ไม่ต้องรอ round-trip ไปเซิร์ฟเวอร์
+                    // เพื่อ resolve `name` ข้างบนใหม่ทุกครั้งที่เปลี่ยนภาษา
                     'translations' => $group->translations,
                     'attributes' => [],
                 ];
             }
             $attr->editable = $this->canUserEditAttributeGroup($user, $group) && $this->canUserEditAttribute($user, $attr);
+            $this->decorateOptionsWithMappedPlatforms($attr);
             $groupsData[$groupId]['attributes'][] = $attr;
         }
 
-        // Remove empty groups (groups with no visible attributes)
+        // เอากลุ่มที่ว่างเปล่าออก (กลุ่มที่ไม่มี attribute ที่มองเห็นได้เลย)
         $groupsData = array_filter($groupsData, fn ($group) => ! empty($group['attributes']));
 
-        // If product family has no assigned family attributes yet, show all system attributes under General.
-        // Note: this must check the family's raw attribute assignments, not $groupsData, so that a family
-        // with assigned attributes the user simply lacks permission to view doesn't fall through to showing
-        // every system attribute instead of correctly appearing empty.
+        // ถ้า family ของสินค้ายังไม่มี family attributes ที่ผูกไว้เลย ให้โชว์ system attribute ทั้งหมดไว้ในกลุ่ม General แทน
+        // หมายเหตุ: ตรงนี้ต้องเช็คจาก attribute assignments ดิบๆ ของ family เอง ไม่ใช่เช็คจาก $groupsData
+        // เพราะไม่งั้น family ที่มี attribute ผูกไว้จริง แต่ user ดันไม่มีสิทธิ์ดู จะเผลอไหลไปโชว์
+        // system attribute ทั้งหมดแทน ทั้งที่ควรจะโชว์เป็นกลุ่มว่างเปล่าตามความถูกต้อง
         if ($familyAttributes->isEmpty()) {
             $allAttributes = Attribute::with('options')->get();
 
-            // Filter by user permissions if applicable
+            // ถ้ามีการเช็คสิทธิ์ user ก็กรองตามนั้นด้วย
             if ($user) {
                 $allAttributes = $allAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
 
-            $allAttributes->each(fn ($attr) => $attr->editable = $this->canUserEditAttribute($user, $attr));
+            $allAttributes->each(function ($attr) use ($user) {
+                $attr->editable = $this->canUserEditAttribute($user, $attr);
+                $this->decorateOptionsWithMappedPlatforms($attr);
+            });
 
             if ($allAttributes->isNotEmpty()) {
                 $groupsData[] = [
@@ -1581,44 +1570,48 @@ class ProductController extends Controller
                 ];
             }
         } else {
+            // $groupsData is already in the real, curated order at this point —
+            // $familyAttributes was loaded ->orderBy('sort_order') above, and
+            // group_id keys land in $groupsData in first-appearance order, so
+            // this reflects exactly the drag-and-drop order set on the
+            // Attribute Family edit page (resources/js/pages/catalog/
+            // attribute-families/edit.tsx — see its handleReorderGroup()).
+            //
+            // A hardcoded ['general', 'specifications', ...] re-sort used to
+            // run here, re-ranking groups by a fixed list matched on `code`.
+            // That silently broke any family with a group whose code wasn't
+            // in the list (e.g. a custom 'purchasing'/'accounting' group,
+            // created via the group-management UI, no seeder entry) — such a
+            // group always fell through to the same fallback rank, sorting it
+            // ahead of 'tis_certification' ("Others") even when the user had
+            // deliberately dragged "Others" below it. Removed rather than
+            // extended: the real order was already correct and available;
+            // the hardcoded list was strictly a second, conflicting source of
+            // truth for the same thing.
             $groupsData = array_values($groupsData);
-
-            // Canonical group display order for the tabbed edit-product layout
-            // (see resources/js/pages/catalog/products/edit.tsx) — matched by
-            // code (stable across locales), not the translated name. Any
-            // group whose code isn't in this list (a family with its own
-            // custom groups) falls through to the end in its original order
-            // rather than disappearing.
-            $groupOrder = ['general', 'specifications', 'warranty_usage', 'pricing_packaging', 'packaging', 'tis_certification'];
-            usort($groupsData, function ($a, $b) use ($groupOrder) {
-                $posA = array_search($a['code'], $groupOrder);
-                $posB = array_search($b['code'], $groupOrder);
-
-                return ($posA === false ? count($groupOrder) : $posA) <=> ($posB === false ? count($groupOrder) : $posB);
-            });
         }
 
-        // Preload values scoped to no channel (global attributes) plus the default
-        // channel, across all locales. Values for other channels are fetched on
-        // demand via GET .../attribute-values when the user switches the channel
-        // selector, to keep this initial payload bounded.
+        // โหลดค่าล่วงหน้าเฉพาะที่ไม่ผูก channel (global attribute) บวกกับ channel
+        // ค่าเริ่มต้น ครบทุกภาษา ส่วนค่าของ channel อื่นจะโหลดทีหลังตอน user
+        // สลับ channel selector ผ่าน GET .../attribute-values เพื่อไม่ให้
+        // payload ตอนโหลดครั้งแรกใหญ่เกินไป
         $channels = Channel::cachedAll()->map(fn (Channel $c) => ['id' => $c->id, 'code' => $c->code, 'name' => $c->name]);
         $defaultChannelId = $channels->first()['id'] ?? null;
 
-        // Groups the flat channel list by sales platform (Lazada, ...) for the
-        // Edit Product sidebar's collapsible tree — channels with no linked
-        // shop (e.g. the default web channel) fall under a "Website" bucket
-        // and carry no shop_id, since there's nothing to publish a checkbox for.
+        // จัดกลุ่มลิสต์ channel แบบแบนๆ ตาม sales platform (Lazada, ...) สำหรับ
+        // tree แบบพับเก็บได้ใน sidebar ของหน้า Edit Product — channel ที่ไม่มี shop
+        // ผูกอยู่ (เช่น channel เว็บไซต์เริ่มต้น) จะตกไปอยู่กลุ่ม "Website" และ
+        // ไม่มี shop_id เพราะไม่มีอะไรให้ publish checkbox ตอบด้วย
         $shopByChannelId = SalesPlatformShop::with('platform:id,name')
             ->whereNotNull('channel_id')
             ->get()
             ->keyBy('channel_id');
 
-        // Confirmed-live status for this product's own shops (see
-        // LazadaProductSyncService::syncLiveStatus()) — separate from
-        // publishedShopIds below, which only means "marked to publish".
-        // Answers "did I already push this?" so the Push button isn't the
-        // only way to find out — see the Sales Channels panel's live badge.
+        // สถานะ live ที่ยืนยันแล้วของ shop ต่างๆ ของสินค้านี้ (ดูที่
+        // LazadaProductSyncService::syncLiveStatus()) — แยกกันคนละเรื่องกับ
+        // publishedShopIds ด้านล่าง ที่แปลว่า "ติ๊กว่าจะ publish" เฉยๆ ตัวนี้
+        // ตอบคำถาม "เรา push อันนี้ไปแล้วหรือยัง?" เพื่อไม่ต้องกดปุ่ม Push
+        // เพื่อรู้คำตอบเพียงอย่างเดียว — ดูที่ live badge ในแผง Sales Channels
         $liveStatusByShopId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)
             ->where('status', 'live')
@@ -1666,10 +1659,10 @@ class ProductController extends Controller
             $qtyAttrId = Attribute::idForCode('qty');
 
             $variants = Product::where('parent_id', $product->id)->get();
-            // Batched into one query keyed by product_id instead of a
-            // ProductValue::where('product_id', ...) query per variant
-            // inside the loop below — that was N+1 queries for an N-variant
-            // configurable product.
+            // รวมเป็น query เดียวแล้ว key ด้วย product_id แทนที่จะยิง
+            // ProductValue::where('product_id', ...) แยกทีละ variant
+            // ในลูปข้างล่าง — เดิมทำแบบนั้นจะกลายเป็น N+1 query สำหรับ
+            // configurable product ที่มี N variant
             $variantValuesByProduct = ProductValue::whereIn('product_id', $variants->pluck('id'))
                 ->get()
                 ->groupBy('product_id');
@@ -1685,10 +1678,10 @@ class ProductController extends Controller
                     } elseif ($val->attribute_id == $qtyAttrId) {
                         $qty = $val->value;
                     } else {
-                        // Only the combination-defining attributes (color, size, ...)
-                        // go here — price/qty are surfaced separately above so the
-                        // frontend can match "does this variant's combination match
-                        // the regenerated one" purely by comparing this map.
+                        // ตรงนี้เก็บเฉพาะ attribute ที่ใช้กำหนด combination (สี, ไซส์, ...)
+                        // เท่านั้น — price/qty แยกออกไปโชว์ต่างหากด้านบนแล้ว เพื่อให้
+                        // frontend เช็คได้ง่ายๆ ว่า "combination ของ variant นี้ตรงกับ
+                        // ที่ generate ใหม่หรือเปล่า" แค่เทียบ map ตัวนี้ตัวเดียวพอ
                         $variantValues[$val->attribute_id] = $val->value;
                     }
                 }
@@ -1716,8 +1709,8 @@ class ProductController extends Controller
                 'type' => ucfirst($product->type),
                 'enabled' => (bool) $product->enabled,
                 'configurable_attributes' => $product->configurable_attributes ?? [],
-                // ISO 8601 with an explicit UTC offset so the frontend can
-                // localize it, rather than a naive string shown verbatim.
+                // ใช้ ISO 8601 ที่มี UTC offset ระบุชัดเจน เพื่อให้ frontend
+                // แปลงเป็นเวลาท้องถิ่นได้ ไม่ใช่แค่โชว์ string ดิบๆ ตรงๆ
                 'created_at' => ($product->created_at ?? now())->toIso8601String(),
                 'updated_at' => ($product->updated_at ?? now())->toIso8601String(),
                 'translation_completeness' => $this->translationCompletenessByProduct(collect([$product]))[$product->id] ?? null,
@@ -1742,13 +1735,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Read-only, real-time check of whether this product actually is live
-     * on Lazada for this shop right now — called by the Edit Product page
-     * when opening the Push/Deactivate confirm dialog, so it reflects
-     * Lazada's current state rather than product_platform_shops' cached
-     * status (which is only ever as fresh as the last bulk sync, or could
-     * simply have never been run for this product). See
-     * LazadaProductSyncService::checkLiveStatus().
+     * เช็คแบบ read-only แบบเรียลไทม์ว่าสินค้านี้ live อยู่บน Lazada สำหรับ shop
+     * นี้จริงๆ ตอนนี้หรือเปล่า — ถูกเรียกจากหน้า Edit Product ตอนเปิด dialog
+     * ยืนยัน Push/Deactivate เพื่อให้เห็นสถานะปัจจุบันจริงๆ ของ Lazada แทนที่
+     * จะใช้สถานะที่ cache ไว้ใน product_platform_shops (ซึ่งจะสดแค่เท่าที่
+     * bulk sync ครั้งล่าสุดทำไว้ หรืออาจจะยังไม่เคย sync สินค้านี้เลยด้วยซ้ำ)
+     * ดูที่ LazadaProductSyncService::checkLiveStatus()
      */
     public function checkLazadaStatus(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1760,13 +1752,13 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO LAZADA — creates or updates an actual
-     * listing on the seller's storefront. Only reachable for a shop the
-     * product is explicitly marked "published" for (see platformShops()),
-     * so this can't be triggered for a shop nobody opted into.
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า LAZADA เลย — สร้างหรืออัปเดตลิสติ้งจริง
+     * บนหน้าร้านของผู้ขาย เรียกได้เฉพาะ shop ที่สินค้านี้ถูกติ๊กว่า "published"
+     * ไว้ชัดเจนแล้วเท่านั้น (ดูที่ platformShops()) ดังนั้นจะไม่มีทางถูกยิงไป
+     * shop ที่ไม่มีใครเลือกไว้ได้
      *
-     * Queued rather than run inline (see queueMarketplaceSync()) — the web
-     * worker used to sit blocked for however long Lazada took to respond.
+     * ใช้วิธี queue แทนที่จะรันตรงๆ (ดูที่ queueMarketplaceSync()) — เมื่อก่อน
+     * web worker จะค้างรอจน Lazada ตอบกลับ ไม่ว่าจะใช้เวลานานแค่ไหนก็ตาม
      */
     public function pushToLazada(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1774,10 +1766,10 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO LAZADA — hides an actual listing from the
-     * storefront. Same "published" guard as pushToLazada(); the service
-     * layer additionally guards that the product has actually been pushed
-     * before (nothing to deactivate otherwise).
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า LAZADA เลย — ซ่อนลิสติ้งจริงออกจากหน้าร้าน
+     * ใช้เงื่อนไข "published" เดียวกับ pushToLazada() แต่ที่ service layer จะมี
+     * การเช็คเพิ่มอีกชั้นว่าสินค้านี้เคยถูก push ไปแล้วจริงๆ (ไม่งั้นก็ไม่มีอะไร
+     * ให้ deactivate)
      */
     public function deactivateLazada(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1785,10 +1777,10 @@ class ProductController extends Controller
     }
 
     /**
-     * Same role as checkLazadaStatus() above, for Shopee — see
-     * ShopeeProductSyncService::checkLiveStatus() for how "live" is
-     * determined there (against our own cached platform_item_id, not a
-     * Shopee-side SKU search).
+     * ทำหน้าที่เหมือน checkLazadaStatus() ด้านบน แต่เป็นฝั่ง Shopee — ดูที่
+     * ShopeeProductSyncService::checkLiveStatus() ว่าเช็คคำว่า "live" ยังไง
+     * (เทียบกับ platform_item_id ที่เรา cache ไว้เอง ไม่ได้ค้นหาด้วย SKU
+     * ฝั่ง Shopee)
      */
     public function checkShopeeStatus(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1800,9 +1792,8 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO SHOPEE — creates or updates an actual
-     * listing on the seller's storefront. Same "published" guard as
-     * pushToLazada().
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า SHOPEE เลย — สร้างหรืออัปเดตลิสติ้งจริง
+     * บนหน้าร้านของผู้ขาย ใช้เงื่อนไข "published" เดียวกับ pushToLazada()
      */
     public function pushToShopee(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1810,8 +1801,8 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO SHOPEE — hides an actual listing from the
-     * storefront. Same "published" guard as deactivateLazada().
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า SHOPEE เลย — ซ่อนลิสติ้งจริงออกจากหน้าร้าน
+     * ใช้เงื่อนไข "published" เดียวกับ deactivateLazada()
      */
     public function deactivateShopee(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1819,12 +1810,12 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO SHOPEE — permanently deletes an actual
-     * listing (ShopeeProductSyncService::delete(), via v2.product.delete_item
-     * — see ShopeeClient::deleteItem()'s docblock). Cannot be undone from
-     * Shopee's side. Same "published" guard as deactivateShopee(), reusing
-     * the same queued-job infrastructure — Shopee-only for now, no
-     * equivalent wired for the other platforms.
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า SHOPEE เลย — ลบลิสติ้งจริงถาวร
+     * (ShopeeProductSyncService::delete() ผ่าน v2.product.delete_item — ดู
+     * docblock ของ ShopeeClient::deleteItem()) ยกเลิกไม่ได้จากฝั่ง Shopee
+     * ใช้เงื่อนไข "published" เดียวกับ deactivateShopee() และใช้ infrastructure
+     * queued-job ตัวเดียวกัน — ตอนนี้มีให้เฉพาะ Shopee เท่านั้น ยังไม่ได้ทำ
+     * ให้ platform อื่นด้วย
      */
     public function deleteFromShopee(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1832,12 +1823,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Same role as checkLazadaStatus()/checkShopeeStatus() above, but
-     * degraded — see TikTokProductSyncService::checkLiveStatus()'s
-     * docblock: TikTok has no documented single-item "Get Product" endpoint
-     * yet, so unlike Lazada (asks Lazada directly) or Shopee (asks via
-     * platform_item_id), this only reflects our own cached
-     * product_platform_shops row, not TikTok's actual current state.
+     * ทำหน้าที่เหมือน checkLazadaStatus()/checkShopeeStatus() ด้านบน แต่แบบ
+     * ลดสเปคลง — ดู docblock ของ TikTokProductSyncService::checkLiveStatus():
+     * TikTok ยังไม่มี endpoint "Get Product" แบบรายชิ้นที่มีเอกสารรองรับ
+     * ดังนั้นต่างจาก Lazada (ถามตรงจาก Lazada) หรือ Shopee (ถามผ่าน
+     * platform_item_id) ตัวนี้จะสะท้อนแค่ข้อมูล product_platform_shops
+     * ที่เรา cache ไว้เอง ไม่ใช่สถานะจริงของ TikTok ณ ตอนนั้น
      */
     public function checkTikTokStatus(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1849,15 +1840,14 @@ class ProductController extends Controller
     }
 
     /**
-     * "Check live status" button on the product list — runs checkLazadaStatus()/
-     * checkShopeeStatus()/checkTikTokStatus() (the same real, per-shop checks
-     * the Edit page's push/deactivate dialog uses) against every shop this
-     * product is linked to, so the list's "Sales Channels" cell reflects each
-     * platform's real current state instead of only whatever the last bulk
-     * sync or manual push happened to leave cached in product_platform_shops.
-     * One shop failing to answer (rate limit, expired token, etc.) doesn't
-     * abort the others — its error is collected and returned alongside
-     * whatever did succeed.
+     * ปุ่ม "Check live status" ในหน้ารายการสินค้า — รัน checkLazadaStatus()/
+     * checkShopeeStatus()/checkTikTokStatus() (การเช็คจริงต่อ shop แบบเดียว
+     * กับที่ dialog push/deactivate ในหน้า Edit ใช้) กับทุก shop ที่สินค้านี้
+     * เชื่อมอยู่ เพื่อให้ cell "Sales Channels" ในหน้ารายการสะท้อนสถานะจริง
+     * ปัจจุบันของแต่ละ platform แทนที่จะใช้แต่ค่าที่ bulk sync หรือ push
+     * ครั้งล่าสุดทิ้ง cache ไว้ใน product_platform_shops เท่านั้น ถ้า shop ไหน
+     * ตอบไม่ได้ (โดน rate limit, token หมดอายุ ฯลฯ) ก็ไม่ทำให้ shop อื่นล้ม
+     * ตามไปด้วย — เก็บ error ของมันไว้แล้วส่งกลับไปพร้อมกับผลที่สำเร็จ
      */
     public function checkLiveStatus(Product $product): JsonResponse
     {
@@ -1905,11 +1895,11 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO TIKTOK — creates or updates an actual
-     * listing on the seller's storefront. Same "published" guard as
-     * pushToLazada(). Will currently fail for every product — see
-     * TikTokProductSyncService::buildPayload()'s docblock for why
-     * (no known TikTok warehouse_id, no product-attribute source mapping).
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า TIKTOK เลย — สร้างหรืออัปเดตลิสติ้งจริง
+     * บนหน้าร้านของผู้ขาย ใช้เงื่อนไข "published" เดียวกับ pushToLazada()
+     * ตอนนี้จะพังทุกสินค้า — ดู docblock ของ
+     * TikTokProductSyncService::buildPayload() ว่าทำไม (ยังไม่รู้ warehouse_id
+     * ของ TikTok และยังไม่มี mapping ต้นทาง product-attribute)
      */
     public function pushToTikTok(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1917,8 +1907,8 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO TIKTOK — hides an actual listing from the
-     * storefront. Same "published" guard as deactivateLazada().
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า TIKTOK เลย — ซ่อนลิสติ้งจริงออกจากหน้าร้าน
+     * ใช้เงื่อนไข "published" เดียวกับ deactivateLazada()
      */
     public function deactivateTikTok(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1926,10 +1916,11 @@ class ProductController extends Controller
     }
 
     /**
-     * Same role as checkLazadaStatus()/checkShopeeStatus()/checkTikTokStatus()
-     * above, for WooCommerce — see WooCommerceProductSyncService::checkLiveStatus()
-     * for how "live" is determined (asks WooCommerce directly by SKU, same as
-     * Lazada, rather than trusting a cache).
+     * ทำหน้าที่เหมือน checkLazadaStatus()/checkShopeeStatus()/checkTikTokStatus()
+     * ด้านบน แต่เป็นฝั่ง WooCommerce — ดูที่
+     * WooCommerceProductSyncService::checkLiveStatus() ว่าเช็คคำว่า "live"
+     * ยังไง (ถามตรงจาก WooCommerce ด้วย SKU เหมือน Lazada ไม่ได้เชื่อ cache
+     * เฉยๆ)
      */
     public function checkWoocommerceStatus(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1941,8 +1932,8 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO WOOCOMMERCE — creates or updates an actual
-     * listing on the store. Same "published" guard as pushToLazada().
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า WOOCOMMERCE เลย — สร้างหรืออัปเดตลิสติ้ง
+     * จริงในร้าน ใช้เงื่อนไข "published" เดียวกับ pushToLazada()
      */
     public function pushToWoocommerce(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1950,9 +1941,9 @@ class ProductController extends Controller
     }
 
     /**
-     * FIRES A REAL, LIVE WRITE TO WOOCOMMERCE — sets an actual listing to
-     * draft, hiding it from the storefront. Same "published" guard as
-     * deactivateLazada().
+     * ยิงเขียนข้อมูลจริงแบบ live เข้า WOOCOMMERCE เลย — ตั้งลิสติ้งจริงเป็น
+     * draft ซ่อนออกจากหน้าร้าน ใช้เงื่อนไข "published" เดียวกับ
+     * deactivateLazada()
      */
     public function deactivateWoocommerce(Product $product, SalesPlatformShop $shop): JsonResponse
     {
@@ -1960,18 +1951,17 @@ class ProductController extends Controller
     }
 
     /**
-     * Fills this one product's English name into TranslatePress's
-     * dictionary — see TranslatePressTranslationSyncService's docblock for
-     * the exact safety scope (only products TranslatePress has already
-     * rendered are touched). Refuses below 100% translation completeness —
-     * enforced here too, not just by the frontend disabling the button,
-     * since this writes real (if easily overwritable) content to the live
-     * site.
+     * เติมชื่อภาษาอังกฤษของสินค้าตัวนี้ตัวเดียวเข้าไปในดิกชันนารีของ
+     * TranslatePress — ดู docblock ของ TranslatePressTranslationSyncService
+     * เพื่อดูขอบเขตความปลอดภัยที่แน่ชัด (แตะเฉพาะสินค้าที่ TranslatePress
+     * เคย render ไปแล้วเท่านั้น) จะปฏิเสธถ้าความสมบูรณ์ของคำแปลยังไม่ถึง
+     * 100% — บังคับตรงนี้ด้วย ไม่ใช่แค่ปิดปุ่มไว้ที่ frontend เพราะมันเขียน
+     * เนื้อหาจริง (แม้จะเขียนทับได้ง่ายก็ตาม) ลงเว็บไซต์จริง
      *
-     * Synchronous, unlike the queued marketplace pushes above — this is a
-     * single direct DB write behind an SSH tunnel we already have to open
-     * and close per call, not an external platform API call with
-     * unpredictable latency, so there's nothing to poll for.
+     * ทำงานแบบ synchronous ต่างจาก marketplace push ที่ใช้ queue ด้านบน —
+     * เพราะนี่คือการเขียน DB ตรงๆ ครั้งเดียวผ่าน SSH tunnel ที่ต้องเปิดปิด
+     * ทุกครั้งอยู่แล้ว ไม่ใช่การเรียก API ของ platform ภายนอกที่ latency
+     * ไม่แน่นอน เลยไม่มีอะไรต้อง poll
      */
     public function fillWoocommerceTranslationsForProduct(Product $product): JsonResponse
     {
@@ -2003,13 +1993,12 @@ class ProductController extends Controller
     }
 
     /**
-     * Shared by pushToLazada()/deactivateLazada()/pushToShopee()/
-     * deactivateShopee()/pushToTikTok()/deactivateTikTok() — validates the
-     * "published" guard synchronously (cheap, local-only), then hands the
-     * actual live write off to
-     * SyncProductToMarketplaceJob instead of calling the sync service here.
-     * Returns 202 with a job id immediately; the frontend polls
-     * marketplaceSyncJobStatus() for the real result.
+     * ใช้ร่วมกันโดย pushToLazada()/deactivateLazada()/pushToShopee()/
+     * deactivateShopee()/pushToTikTok()/deactivateTikTok() — เช็คเงื่อนไข
+     * "published" แบบ synchronous ก่อน (ไม่แพง เช็คในเครื่องเลย) แล้วส่งต่อ
+     * การเขียนข้อมูล live จริงๆ ไปให้ SyncProductToMarketplaceJob แทนที่จะ
+     * เรียก sync service ตรงนี้เอง ส่งกลับ 202 พร้อม job id ทันที ส่วน
+     * frontend จะ poll marketplaceSyncJobStatus() เพื่อดูผลจริงทีหลัง
      */
     private function queueMarketplaceSync(Product $product, SalesPlatformShop $shop, string $platform, string $action): JsonResponse
     {
@@ -2036,13 +2025,13 @@ class ProductController extends Controller
     }
 
     /**
-     * The actual job-queuing behind queueMarketplaceSync() above, without
-     * its "already published" guard — reused by pushBulk() (below), which
-     * publishes the product for this shop itself first (see
-     * Product::platformShops()), so the guard would always pass there
-     * anyway. The required-attribute validation both callers rely on lives
-     * inside SyncProductToMarketplaceJob → {Platform}ProductSyncService,
-     * untouched by this split.
+     * ตัวที่ queue job จริงๆ อยู่เบื้องหลัง queueMarketplaceSync() ด้านบน แต่
+     * ไม่มีเงื่อนไข "published อยู่แล้ว" — ถูกใช้ซ้ำโดย pushBulk() (ด้านล่าง)
+     * ที่จะ publish สินค้าให้ shop นี้เองก่อนอยู่แล้ว (ดูที่
+     * Product::platformShops()) ดังนั้นเงื่อนไขนี้จะผ่านอยู่ดีในกรณีนั้น
+     * ส่วนการ validate required-attribute ที่ทั้งสองฝั่งพึ่งพาอยู่นั้นอยู่ใน
+     * SyncProductToMarketplaceJob → {Platform}ProductSyncService ไม่ได้
+     * ถูกกระทบจากการแยกฟังก์ชันนี้แต่อย่างใด
      */
     private function dispatchMarketplaceSyncJob(Product $product, SalesPlatformShop $shop, string $platform, string $action): ProductMarketplaceSyncJob
     {
@@ -2061,15 +2050,15 @@ class ProductController extends Controller
     }
 
     /**
-     * Product list's bulk "Share" action — publishes every selected product
-     * to every selected shop (auto-checking the box a user would otherwise
-     * have to set per-product on Edit's Sales Channels panel first) and
-     * queues one push job per product×shop pair via
-     * dispatchMarketplaceSyncJob() above. Fire-and-forget: this returns
-     * immediately with a flash count, same as queueMissingTranslationsBulk()
-     * — per-product/per-shop success or failure (including each platform's
-     * required-attribute validation, which still runs unchanged inside the
-     * queued job) is checked afterwards on that product's Edit page.
+     * ปุ่ม bulk "Share" ในหน้ารายการสินค้า — publish สินค้าที่เลือกทั้งหมด
+     * ไปยัง shop ที่เลือกทั้งหมด (ติ๊กช่องให้อัตโนมัติ ที่ปกติ user ต้องมาติ๊ก
+     * เองทีละสินค้าในแผง Sales Channels ของหน้า Edit) แล้ว queue job push
+     * ทีละคู่ product×shop ผ่าน dispatchMarketplaceSyncJob() ด้านบน ทำงาน
+     * แบบ fire-and-forget: ฟังก์ชันนี้ return จำนวนแบบ flash message ทันที
+     * เหมือนกับ queueMissingTranslationsBulk() — ผลสำเร็จหรือล้มเหลวของ
+     * แต่ละสินค้า/แต่ละ shop (รวมถึงการ validate required-attribute ของแต่ละ
+     * platform ที่ยังรันเหมือนเดิมอยู่ใน queued job) จะไปเช็คทีหลังได้ที่
+     * หน้า Edit ของสินค้านั้นๆ
      */
     public function pushBulk(Request $request): RedirectResponse
     {
@@ -2096,14 +2085,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Product list's bulk "Deactivate" action — the Deactivate counterpart
-     * to pushBulk() above. Unlike push, this never auto-publishes: only
-     * product×shop pairs already marked "published" (product->
-     * platformShops()) are queued, mirroring both queueMarketplaceSync()'s
-     * "not marked as published" guard and Edit's Sales Channels panel,
-     * which never offers a Deactivate button for a shop that isn't
-     * checked. Pairs that aren't published are silently skipped (counted,
-     * not errored) rather than failing the whole request over them.
+     * ปุ่ม bulk "Deactivate" ในหน้ารายการสินค้า — เป็นคู่หูฝั่ง Deactivate ของ
+     * pushBulk() ด้านบน ต่างจาก push ตรงที่ตัวนี้จะไม่ auto-publish ให้เลย:
+     * จะ queue เฉพาะคู่ product×shop ที่ถูกติ๊ก "published" ไว้อยู่แล้วเท่านั้น
+     * (product->platformShops()) สอดคล้องกับทั้งเงื่อนไข "ยังไม่ได้ published"
+     * ของ queueMarketplaceSync() และแผง Sales Channels ของหน้า Edit ที่จะไม่
+     * มีปุ่ม Deactivate โผล่มาให้กดถ้า shop นั้นยังไม่ได้ติ๊กไว้ คู่ไหนที่ยังไม่
+     * ได้ publish จะถูกข้ามไปเงียบๆ (แค่นับจำนวนไว้ ไม่ถือเป็น error) แทนที่จะ
+     * ทำให้ request ทั้งก้อนพังไปเพราะคู่นั้นคู่เดียว
      */
     public function deactivateBulk(Request $request): RedirectResponse
     {
@@ -2142,9 +2131,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Polled by the Edit Product page after pushToLazada()/pushToShopee()/
-     * deactivateLazada()/deactivateShopee() return their initial "queued"
-     * response, until status leaves queued/processing.
+     * ถูก poll โดยหน้า Edit Product หลังจาก pushToLazada()/pushToShopee()/
+     * deactivateLazada()/deactivateShopee() ตอบ response "queued" เริ่มต้น
+     * กลับมา จนกว่า status จะไม่ใช่ queued/processing แล้ว
      */
     public function marketplaceSyncJobStatus(Product $product, ProductMarketplaceSyncJob $syncJob): JsonResponse
     {
@@ -2189,9 +2178,9 @@ class ProductController extends Controller
             'variants.*.attributes' => ['nullable', 'array'],
         ]);
 
-        // Same "unknown attribute id in variants.*.attributes' keys" guard as
-        // store() — see the comment there. update() previously had no rule at
-        // all for this field, leaving it fully unvalidated.
+        // เช็คกันแบบเดียวกับตอน store() เรื่อง "attribute id ใน variants.*.attributes
+        // ที่ไม่รู้จัก" — ดูคอมเมนต์ตรงนั้นได้เลย เมื่อก่อน update() ไม่มีการเช็ค field
+        // นี้เลย ปล่อยผ่านแบบไม่ validate อะไรเลย
         $validator->after(function ($validator) use ($request) {
             $validAttributeIds = null;
 
@@ -2241,17 +2230,17 @@ class ProductController extends Controller
 
             $this->syncAssociations($product, $validated['associations'] ?? []);
 
-            // $values is nested: attribute_id -> channelKey ('global' or channel id) -> localeKey ('default' or locale id) -> value.
-            // The frontend already resolves each attribute's channelKey/localeKey against its
-            // is_channel_based/is_locale_based flags, so this loop just needs to translate the
-            // sentinel keys back to null for global/default scope.
+            // $values เป็น array ซ้อนกัน: attribute_id -> channelKey ('global' หรือ channel id) -> localeKey ('default' หรือ locale id) -> value
+            // ฝั่ง frontend คำนวณ channelKey/localeKey ของแต่ละ attribute ตามค่า
+            // is_channel_based/is_locale_based ให้แล้ว ดังนั้น loop นี้แค่ต้องแปลง
+            // sentinel key กลับเป็น null สำหรับ scope แบบ global/default เท่านั้น
             $values = $request->input('values', []);
 
-            // Collects "values.{attributeId}" => message. Populated by both the
-            // file-upload pass and the required/unique pass below, then thrown
-            // together as one ValidationException so the whole save is rejected
-            // atomically (the transaction rolls back) instead of partially
-            // applying edits around a bad field.
+            // เก็บ error แบบ "values.{attributeId}" => message ไว้ตรงนี้ ทั้งจาก
+            // รอบอัปโหลดไฟล์และรอบเช็ค required/unique ด้านล่าง แล้วค่อยโยน
+            // ValidationException รวมกันทีเดียว เพื่อให้การบันทึกทั้งหมด
+            // ถูกยกเลิกไปพร้อมกัน (transaction rollback) แทนที่จะบันทึกไปครึ่งๆ
+            // กลางๆ แล้วมาสะดุดที่ field ที่ผิด
             $valueErrors = [];
 
             $storeAttributeFile = function (Attribute $attribute, $file) use (&$valueErrors) {
@@ -2259,12 +2248,12 @@ class ProductController extends Controller
                     return null;
                 }
 
-                // Mirrors CategoryController's Image/File field rules (4MB images, 10MB
-                // generic files) — this loop previously stored any uploaded file with no
-                // mime-type or size restriction at all. Video gets its own branch: MP4
-                // only, 100MB — matching Lazada's own video-upload requirements, since
-                // this attribute exists to feed Lazada's optional "video" (Video URL)
-                // product field.
+                // ใช้กฎเดียวกับ field รูปภาพ/ไฟล์ของ CategoryController (รูป 4MB,
+                // ไฟล์ทั่วไป 10MB) — เมื่อก่อน loop นี้เก็บไฟล์ที่อัปโหลดได้ทุกชนิด
+                // โดยไม่จำกัด mime-type หรือขนาดเลย ส่วนวิดีโอแยกเงื่อนไขเอง:
+                // เฉพาะ MP4 เท่านั้น ขนาดไม่เกิน 100MB — ให้ตรงกับข้อกำหนดอัปโหลด
+                // วิดีโอของ Lazada เอง เพราะ attribute นี้มีไว้ใช้กับฟิลด์ "video"
+                // (Video URL) ที่เป็น optional ของ Lazada
                 $rules = match (true) {
                     in_array($attribute->type, ['image', 'gallery'], true) => ['image', 'max:4096'],
                     $attribute->type === 'video' => ['file', 'mimes:mp4', 'max:102400'],
@@ -2279,10 +2268,10 @@ class ProductController extends Controller
                     return null;
                 }
 
-                // Duration/dimension aren't things Laravel's validator can check —
-                // done as a second pass, only once mime/size already passed, so a
-                // wrong-format file gets the cheaper, more specific error above
-                // instead of getID3 trying (and likely failing) to parse it.
+                // ระยะเวลา/ขนาดของไฟล์ validator ของ Laravel เช็คให้ไม่ได้ —
+                // เลยทำเป็นรอบที่สอง เช็คต่อเมื่อ mime/size ผ่านแล้วเท่านั้น
+                // เพื่อให้ไฟล์ผิดฟอร์แมตโดน error ที่เจาะจงกว่าและถูกกว่าด้านบน
+                // แทนที่จะให้ getID3 พยายามอ่านไฟล์ (แล้วน่าจะพังอยู่ดี)
                 if ($attribute->type === 'video') {
                     $videoError = $this->validateVideoConstraints($file);
                     if ($videoError !== null) {
@@ -2315,25 +2304,24 @@ class ProductController extends Controller
                         if (is_array($localeFiles)) {
                             foreach ($localeFiles as $localeKey => $file) {
                                 if (is_array($file)) {
-                                    // Gallery: the frontend now sends kept existing
-                                    // paths (strings) mixed with newly picked files
-                                    // at the same array indices. Multipart requests
-                                    // keep uploads and plain fields separate even
-                                    // within one array, so the kept strings already
-                                    // survived into $values via the input() read
-                                    // above — merge the new uploads' stored paths
-                                    // back in instead of discarding them (previously
-                                    // any new upload replaced the whole gallery).
+                                    // Gallery: ตอนนี้ frontend ส่ง path เดิมที่ยังเก็บไว้
+                                    // (เป็น string) ปนมากับไฟล์ใหม่ที่เพิ่งเลือก โดยอยู่ใน
+                                    // index เดียวกันของ array คำขอแบบ multipart จะแยก
+                                    // ไฟล์อัปโหลดกับ field ธรรมดาออกจากกันเสมอแม้อยู่ใน
+                                    // array เดียวกัน ดังนั้น string ที่เก็บไว้จึงรอดมาอยู่ใน
+                                    // $values ผ่านการอ่าน input() ด้านบนอยู่แล้ว — ให้เอา
+                                    // path ของไฟล์ใหม่ที่เพิ่งอัปโหลดมารวมกลับเข้าไปแทนที่จะ
+                                    // ทิ้งไป (เมื่อก่อนอัปโหลดใหม่ทีนึงจะทับ gallery ทั้งหมด)
                                     $keptPaths = array_values(array_filter(
                                         (array) ($values[$attributeId][$channelKey][$localeKey] ?? []),
                                         fn ($v) => is_string($v) && $v !== ''
                                     ));
                                     $incomingFiles = array_values(array_filter($file));
 
-                                    // Checked before storing any of the incoming files
-                                    // (rather than after), so a request over the limit
-                                    // never leaves orphaned files on disk that no
-                                    // product_values row ends up referencing.
+                                    // เช็คก่อนที่จะเก็บไฟล์ที่ส่งเข้ามาแม้แต่ไฟล์เดียว
+                                    // (ไม่ใช่เช็คทีหลัง) เพื่อไม่ให้คำขอที่เกิน limit
+                                    // ทิ้งไฟล์กำพร้าไว้บน disk โดยไม่มี product_values
+                                    // row ไหนอ้างอิงถึงเลย
                                     if (count($keptPaths) + count($incomingFiles) > self::MAX_GALLERY_IMAGES) {
                                         $valueErrors["values.{$attributeId}"] = "{$attribute->name}: You can upload up to ".self::MAX_GALLERY_IMAGES.' images.';
 
@@ -2372,13 +2360,13 @@ class ProductController extends Controller
 
             $user = $request->user();
 
-            // Group each touched attribute belongs to, for this product's family —
-            // needed so edit permission checks below can enforce the same
-            // "read-only group overrides an individually-editable attribute" rule
-            // that edit() already applies when rendering (see canUserEditAttributeGroup()
-            // docblock). Without this, a request sent directly to this endpoint
-            // (bypassing the UI, which does apply that rule) could still write an
-            // attribute whose parent group is read-only.
+            // หา group ที่แต่ละ attribute ที่ถูกแก้ไปสังกัดอยู่ ในบริบทของ family
+            // ของ product นี้ — ต้องมีตัวนี้เพื่อให้การเช็ค permission ด้านล่างบังคับ
+            // กฎเดียวกับที่ edit() ใช้ตอน render อยู่แล้ว คือ "ถ้า group เป็น
+            // read-only จะทับกฎที่ attribute เดี่ยวๆ แก้ไขได้" (ดู docblock ของ
+            // canUserEditAttributeGroup()) ถ้าไม่มีตัวเช็คนี้ คำขอที่ยิงตรงมาที่
+            // endpoint นี้เลย (ข้าม UI ที่บังคับกฎนี้อยู่) จะยังเขียนค่าลง attribute
+            // ที่ group แม่เป็น read-only ได้อยู่ดี
             $attributeGroupsById = FamilyAttribute::with('attributeGroup')
                 ->where('family_id', $product->family_id)
                 ->whereIn('attribute_id', $touchedAttributeIds)
@@ -2398,14 +2386,13 @@ class ProductController extends Controller
                 return $this->canUserEditAttribute($user, $attribute);
             };
 
-            // Enforce each attribute's is_required/is_unique flags server-side —
-            // previously only rendered as a cosmetic "*" on the frontend, with
-            // nothing stopping a blank "required" value or a duplicate "unique"
-            // one from being saved. Only checked for scopes actually present in
-            // this submission (channels/locales the user hasn't opened yet were
-            // never loaded into the form, so they can't be validated here) and
-            // skipped for attributes this user has no edit permission for, same
-            // as the persistence loop below silently skips those.
+            // บังคับ flag is_required/is_unique ของแต่ละ attribute ที่ฝั่ง server —
+            // เมื่อก่อนมีแค่เครื่องหมาย "*" สวยๆ บน frontend ไม่มีอะไรกันไม่ให้
+            // ค่า "required" ว่างเปล่า หรือค่า "unique" ที่ซ้ำกันถูกบันทึกเข้าไปได้เลย
+            // จะเช็คเฉพาะ scope ที่มีอยู่จริงในคำขอนี้เท่านั้น (channel/locale ที่ user
+            // ยังไม่ได้เปิดดูจะไม่ถูกโหลดเข้าฟอร์ม เลยเช็คตรงนี้ไม่ได้) และข้ามไป
+            // สำหรับ attribute ที่ user คนนี้ไม่มีสิทธิ์แก้ไข เหมือนกับที่ loop
+            // การบันทึกด้านล่างข้ามไปแบบเงียบๆ เช่นกัน
             if (is_array($values)) {
                 foreach ($values as $attributeId => $channelValues) {
                     $attribute = Attribute::find($attributeId);
@@ -2461,8 +2448,8 @@ class ProductController extends Controller
                         continue;
                     }
 
-                    // Check if user has permission to edit this attribute (and that
-                    // its attribute group isn't read-only — see $canEditTouchedAttribute above)
+                    // เช็คว่า user มีสิทธิ์แก้ไข attribute นี้หรือไม่ (รวมถึงเช็คว่า
+                    // attribute group ของมันไม่ได้เป็น read-only ด้วย — ดู $canEditTouchedAttribute ด้านบน)
                     if (! $canEditTouchedAttribute($attribute)) {
                         continue;
                     }
@@ -2477,9 +2464,9 @@ class ProductController extends Controller
                         foreach ($localeValues as $localeKey => $val) {
                             $localeId = $localeKey === 'default' ? null : $localeKey;
 
-                            // Uploads previously left the file they replaced on disk forever —
-                            // grab whatever was stored before this write so it can be cleaned
-                            // up below once the new value (or deletion) has been saved.
+                            // เมื่อก่อนไฟล์อัปโหลดที่ถูกแทนที่จะค้างอยู่บน disk ตลอดไป —
+                            // เก็บค่าที่บันทึกไว้ก่อนหน้าการเขียนครั้งนี้ไว้ก่อน เพื่อจะได้
+                            // เอามาลบทิ้งด้านล่าง หลังจากบันทึกค่าใหม่ (หรือลบค่า) เรียบร้อยแล้ว
                             $isFileAttribute = in_array($attribute->type, ['image', 'gallery', 'file', 'video'], true);
                             $oldStoredValue = $isFileAttribute
                                 ? ProductValue::where('product_id', $product->id)
@@ -2489,10 +2476,10 @@ class ProductController extends Controller
                                     ->value('value')
                                 : null;
 
-                            // A gallery cleared down to zero images arrives here as `[]`
-                            // (still touched, so still worth diffing/persisting) — treat
-                            // that the same as null/'' instead of storing the literal
-                            // string "[]", consistent with the is_required check above.
+                            // ถ้า gallery ถูกล้างจนเหลือรูปเป็นศูนย์ ค่าที่ส่งมาจะเป็น `[]`
+                            // (ยังนับว่าถูกแตะต้อง เลยยังต้อง diff/บันทึกอยู่ดี) — ให้ถือว่า
+                            // เหมือนกับ null/'' แทนที่จะเก็บเป็น string "[]" ตรงๆ เพื่อให้
+                            // สอดคล้องกับการเช็ค is_required ด้านบน
                             $isEmptyVal = $val === null || $val === '' || (is_array($val) && empty($val));
 
                             if (! $isEmptyVal) {
@@ -2535,14 +2522,14 @@ class ProductController extends Controller
                 Product::bumpStorefrontVersion();
             }
 
-            // Sync Variants (Cartesian Product Children)
+            // ซิงค์ Variants (ลูกๆ ที่เป็น Cartesian Product)
             $oldVariantValues = $this->variantValueSnapshot($product);
 
-            // $request->has (not !empty) so that clearing every variant in the
-            // Edit UI — submitting `variants: []` after regenerating with no
-            // attributes selected — still deletes the now-orphaned children
-            // below, instead of the empty array being mistaken for "field not
-            // sent, leave variants alone".
+            // ใช้ $request->has (ไม่ใช่ !empty) เพื่อให้กรณีล้าง variant ทั้งหมด
+            // ในหน้า Edit UI — คือส่ง `variants: []` มาหลังจาก regenerate โดยไม่ได้
+            // เลือก attribute เลย — ยังคงลบลูกที่กลายเป็นกำพร้าด้านล่างได้อยู่ แทนที่
+            // จะเข้าใจผิดว่า array ว่างๆ นี้แปลว่า "ไม่ได้ส่ง field มา ปล่อย variants
+            // ไว้เหมือนเดิม"
             if (strtolower($validated['type']) === 'configurable' && $request->has('variants')) {
                 $priceAttr = Attribute::where('code', 'price')->first();
                 $qtyAttr = Attribute::where('code', 'qty')->first();
@@ -2555,10 +2542,10 @@ class ProductController extends Controller
                     }
 
                     if ($childProduct) {
-                        // Renaming an existing variant had no uniqueness check at
-                        // all — colliding with another product/variant's SKU hit
-                        // the DB's unique constraint directly, raising a raw
-                        // QueryException (500) instead of a clean validation error.
+                        // เมื่อก่อนการเปลี่ยนชื่อ (rename) variant ที่มีอยู่แล้วไม่มีการเช็ค
+                        // ความซ้ำเลย — ถ้า SKU ไปชนกับ product/variant อื่น จะโดน
+                        // unique constraint ของ DB ตรงๆ ทำให้เกิด QueryException
+                        // ดิบๆ (500) แทนที่จะเป็น validation error ที่สวยงาม
                         $skuTaken = Product::where('sku', $variantData['sku'])
                             ->where('id', '!=', $childProduct->id)
                             ->exists();
@@ -2575,7 +2562,7 @@ class ProductController extends Controller
                             'updated_by' => $request->user()?->id,
                         ]);
                     } else {
-                        // Check unique SKU for new variants
+                        // เช็ค SKU ไม่ให้ซ้ำ สำหรับ variant ใหม่
                         $request->validate([
                             'variants.*.sku' => ['unique:products,sku'],
                         ]);
@@ -2595,7 +2582,7 @@ class ProductController extends Controller
 
                     $existingVariantIds[] = $childProduct->id;
 
-                    // Update price
+                    // อัปเดตราคา
                     if ($priceAttr) {
                         if (isset($variantData['price']) && $variantData['price'] !== '') {
                             ProductValue::updateOrCreate(
@@ -2610,7 +2597,7 @@ class ProductController extends Controller
                         }
                     }
 
-                    // Update qty
+                    // อัปเดตจำนวนคงเหลือ (qty)
                     if ($qtyAttr) {
                         if (isset($variantData['qty']) && $variantData['qty'] !== '') {
                             ProductValue::updateOrCreate(
@@ -2625,7 +2612,7 @@ class ProductController extends Controller
                         }
                     }
 
-                    // Save attribute combinations (new variants)
+                    // บันทึกชุดค่า attribute ที่ผสมกัน (variant ใหม่)
                     if (! empty($variantData['attributes'])) {
                         foreach ($variantData['attributes'] as $attrId => $attrVal) {
                             if ($attrVal !== null && $attrVal !== '') {
@@ -2641,15 +2628,15 @@ class ProductController extends Controller
                     }
                 }
 
-                // Delete variants removed from frontend. Deleted one-by-one (not a
-                // bulk query delete) so Eloquent fires the `deleted` event and
-                // Auditable actually records the removal.
+                // ลบ variant ที่ถูกเอาออกจาก frontend ลบทีละตัว (ไม่ใช้ query delete
+                // แบบ bulk) เพื่อให้ Eloquent ยิง event `deleted` และ Auditable
+                // บันทึกการลบไว้จริงๆ
                 Product::where('parent_id', $product->id)->whereNotIn('id', $existingVariantIds)->get()->each->delete();
             } elseif (strtolower($validated['type']) !== 'configurable') {
-                // Product Type was switched away from Configurable (or already
-                // was Simple) — a Simple product can't have variant children,
-                // so drop any that still exist instead of leaving them orphaned
-                // under a parent that no longer presents itself as configurable.
+                // Product Type ถูกเปลี่ยนจาก Configurable ออกไป (หรือเป็น Simple
+                // อยู่แล้ว) — product แบบ Simple มี variant ลูกไม่ได้ เลยต้องลบ
+                // ตัวที่ยังเหลืออยู่ทิ้งไป แทนที่จะปล่อยให้เป็นลูกกำพร้าอยู่ใต้
+                // parent ที่ไม่ได้แสดงตัวว่าเป็น configurable แล้ว
                 Product::where('parent_id', $product->id)->get()->each->delete();
             }
 
@@ -2669,9 +2656,9 @@ class ProductController extends Controller
     {
         $productId = $product->id;
 
-        // Delete variant children one-by-one (not relying on the parent_id
-        // cascadeOnDelete FK) so Eloquent fires `deleted` and Auditable
-        // actually records their removal.
+        // ลบ variant ลูกๆ ทีละตัว (ไม่พึ่ง parent_id cascadeOnDelete ของ FK)
+        // เพื่อให้ Eloquent ยิง event `deleted` และ Auditable
+        // บันทึกการลบไว้จริงๆ
         Product::where('parent_id', $product->id)->get()->each->delete();
 
         ProductValue::where('product_id', $product->id)->delete();
@@ -2684,9 +2671,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Return the current value of every channel/locale-scopable attribute for
-     * the given channel/locale combination. Used by the product edit page to
-     * re-fetch just the scopable fields when the channel or locale selector changes.
+     * ดึงค่าปัจจุบันของทุก attribute ที่ผูกกับ channel/locale
+     * ตามคู่ channel/locale ที่ระบุ ใช้โดยหน้าแก้ไขสินค้าเพื่อดึงเฉพาะ
+     * ฟิลด์ที่ผูกกับ scope นี้ใหม่ เวลาผู้ใช้เปลี่ยน channel หรือ locale
      */
     public function attributeValues(Request $request, Product $product): JsonResponse
     {
@@ -2700,8 +2687,8 @@ class ProductController extends Controller
             $values[$attribute->id] = null;
         }
 
-        // Group attributes by their scoping shape so each group can be fetched with a
-        // single batched query instead of one query per attribute (N+1).
+        // จัดกลุ่ม attribute ตามรูปแบบ scope ของมัน เพื่อให้แต่ละกลุ่มดึงข้อมูลได้ด้วย
+        // query เดียวรวดเดียว แทนที่จะยิง query แยกทีละ attribute (ปัญหา N+1)
         $attributes->groupBy(fn ($attribute) => ($attribute->is_channel_based ? '1' : '0').($attribute->is_locale_based ? '1' : '0'))
             ->each(function ($group) use (&$values, $product, $channelId, $localeId) {
                 $first = $group->first();
@@ -2711,12 +2698,12 @@ class ProductController extends Controller
                     ->where('channel_id', $first->is_channel_based ? $channelId : null);
 
                 if ($first->is_locale_based) {
-                    // Fall back to the global (locale_id IS NULL) value when this
-                    // locale doesn't have its own yet — imported values always land
-                    // in the global scope (see ProductRowImporter) until someone
-                    // translates them per locale, so without this fallback a
-                    // freshly-imported locale-based field reads as empty here even
-                    // though it has a value.
+                    // ถ้า locale นี้ยังไม่มีค่าของตัวเอง ให้ fallback ไปใช้ค่า global
+                    // (locale_id เป็น NULL) แทน — ค่าที่ import เข้ามาจะตกอยู่ใน
+                    // global scope เสมอ (ดูที่ ProductRowImporter) จนกว่าจะมีใครมา
+                    // แปลแยกตาม locale ทีหลัง ถ้าไม่มี fallback นี้ ฟิลด์ที่ผูกกับ
+                    // locale ซึ่งเพิ่ง import มาใหม่ๆ จะดูเหมือนว่างเปล่า
+                    // ทั้งที่จริงๆ มันมีค่าอยู่
                     $query->where(function ($q) use ($localeId) {
                         $q->whereNull('locale_id')->orWhere('locale_id', $localeId);
                     })->orderByRaw('CASE WHEN locale_id = ? THEN 0 ELSE 1 END ASC', [$localeId]);
@@ -2727,8 +2714,8 @@ class ProductController extends Controller
                 $query->get(['attribute_id', 'value'])
                     ->each(function ($value) use (&$values) {
                         $attributeId = $value->attribute_id;
-                        // Rows are active-locale-first for locale-based attributes, so
-                        // only the first one seen per attribute should win.
+                        // สำหรับ attribute ที่ผูกกับ locale แถวจะเรียงเอา locale ที่ใช้งานอยู่
+                        // ขึ้นก่อนเสมอ ดังนั้นให้เอาแค่แถวแรกที่เจอของแต่ละ attribute เท่านั้น
                         if ($values[$attributeId] === null) {
                             $values[$attributeId] = $value->value;
                         }
@@ -2739,8 +2726,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Related/Up-sell/Cross-sell products for the edit page's Associations
-     * panel, keyed by association type code, each entry {id, sku, name}.
+     * สินค้าที่เกี่ยวข้อง/Up-sell/Cross-sell สำหรับพาเนล Associations
+     * ในหน้าแก้ไขสินค้า โดย key เป็น association type code แต่ละรายการเป็น {id, sku, name}
      */
     private function associationsFor(Product $product): array
     {
@@ -2767,8 +2754,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Replace-all-on-save sync for the 3 association types, mirroring the
-     * delete-then-recreate pattern already used for variants above.
+     * ซิงค์แบบ replace-all-on-save สำหรับ association ทั้ง 3 ประเภท
+     * ใช้แพทเทิร์นลบแล้วสร้างใหม่ เหมือนกับที่ใช้กับ variant ด้านบน
      */
     private function syncAssociations(Product $product, array $associations): void
     {
@@ -2795,9 +2782,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Current attribute values for a product, restricted to the given
-     * attribute ids, keyed by a human-readable "code[channel:x,locale:y]"
-     * label so it reads sensibly in the audit diff table.
+     * ค่าปัจจุบันของ attribute ทั้งหมดของสินค้า จำกัดแค่ attribute id
+     * ที่ระบุมา โดย key เป็น label ที่อ่านง่ายแบบ "code[channel:x,locale:y]"
+     * เพื่อให้อ่านรู้เรื่องเวลาไปโชว์ในตาราง diff ของ audit log
      */
     private function productValueSnapshot(int $productId, Collection $attributeIds): array
     {
@@ -2824,9 +2811,9 @@ class ProductController extends Controller
     }
 
     /**
-     * Diff two productValueSnapshot() results and, if anything changed,
-     * record it against the product's audit trail. Returns whether anything
-     * actually changed, so callers can decide whether to notify the storefront.
+     * เทียบผลลัพธ์ของ productValueSnapshot() สองชุด ถ้ามีอะไรเปลี่ยนแปลง
+     * ก็บันทึกลง audit trail ของสินค้า คืนค่ากลับว่ามีการเปลี่ยนแปลงจริงหรือไม่
+     * เพื่อให้ผู้เรียกใช้ตัดสินใจได้ว่าต้องแจ้งเตือน storefront หรือเปล่า
      */
     private function recordProductValueChanges(Product $product, array $oldValues, array $newValues, string $event = 'attribute_values_updated'): bool
     {
@@ -2853,11 +2840,11 @@ class ProductController extends Controller
     }
 
     /**
-     * Snapshot of every ProductValue row (price, qty, combination attributes)
-     * belonging to the parent's current variant children, keyed by
-     * "{variant sku}.{attribute code}" so a diff reads naturally against the
-     * parent product's own audit trail — variants don't have an edit page of
-     * their own, so this is the only place their changes are ever visible.
+     * สแนปช็อตของทุกแถว ProductValue (ราคา, จำนวน, attribute ของ combination)
+     * ที่เป็นของ variant ลูกทั้งหมดของสินค้าหลักตอนนี้ โดย key เป็น
+     * "{variant sku}.{attribute code}" เพื่อให้ diff อ่านเข้าใจง่ายเมื่อไปโชว์ใน
+     * audit trail ของสินค้าหลัก — เพราะ variant ไม่มีหน้าแก้ไขของตัวเอง
+     * นี่จึงเป็นที่เดียวที่จะเห็นการเปลี่ยนแปลงของมันได้
      */
     private function variantValueSnapshot(Product $product): array
     {
@@ -2881,14 +2868,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Attributes assigned to the product's family (or all attributes, if the
-     * family has none assigned yet) that vary by channel and/or locale.
+     * Attribute ที่ผูกกับ family ของสินค้า (หรือถ้า family ยังไม่ได้ผูก
+     * attribute ไว้เลยก็เอาทั้งหมด) ที่แปรผันตาม channel และ/หรือ locale
      */
     /**
-     * Attributes eligible for the channel/locale value refetch, scoped to the
-     * product's family and — mirroring edit()'s group/attribute filtering —
-     * to what $user is allowed to view, so switching the channel/locale
-     * selector can't leak values for attributes the page itself would hide.
+     * Attribute ที่มีสิทธิ์ให้ดึงค่าใหม่ตอนเปลี่ยน channel/locale โดย scope
+     * ตาม family ของสินค้าและ — ให้ตรงกับการกรอง group/attribute ของ edit() —
+     * ตามสิทธิ์ที่ $user มองเห็นได้ เพื่อไม่ให้การสลับ channel/locale
+     * รั่วไหลค่าของ attribute ที่หน้าเว็บเองก็ซ่อนไว้อยู่แล้ว
      */
     private function scopableAttributesFor(Product $product, $user = null)
     {
@@ -2913,8 +2900,8 @@ class ProductController extends Controller
                 })
                 ->map(fn ($fa) => $fa->attribute);
         } else {
-            // No family attributes assigned yet — edit() falls back to showing
-            // every system attribute under "General", so mirror that here too.
+            // ยังไม่มี family attribute ให้ใช้เลย — edit() จะ fallback ไปโชว์
+            // system attribute ทั้งหมดใต้หมวด "General" เลยทำแบบเดียวกันตรงนี้ด้วย
             $attributes = Attribute::all();
 
             if ($user) {
@@ -2928,10 +2915,10 @@ class ProductController extends Controller
     }
 
     /**
-     * Check if a user has permission to view an attribute group. Thin
-     * wrapper kept so every existing call site in this controller doesn't
-     * need to change — the actual rule now lives in AttributeAccessPolicy
-     * (shared with bulk product import/export column filtering).
+     * เช็คว่าผู้ใช้มีสิทธิ์ดู attribute group นี้ไหม เป็นแค่ wrapper บางๆ
+     * ที่เก็บไว้เพื่อไม่ต้องแก้จุดเรียกใช้เดิมทุกจุดใน controller นี้ —
+     * กฎจริงๆ ตอนนี้ย้ายไปอยู่ที่ AttributeAccessPolicy แล้ว
+     * (ใช้ร่วมกับตัวกรองคอลัมน์ตอน import/export สินค้าแบบ bulk)
      */
     private function canUserViewAttributeGroup($user, $group): bool
     {
@@ -2939,8 +2926,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Check if a user has permission to view a specific attribute. See
-     * canUserViewAttributeGroup()'s docblock.
+     * เช็คว่าผู้ใช้มีสิทธิ์ดู attribute ตัวนี้ไหม ดูรายละเอียดเพิ่มเติม
+     * ที่ docblock ของ canUserViewAttributeGroup()
      */
     private function canUserViewAttribute($user, $attribute): bool
     {
@@ -2948,8 +2935,8 @@ class ProductController extends Controller
     }
 
     /**
-     * Check if a user has permission to *edit* an attribute group's values.
-     * See canUserViewAttributeGroup()'s docblock.
+     * เช็คว่าผู้ใช้มีสิทธิ์ *แก้ไข* ค่าของ attribute group นี้ไหม ดูรายละเอียด
+     * เพิ่มเติมที่ docblock ของ canUserViewAttributeGroup()
      */
     private function canUserEditAttributeGroup($user, $group): bool
     {
@@ -2957,11 +2944,40 @@ class ProductController extends Controller
     }
 
     /**
-     * Check if a user has permission to *edit* a specific attribute's value.
-     * See canUserViewAttributeGroup()'s docblock.
+     * เช็คว่าผู้ใช้มีสิทธิ์ *แก้ไข* ค่าของ attribute ตัวนี้ไหม ดูรายละเอียด
+     * เพิ่มเติมที่ docblock ของ canUserViewAttributeGroup()
      */
     private function canUserEditAttribute($user, $attribute): bool
     {
         return $this->attributeAccess->canEditAttribute($user, $attribute);
+    }
+
+    /**
+     * เติมข้อมูลลงใน `options` ของ attribute แบบ select/multiselect ที่ eager-load
+     * มาแล้ว ว่าแต่ละ option ถูก map ไว้กับ marketplace ไหนบ้าง — ใช้วิธีคำนวณ
+     * แบบเดียวกับที่ BrandController::index() และ CategoryController::tree()
+     * ใช้กับคอลัมน์ mapped_platforms ของตัวเอง ตอนนี้มีแค่ `pbrand` เท่านั้นที่มี
+     * ข้อมูลจริงในสี่คอลัมน์นี้ (ดูที่ shopee_brand_id/lazada_brand_id/
+     * tiktok_brand_id/woocommerce_brand_id ของ AttributeOption) แต่ฟังก์ชันนี้
+     * รันให้กับทุก attribute เหมือนกันหมด แทนที่จะเช็คเจาะจงแค่ code นี้ —
+     * เพราะทำแบบนี้ต้นทุนถูก (ไม่ต้อง query เพิ่ม `options` โหลดมาแล้ว)
+     * และยังใช้ได้ถูกต้องถ้าวันหน้ามี select attribute ตัวอื่นเกิด map กับ
+     * marketplace แบบนี้ขึ้นมาบ้าง ถ้า attribute ตัวไหนไม่ได้โหลด relation
+     * `options` ไว้ (เช่นพวกที่ไม่ใช่ select type) ฟังก์ชันนี้จะไม่ทำอะไรเลย
+     */
+    private function decorateOptionsWithMappedPlatforms(Attribute $attr): void
+    {
+        if (! $attr->relationLoaded('options')) {
+            return;
+        }
+
+        foreach ($attr->options as $option) {
+            $option->mapped_platforms = collect([
+                'lazada' => $option->lazada_brand_id,
+                'shopee' => $option->shopee_brand_id,
+                'tiktok' => $option->tiktok_brand_id,
+                'woocommerce' => $option->woocommerce_brand_id,
+            ])->filter()->keys()->values()->all();
+        }
     }
 }

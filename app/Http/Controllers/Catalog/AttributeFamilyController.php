@@ -28,21 +28,22 @@ class AttributeFamilyController extends Controller
     {
         $grid = new GridManager('attribute_family_grid');
 
-        // `name` is a language-agnostic fallback column (see
-        // AttributeFamily::name() accessor) — what the grid actually
-        // displays is each family's translated label, which lives in a
-        // separate translations table. GridManager's generic search/
-        // per-column filter only know how to LIKE-match real columns, so
-        // matching by name is handled here instead: attribute_family_grid.yml's
-        // `filters.global` block was removed entirely (GridManager ANDs its
-        // own search clause with whatever this closure adds, so a narrower
-        // built-in `code`-only clause would silently absorb — and defeat —
-        // the broader one below), and `name` is stripped from the per-column
-        // filters input before GridManager sees it, then both are handled
-        // below against the fallback column and the translations table.
+        // `name` เป็นคอลัมน์ fallback ที่ไม่ผูกกับภาษาไหนเป็นพิเศษ (ดู
+        // accessor AttributeFamily::name()) — สิ่งที่ grid โชว์จริงๆ คือ
+        // label ที่แปลแล้วของแต่ละ family ซึ่งอยู่ในตาราง translations
+        // แยกต่างหาก ฟีเจอร์ search/filter ทั่วไปของ GridManager รู้แค่
+        // วิธี LIKE-match กับคอลัมน์จริงเท่านั้น เลยต้องมาจัดการ match ด้วย
+        // name ตรงนี้แทน โดยเอา block `filters.global` ใน
+        // attribute_family_grid.yml ออกไปทั้งหมด (เพราะ GridManager จะเอา
+        // search clause ของตัวเองมา AND กับสิ่งที่ closure นี้เพิ่มเข้าไป
+        // ถ้ามี clause แคบๆ ที่ built-in ไว้แบบ `code` เท่านั้น มันจะกลืน
+        // และทำลาย clause ที่กว้างกว่าด้านล่างนี้ไปเงียบๆ) แล้วก็ตัด
+        // `name` ออกจาก input ของ per-column filters ก่อนที่ GridManager
+        // จะเห็นมัน จากนั้นค่อยจัดการทั้งคู่ด้านล่างนี้กับทั้งคอลัมน์
+        // fallback และตาราง translations
         $search = $request->input('search');
-        // (array) cast — see GridManager::getData()'s comment: an empty
-        // `?filters=` query param arrives here as a literal null.
+        // cast เป็น (array) — ดูคอมเมนต์ใน GridManager::getData() ประกอบ:
+        // ถ้า query param `?filters=` ว่างเปล่า มันจะมาถึงตรงนี้เป็น null ตรงๆ
         $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
 
@@ -70,8 +71,9 @@ class AttributeFamilyController extends Controller
         return Inertia::render('catalog/attribute-families/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
-            // Explicit keys, not only() — see ProductController::index() for why
-            // an empty array here (vs. object) is a landmine for `filters.sort`.
+            // ใส่ key ตรงๆ แบบนี้ ไม่ใช้ only() — ดูเหตุผลได้ที่
+            // ProductController::index() ว่าทำไม array ว่าง (เทียบกับ object)
+            // ตรงนี้ถึงเป็นกับดักสำหรับ `filters.sort`
             'filters' => [
                 'search' => $search ?? '',
                 'sort' => $request->input('sort', ''),
@@ -194,7 +196,7 @@ class AttributeFamilyController extends Controller
             AuditLog::record('labels_updated', $attributeFamily, $oldTranslations, $newTranslations);
         }
 
-        // Sync family_attributes pivot relations
+        // ซิงก์ความสัมพันธ์ pivot ของ family_attributes ให้ตรงกับข้อมูลใหม่
         FamilyAttribute::where('family_id', $attributeFamily->id)->delete();
 
         if (!empty($validated['group_attributes'])) {
@@ -235,8 +237,9 @@ class AttributeFamilyController extends Controller
     }
 
     /**
-     * Fresh (uncached) locale_id => label map for the family's current
-     * translations — used to snapshot before/after state for audit diffs.
+     * ดึง map locale_id => label ของ translation ปัจจุบันของ family
+     * แบบสดๆ (ไม่ใช้ cache) — ใช้สำหรับ snapshot สถานะก่อน/หลัง เพื่อไปทำ
+     * audit diff
      */
     private function currentTranslations(AttributeFamily $family): array
     {
@@ -246,8 +249,9 @@ class AttributeFamilyController extends Controller
     }
 
     /**
-     * "attributeCode→groupCode" list for a family's current attribute/group
-     * assignments — used to snapshot before/after state for audit diffs.
+     * รายการ "attributeCode→groupCode" ของการจับคู่ attribute/group
+     * ปัจจุบันของ family — ใช้สำหรับ snapshot สถานะก่อน/หลัง เพื่อไปทำ
+     * audit diff
      */
     private function familyAttributesSnapshot(int $familyId): array
     {

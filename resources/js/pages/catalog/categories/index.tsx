@@ -57,10 +57,10 @@ interface Props {
     filterColumns: Record<string, GridColumn>;
 }
 
-// Same 4-color rotation as marketplace-sync.tsx's PLATFORM_ACCENT_COLORS /
-// CATEGORY_SYNC_PLATFORMS order (Lazada, Shopee, TikTok, WooCommerce) — kept
-// as a plain label+color map here since this column just needs to mark
-// which platforms a row is mapped to, not link out to each sync flow.
+// ใช้ชุดสี 4 สีเรียงลำดับเดียวกับ PLATFORM_ACCENT_COLORS / CATEGORY_SYNC_PLATFORMS
+// ใน marketplace-sync.tsx (Lazada, Shopee, TikTok, WooCommerce) — ที่นี่ทำเป็น
+// map label+color ธรรมดาไปเลย เพราะคอลัมน์นี้แค่ต้องการบอกว่าแถวนี้ผูกกับแพลตฟอร์มไหนบ้าง
+// ไม่ได้ต้องการลิงก์ไปหน้า sync ของแต่ละแพลตฟอร์ม
 const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
     { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
     { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
@@ -137,13 +137,12 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         router.get('/catalog/categories', { search, per_page: perPage, filters: activeFilters, sort: sortField, dir: sortDir, platform: value }, { preserveState: true });
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the category
-    // name identifies the row and row actions stay visible down to phone
-    // width; the products-count link and active status are the next most
-    // useful things to act on/scan, then parent/description/mapped
-    // platforms, with the decorative thumbnail and the low-value slug
-    // reflowing first (the thumbnail carries no data worth restating as a
-    // label/value pair, so it's dropped from the pop-in entirely).
+    // ลำดับความสำคัญคอลัมน์ตอนย่อจอ (SAP Fiori responsive table): ชื่อหมวดหมู่
+    // เป็นตัวบ่งบอกแถวและปุ่ม action ต้องโชว์ตลอดแม้จอมือถือ; ลิงก์จำนวนสินค้ากับ
+    // สถานะ active เป็นสิ่งที่ต้องกดดู/สแกนรองลงมา ตามด้วย parent/description/
+    // แพลตฟอร์มที่ผูกไว้ ส่วนรูปตัวอย่างที่เป็นแค่ของตกแต่งกับ slug ที่ไม่ค่อยสำคัญ
+    // จะถูกซ่อนก่อนเพื่อน (รูปตัวอย่างไม่มีข้อมูลที่คุ้มค่าจะโชว์เป็น label/value เลยตัดออก
+    // จากการ pop-in ไปเลย)
     const columns: FioriResponsiveColumn<CategoryItem>[] = [
         {
             key: 'thumbnail',

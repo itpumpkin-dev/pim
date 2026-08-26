@@ -89,10 +89,10 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
         router.get('/catalog/channels', { search, filters: next }, { preserveState: true });
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the channel name
-    // identifies the row and row actions stay visible down to phone width;
-    // the short code follows next, then the linked root category, with the
-    // raw id reflowing first since it's the least useful column at a glance.
+    // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
+    // ชื่อช่องทาง (name) กับปุ่ม action ของแถวจะยังโชว์อยู่แม้จอมือถือแคบๆ
+    // รองลงมาคือ code แล้วก็ root category ที่ลิงก์ไว้
+    // ส่วน id จะถูกซ่อนก่อนเพื่อนเพราะมีประโยชน์น้อยสุดตอนดูเร็วๆ
     const columns: FioriResponsiveColumn<ChannelItem>[] = [
         {
             key: 'id',

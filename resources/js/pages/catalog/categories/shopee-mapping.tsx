@@ -14,6 +14,7 @@ import {
     Button,
     Chip,
     CircularProgress,
+    Divider,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -45,7 +46,9 @@ interface MappedCategory {
 interface ShopeeRow {
     id: number;
     name: string;
+    name_th: string | null;
     path: string;
+    path_th: string | null;
     leaf: boolean;
     mapped_categories: MappedCategory[];
     brand_count: number;
@@ -65,7 +68,7 @@ interface ShopeeAttributeRow {
     mapped: { id: number; name: string } | null;
 }
 
-const MAPPABLE_ATTRIBUTE_INPUT_TYPE = 3; // FREE_TEXT_FILED — must match ShopeeAttributeMappingController::MAPPABLE_INPUT_TYPE
+const MAPPABLE_ATTRIBUTE_INPUT_TYPE = 3; // FREE_TEXT_FILED — ต้องตรงกับ ShopeeAttributeMappingController::MAPPABLE_INPUT_TYPE
 
 const ATTRIBUTE_INPUT_TYPE_LABEL_KEYS: Record<number, string> = {
     1: 'inputTypeDropdown',
@@ -90,7 +93,7 @@ interface Props {
     filters: { filter: ShopeeFilter; search: string; per_page: number };
 }
 
-/** What a pending edit stages for one PIM category id: `null` clears its Shopee mapping; an object points it at a (possibly different) Shopee node. Keyed by PIM category id, not Shopee id — that's what bulkMapShopee() actually persists. */
+/** สิ่งที่การแก้ไขที่ยังไม่บันทึกเตรียมไว้สำหรับ PIM category id หนึ่งตัว: `null` คือล้าง mapping กับ Shopee ทิ้ง ส่วนถ้าเป็น object คือชี้ไปที่ Shopee node ตัวใหม่ (อาจเป็นคนละตัวกับเดิม) ใช้ PIM category id เป็น key ไม่ใช่ Shopee id — เพราะนั่นคือสิ่งที่ bulkMapShopee() บันทึกจริงๆ */
 interface PendingAssignment {
     shopeeId: number;
     pimName: string;
@@ -101,11 +104,10 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
 
-    // The Shopee Brands table below (sync + PIM mapping for whichever
-    // category is selected) writes brand data, not category data — gated on
-    // brands.edit_brands same as the old dedicated brand mapping page was,
-    // even though both now live on this categories.edit_categories-gated
-    // page.
+    // ตาราง Shopee Brands ด้านล่าง (sync + PIM mapping ของหมวดหมู่ที่เลือกอยู่)
+    // เขียนข้อมูลแบรนด์ ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วย brands.edit_brands
+    // เหมือนหน้า brand mapping แยกต่างหากตัวเก่า แม้ตอนนี้ทั้งสองอย่างจะย้ายมาอยู่
+    // ในหน้าเดียวกันที่ gate ด้วย categories.edit_categories แล้วก็ตาม
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canEditBrands = permissions.includes('brands.edit_brands');
@@ -120,18 +122,17 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     ];
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [filter, setFilter] = useState<ShopeeFilter>(filters.filter ?? 'all');
+    const [filter, setFilter] = useState<ShopeeFilter>(filters.filter ?? 'leaf');
     const [perPage, setPerPage] = useState<number>(categories.per_page ?? 25);
     const [pending, setPending] = useState<Record<number, PendingAssignment | null>>({});
     const [assigningFor, setAssigningFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [syncingCategories, setSyncingCategories] = useState(false);
 
-    // The dedicated Shopee Brands table below the categories table — driven
-    // by whichever leaf category row was last clicked, not a per-row
-    // expander anymore (get_brand_list's own category scoping means only
-    // one category's brands are ever relevant at a time, so a full-width
-    // "detail" table reads better than squeezing a picker into every row).
+    // ตาราง Shopee Brands แยกต่างหากที่อยู่ใต้ตารางหมวดหมู่ — ขับเคลื่อนด้วยแถว
+    // leaf category ล่าสุดที่คลิก ไม่ใช่ expander แยกต่อแถวแล้ว (เพราะ get_brand_list
+    // เองก็ scope ตามหมวดหมู่อยู่แล้ว มีแค่หมวดหมู่เดียวที่เกี่ยวข้องในแต่ละครั้ง เลยทำเป็น
+    // ตาราง "detail" เต็มความกว้างอ่านง่ายกว่าไปยัด picker ไว้ในทุกแถว)
     const [selectedCategory, setSelectedCategory] = useState<ShopeeRow | null>(null);
     const [brands, setBrands] = useState<ShopeeBrandRow[] | null>(null);
     const [brandsMeta, setBrandsMeta] = useState<{ currentPage: number; lastPage: number; total: number } | null>(null);
@@ -144,10 +145,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const brandPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const firstRender = useRef(true);
     const firstBrandSearchRender = useRef(true);
-    // Set right before a category switch resets brandSearch to '' — that
-    // state change would otherwise also trigger the debounced search effect
-    // below, firing a second, redundant fetch a moment after the immediate
-    // one the category-switch effect already made.
+    // ตั้งค่าไว้ก่อนที่การสลับหมวดหมู่จะรีเซ็ต brandSearch เป็น '' — ไม่งั้นการเปลี่ยน
+    // state ตรงนี้จะไปทริกเกอร์ effect ค้นหาแบบ debounced ด้านล่างด้วย ทำให้ยิง fetch
+    // ซ้ำซ้อนอีกรอบหลังจากที่ effect ตอนสลับหมวดหมู่ยิงไปแล้วรอบหนึ่ง
     const skipNextSearchDebounce = useRef(false);
 
     useEffect(() => {
@@ -156,10 +156,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
         };
     }, []);
 
-    // A category's brand list can run into five figures (confirmed live:
-    // 12,102 for one real category), so this is paginated + searched the
-    // same way the categories table above it is — fetching and rendering
-    // every row at once is what made this table slow to open.
+    // รายการแบรนด์ของหมวดหมู่หนึ่งอาจมีได้เป็นหลักหมื่น (เจอจริงมาแล้ว: 12,102 รายการ
+    // ในหมวดหมู่จริงหมวดเดียว) เลยต้องทำ pagination + search แบบเดียวกับตารางหมวดหมู่
+    // ด้านบน — เพราะการโหลดและ render ทุกแถวพร้อมกันคือสาเหตุที่ทำให้ตารางนี้เปิดช้า
     const loadBrands = (shopeeCategoryId: number, opts: { search?: string; page?: number; perPage?: number } = {}) => {
         const search = opts.search ?? brandSearch;
         const page = opts.page ?? 1;
@@ -177,9 +176,8 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             .finally(() => setLoadingBrands(false));
     };
 
-    // Selecting a different category drops whatever brand list/sync state
-    // belonged to the previous one — they're unrelated categories, nothing
-    // here should carry over.
+    // พอเลือกหมวดหมู่อื่น ให้ล้างรายการแบรนด์/สถานะ sync ของหมวดหมู่เดิมทิ้งไปเลย —
+    // เพราะเป็นหมวดหมู่คนละอันกัน ไม่ควรมีอะไรค้างข้ามมา
     useEffect(() => {
         setBrands(null);
         setBrandsMeta(null);
@@ -276,11 +274,10 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             });
     };
 
-    // `optionId` is which PIM AttributeOption row actually gets written to
-    // (attribute_options.shopee_brand_id) — for a fresh assignment that's
-    // the newly-picked PIM brand's own id; for clearing an existing one it's
-    // that existing mapping's PIM id, not anything derived from
-    // `shopeeBrandId`. `display` is what the row should show afterward.
+    // `optionId` คือแถว PIM AttributeOption ที่จะถูกเขียนค่าลงไปจริงๆ
+    // (attribute_options.shopee_brand_id) — ถ้าเป็นการจับคู่ใหม่ ก็คือ id ของแบรนด์ PIM
+    // ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping เดิมนั้น
+    // ไม่ใช่อะไรที่คำนวณมาจาก `shopeeBrandId` ส่วน `display` คือสิ่งที่จะโชว์ในแถวหลังจากนั้น
     const persistBrand = (shopeeBrandId: number, optionId: number, newShopeeId: number | null, display: { id: number; name: string } | null) => {
         setSavingBrandId(shopeeBrandId);
         fetch('/catalog/brands/shopee-mapping', {
@@ -303,11 +300,11 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
         persistBrand(shopeeBrandId, currentPimOptionId, null, null);
     };
 
-    // The Shopee Attributes table — same "select a leaf category above"
-    // detail-table pattern as the Brands table, but synchronous (no
-    // JobTracker/polling): get_attribute_tree has no pagination and a
-    // category's schema is small, so ShopeeAttributeMappingController::
-    // syncShopeeAttributesForCategory() just returns the result directly.
+    // ตาราง Shopee Attributes — ใช้แพทเทิร์นตาราง "detail" แบบเดียวกับตาราง Brands
+    // คือเลือก leaf category ด้านบนก่อน แต่ทำงานแบบ synchronous (ไม่มี JobTracker/
+    // polling) เพราะ get_attribute_tree ไม่มี pagination และ schema ของแต่ละหมวดหมู่
+    // ก็เล็ก ทำให้ ShopeeAttributeMappingController::syncShopeeAttributesForCategory()
+    // แค่ return ผลลัพธ์กลับมาตรงๆ ได้เลย
     const [attributes, setAttributes] = useState<ShopeeAttributeRow[] | null>(null);
     const [loadingAttributes, setLoadingAttributes] = useState(false);
     const [attributeSyncing, setAttributeSyncing] = useState(false);
@@ -354,12 +351,12 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             .finally(() => setAttributeSyncing(false));
     };
 
-    // `pimAttributeId` is which PIM Attribute row actually gets written to
-    // (a shopee_attribute_mappings row keyed by attribute_id) — for a fresh
-    // assignment that's the newly-picked PIM attribute's own id; for
-    // clearing an existing one it's that existing mapping's PIM id.
-    // `targetField` null clears the mapping (ShopeeAttributeMappingController::
-    // update() deletes the row); 'shopee_attribute' sets it.
+    // `pimAttributeId` คือแถว PIM Attribute ที่จะถูกเขียนค่าลงไปจริงๆ (แถวใน
+    // shopee_attribute_mappings ที่ key ด้วย attribute_id) — ถ้าเป็นการจับคู่ใหม่
+    // ก็คือ id ของ attribute PIM ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ
+    // PIM id ของ mapping เดิมนั้น ส่วน `targetField` เป็น null คือล้าง mapping
+    // (ShopeeAttributeMappingController::update() จะลบแถวทิ้ง) ถ้าเป็น
+    // 'shopee_attribute' คือตั้งค่า mapping
     const persistAttribute = (
         shopeeAttributeId: number,
         pimAttributeId: number,
@@ -401,10 +398,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
         router.post('/catalog/categories/sync-shopee', {}, { preserveScroll: true, onFinish: () => setSyncingCategories(false) });
     };
 
-    // Any navigation (page/filter/search change, or a completed save) hands
-    // us a fresh `categories` prop — pending picks made against the previous
-    // set of rows no longer apply, so drop them rather than let them leak
-    // into a future save.
+    // ทุกครั้งที่มีการ navigate (เปลี่ยนหน้า/filter/search หรือบันทึกเสร็จ) เราจะได้
+    // prop `categories` ชุดใหม่มา — การเลือกที่ยังค้างอยู่จากชุดแถวเดิมใช้ไม่ได้แล้ว
+    // เลยต้องล้างทิ้ง ไม่งั้นมันจะหลุดไปปนกับการบันทึกครั้งถัดไป
     useEffect(() => {
         setPending({});
         setAssigningFor(null);
@@ -474,10 +470,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
         router.post('/catalog/categories/shopee-mapping', { mappings }, { preserveScroll: true, onFinish: () => setSaving(false) });
     };
 
-    // A row counts as "pending" (for the dashed row highlight) in either
-    // direction: one of its existing PIM mappings is being cleared/moved
-    // away, or a fresh assignment is landing on it from a different PIM
-    // category.
+    // แถวหนึ่งจะถูกนับเป็น "pending" (ไฮไลต์ด้วยเส้นประ) ได้ทั้งสองทาง: กำลังจะล้าง/
+    // ย้าย mapping PIM เดิมของมันออกไป หรือกำลังจะมีการจับคู่ใหม่จาก PIM category
+    // อื่นเข้ามาลงตรงนี้
     const rowHasPendingChange = (row: ShopeeRow) =>
         row.mapped_categories.some((pc) => pc.id in pending) || Object.values(pending).some((assignment) => assignment?.shopeeId === row.id);
 
@@ -499,7 +494,20 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             header: t('nameColumn'),
             priority: 'always',
             minWidth: 220,
-            render: (row) => <Typography fontWeight={600}>{row.name}</Typography>,
+            render: (row) => (
+                <Stack spacing={0}>
+                    <Typography fontWeight={600}>{row.name}</Typography>
+                    {row.name_th ? (
+                        <Typography variant="caption" color="text.secondary">
+                            {row.name_th}
+                        </Typography>
+                    ) : (
+                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                            {t('noThaiName')}
+                        </Typography>
+                    )}
+                </Stack>
+            ),
         },
         {
             key: 'path',
@@ -507,9 +515,16 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'medium',
             minWidth: 260,
             render: (row) => (
-                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                    {row.path}
-                </Typography>
+                <Stack spacing={0}>
+                    <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                        {row.path}
+                    </Typography>
+                    {row.path_th && (
+                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                            {row.path_th}
+                        </Typography>
+                    )}
+                </Stack>
             ),
         },
         {
@@ -551,10 +566,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
 
                 const existingIds = new Set(row.mapped_categories.map((c) => c.id));
 
-                // Everything currently mapped to this Shopee node, folded
-                // together with any pending edit against that same PIM
-                // category — including one that moves it elsewhere, which
-                // has to render here as "will clear" too.
+                // ทุกอย่างที่ mapping กับ Shopee node นี้อยู่ตอนนี้ รวมเข้ากับการแก้ไข
+                // ที่ยังค้างอยู่ของ PIM category เดียวกัน — รวมถึงกรณีที่ย้ายไปที่อื่น
+                // ด้วย ซึ่งต้อง render ตรงนี้เป็น "will clear" เหมือนกัน
                 const existingChips = row.mapped_categories.map((pc) => {
                     const staged = pending[pc.id];
                     if (staged === undefined) {
@@ -584,8 +598,8 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                     );
                 });
 
-                // A PIM category not currently listed here, but staged (from
-                // its own row elsewhere on this page) to move onto this one.
+                // PIM category ที่ยังไม่อยู่ในลิสต์นี้ แต่ถูกเตรียมไว้ (จากแถวของมันเองที่
+                // อื่นในหน้านี้) ให้ย้ายมาอยู่ตรงนี้
                 const newlyAssigned = Object.entries(pending)
                     .filter((entry): entry is [string, PendingAssignment] => {
                         const [pimId, assignment] = entry;
@@ -773,7 +787,7 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                         >
                             {t('marketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('shopeeMappingTitle')}</Typography>
+                        <Typography variant="h4" fontWeight={700}>{t('shopeeMappingTitle')}</Typography><Divider sx={{ my: 2 }} />
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}

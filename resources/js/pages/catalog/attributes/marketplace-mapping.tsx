@@ -19,29 +19,28 @@ interface Props {
 }
 
 /**
- * One entry point for every platform's "which PIM attribute feeds which
- * marketplace attribute" mapping — previously four separate hub tiles/pages
+ * เพจนี้เป็นจุดรวมเดียวสำหรับ mapping "แอตทริบิวต์ PIM ตัวไหน ป้อนค่าให้แอตทริบิวต์
+ * มาร์เก็ตเพลสตัวไหน" ของทุกแพลตฟอร์ม — เมื่อก่อนแยกเป็น 4 หน้า/tile กันคนละที่
  * (woocommerce-mapping.tsx, shopee-mapping.tsx, lazada-mapping.tsx,
- * tiktok-mapping.tsx). Each platform's actual mapping UI now lives in its
- * own panel component under components/catalog/*-attribute-mapping-panel.tsx
- * (identical behavior to the old standalone pages, just without their own
- * AppLayout/breadcrumb/header) — this page only owns the Tabs shell.
+ * tiktok-mapping.tsx) ตอนนี้ UI การ mapping จริงๆ ของแต่ละแพลตฟอร์มย้ายไปอยู่ใน
+ * panel component ของตัวเองที่ components/catalog/*-attribute-mapping-panel.tsx
+ * (พฤติกรรมเหมือนหน้าเดิมทุกอย่าง แค่ไม่มี AppLayout/breadcrumb/header ของตัวเอง
+ * แล้ว) — เพจนี้เลยดูแลแค่ shell ของ Tabs เท่านั้น
  *
- * Once a tab has been opened it stays mounted (toggled with `display`, not
- * unmounted) so switching back to it never discards a panel's unsaved
- * pending edits/search/filter state — same reasoning products/edit.tsx's
- * General/History tabs don't need, since only this page's tabs carry
- * editable state. A tab never opened yet, though, isn't mounted at all: with
- * ~100 PIM attributes each rendering a full MUI card (Select + TextField),
- * mounting all four up front at once was making the page visibly stall on
- * first load for a render of ~400 cards nobody was looking at yet — this
- * defers each tab's cost to the moment it's actually opened.
+ * พอแท็บไหนถูกเปิดแล้วจะค้าง mount ไว้ตลอด (สลับด้วย `display` ไม่ได้ unmount ออก)
+ * เพื่อให้กลับมาแท็บนั้นแล้วข้อมูลที่แก้ไว้/ค้นหา/กรองไว้ยังอยู่ครบ ไม่หายไปไหน —
+ * เหตุผลเดียวกับที่แท็บ General/History ใน products/edit.tsx ไม่จำเป็นต้องทำแบบนี้
+ * เพราะมีแค่แท็บของเพจนี้เท่านั้นที่มี state ที่แก้ไขได้ ส่วนแท็บที่ยังไม่เคยเปิดเลย
+ * จะยังไม่ mount เลย เพราะแอตทริบิวต์ PIM มีประมาณ 100 ตัว แต่ละตัว render เป็น
+ * MUI card เต็มๆ (Select + TextField) ถ้า mount ทั้ง 4 แท็บพร้อมกันตั้งแต่แรกจะทำให้
+ * หน้าเว็บกระตุกเห็นชัดตอนโหลดครั้งแรก จาก card ที่ render ~400 ใบที่ยังไม่มีใครดูด้วยซ้ำ
+ * — โค้ดตรงนี้เลยเลื่อนต้นทุนของแต่ละแท็บไปจนกว่าจะถูกเปิดจริงๆ
  *
- * That first-open mount is still itself a synchronous render of ~100 rows'
- * worth of Selects/TextFields, which can take long enough to feel like the
- * click did nothing. The tab switch runs inside a transition (isPending)
- * so React keeps the outgoing panel on screen — dimmed, under a spinner —
- * instead of the whole area going blank while the new one is prepared.
+ * แต่การ mount ตอนเปิดครั้งแรกก็ยังเป็นการ render แบบ synchronous ของ Select/TextField
+ * ประมาณ 100 แถวอยู่ดี ซึ่งอาจใช้เวลานานพอที่จะรู้สึกเหมือนคลิกแล้วไม่มีอะไรเกิดขึ้น
+ * การสลับแท็บเลยรันอยู่ใน transition (isPending) เพื่อให้ React ยังคง panel เดิมค้าง
+ * อยู่บนจอ — แค่ทำให้จางลงพร้อม spinner — แทนที่จะปล่อยให้พื้นที่ทั้งหมดว่างเปล่า
+ * ระหว่างรอ panel ใหม่เตรียมพร้อม
  */
 export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazada, tiktok }: Props) {
     const { t } = useTranslation('catalog');

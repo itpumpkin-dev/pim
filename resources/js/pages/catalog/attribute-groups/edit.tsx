@@ -75,7 +75,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
 
                 {tabIndex === 0 && (
                 <>
-                {/* Header Title & Actions */}
+                {/* หัวข้อและปุ่มต่างๆ */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         Edit Attribute Group
@@ -102,7 +102,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                 </Stack>
 
                 <Stack spacing={3} sx={{ maxWidth: 800 }}>
-                    {/* General Panel */}
+                    {/* ส่วนข้อมูลทั่วไป */}
                     <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
                         <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                             General

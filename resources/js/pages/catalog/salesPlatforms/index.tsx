@@ -45,15 +45,14 @@ import {
     fioriIconButtonSx,
 } from '@/lib/fiori-style';
 
-// Cycled by platform index (not brand colors) — this page's platforms are
-// admin-created and arbitrary (see storePlatform()), not just Lazada/Shopee/
-// TikTok, so a per-brand color map would leave any custom platform
-// uncolored. Same 4-color rotation the dashboard's own info boxes use.
+// วนสีตาม index ของ platform (ไม่ใช้สีตามแบรนด์) — เพราะ platform ในหน้านี้
+// admin สร้างเองได้อิสระ (ดูที่ storePlatform()) ไม่ได้มีแค่ Lazada/Shopee/
+// TikTok เท่านั้น ถ้าทำ map สีตามแบรนด์ตายตัวจะมี platform ที่สร้างเองเหลือไม่มีสี
+// เลยใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับที่กล่องข้อมูลใน dashboard ใช้
 const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
 
-// How many shops show before the "view all" toggle takes over — enough to
-// give a sense of the list without pushing the table past the fold for
-// platforms with many shops.
+// จำนวนร้านค้าที่โชว์ก่อนจะสลับเป็นปุ่ม "ดูทั้งหมด" — ตั้งไว้พอให้เห็นภาพรวมของลิสต์
+// โดยไม่ทำให้ตารางยาวเกินจอสำหรับ platform ที่มีร้านค้าเยอะๆ
 const SHOPS_PREVIEW_COUNT = 3;
 
 interface ShopItem {
@@ -211,9 +210,8 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         router.post('/catalog/sales-platforms/sync-live-status', {}, { onFinish: () => setSyncingLiveStatus(false) });
     };
 
-    // Per-shop sync — a Set (not a single id) since more than one shop's
-    // sync could be in flight at once, same reasoning as products/index.tsx's
-    // duplicatingIds.
+    // sync แยกตามร้าน — ใช้ Set (ไม่ใช่ id เดี่ยวๆ) เพราะอาจมีหลายร้านที่กำลัง
+    // sync พร้อมกันได้ เหตุผลเดียวกับ duplicatingIds ใน products/index.tsx
     const [syncingShopIds, setSyncingShopIds] = useState<Set<number>>(new Set());
     const syncShopLiveStatus = (shopId: number) => {
         setSyncingShopIds((prev) => new Set(prev).add(shopId));
@@ -234,10 +232,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const menuShop = activePlatform?.shops.find((s) => s.id === shopMenuAnchor?.shopId) ?? null;
     const visibleShops = activePlatform ? (showAllShops ? activePlatform.shops : activePlatform.shops.slice(0, SHOPS_PREVIEW_COUNT)) : [];
 
-    // Column pop-in priority (SAP Fiori responsive table): the shop
-    // name/code identifies the row and the row-menu action stay visible down
-    // to phone width; the linked-account and active-status columns are
-    // secondary/meta so they reflow into the pop-in area first.
+    // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
+    // ชื่อ/code ของร้านกับปุ่มเมนู action จะยังโชว์อยู่แม้จอมือถือแคบๆ
+    // ส่วนคอลัมน์บัญชีที่ลิงก์กับสถานะ active เป็นข้อมูลรองเลยถูกซ่อนก่อน
     const shopColumns: FioriResponsiveColumn<ShopItem>[] = [
         {
             key: 'shop',

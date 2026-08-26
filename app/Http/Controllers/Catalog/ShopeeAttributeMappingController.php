@@ -16,26 +16,25 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
- * Lets an admin pick which PIM attribute feeds each Shopee push field,
- * without a code change — see ShopeeProductSyncService::buildPayload()/
- * resolveMappedField() (structured fields) and resolveAttributes()
- * (`shopee_attribute`, the old attribute_list-only behavior), which read
- * this table instead of the old hardcoded pname/price_std/qty/weight_pcs/
+ * ให้แอดมินเลือกได้ว่าจะเอา PIM attribute ตัวไหนมาเติมลงฟิลด์ที่จะส่งไป Shopee
+ * โดยไม่ต้องแก้โค้ด — ดูที่ ShopeeProductSyncService::buildPayload()/
+ * resolveMappedField() (สำหรับฟิลด์ที่มีโครงสร้างชัดเจน) และ resolveAttributes()
+ * (`shopee_attribute` พฤติกรรมเดิมแบบใช้ attribute_list อย่างเดียว) ซึ่งจะอ่านจาก
+ * ตารางนี้แทนที่จะไป lookup แบบ hardcode เดิมอย่าง pname/price_std/qty/weight_pcs/
  * product_details_features/attribute_6/length_pcs/width_pcs/height_pcs
- * lookups. v1 only supports free-text Shopee attributes (input_type
- * FREE_TEXT_FILED = 3) for the `shopee_attribute` target — select/dropdown
- * attributes need a specific value_id, not free text, so they're synced for
- * visibility but rejected as a mapping target here.
+ * เวอร์ชัน 1 รองรับแค่ Shopee attribute แบบพิมพ์ข้อความอิสระ (input_type
+ * FREE_TEXT_FILED = 3) สำหรับ target แบบ `shopee_attribute` เท่านั้น — ส่วน attribute
+ * แบบ select/dropdown ต้องใช้ value_id เฉพาะเจาะจง ไม่ใช่ข้อความอิสระ เลยแค่ sync มาโชว์
+ * ให้เห็น แต่ยังเลือกมาเป็น target การแมปตรงนี้ไม่ได้
  *
- * The read-only index() this used to own now lives in
- * MarketplaceAttributeMappingController (bundled with WooCommerce/Lazada/
- * TikTok's equivalents into one Inertia response for the combined
- * "จับคู่เนื้อหา Marketplace" tabbed page) — this controller keeps only the
- * write actions.
+ * index() แบบ read-only ที่เคยอยู่ในนี้ ตอนนี้ย้ายไปอยู่ที่
+ * MarketplaceAttributeMappingController แล้ว (รวมกับของ WooCommerce/Lazada/
+ * TikTok ไว้ใน Inertia response เดียวกัน สำหรับหน้าแท็บรวม
+ * "จับคู่เนื้อหา Marketplace") — controller นี้เลยเหลือแค่ action ที่เขียนข้อมูลเท่านั้น
  */
 class ShopeeAttributeMappingController extends Controller
 {
-    private const MAPPABLE_INPUT_TYPE = 3; // FREE_TEXT_FILED
+    private const MAPPABLE_INPUT_TYPE = 3; // FREE_TEXT_FILED (แบบพิมพ์ข้อความอิสระ)
 
     private const TARGET_FIELDS = [
         'name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video',
@@ -60,12 +59,12 @@ class ShopeeAttributeMappingController extends Controller
                 collect($entries)->pluck('shopee_attribute_id')->filter()
             )->get()->keyBy('id');
 
-            // Shopee's video_upload_id expects a real uploaded video file
-            // (see ShopeeClient::uploadVideo(), which downloads whatever URL
-            // is mapped here and re-uploads it as video bytes) — same
-            // restriction Lazada/TikTok's video fields both enforce after a
-            // real push broke there when a plain-text/URL attribute (e.g.
-            // youtube_url) got mapped instead of an uploaded-file one.
+            // video_upload_id ของ Shopee ต้องการไฟล์วิดีโอที่อัปโหลดจริงๆ
+            // (ดูที่ ShopeeClient::uploadVideo() ซึ่งจะโหลด URL ที่แมปไว้ตรงนี้มา
+            // แล้วอัปโหลดขึ้นไปใหม่เป็นไฟล์วิดีโอ) — ข้อจำกัดเดียวกับที่ฟิลด์วิดีโอของ
+            // Lazada/TikTok บังคับใช้ หลังจากเคยมีปัญหาตอน push จริงเพราะดันแมป
+            // attribute ที่เป็นข้อความ/URL ธรรมดา (เช่น youtube_url) แทนที่จะเป็นไฟล์
+            // ที่อัปโหลดไว้
             $attributesById = Attribute::whereIn(
                 'id',
                 collect($entries)->pluck('attribute_id')->filter()
@@ -129,11 +128,11 @@ class ShopeeAttributeMappingController extends Controller
 
         ShopeeAttributeMapping::bumpListVersion();
 
-        // The embedded per-category picker on categories/shopee-mapping.tsx
-        // calls this same endpoint via plain fetch (Accept: application/json)
-        // instead of an Inertia visit — see
-        // BrandController::bulkMapMarketplaceBrand()'s identical branch for
-        // why. Every other caller is a real Inertia POST, unaffected.
+        // ตัวเลือกรายหมวดหมู่ที่ฝังอยู่ในหน้า categories/shopee-mapping.tsx จะเรียก
+        // endpoint นี้ผ่าน fetch ธรรมดา (Accept: application/json) แทนที่จะเป็นการ
+        // visit แบบ Inertia — ดูเหตุผลได้ที่ branch แบบเดียวกันใน
+        // BrandController::bulkMapMarketplaceBrand() ส่วนตัวเรียกอื่นๆ ที่เหลือเป็น
+        // Inertia POST จริงๆ ไม่ได้รับผลกระทบ
         if ($request->wantsJson()) {
             return response()->json(['success' => true]);
         }
@@ -142,12 +141,12 @@ class ShopeeAttributeMappingController extends Controller
     }
 
     /**
-     * Pulls Shopee's real attribute schema in (read-only against Shopee)
-     * for every PIM category currently mapped to a shopee_category_id,
-     * batched 20 at a time per get_attribute_tree's documented max, deduped
-     * globally by attribute_id (confirmed live 2026-08-14 to be stable
-     * across categories). Mirrors CategoryController::syncShopeeCategories()
-     * for account resolution.
+     * ดึงโครงสร้าง attribute จริงจาก Shopee เข้ามา (แค่อ่านอย่างเดียว ไม่ได้เขียนกลับไป)
+     * สำหรับทุกหมวดหมู่ PIM ที่แมปกับ shopee_category_id ไว้แล้ว โดยแบ่งดึงทีละ 20
+     * ตามค่า max ที่ get_attribute_tree รองรับตามเอกสาร แล้วตัดตัวซ้ำด้วย attribute_id
+     * รวมทุกหมวดหมู่ (เทสจริงเมื่อ 2026-08-14 แล้วยืนยันว่า id เดียวกันข้ามหมวดหมู่ได้
+     * ค่าเดิมเสมอ) ส่วนการหา account ใช้ตามแบบ
+     * CategoryController::syncShopeeCategories()
      */
     public function syncShopeeAttributes(): RedirectResponse
     {
@@ -197,13 +196,13 @@ class ShopeeAttributeMappingController extends Controller
     }
 
     /**
-     * Same idea as syncShopeeAttributes() above, but scoped to exactly one
-     * Shopee category — the "Sync Attributes" action on
-     * categories/shopee-mapping.tsx, next to that page's identical "Sync
-     * brand" row action (see BrandController::syncShopeeBrandsForCategory()).
-     * Unlike brands, get_attribute_tree has no pagination and a category's
-     * schema is small (single digits to a few dozen rows, not thousands), so
-     * this runs synchronously in the request — no JobTracker/queue needed.
+     * แนวคิดเดียวกับ syncShopeeAttributes() ด้านบน แต่ทำแค่หมวดหมู่ Shopee เดียว —
+     * เป็น action "Sync Attributes" บนหน้า categories/shopee-mapping.tsx ที่อยู่ข้างๆ
+     * กับ action แถว "Sync brand" แบบเดียวกันของหน้านั้น (ดู
+     * BrandController::syncShopeeBrandsForCategory()) ต่างจากแบรนด์ตรงที่
+     * get_attribute_tree ไม่มี pagination และโครงสร้างของแต่ละหมวดหมู่ก็เล็ก
+     * (แค่หลักหน่วยถึงหลักสิบกว่าแถว ไม่ใช่หลักพัน) เลยรันแบบ synchronous
+     * ในตัว request เลยได้ ไม่ต้องใช้ JobTracker/queue
      */
     public function syncShopeeAttributesForCategory(Request $request): JsonResponse
     {
@@ -242,13 +241,12 @@ class ShopeeAttributeMappingController extends Controller
     }
 
     /**
-     * Shopee attributes cached for one category (see the migration's
-     * "informational, not a real FK" caveat on that column — this lists
-     * whatever the most recent sync for that category actually saw), each
-     * annotated with whichever PIM attribute currently maps to it, if any.
-     * Backs the "จับคู่แบรนด์กับ PIM"-equivalent column's table on
-     * categories/shopee-mapping.tsx — mirrors
-     * BrandController::shopeeBrandsForCategory() exactly.
+     * Shopee attribute ที่แคชไว้สำหรับหมวดหมู่หนึ่งๆ (ดูหมายเหตุใน migration ที่บอกว่า
+     * คอลัมน์นี้ "ใช้บอกข้อมูลเฉยๆ ไม่ใช่ FK จริง" — ที่ list ออกมาก็คือสิ่งที่ sync ล่าสุด
+     * ของหมวดหมู่นั้นเจอจริงๆ) แต่ละตัวจะแนบมาด้วยว่า PIM attribute ไหนแมปอยู่ (ถ้ามี)
+     * เป็นข้อมูลหนุนหลังตารางคอลัมน์แบบเดียวกับ "จับคู่แบรนด์กับ PIM" บนหน้า
+     * categories/shopee-mapping.tsx — ทำงานเหมือนกับ
+     * BrandController::shopeeBrandsForCategory() เป๊ะๆ
      */
     public function shopeeAttributesForCategory(int $shopeeCategoryId): JsonResponse
     {
@@ -275,12 +273,11 @@ class ShopeeAttributeMappingController extends Controller
     }
 
     /**
-     * Search endpoint backing the PIM attribute Autocomplete inside that
-     * same table — the mirror image of BrandController::searchPimBrands():
-     * that one searches PIM brand options, this searches PIM attributes by
-     * label, since here too mapping starts from the Shopee side (pick a PIM
-     * attribute for a given Shopee attribute row) rather than the other way
-     * around.
+     * endpoint สำหรับค้นหาที่หนุนหลัง Autocomplete ของ PIM attribute ในตารางเดียวกันนี้
+     * — เป็นภาพสะท้อนกลับด้านของ BrandController::searchPimBrands() คือตัวนั้น
+     * ค้นหาตัวเลือกแบรนด์ของ PIM ส่วนตัวนี้ค้นหา PIM attribute จาก label เพราะที่นี่
+     * การแมปก็เริ่มจากฝั่ง Shopee เหมือนกัน (เลือก PIM attribute ให้กับแถว Shopee
+     * attribute หนึ่งๆ) ไม่ใช่เลือกกลับด้าน
      */
     public function searchPimAttributes(Request $request): JsonResponse
     {

@@ -33,11 +33,11 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * "API Usage" tab — a reference view of every marketplace API operation
-     * this app calls (MarketplaceApiCatalog), annotated with whether each
-     * platform currently has usable credentials. Never calls any of the
-     * cataloged APIs itself (see that class's docblock) — "configured" only
-     * checks for the *presence* of credentials, not that they still work.
+     * แท็บ "API Usage" — หน้าดูอ้างอิงว่าแอปนี้เรียก API อะไรของ marketplace บ้าง
+     * (MarketplaceApiCatalog) พร้อมบอกด้วยว่าแต่ละแพลตฟอร์มมี credentials
+     * ที่ใช้งานได้อยู่หรือเปล่า ตัวมันเองไม่เคยเรียก API ที่อยู่ในรายการนี้เลย
+     * (ดู docblock ของคลาสนั้น) — "configured" เช็คแค่ว่า *มี* credentials อยู่
+     * เท่านั้น ไม่ได้เช็คว่ามันยังใช้งานได้จริงหรือเปล่า
      */
     public function apiUsage(): Response
     {
@@ -56,10 +56,10 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Whether n8n's token table for this platform has at least one row —
-     * `null` (not `false`) if the n8n database connection itself couldn't
-     * be reached, so the page can show "couldn't check" instead of the
-     * misleading "not configured" for what's actually an infra hiccup.
+     * เช็คว่าตาราง token ของ n8n สำหรับแพลตฟอร์มนี้มีข้อมูลอยู่อย่างน้อย 1 แถวไหม —
+     * คืนค่า `null` (ไม่ใช่ `false`) ถ้าเชื่อมต่อฐานข้อมูล n8n เองไม่ได้เลย เพื่อให้
+     * หน้าจอแสดง "เช็คไม่ได้" แทนที่จะขึ้น "ยังไม่ได้ตั้งค่า" ซึ่งจะทำให้เข้าใจผิด
+     * ทั้งที่จริงๆ แล้วเป็นปัญหาที่ infra
      *
      * @param  class-string<LazadaSellerAccount|ShopeeSellerAccount|TikTokSellerAccount>  $model
      */
@@ -131,11 +131,11 @@ class SalesPlatformController extends Controller
             scope: ['sales_platform_id' => $salesPlatform->id],
         );
 
-        // The three sync*Shops() methods below already do this for
-        // Lazada/Shopee/TikTok shops; a manually-created shop (the only way
-        // to add one for a platform with no external account source, e.g.
-        // WooCommerce) needs the same channel so its product values can be
-        // scoped per-store too.
+        // เมธอด sync*Shops() ทั้งสามตัวด้านล่างทำแบบนี้ให้กับ shop ของ
+        // Lazada/Shopee/TikTok อยู่แล้ว ส่วน shop ที่สร้างเองด้วยมือ (ซึ่งเป็นวิธีเดียว
+        // ที่จะเพิ่ม shop ให้แพลตฟอร์มที่ไม่มีแหล่งบัญชีจากภายนอก เช่น WooCommerce)
+        // ก็ต้องมี channel แบบเดียวกันนี้เหมือนกัน เพื่อให้ค่าของ product แยกตาม
+        // ร้านได้ด้วย
         $this->ensureChannelFor($shop, $salesPlatform, $request);
 
         return back()->with('success', 'Shop created successfully.');
@@ -154,8 +154,8 @@ class SalesPlatformController extends Controller
             'updated_by' => $request->user()?->id,
         ]);
 
-        // Backfills a channel for any shop that predates the storeShop() fix
-        // above — ensureChannelFor() no-ops once $shop->channel_id is set.
+        // เติม channel ย้อนหลังให้ shop ที่ถูกสร้างไว้ก่อนที่จะแก้ storeShop() ด้านบน
+        // — ensureChannelFor() จะไม่ทำอะไรเลยถ้า $shop->channel_id ถูกตั้งค่าไว้แล้ว
         $this->ensureChannelFor($shop, $shop->platform, $request);
 
         return back()->with('success', 'Shop updated successfully.');
@@ -169,9 +169,9 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * One-time/repeatable bootstrap: mirrors n8n's already-connected Lazada
-     * shops (lazada_tokens) into sales_platform_shops under the 'lazada'
-     * platform, matched by seller_id so re-running just updates names.
+     * ตัว bootstrap ที่รันครั้งเดียวหรือรันซ้ำก็ได้: ดึง Lazada shop ที่เชื่อมต่อ
+     * ไว้แล้วใน n8n (lazada_tokens) เข้ามาใส่ใน sales_platform_shops ภายใต้
+     * แพลตฟอร์ม 'lazada' โดย match กันด้วย seller_id ทำให้รันซ้ำแค่อัปเดตชื่อ
      */
     public function syncLazadaShops(Request $request): RedirectResponse
     {
@@ -206,11 +206,11 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Same bootstrap as syncLazadaShops() above, but mirrors n8n's
-     * shopee_tokens into sales_platform_shops under the 'shopee' platform,
-     * matched by shop_id. See ShopeeSellerAccount for why this reads
-     * ::all() rather than an ::active() scope — shopee_tokens has no
-     * is_active column to filter on.
+     * bootstrap แบบเดียวกับ syncLazadaShops() ด้านบน แต่ดึงจาก shopee_tokens
+     * ของ n8n เข้ามาใส่ใน sales_platform_shops ภายใต้แพลตฟอร์ม 'shopee' แทน
+     * โดย match กันด้วย shop_id ดูที่ ShopeeSellerAccount ว่าทำไมตรงนี้ถึงใช้
+     * ::all() แทน scope ::active() — เพราะ shopee_tokens ไม่มีคอลัมน์
+     * is_active ให้กรอง
      */
     public function syncShopeeShops(Request $request): RedirectResponse
     {
@@ -245,16 +245,15 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Same bootstrap as syncLazadaShops()/syncShopeeShops() above, but
-     * mirrors n8n's tiktok_tokens into sales_platform_shops under the
-     * 'tiktok' platform, matched by id (tiktok_tokens.id, an auto-increment
-     * int like lazada_tokens.id — unlike shopee_tokens' string shop_id). See
-     * TikTokSellerAccount for why this reads ::all() rather than an
-     * ::active() scope — tiktok_tokens has no is_active column to filter
-     * on, same situation as shopee_tokens. Uses shops_code (TikTok's own
-     * short shop code, e.g. "THLCVRLWA7") for the local shop code rather
-     * than seller_id, which is a long opaque token-like string unsuited to
-     * a human-facing/URL-ish identifier.
+     * bootstrap แบบเดียวกับ syncLazadaShops()/syncShopeeShops() ด้านบน แต่ดึงจาก
+     * tiktok_tokens ของ n8n เข้ามาใส่ใน sales_platform_shops ภายใต้แพลตฟอร์ม
+     * 'tiktok' แทน โดย match กันด้วย id (tiktok_tokens.id ซึ่งเป็น int auto-increment
+     * เหมือน lazada_tokens.id — ต่างจาก shopee_tokens ที่ shop_id เป็น string)
+     * ดูที่ TikTokSellerAccount ว่าทำไมตรงนี้ถึงใช้ ::all() แทน scope ::active()
+     * — เพราะ tiktok_tokens ไม่มีคอลัมน์ is_active ให้กรอง เหมือนกับ shopee_tokens
+     * เลย ใช้ shops_code (โค้ดร้านสั้นๆ ของ TikTok เอง เช่น "THLCVRLWA7") เป็น
+     * shop code ในระบบเรา แทนที่จะใช้ seller_id ซึ่งเป็น string ยาวๆ คล้าย token
+     * ที่ไม่เหมาะจะใช้เป็น identifier ที่คนอ่านเข้าใจได้หรือใช้ใน URL
      */
     public function syncTikTokShops(Request $request): RedirectResponse
     {
@@ -289,24 +288,25 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Refreshes real live-listing status (product_platform_shops.status/
-     * platform_item_id/last_synced_at) for every active Lazada-linked shop —
-     * powers the Products list's "Sales Channels" column. Reads from Lazada
-     * (LazadaProductSyncService::syncLiveStatus()), writes only to our own
-     * DB — same risk class as syncLazadaShops()/CategoryController::
-     * syncLazadaCategories() above, safe to re-run any time.
+     * รีเฟรชสถานะ live-listing ตัวจริง (product_platform_shops.status/
+     * platform_item_id/last_synced_at) ให้ทุก shop ของ Lazada ที่ active อยู่ —
+     * เป็นตัวขับข้อมูลคอลัมน์ "Sales Channels" ในหน้ารายการ Products อ่านข้อมูล
+     * จาก Lazada (LazadaProductSyncService::syncLiveStatus()) แล้วเขียนกลับ
+     * เข้า DB ของเราเองเท่านั้น — เสี่ยงพอๆ กับ syncLazadaShops()/
+     * CategoryController::syncLazadaCategories() ด้านบน รันซ้ำเมื่อไหร่ก็ได้
+     * ปลอดภัย
      *
-     * Runs synchronously rather than as a queued job — confirmed live,
-     * 2026-08-13: this environment has 225 jobs stuck in the `jobs` table
-     * from 5 days earlier (all clustered within one ~20-minute window, none
-     * since), meaning a queue worker isn't reliably running here. Queuing
-     * this would trade a visible timeout for a silent no-op (dispatched,
-     * "success" shown, nothing ever actually runs) — worse. Instead:
-     * set_time_limit() covers 8 shops × several paginated Lazada calls each
-     * (confirmed to exceed PHP's default 60s ceiling live), and a short
-     * pause between shops spreads out requests to reduce (not guarantee
-     * against — Lazada's own limit is opaque) hitting Lazada's "901: too
-     * frequent" rate limit, which one shop did mid-run before this fix.
+     * รันแบบ synchronous แทนที่จะเป็น queued job — เช็คจากของจริงแล้วเมื่อ
+     * 2026-08-13: environment นี้มี job ค้างอยู่ในตาราง `jobs` ถึง 225 job
+     * จากเมื่อ 5 วันก่อน (กระจุกอยู่ในช่วง ~20 นาทีเดียวกัน หลังจากนั้นไม่มีอีกเลย)
+     * แปลว่า queue worker ไม่ได้รันอยู่แบบเสถียรในนี้ ถ้าเอาไปทำเป็น queue จะกลาย
+     * เป็นแลก timeout ที่เห็นได้ชัด มาเป็น no-op แบบเงียบๆ แทน (dispatch ไปแล้ว
+     * ขึ้น "success" แต่ไม่มีอะไรรันจริงเลย) ซึ่งแย่กว่าเดิม เลยใช้วิธีนี้แทน:
+     * set_time_limit() ครอบคลุมทั้ง 8 shop × การเรียก Lazada แบบแบ่งหน้าหลาย
+     * ครั้งต่อ shop (เช็คแล้วว่าเกินเพดาน 60 วินาทีเริ่มต้นของ PHP จริงๆ) และการ
+     * พักสั้นๆ ระหว่าง shop ก็ช่วยกระจายการยิง request ลดโอกาส (ไม่ได้การันตี —
+     * limit ของ Lazada เองก็ไม่เปิดเผยชัดเจน) โดนลิมิต "901: too frequent" ของ
+     * Lazada ซึ่งเคยเกิดขึ้นกับ shop หนึ่งระหว่างรันก่อนจะแก้ตรงนี้
      */
     public function syncLiveStatus(): RedirectResponse
     {
@@ -341,12 +341,11 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Same sync as syncLiveStatus() above, but for exactly one shop —
-     * finishes well within PHP's default time limit (one shop's own
-     * pagination loop, not eight shops' worth back to back) and only spends
-     * this shop's share of Lazada's rate limit, so a shop that failed in the
-     * bulk sync (or just needs a quicker check) can be retried on its own
-     * without waiting on — or re-hitting the limit via — every other shop.
+     * sync แบบเดียวกับ syncLiveStatus() ด้านบน แต่ทำแค่ shop เดียว — เสร็จได้
+     * สบายๆ ภายใน time limit เริ่มต้นของ PHP (วน pagination แค่ของ shop เดียว
+     * ไม่ใช่ต่อกัน 8 shop) และใช้ rate limit ของ Lazada แค่ส่วนของ shop นี้เท่านั้น
+     * ทำให้ shop ที่ sync แบบ bulk แล้วพัง (หรือแค่อยากเช็คไวๆ) รีทรายเฉพาะตัว
+     * เองได้ โดยไม่ต้องรอ — หรือไปโดนลิมิตซ้ำผ่าน — shop ตัวอื่นๆ
      */
     public function syncShopLiveStatus(SalesPlatformShop $shop): RedirectResponse
     {
@@ -370,10 +369,10 @@ class SalesPlatformController extends Controller
     }
 
     /**
-     * Every shop needs a Channel so Edit Product's existing channel-based
-     * value scoping (price, description, ...) can hold a value specific to
-     * that shop — see the "sales platforms vs channels" design discussion.
-     * Only ever creates once per shop; never touches an already-linked one.
+     * ทุก shop ต้องมี Channel เพื่อให้กลไก scoping ค่าตาม channel ที่มีอยู่แล้วใน
+     * หน้า Edit Product (price, description, ...) เก็บค่าเฉพาะของ shop นั้นได้
+     * ด้วย — ดูที่บทสนทนาเรื่องดีไซน์ "sales platforms vs channels"
+     * จะสร้างให้แค่ครั้งเดียวต่อ shop เท่านั้น ถ้ามี channel ผูกอยู่แล้วจะไม่แตะต้องเลย
      */
     private function ensureChannelFor(SalesPlatformShop $shop, SalesPlatform $platform, Request $request): void
     {
@@ -408,13 +407,12 @@ class SalesPlatformController extends Controller
         $shop->channel_id = $channel->id;
         $shop->save();
 
-        // Channel::cachedAll() (used by ProductController::edit()'s Sales
-        // Channels panel, among others) is keyed by this version number and
-        // otherwise never notices a channel created outside ChannelController::
-        // store() — confirmed live, 2026-08-20: a shop's new channel existed
-        // in the database but never appeared in the product edit page's Sales
-        // Channels list until this was added, since the cached channel list
-        // was never invalidated.
+        // Channel::cachedAll() (ใช้โดยแผง Sales Channels ใน ProductController::edit()
+        // และที่อื่นๆ) จะ key ด้วยเลขเวอร์ชันตัวนี้ ถ้าไม่ทำแบบนี้มันจะไม่มีทางรู้เลยว่ามี
+        // channel ที่ถูกสร้างนอก ChannelController::store() — เช็คจากของจริงแล้วเมื่อ
+        // 2026-08-20: channel ใหม่ของ shop มีอยู่ในฐานข้อมูลจริง แต่ไม่เคยโผล่ในลิสต์
+        // Sales Channels ของหน้า edit product เลยจนกว่าจะเพิ่มบรรทัดนี้เข้าไป เพราะ
+        // cache ของลิสต์ channel ไม่เคยถูก invalidate
         Channel::bumpListVersion();
     }
 }

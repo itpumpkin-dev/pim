@@ -33,21 +33,21 @@ class AttributeController extends Controller
     {
         $grid = new GridManager('attribute_grid');
 
-        // `name` is a language-agnostic fallback column (see Attribute::name()
-        // accessor) — what the grid actually displays is each attribute's
-        // translated label, which lives in a separate translations table.
-        // GridManager's generic search/per-column filter only know how to
-        // LIKE-match real columns, so matching by name is handled here
-        // instead: attribute_grid.yml's `filters.global` block was removed
-        // entirely (GridManager ANDs its own search clause with whatever
-        // this closure adds, so a narrower built-in `code`/`type`-only
-        // clause would silently absorb — and defeat — the broader one
-        // below), and `name` is stripped from the per-column filters input
-        // before GridManager sees it, then both are handled below against
-        // the fallback column and the translations table.
+        // `name` เป็นคอลัมน์ fallback ที่ไม่ผูกกับภาษาไหนเป็นพิเศษ (ดู
+        // accessor Attribute::name()) — สิ่งที่ grid โชว์จริงๆ คือ label
+        // ที่แปลแล้วของแต่ละ attribute ซึ่งอยู่ในตาราง translations แยกต่างหาก
+        // ฟีเจอร์ search/filter ทั่วไปของ GridManager รู้แค่วิธี LIKE-match
+        // กับคอลัมน์จริงเท่านั้น เลยต้องมาจัดการ match ด้วย name ตรงนี้แทน
+        // โดยเอา block `filters.global` ใน attribute_grid.yml ออกไปทั้งหมด
+        // (เพราะ GridManager จะเอา search clause ของตัวเองมา AND กับสิ่งที่
+        // closure นี้เพิ่มเข้าไป ถ้ามี clause แคบๆ ที่ built-in ไว้แบบ
+        // `code`/`type` เท่านั้น มันจะกลืนและทำลาย clause ที่กว้างกว่าด้าน
+        // ล่างนี้ไปเงียบๆ) แล้วก็ตัด `name` ออกจาก input ของ per-column
+        // filters ก่อนที่ GridManager จะเห็นมัน จากนั้นค่อยจัดการทั้งคู่
+        // ด้านล่างนี้กับทั้งคอลัมน์ fallback และตาราง translations
         $search = $request->input('search');
-        // (array) cast — see GridManager::getData()'s comment: an empty
-        // `?filters=` query param arrives here as a literal null.
+        // cast เป็น (array) — ดูคอมเมนต์ใน GridManager::getData() ประกอบ:
+        // ถ้า query param `?filters=` ว่างเปล่า มันจะมาถึงตรงนี้เป็น null ตรงๆ
         $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
 
@@ -60,8 +60,9 @@ class AttributeController extends Controller
         return Inertia::render('catalog/attributes/index', [
             'gridConfig' => $grid->getConfig(),
             'gridData' => $gridData,
-            // Explicit keys, not only() — see ProductController::index() for why
-            // an empty array here (vs. object) is a landmine for `filters.sort`.
+            // ใส่ key ตรงๆ แบบนี้ ไม่ใช้ only() — ดูเหตุผลได้ที่
+            // ProductController::index() ว่าทำไม array ว่าง (เทียบกับ object)
+            // ตรงนี้ถึงเป็นกับดักสำหรับ `filters.sort`
             'filters' => [
                 'search' => $search ?? '',
                 'sort' => $request->input('sort', ''),
@@ -72,10 +73,10 @@ class AttributeController extends Controller
     }
 
     /**
-     * Shared by index() and export() — see index()'s comment on why `name`
-     * (a fallback column that stands in for the attribute's translated
-     * label) needs this bespoke handling instead of GridManager's generic
-     * per-column filtering.
+     * ใช้ร่วมกันระหว่าง index() กับ export() — ดูคอมเมนต์ใน index()
+     * ประกอบว่าทำไม `name` (คอลัมน์ fallback ที่แทน label ที่แปลแล้วของ
+     * attribute) ถึงต้องจัดการแบบเฉพาะทางนี้ แทนที่จะใช้ per-column
+     * filtering แบบทั่วไปของ GridManager
      */
     private function applyNameAwareSearch($query, ?string $search, mixed $nameFilter): void
     {
@@ -97,10 +98,10 @@ class AttributeController extends Controller
     }
 
     /**
-     * Exports the attribute list as CSV/XLS/XLSX, honoring whatever
-     * search/column-filters are currently applied on the list page (same
-     * query-building as index(), just unpaginated) — mirrors
-     * ProductController::quickExport()'s shape.
+     * ส่งออกรายการ attribute เป็น CSV/XLS/XLSX โดยยึดตาม search/
+     * column-filters ที่กำลังใช้อยู่ในหน้า list ตอนนั้น (สร้าง query
+     * เหมือนกับ index() เลย แค่ไม่แบ่งหน้า) — ทำตามรูปแบบเดียวกับ
+     * ProductController::quickExport()
      */
     public function export(Request $request): BinaryFileResponse
     {
@@ -110,12 +111,12 @@ class AttributeController extends Controller
         ]);
         $format = $validated['format'];
 
-        // Forced explicitly from what the list page is actually showing,
-        // rather than left to resolve from the session/cookie the way
-        // SetLocale normally does — a user whose profile has no saved UI
-        // locale and whose `locale` cookie doesn't ride along on this
-        // particular request would otherwise silently export in whatever
-        // the app's default locale is instead of matching their screen.
+        // บังคับใช้ locale ตามที่หน้า list กำลังแสดงอยู่จริงตรงๆ เลย
+        // แทนที่จะปล่อยให้ resolve จาก session/cookie แบบที่ SetLocale
+        // ทำตามปกติ — เพราะถ้าเป็น user ที่โปรไฟล์ไม่มี locale UI ที่บันทึกไว้
+        // และ cookie `locale` ก็ไม่ได้ติดมากับ request นี้ ระบบจะเงียบๆ
+        // export ออกมาเป็น locale default ของแอปแทน ซึ่งจะไม่ตรงกับที่
+        // หน้าจอ user กำลังแสดงอยู่
         if (! empty($validated['locale'])) {
             app()->setLocale($validated['locale']);
         }
@@ -124,8 +125,8 @@ class AttributeController extends Controller
         $columns = array_keys($grid->getConfig()['columns']);
 
         $search = $request->input('search');
-        // (array) cast — see GridManager::getData()'s comment: an empty
-        // `?filters=` query param arrives here as a literal null.
+        // cast เป็น (array) — ดูคอมเมนต์ใน GridManager::getData() ประกอบ:
+        // ถ้า query param `?filters=` ว่างเปล่า มันจะมาถึงตรงนี้เป็น null ตรงๆ
         $originalFilters = (array) $request->input('filters', []);
         $nameFilter = $originalFilters['name'] ?? null;
         $columnFilters = ($nameFilter !== null && $nameFilter !== '')
@@ -333,8 +334,9 @@ class AttributeController extends Controller
     }
 
     /**
-     * Fresh (uncached) locale_id => label map for the attribute's current
-     * translations — used to snapshot before/after state for audit diffs.
+     * ดึง map locale_id => label ของ translation ปัจจุบันของ attribute
+     * แบบสดๆ (ไม่ใช้ cache) — ใช้สำหรับ snapshot สถานะก่อน/หลัง เพื่อไปทำ
+     * audit diff
      */
     private function currentTranslations(Attribute $attribute): array
     {
@@ -360,13 +362,13 @@ class AttributeController extends Controller
     }
 
     /**
-     * When "AI translate" is enabled and the default locale's label is
-     * filled in, queues a job to pre-fill every other active locale that
-     * doesn't already have a translation — kept off the request/response
-     * cycle since it's a handful of translation-provider calls, one per
-     * missing locale, which is too slow to make Save wait on. Skipped
-     * entirely if the default locale's own label is empty, since we'd
-     * otherwise have no reliable source text/language to translate from.
+     * ถ้าเปิด "AI translate" ไว้ และมีการกรอก label ของ locale default
+     * แล้ว จะ queue job ไปเติม label ให้ทุก locale ที่ active อยู่แล้ว
+     * ยังไม่มี translation — ตั้งใจให้ทำงานนอก request/response cycle
+     * เพราะเป็นการยิง call ไปยัง translation provider หลายครั้ง (ครั้งละ
+     * locale ที่ขาด) ซึ่งช้าเกินกว่าจะให้ Save รอ จะข้ามไปเลยถ้า label
+     * ของ locale default เองว่างเปล่า เพราะงั้นเราจะไม่มีต้นฉบับ
+     * ข้อความ/ภาษาที่เชื่อถือได้ให้แปลจาก
      */
     private function autoTranslate(Attribute $attribute, array $translations): void
     {
@@ -390,12 +392,12 @@ class AttributeController extends Controller
     }
 
     /**
-     * Picks which locale to translate FROM. Prefers the app's default
-     * locale when it was filled in, but falls back to whichever locale
-     * actually has a label otherwise — a form submitting only a non-default
-     * locale's translation (e.g. an editor working in a locale other than
-     * the app default) would otherwise silently skip auto-translation
-     * entirely, since nothing was ever in the default locale to begin with.
+     * เลือกว่าจะแปลจาก locale ไหน จะพยายามใช้ locale default ของแอปก่อน
+     * ถ้ามีค่ากรอกไว้ แต่ถ้าไม่มีก็ fallback ไปใช้ locale ไหนก็ได้ที่มี
+     * label อยู่ — ถ้าฟอร์มส่งมาแค่ translation ของ locale ที่ไม่ใช่
+     * default (เช่น ผู้แก้ไขทำงานอยู่ใน locale อื่นที่ไม่ใช่ default ของ
+     * แอป) จะทำให้ auto-translation ถูกข้ามไปเงียบๆ ทั้งหมด เพราะตั้งแต่
+     * แรกไม่มีอะไรอยู่ใน locale default เลย
      *
      * @param  array<int|string, mixed>  $translations
      * @return array{0: int|null, 1: string}

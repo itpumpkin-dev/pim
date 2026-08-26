@@ -139,10 +139,10 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
         );
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the selection
-    // checkbox and sku identify/act on the row and stay pinned; the missing-
-    // locales chips are this page's whole point so they follow close behind;
-    // family/status are secondary context. Row actions stay pinned too.
+    // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
+    // checkbox เลือกแถวกับ sku เป็นตัวระบุ/action ของแถวเลยปักหมุดไว้ตลอด
+    // ส่วน chip ของ locale ที่ขาดคำแปลคือใจความหลักของหน้านี้เลยตามมาติดๆ
+    // family/status เป็นข้อมูลรองประกอบ ส่วน action ของแถวก็ปักหมุดไว้เหมือนกัน
     const columns: FioriResponsiveColumn<MissingRow>[] = [
         ...(canEdit
             ? [

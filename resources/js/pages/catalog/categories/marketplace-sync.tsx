@@ -10,19 +10,18 @@ import { useTranslation } from 'react-i18next';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { FIORI, FioriStatus, fioriDefaultSx, type FioriTone } from '@/lib/fiori-style';
 
-// One row per platform instead of a picker-tile + single detail panel (the
-// old design only ever showed one platform's actions at a time) — every
-// platform's available actions are visible at once now, so adding another
-// platform is still just one more entry here plus its own backend route.
+// ทำเป็นตารางแถวละแพลตฟอร์ม แทนที่จะเป็น picker-tile + panel รายละเอียดอันเดียว
+// (ดีไซน์เดิมโชว์ action ได้ทีละแพลตฟอร์มเท่านั้น) — ตอนนี้เห็น action ของทุก
+// แพลตฟอร์มพร้อมกันเลย จะเพิ่มแพลตฟอร์มใหม่ก็แค่เพิ่ม entry ตรงนี้กับ route ฝั่ง
+// backend เพิ่มอีกอันเดียวจบ
 //
-// Category AND brand sync/mapping both live on each platform's own
-// categories/{platform}-mapping.tsx page now (Shopee and Lazada first,
-// TikTok and WooCommerce brought in line the same way — see each page's
-// docblock) — reviewing a category tree and its associated brand catalog
-// side by side beat a separate global hub for every action, not just the
-// ones where the brand catalog happens to be category-scoped. This hub is
-// left with only "Map" (a shortcut into that page) plus WooCommerce's own
-// export/import, which have nowhere more specific to live.
+// ตอนนี้การ sync/mapping ทั้งหมวดหมู่และแบรนด์ ย้ายไปอยู่ที่หน้า
+// categories/{platform}-mapping.tsx ของแต่ละแพลตฟอร์มแล้ว (Shopee กับ Lazada
+// ทำก่อน ส่วน TikTok กับ WooCommerce ตามมาทีหลังด้วยแนวทางเดียวกัน — ดู docblock
+// ของแต่ละหน้า) — เพราะดูต้นไม้หมวดหมู่คู่กับ brand catalog ที่ผูกกันในหน้าเดียว
+// มันดีกว่าทำเป็น hub กลางแยกทุก action ออกมา ไม่ใช่แค่เคสที่ brand catalog
+// ผูกกับหมวดหมู่เท่านั้น หน้านี้เลยเหลือแค่ปุ่ม "Map" (ทางลัดไปหน้านั้น) กับ
+// export/import ของ WooCommerce เอง ที่ยังไม่มีที่เฉพาะให้ไปอยู่
 const CATEGORY_SYNC_PLATFORMS = [
     { value: 'lazada', label: 'Lazada', mappingRoute: '/catalog/categories/lazada-mapping', exportRoute: null, importRoute: null },
     { value: 'shopee', label: 'Shopee', mappingRoute: '/catalog/categories/shopee-mapping', exportRoute: null, importRoute: null },
@@ -44,7 +43,7 @@ function formatLocalDateTime(value: string | null): string {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString('th-TH-u-ca-gregory', { timeZone: 'Asia/Bangkok' });
 }
 
-/** Fiori ObjectStatus tone for how stale a sync timestamp is — never synced (or unparseable) reads as neutral, not an error; there's nothing wrong yet, just nothing done. */
+/** โทนสี Fiori ObjectStatus บอกว่าเวลา sync เก่าแค่ไหน — ถ้ายังไม่เคย sync (หรือ parse วันที่ไม่ได้) จะถือเป็น neutral ไม่ใช่ error เพราะยังไม่มีอะไรผิดพลาด แค่ยังไม่ได้ทำเท่านั้นเอง */
 function syncFreshnessTone(value: string | null): FioriTone {
     if (!value) return 'neutral';
     const date = new Date(value);
@@ -75,9 +74,9 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
         { title: t('marketplaceSyncTitle'), href: '#' },
     ];
 
-    // Keyed by platform value, not a single shared boolean — every row's
-    // import button is independently clickable (the old design only ever
-    // had one "selected" platform, so one boolean was enough).
+    // ใช้ key เป็นค่าของแพลตฟอร์ม ไม่ใช่ boolean ตัวเดียวใช้ร่วมกัน — เพราะปุ่ม
+    // import ของแต่ละแถวต้องกดแยกอิสระจากกันได้ (ดีไซน์เดิมมีแพลตฟอร์มที่ "เลือกอยู่"
+    // แค่ตัวเดียว เลยใช้ boolean ตัวเดียวพอ)
     const [importingPlatform, setImportingPlatform] = useState<string | null>(null);
 
     const runImport = (platform: Platform) => {

@@ -83,8 +83,7 @@ interface Props {
     filters: { search?: string; sort?: string; dir?: string; platform?: string };
 }
 
-// Same colors as categories/index.tsx's MAPPED_PLATFORMS for visual
-// consistency across the app.
+// ใช้สีชุดเดียวกับ MAPPED_PLATFORMS ใน categories/index.tsx เพื่อให้สีสันในแอปดูเป็นระบบเดียวกัน
 const MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
     { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
     { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
@@ -97,14 +96,13 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     const { t: tGrid } = useTranslation('grid');
     const { t: tNav } = useTranslation('nav');
 
-    // Brands are AttributeOption rows under the hood, but split into their
-    // own `brands` permission resource (distinct from `attributes`) so a
-    // role can be granted one without the other — see the
-    // split_brands_permission_from_attributes migration. Add/edit/delete
-    // here all go through routes gated by brands.edit_brands, so one check
-    // covers the whole page's write actions (viewing the list itself only
-    // needs list_brands, already enforced by the index route and the
-    // sidebar nav entry).
+    // จริงๆ แล้ว Brand คือแถวข้อมูลของ AttributeOption ข้างในนั่นแหละ แต่แยกออกมาเป็น
+    // permission resource ของตัวเอง (`brands`) ต่างหากจาก `attributes` เพื่อให้กำหนดสิทธิ์
+    // ให้ role ใช้อย่างใดอย่างหนึ่งได้โดยไม่ต้องให้อีกอันด้วย — ดูได้จาก migration
+    // split_brands_permission_from_attributes การเพิ่ม/แก้ไข/ลบ ที่นี่ทั้งหมดจะผ่าน
+    // route ที่เช็คสิทธิ์ brands.edit_brands ดังนั้นเช็คแค่ตัวเดียวก็ครอบคลุมการเขียนข้อมูล
+    // ทั้งหน้าแล้ว (แค่ดูรายการเฉยๆ ใช้แค่สิทธิ์ list_brands ซึ่ง route index กับเมนู sidebar
+    // บังคับเช็คให้อยู่แล้ว)
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
     const canEdit = permissions.includes('brands.edit_brands');
@@ -176,13 +174,12 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
         router.visit(url);
     };
 
-    // Column pop-in priority (SAP Fiori responsive table): the brand name
-    // identifies the row and row actions stay visible down to phone width;
-    // the products-count chip is a primary interactive control (navigates to
-    // the brand's products) so it stays next in line, then mapped platforms
-    // and description, with the low-value slug reflowing first — the
-    // decorative thumbnail carries no data worth restating as a label/value
-    // pair, so it's dropped from the pop-in entirely.
+    // ลำดับความสำคัญของคอลัมน์เวลาจอแคบ (ตาราง responsive แบบ SAP Fiori): ชื่อแบรนด์ใช้
+    // ระบุแถวและปุ่ม actions ต้องโชว์ตลอดแม้จอมือถือแคบสุด ส่วน chip นับจำนวนสินค้าเป็น
+    // ปุ่มที่กดใช้งานได้จริง (กดแล้วไปหน้าสินค้าของแบรนด์นั้น) เลยได้ความสำคัญรองลงมา
+    // ตามด้วยแพลตฟอร์มที่ map ไว้กับคำอธิบาย ส่วน slug ที่มีประโยชน์น้อยสุดจะโดนซ่อนก่อน —
+    // ส่วน thumbnail ที่เป็นแค่รูปประกอบไม่มีข้อมูลอะไรที่คุ้มจะเอาไปโชว์แบบ label/value เลย
+    // ตัดออกจาก pop-in ไปเลย
     const columns: FioriResponsiveColumn<BrandItem>[] = [
         {
             key: 'thumbnail',
