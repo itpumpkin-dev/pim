@@ -40,6 +40,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import {
     FIORI,
     fioriCardSx,
@@ -186,26 +187,15 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
             header: t('imageLabel'),
             priority: 'low',
             hideInPopin: true,
-            render: (row) =>
-                row.thumbnail_url ? (
-                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 1.5, border: `1px solid ${FIORI.border}` }} />
-                ) : (
-                    <Box
-                        sx={{
-                            height: 38,
-                            width: 38,
-                            borderRadius: 1.5,
-                            bgcolor: 'grey.100',
-                            border: `1px solid ${FIORI.border}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'grey.500',
-                        }}
-                    >
-                        <ImageOutlinedIcon fontSize="small" />
-                    </Box>
-                ),
+            render: (row) => (
+                <ClickableThumbnail
+                    src={row.thumbnail_url}
+                    alt={row.admin_label || row.code}
+                    size={38}
+                    radius={1.5}
+                    fallback={<ImageOutlinedIcon fontSize="small" sx={{ color: 'grey.500' }} />}
+                />
+            ),
         },
         {
             key: 'name',
@@ -319,6 +309,7 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
     ];
 
     return (
+        <ImagePreviewProvider>
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('brandsTitle')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
@@ -547,5 +538,6 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                 </DialogActions>
             </Dialog>
         </AppLayout>
+        </ImagePreviewProvider>
     );
 }

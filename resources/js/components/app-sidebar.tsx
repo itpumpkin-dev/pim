@@ -375,8 +375,7 @@ export function AppSidebar() {
                     width: hasSubmenus && !collapsed ? SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON : 0,
                     opacity: hasSubmenus && !collapsed ? 1 : 0,
                     overflow: 'hidden',
-                    bgcolor: FIORI.pageBg,
-                    borderLeft: `1px solid ${FIORI.border}`,
+                    bgcolor: FIORI.surface,
                 }}
             >
                 <Toolbar

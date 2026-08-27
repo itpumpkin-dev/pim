@@ -33,6 +33,37 @@ export const PALETTE = {
     redAlert: '#EF4444',
 } as const;
 
+/* ──────────────────────────────────────────────────────────────────────
+ *  Fiori Horizon "Shell Bar" tokens
+ *  ────────────────────────────────
+ *  A local approximation of the SAP Fiori (Horizon theme) shell-bar CSS
+ *  custom properties — --sapShellColor, --sapShell_TextColor,
+ *  --sapShell_Shadow, --sapShell_Hover_Background,
+ *  --sapShell_InteractiveTextColor — consumed only by <AppSidebarHeader>.
+ *  This is NOT a full design-system swap: the rest of the app keeps the
+ *  MUI palette above. See sap.com/design-system/fiori-design-web →
+ *  UI elements → Shell Bar.
+ * ────────────────────────────────────────────────────────────────────── */
+export function getFioriShell(mode: PaletteMode) {
+    const isDark = mode === 'dark';
+
+    return {
+        height: 44, //                                         2.75rem — Horizon shell-bar height
+        color: isDark ? '#1c2228' : '#ffffff', //              --sapShellColor
+        textColor: isDark ? '#eaecee' : '#1d2d3e', //          --sapShell_TextColor
+        secondaryTextColor: isDark ? '#a9b4be' : '#556b82', // muted title / breadcrumb
+        interactiveColor: isDark ? '#7fc5ff' : '#0064d9', //   --sapShell_InteractiveTextColor
+        hoverBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(85,107,130,0.10)', // --sapShell_Hover_Background
+        activeBg: isDark ? 'rgba(255,255,255,0.16)' : 'rgba(85,107,130,0.20)', // --sapShell_Active_Background
+        searchBg: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(85,107,130,0.08)',
+        searchBorder: isDark ? 'rgba(255,255,255,0.22)' : 'rgba(34,54,73,0.20)',
+        shadow: isDark
+            ? '0 0.125rem 0.5rem 0 rgba(0,0,0,0.45)'
+            : '0 0.125rem 0.125rem 0 rgba(34,54,73,0.10), inset 0 -1px 0 0 rgba(34,54,73,0.08)', // --sapShell_Shadow
+        borderRadius: 8, //                                    0.5rem — Horizon button radius
+    } as const;
+}
+
 export function getTheme(mode: PaletteMode) {
     const isDark = mode === 'dark';
 

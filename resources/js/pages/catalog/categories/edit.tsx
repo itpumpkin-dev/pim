@@ -32,6 +32,9 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
 import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/catalog/lazada-category-picker';
+import { ShopeeCategoryPicker, type ShopeeCategoryOption } from '@/components/catalog/shopee-category-picker';
+import { TikTokCategoryPicker, type TikTokCategoryOption } from '@/components/catalog/tiktok-category-picker';
+import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/components/catalog/woocommerce-category-picker';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface CategoryItem {
@@ -47,6 +50,12 @@ interface CategoryItem {
     additional_data: Record<string, any> | null;
     lazada_category_id: number | null;
     lazada_category: LazadaCategoryOption | null;
+    shopee_category_id: number | null;
+    shopee_category: ShopeeCategoryOption | null;
+    tiktok_category_id: number | null;
+    tiktok_category: TikTokCategoryOption | null;
+    woocommerce_category_id: number | null;
+    woocommerce_category: WooCommerceCategoryOption | null;
 }
 
 interface Props {
@@ -71,6 +80,9 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
     ];
 
     const [lazadaCategory, setLazadaCategory] = useState<LazadaCategoryOption | null>(category.lazada_category);
+    const [shopeeCategory, setShopeeCategory] = useState<ShopeeCategoryOption | null>(category.shopee_category);
+    const [tiktokCategory, setTiktokCategory] = useState<TikTokCategoryOption | null>(category.tiktok_category);
+    const [woocommerceCategory, setWoocommerceCategory] = useState<WooCommerceCategoryOption | null>(category.woocommerce_category);
 
     const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         code: category.code || '',
@@ -79,6 +91,9 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
         description: category.description || '',
         parent_id: (category.parent_id !== null ? category.parent_id : '') as string | number,
         lazada_category_id: category.lazada_category_id,
+        shopee_category_id: category.shopee_category_id,
+        tiktok_category_id: category.tiktok_category_id,
+        woocommerce_category_id: category.woocommerce_category_id,
         additional_data: (category.additional_data || {}) as Record<string, any>,
         slug: category.slug || '',
         display_type: category.display_type || 'default',
@@ -229,18 +244,70 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                                 label={t('active')}
                             />
                             <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                    {t('lazadaCategoryLabel')}
+                                <Typography variant="body2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                    {t('marketplaceCategoryTitle')}
                                 </Typography>
-                                <LazadaCategoryPicker
-                                    value={lazadaCategory}
-                                    onChange={(next) => {
-                                        setLazadaCategory(next);
-                                        setData('lazada_category_id', next?.id ?? null);
-                                    }}
-                                    placeholder={t('lazadaCategoryPlaceholder')}
-                                />
-                                {errors.lazada_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.lazada_category_id}</Alert>}
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                                    {t('marketplaceCategoryHelperText')}
+                                </Typography>
+                                <Stack spacing={2}>
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                            {t('lazadaCategoryLabel')}
+                                        </Typography>
+                                        <LazadaCategoryPicker
+                                            value={lazadaCategory}
+                                            onChange={(next) => {
+                                                setLazadaCategory(next);
+                                                setData('lazada_category_id', next?.id ?? null);
+                                            }}
+                                            placeholder={t('lazadaCategoryPlaceholder')}
+                                        />
+                                        {errors.lazada_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.lazada_category_id}</Alert>}
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                            {t('shopeeCategoryLabel')}
+                                        </Typography>
+                                        <ShopeeCategoryPicker
+                                            value={shopeeCategory}
+                                            onChange={(next) => {
+                                                setShopeeCategory(next);
+                                                setData('shopee_category_id', next?.id ?? null);
+                                            }}
+                                            placeholder={t('shopeeCategoryPlaceholder')}
+                                        />
+                                        {errors.shopee_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.shopee_category_id}</Alert>}
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                            {t('tiktokCategoryLabel')}
+                                        </Typography>
+                                        <TikTokCategoryPicker
+                                            value={tiktokCategory}
+                                            onChange={(next) => {
+                                                setTiktokCategory(next);
+                                                setData('tiktok_category_id', next?.id ?? null);
+                                            }}
+                                            placeholder={t('tiktokCategoryPlaceholder')}
+                                        />
+                                        {errors.tiktok_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.tiktok_category_id}</Alert>}
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                                            {t('woocommerceCategoryLabel')}
+                                        </Typography>
+                                        <WooCommerceCategoryPicker
+                                            value={woocommerceCategory}
+                                            onChange={(next) => {
+                                                setWoocommerceCategory(next);
+                                                setData('woocommerce_category_id', next?.id ?? null);
+                                            }}
+                                            placeholder={t('woocommerceCategoryPlaceholder')}
+                                        />
+                                        {errors.woocommerce_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.woocommerce_category_id}</Alert>}
+                                    </Box>
+                                </Stack>
                             </Box>
                         </Stack>
                     </Paper>

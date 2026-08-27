@@ -1,11 +1,11 @@
-import { ProductCard } from '@/components/product-card';
-import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import AppLogoIcon from '@/components/app-logo-icon';
 import LocaleDropdown from '@/components/locale-dropdown';
+import { ProductCard } from '@/components/product-card';
 import SplashScreen from '@/components/splash-screen';
-import { downloadCsv } from '@/lib/csv';
-import { getCategoryIcon } from '@/lib/category-icon';
+import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
+import { getCategoryIcon } from '@/lib/category-icon';
+import { downloadCsv } from '@/lib/csv';
 import { trackEvent } from '@/lib/track-event';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -14,12 +14,19 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
+import LoginIcon from '@mui/icons-material/Login';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
-import LoginIcon from '@mui/icons-material/Login';
-import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Skeleton, Stack, TextField, Toolbar, Typography } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Stack, TextField, Toolbar, Typography } from '@mui/material';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+// How many product cards to render on first paint, and how many more each
+// time the load-more sentinel scrolls into view. The full result set can be
+// 150+ products — rendering every MUI card up front is the single biggest
+// main-thread cost on this page.
+const INITIAL_VISIBLE = 24;
+const LOAD_MORE_STEP = 24;
 
 const SLIDE_ICONS: IconType[] = [ScienceIcon, ConstructionIcon, LocalOfferOutlinedIcon];
 const SLIDE_GRADIENTS = [
@@ -186,21 +193,22 @@ export default function Home({
     const { auth } = usePage<SharedData>().props;
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
-    const [loading, setLoading] = useState(true);
+    const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+    const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const [showSplash, setShowSplash] = useState(true);
     const [splashExiting, setSplashExiting] = useState(false);
 
     useEffect(() => {
-        // Mount the real content while the splash is still fully opaque (not
-        // mid-fade) so the heavy product grid render doesn't compete with the
-        // splash's exit transition on the main thread.
-        const timer = setTimeout(() => {
-            setLoading(false);
-        }, 50);
-        return () => clearTimeout(timer);
-    }, []);
-
-    useEffect(() => {
+        // The splash is a first-impression flourish, not a loading gate — the
+        // product data is already in the Inertia props by the time this renders.
+        // Show it once per browser session; on every later client-side visit to
+        // home, drop it on the first effect tick so the page isn't held behind a
+        // ~1.3s animation it doesn't need.
+        if (window.sessionStorage.getItem('home-splash-shown')) {
+            setShowSplash(false);
+            return;
+        }
+        window.sessionStorage.setItem('home-splash-shown', '1');
         const exitTimer = setTimeout(() => setSplashExiting(true), 900);
         const hideTimer = setTimeout(() => setShowSplash(false), 1300);
         return () => {
@@ -222,6 +230,32 @@ export default function Home({
             return matchesCategory && matchesQuery;
         });
     }, [products, selectedCategory, search]);
+
+    // Collapse the visible window back to the first page whenever the filter or
+    // search changes, then grow it as the sentinel below the grid scrolls in.
+    useEffect(() => {
+        setVisibleCount(INITIAL_VISIBLE);
+    }, [selectedCategory, search]);
+
+    useEffect(() => {
+        const sentinel = loadMoreRef.current;
+        if (!sentinel) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0]?.isIntersecting) {
+                    setVisibleCount((current) => current + LOAD_MORE_STEP);
+                }
+            },
+            { rootMargin: '800px' },
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+        // Re-created after each bump: observe() re-fires with the current
+        // intersection state, so the grid keeps filling until the sentinel is
+        // pushed out of view rather than stalling when it stays on screen.
+    }, [filtered.length, visibleCount]);
+
+    const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
     const handleExport = () => {
         const filename = `products-${selectedCategory ?? 'all'}.csv`;
@@ -291,7 +325,10 @@ export default function Home({
                             <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
                         </Box>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
+                            PIM{' '}
+                            <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                                Pumpkin
+                            </Box>
                         </Typography>
                     </Box>
                     <Stack direction="row" spacing={1.5} alignItems="center">
@@ -302,132 +339,86 @@ export default function Home({
             </AppBar>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
-                {loading ? (
-                    <>
-                        {/* Carousel Skeleton */}
-                        <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 3 }} />
+                <HeroCarousel />
 
-                        <Box>
-                            <Skeleton variant="text" width={150} height={32} sx={{ mb: 1.5 }} />
-                            <Stack direction="row" spacing={1.5} sx={{ overflow: 'hidden' }}>
-                                {[...Array(6)].map((_, i) => (
-                                    <Skeleton key={i} variant="rounded" width={120} height={40} sx={{ borderRadius: 3, flexShrink: 0 }} />
-                                ))}
-                            </Stack>
-                        </Box>
-
-                        <Box>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                                <Box>
-                                    <Skeleton variant="text" width={120} height={32} />
-                                    <Skeleton variant="text" width={200} height={20} />
-                                </Box>
-                                <Stack direction="row" spacing={1.5} sx={{ display: { xs: 'none', md: 'flex' } }}>
-                                    <Skeleton variant="rounded" width={200} height={40} />
-                                    <Skeleton variant="rounded" width={120} height={40} />
-                                </Stack>
-                            </Stack>
-                            
-                            <Box
-                                sx={{
-                                    display: 'grid',
-                                    gap: 2,
-                                    gridTemplateColumns: {
-                                        xs: 'repeat(2, 1fr)',
-                                        sm: 'repeat(3, 1fr)',
-                                        md: 'repeat(4, 1fr)',
-                                    },
-                                }}
-                            >
-                                {[...Array(8)].map((_, i) => (
-                                    <Skeleton key={i} variant="rectangular" height={280} sx={{ borderRadius: 3 }} />
-                                ))}
-                            </Box>
-                        </Box>
-                    </>
-                ) : (
-                    <>
-                        <HeroCarousel />
-
-                        <Box>
-                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                                {t('categoriesHeading')}
-                            </Typography>
-                            <CategoryStrip
-                                categories={categoryOptions}
-                                selected={selectedCategory}
-                                onSelect={(label) =>
-                                    setSelectedCategory((current) => {
-                                        const next = current === label ? null : label;
-                                        if (next) {
-                                            trackEvent({ eventType: 'category_select', category: next });
-                                        }
-                                        return next;
-                                    })
+                <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+                        {t('categoriesHeading')}
+                    </Typography>
+                    <CategoryStrip
+                        categories={categoryOptions}
+                        selected={selectedCategory}
+                        onSelect={(label) =>
+                            setSelectedCategory((current) => {
+                                const next = current === label ? null : label;
+                                if (next) {
+                                    trackEvent({ eventType: 'category_select', category: next });
                                 }
-                            />
-                        </Box>
+                                return next;
+                            })
+                        }
+                    />
+                </Box>
 
+                <Box>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
                         <Box>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
-                                <Box>
-                                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                        {t('productListHeading')}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('totalItems', { count: filtered.length })}
-                                        {selectedCategory && t('categoryFilterSuffix', { category: selectedCategory })}
-                                    </Typography>
-                                </Box>
-                                <Stack direction="row" spacing={1.5}>
-                                    <TextField
-                                        size="small"
-                                        placeholder={t('searchPlaceholder')}
-                                        value={search}
-                                        onChange={(event) => setSearch(event.target.value)}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon fontSize="small" color="action" />
-                                                    </InputAdornment>
-                                                ),
-                                            },
-                                        }}
-                                    />
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<FileDownloadOutlinedIcon />}
-                                        onClick={handleExport}
-                                        disabled={filtered.length === 0}
-                                    >
-                                        {selectedCategory ? t('exportCategory') : t('exportAll')}
-                                    </Button>
-                                </Stack>
-                            </Stack>
-                            <Box
-                                sx={{
-                                    display: 'grid',
-                                    gap: 2,
-                                    gridTemplateColumns: {
-                                        xs: 'repeat(2, 1fr)',
-                                        sm: 'repeat(3, 1fr)',
-                                        md: 'repeat(4, 1fr)',
+                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                                {t('productListHeading')}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                {t('totalItems', { count: filtered.length })}
+                                {selectedCategory && t('categoryFilterSuffix', { category: selectedCategory })}
+                            </Typography>
+                        </Box>
+                        <Stack direction="row" spacing={1.5}>
+                            <TextField
+                                size="small"
+                                placeholder={t('searchPlaceholder')}
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon fontSize="small" color="action" />
+                                            </InputAdornment>
+                                        ),
                                     },
                                 }}
+                            />
+                            <Button
+                                variant="outlined"
+                                startIcon={<FileDownloadOutlinedIcon />}
+                                onClick={handleExport}
+                                disabled={filtered.length === 0}
                             >
-                                {filtered.map((product) => (
-                                    <ProductCard key={product.id} product={product} popular={popularIds.has(product.id)} />
-                                ))}
-                                {filtered.length === 0 && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
-                                        {t('noResults')}
-                                    </Typography>
-                                )}
-                            </Box>
-                        </Box>
-                    </>
-                )}
+                                {selectedCategory ? t('exportCategory') : t('exportAll')}
+                            </Button>
+                        </Stack>
+                    </Stack>
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gap: 2,
+                            gridTemplateColumns: {
+                                xs: 'repeat(2, 1fr)',
+                                sm: 'repeat(3, 1fr)',
+                                md: 'repeat(4, 1fr)',
+                            },
+                        }}
+                    >
+                        {visible.map((product) => (
+                            <ProductCard key={product.id} product={product} popular={popularIds.has(product.id)} />
+                        ))}
+                        {filtered.length === 0 && (
+                            <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
+                                {t('noResults')}
+                            </Typography>
+                        )}
+                    </Box>
+                    {visibleCount < filtered.length && <Box ref={loadMoreRef} sx={{ height: 1, width: '100%' }} />}
+                </Box>
             </Box>
         </Box>
     );

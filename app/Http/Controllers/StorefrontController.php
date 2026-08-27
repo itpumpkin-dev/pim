@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Catalog\ProductPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -54,12 +55,23 @@ class StorefrontController extends Controller
 
                 $mapped = ProductPresenter::mapMany($products, $localeCode);
 
-                $categories = collect($mapped)->pluck('category')->unique()->sort()->values()->all();
+                // The storefront grid (home.tsx / ProductCard) only renders the
+                // card-level fields — never the long-form description, the
+                // highlights list, or the specs table, which only products/show
+                // uses. This payload is serialised straight into the HTML
+                // document Inertia returns, so for 150+ products those three
+                // fields are the bulk of the page weight for no benefit.
+                $list = array_map(
+                    fn (array $product) => Arr::except($product, ['description', 'highlights', 'specs']),
+                    $mapped
+                );
+
+                $categories = collect($list)->pluck('category')->unique()->sort()->values()->all();
 
                 return [
-                    'products' => $mapped,
+                    'products' => $list,
                     'categories' => $categories,
-                    'topViewedProducts' => $this->topViewedProducts($mapped),
+                    'topViewedProducts' => $this->topViewedProducts($list),
                 ];
             }
         );

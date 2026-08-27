@@ -4,7 +4,7 @@ import './lib/i18n';
 import { createInertiaApp } from '@inertiajs/react';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { createElement, useEffect, type ComponentType, type ReactNode } from 'react';
+import { createElement, useEffect, useMemo, type ComponentType, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { PermissionsChangedToast } from './components/permissions-changed-toast';
@@ -12,7 +12,6 @@ import { AppearanceProvider, useResolvedAppearance } from './hooks/use-appearanc
 import { useSyncI18nLanguage } from './hooks/use-locale';
 // import { LocaleProvider } from './hooks/use-locale';
 import { getTheme } from './theme';
-import { useTheme } from '@emotion/react';
 
 declare global {
     const route: typeof routeFn;
@@ -28,7 +27,10 @@ interface PageLayout {
 // unlike a wrapper rendered around <App>, which sits outside Inertia's page-context provider.
 function ThemedPage({ children }: { children: ReactNode }) {
     const { resolved } = useResolvedAppearance();
-    const theme = getTheme(resolved);
+    // getTheme() runs createTheme() — a non-trivial build — and this component
+    // wraps every Inertia page, so recomputing it on each render (e.g. every
+    // page navigation) is pure waste. It only depends on the light/dark mode.
+    const theme = useMemo(() => getTheme(resolved), [resolved]);
     useSyncI18nLanguage();
 
     // Drives the SAP Fiori CSS custom properties in app.css — every FIORI.*

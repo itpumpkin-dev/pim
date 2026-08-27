@@ -18,10 +18,8 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                py: 2,
-                gap: 2,
-                borderRight: '1px solid',
-                borderColor: FIORI.border,
+                py: 1.5,
+                gap: 0.5,
             }}
         >
             {items.map((item) => {
@@ -33,37 +31,38 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                 const buttonContent = (
                     <ButtonBase
                         onClick={() => onSelect(item)}
+                        aria-current={isActive ? 'page' : undefined}
                         sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: '8px',
+                            width: 44,
+                            height: 44,
+                            borderRadius: '10px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             position: 'relative',
-                            transition: 'all 0.2s ease-in-out',
+                            transition: 'background-color 0.15s ease, color 0.15s ease',
                             color: isActive ? FIORI.brand : FIORI.textSecondary,
-                            bgcolor: isActive ? FIORI.brandBg : 'transparent',
+                            bgcolor: isActive ? FIORI.selected : 'transparent',
                             '&:hover': {
-                                bgcolor: isActive ? FIORI.brandBg : FIORI.hover,
+                                bgcolor: isActive ? FIORI.selected : FIORI.hover,
                                 color: isActive ? FIORI.brand : FIORI.textPrimary,
                             },
                         }}
                     >
-                        {/* Active Left Indicator Bar */}
+                        {/* Fiori active-item left accent bar */}
                         {isActive && (
                             <Box
                                 sx={{
                                     position: 'absolute',
                                     left: 0,
                                     width: 3,
-                                    height: 20,
-                                    borderRadius: '0 4px 4px 0',
+                                    height: 22,
+                                    borderRadius: '0 3px 3px 0',
                                     bgcolor: FIORI.brand,
                                 }}
                             />
                         )}
-                        <Icon sx={{ fontSize: '1.4rem' }} />
+                        <Icon sx={{ fontSize: '1.375rem' }} />
                     </ButtonBase>
                 );
 

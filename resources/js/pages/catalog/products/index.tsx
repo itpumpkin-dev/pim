@@ -43,6 +43,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, type FioriColumnPriority, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
 import {
     ProductFilterDrawer,
@@ -174,24 +175,7 @@ function formatAttributeCellValue(value: unknown): string {
 }
 
 function AttributeThumbnail({ src, alt }: { src: string; alt: string }) {
-    return (
-        <Box
-            sx={{
-                width: 38,
-                height: 38,
-                bgcolor: 'grey.100',
-                borderRadius: 2,
-                border: `1px solid ${FIORI.border}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                flexShrink: 0,
-            }}
-        >
-            <Box component="img" src={src} alt={alt} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </Box>
-    );
+    return <ClickableThumbnail src={src} alt={alt} />;
 }
 
 function renderAttributeCellValue(attrType: string, value: unknown, alt: string): ReactNode {
@@ -445,30 +429,11 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 key: 'image',
                 label: t('image'),
                 render: (row) => (
-                    <Box
-                        sx={{
-                            width: 38,
-                            height: 38,
-                            bgcolor: 'grey.100',
-                            borderRadius: 2,
-                            border: `1px solid ${FIORI.border}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                        }}
-                    >
-                        {row.image_url ? (
-                            <Box
-                                component="img"
-                                src={row.image_url}
-                                alt={row.name || row.sku}
-                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                        ) : (
-                            <CategoryOutlinedIcon sx={{ color: 'grey.500', fontSize: 20 }} />
-                        )}
-                    </Box>
+                    <ClickableThumbnail
+                        src={row.image_url}
+                        alt={row.name || row.sku}
+                        fallback={<CategoryOutlinedIcon sx={{ color: 'grey.500', fontSize: 20 }} />}
+                    />
                 ),
             },
             { key: 'name', label: t('name'), render: (row) => (typeof row.name === 'string' && row.name ? row.name : '-') },
@@ -793,6 +758,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     ];
 
     return (
+        <ImagePreviewProvider>
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('products')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
@@ -1218,5 +1184,6 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 </Alert>
             </Snackbar>
         </AppLayout>
+        </ImagePreviewProvider>
     );
 }

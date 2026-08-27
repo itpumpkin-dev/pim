@@ -36,26 +36,39 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                 component={item.url ? Link : 'div'}
                 href={item.url as any}
                 selected={isActive}
+                disableRipple
                 sx={{
+                    position: 'relative',
                     borderRadius: '8px',
-                    pl: indented ? 3 : 2,
-                    pr: 2,
-                    py: 0.8,
-                    mb: 0.5,
-                    transition: 'all 0.15s ease-in-out',
-                    color: isActive ? '#fff' : FIORI.textPrimary,
-                    bgcolor: isActive ? FIORI.brand : 'transparent',
+                    pl: indented ? 2.75 : 1.75,
+                    pr: 1.5,
+                    py: 0.6,
+                    minHeight: 34,
+                    mb: 0.25,
+                    transition: 'background-color 0.12s ease, color 0.12s ease',
+                    color: isActive ? FIORI.brand : FIORI.textPrimary,
+                    bgcolor: isActive ? FIORI.selected : 'transparent',
                     '&:hover': {
-                        bgcolor: isActive ? FIORI.brandDark : FIORI.hover,
-                        color: isActive ? '#fff' : FIORI.textPrimary,
+                        bgcolor: isActive ? FIORI.selected : FIORI.hover,
                     },
-                    '&.Mui-selected': {
-                        bgcolor: FIORI.brand,
-                        color: '#fff',
-                        '&:hover': {
-                            bgcolor: FIORI.brandDark,
-                        },
+                    '&.Mui-selected, &.Mui-selected:hover': {
+                        bgcolor: FIORI.selected,
+                        color: FIORI.brand,
                     },
+                    // Fiori active-item left accent bar
+                    '&::before': isActive
+                        ? {
+                              content: '""',
+                              position: 'absolute',
+                              left: 0,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: 3,
+                              height: 20,
+                              borderRadius: '0 3px 3px 0',
+                              bgcolor: FIORI.brand,
+                          }
+                        : undefined,
                 }}
             >
                 <ListItemText
@@ -63,8 +76,9 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                     sx={{
                         m: 0,
                         '& .MuiTypography-root': {
-                            fontSize: '0.9rem',
-                            fontWeight: isActive ? 600 : 500,
+                            fontSize: '0.875rem',
+                            fontWeight: isActive ? 600 : 400,
+                            lineHeight: 1.3,
                         },
                     }}
                 />
@@ -73,22 +87,31 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
     };
 
     return (
-        <Box sx={{ width: 200, height: '100%', py: 2, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ width: 200, height: '100%', py: 1.5, display: 'flex', flexDirection: 'column' }}>
             <Typography
-                variant="subtitle2"
+                component="h2"
                 sx={{
-                    px: 3,
-                    mb: 2,
+                    px: 2.5,
+                    mb: 1,
                     fontWeight: 700,
                     textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
+                    letterSpacing: '0.05em',
                     color: FIORI.textSecondary,
-                    fontSize: '0.75rem',
+                    fontSize: '0.8125rem',
                 }}
             >
                 {title}
             </Typography>
-            <List dense sx={{ px: 1.5, flex: 1, overflowY: 'auto' }}>
+            <List
+                dense
+                sx={{
+                    px: 1,
+                    flex: 1,
+                    overflowY: 'auto',
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: FIORI.border, borderRadius: 3 },
+                }}
+            >
                 {items.map((item, index) => {
                     // A grouped item (e.g. "หมวดหมู่" wrapping the "หมวดหมู่"/
                     // "ฟิลด์หมวดหมู่" links) renders as a section label
@@ -113,18 +136,18 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
 
                     if (item.items && item.items.length > 0) {
                         return (
-                            <Box key={item.title} sx={{ mt: index === 0 ? 0 : 1.5, mb: 0.5 }}>
+                            <Box key={item.title} sx={{ mt: index === 0 ? 0.5 : 2, mb: 0.5 }}>
                                 <Typography
                                     variant="caption"
                                     sx={{
                                         display: 'block',
-                                        px: 2,
+                                        px: 0.75,
                                         pb: 0.5,
-                                        fontWeight: 700,
+                                        fontWeight: 900,
                                         textTransform: 'uppercase',
-                                        letterSpacing: '0.08em',
+                                        letterSpacing: '0.05em',
                                         color: FIORI.textSecondary,
-                                        fontSize: '0.68rem',
+                                        fontSize: '0.85rem',
                                     }}
                                 >
                                     {item.title}

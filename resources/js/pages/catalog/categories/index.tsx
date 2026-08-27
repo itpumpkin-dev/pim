@@ -16,6 +16,7 @@ import { Box, Button, Chip, CircularProgress, InputAdornment, MenuItem, Paper, S
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
     FIORI,
@@ -149,12 +150,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
             header: t('thumbnail'),
             priority: 'low',
             hideInPopin: true,
-            render: (row) =>
-                row.thumbnail_url ? (
-                    <Box component="img" src={row.thumbnail_url} alt="" sx={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 1, border: `1px solid ${FIORI.border}` }} />
-                ) : (
-                    <Box sx={{ height: 36, width: 36, borderRadius: 1, bgcolor: 'grey.100', border: `1px solid ${FIORI.border}` }} />
-                ),
+            render: (row) => <ClickableThumbnail src={row.thumbnail_url} alt={row.name} size={36} radius={1} />,
         },
         {
             key: 'name',
@@ -290,6 +286,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
     ];
 
     return (
+        <ImagePreviewProvider>
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categories')} />
             <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
@@ -470,5 +467,6 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                 t={t}
             />
         </AppLayout>
+        </ImagePreviewProvider>
     );
 }

@@ -81,81 +81,72 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
         }
     };
 
-    const toggleUser = (userId: number) => {
-        setData('users', data.users.includes(userId) ? data.users.filter((id) => id !== userId) : [...data.users, userId]);
-    };
+    // TODO(New Group): ส่วนเลือก Users (checkbox "Has Group") ยังไม่ต้องมีบนหน้านี้
+    // — คอมเมนต์ไว้ก่อน ปลดคอมเมนต์ทั้ง toggleUser + userColumns + บล็อก <Box> "Users"
+    // ในส่วน render เมื่อ flow พร้อม
+    // const toggleUser = (userId: number) => {
+    //     setData('users', data.users.includes(userId) ? data.users.filter((id) => id !== userId) : [...data.users, userId]);
+    // };
 
     // Column pop-in priority (SAP Fiori responsive table): the "Has Group"
     // checkbox is the control being edited here, so it stays always visible
     // alongside Username (the natural identifier); the rest are descriptive
     // and reflow into the pop-in area first as space runs out.
-    const userColumns: FioriResponsiveColumn<UserGroupUserOption>[] = [
-        {
-            key: 'hasGroup',
-            header: 'Has Group',
-            priority: 'always',
-            render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
-        },
-        {
-            key: 'employeeId',
-            header: 'Employee ID',
-            priority: 'low',
-            render: (user) => user.employee_id || '-',
-        },
-        {
-            key: 'username',
-            header: 'Username',
-            priority: 'high',
-            render: (user) => user.username,
-        },
-        {
-            key: 'email',
-            header: 'E-mail',
-            priority: 'medium',
-            render: (user) => user.email,
-        },
-        {
-            key: 'firstName',
-            header: 'First name',
-            priority: 'medium',
-            render: (user) => user.first_name,
-        },
-        {
-            key: 'lastName',
-            header: 'Last name',
-            priority: 'low',
-            render: (user) => user.last_name,
-        },
-    ];
+    // const userColumns: FioriResponsiveColumn<UserGroupUserOption>[] = [
+    //     {
+    //         key: 'hasGroup',
+    //         header: 'Has Group',
+    //         priority: 'always',
+    //         render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
+    //     },
+    //     {
+    //         key: 'employeeId',
+    //         header: 'Employee ID',
+    //         priority: 'low',
+    //         render: (user) => user.employee_id || '-',
+    //     },
+    //     {
+    //         key: 'username',
+    //         header: 'Username',
+    //         priority: 'high',
+    //         render: (user) => user.username,
+    //     },
+    //     {
+    //         key: 'email',
+    //         header: 'E-mail',
+    //         priority: 'medium',
+    //         render: (user) => user.email,
+    //     },
+    //     {
+    //         key: 'firstName',
+    //         header: 'First name',
+    //         priority: 'medium',
+    //         render: (user) => user.first_name,
+    //     },
+    //     {
+    //         key: 'lastName',
+    //         header: 'Last name',
+    //         priority: 'low',
+    //         render: (user) => user.last_name,
+    //     },
+    // ];
 
     return (
-        <AppLayout
-            breadcrumbs={breadcrumbs}
-            actions={
-                <>
-                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
-                        CANCEL
-                    </Button>
-                    <Button
-                        type="submit"
-                        form="user-group-form"
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 3 }}
-                    >
-                        {processing ? 'Saving…' : 'Save'}
-                    </Button>
-                </>
-            }
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isEdit ? `Edit ${group?.name}` : 'Create Group'} />
-            <Box component="form" id="user-group-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <Box
+                component="form"
+                id="user-group-form"
+                onSubmit={submit}
+                sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', bgcolor: FIORI.pageBg }}
+            >
+                <Box sx={{ flex: 1, p: 4 }}>
                 <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 3 }}>
                     {isEdit ? group?.name : 'New Group'}
                 </Typography>
 
                 <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    {/* TODO(New Group): ส่วน Users (ตาราง + checkbox "Has Group") ยังไม่ต้องมี — ปลดคอมเมนต์เมื่อพร้อม
                     <Box sx={{ flex: 1, minWidth: 320 }}>
                         <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
                             Users
@@ -171,6 +162,7 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                     </Box>
 
                     <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, borderColor: FIORI.border }} />
+                    */}
 
                     <Box sx={{ width: 320, flexShrink: 0 }}>
                         <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
@@ -236,6 +228,35 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                             </Box>
                         </Box>
                     </Box>
+                </Box>
+                </Box>
+
+                {/* Fiori footer action bar — ปุ่มอยู่ล่างสุด ติดขอบ ไม่ใช่บน header */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        bottom: 0,
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: 1,
+                        px: 4,
+                        py: 2,
+                        bgcolor: FIORI.surface,
+                        borderTop: `1px solid ${FIORI.border}`,
+                    }}
+                >
+                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
+                        CANCEL
+                    </Button>
+                    <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...fioriEmphasizedSx, px: 3 }}
+                    >
+                        {processing ? 'Saving…' : 'Save'}
+                    </Button>
                 </Box>
             </Box>
         </AppLayout>

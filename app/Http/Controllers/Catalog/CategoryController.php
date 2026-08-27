@@ -283,6 +283,9 @@ class CategoryController extends Controller
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
+            'shopee_category_id' => ['nullable', 'exists:shopee_categories,id'],
+            'tiktok_category_id' => ['nullable', 'exists:tiktok_categories,id'],
+            'woocommerce_category_id' => ['nullable', 'exists:woocommerce_categories,id'],
             'additional_data' => ['nullable', 'array'],
             'slug' => ['nullable', 'string', 'max:255'],
             'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
@@ -330,6 +333,9 @@ class CategoryController extends Controller
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
             'lazada_category_id' => $validated['lazada_category_id'] ?? null,
+            'shopee_category_id' => $validated['shopee_category_id'] ?? null,
+            'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
+            'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
             'additional_data' => $validated['additional_data'],
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
@@ -403,7 +409,12 @@ class CategoryController extends Controller
         }
 
         return Inertia::render('catalog/categories/edit', [
-            'category' => $category->load('lazadaCategory:id,name,parent_id'),
+            'category' => $category->load([
+                'lazadaCategory:id,name,parent_id',
+                'shopeeCategory:id,name,name_th,parent_id',
+                'tiktokCategory:id,name,name_th,parent_id',
+                'woocommerceCategory:id,name,parent_id',
+            ]),
             'thumbnailUrl' => AttributeValueFormatter::resolveStorageUrl($category->thumbnail),
             'translations' => $translations,
             'categoryFields' => $categoryFields,
@@ -579,6 +590,9 @@ class CategoryController extends Controller
             'description' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:categories,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
+            'shopee_category_id' => ['nullable', 'exists:shopee_categories,id'],
+            'tiktok_category_id' => ['nullable', 'exists:tiktok_categories,id'],
+            'woocommerce_category_id' => ['nullable', 'exists:woocommerce_categories,id'],
             'additional_data' => ['nullable', 'array'],
             'slug' => ['nullable', 'string', 'max:255'],
             'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
@@ -669,6 +683,9 @@ class CategoryController extends Controller
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
             'lazada_category_id' => $validated['lazada_category_id'] ?? null,
+            'shopee_category_id' => $validated['shopee_category_id'] ?? null,
+            'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
+            'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
             'additional_data' => $validated['additional_data'] ?? [],
             'updated_by' => $request->user()?->id,
         ]);
@@ -1310,12 +1327,39 @@ class CategoryController extends Controller
         return response()->json(['data' => $categories]);
     }
 
-    // ไม่มี searchTikTokCategories()/searchWoocommerceCategories() แล้ว —
-    // TikTokCategoryPicker/WooCommerceCategoryPicker (ตัวเดียวที่เคยเรียกใช้)
-    // ถูกลบไปพร้อมกับหน้า mapping แบบจับคู่คร่าวๆ (fuzzy-match) เดิมที่มันหนุนหลัง
-    // อยู่ หน้าใหม่ tiktok-mapping.tsx/woocommerce-mapping.tsx ค้นหาต้นไม้ของ
-    // marketplace ตัวเองโดยตรงผ่าน `search` param ของ tiktokMapping()/
-    // woocommerceMapping() แทนแล้ว
+    /**
+     * endpoint ค้นหาที่หนุนหลัง Autocomplete ของหมวดหมู่ TikTok บนหน้า Edit
+     * Category — ทำงานเหมือน searchShopeeCategories() (ค้นทั้ง name และ name_th)
+     */
+    public function searchTikTokCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = TikTokCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where(fn ($q2) => $q2->where('name', 'like', "%{$query}%")->orWhere('name_th', 'like', "%{$query}%")))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'name_th', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
+    }
+
+    /**
+     * endpoint ค้นหาที่หนุนหลัง Autocomplete ของหมวดหมู่ WooCommerce บนหน้า Edit
+     * Category — ทำงานเหมือน searchLazadaCategories() (WooCommerce ไม่มี name_th)
+     */
+    public function searchWoocommerceCategories(Request $request): JsonResponse
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $categories = WooCommerceCategory::where('is_leaf', true)
+            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        return response()->json(['data' => $categories]);
+    }
 
     /**
      * ลิสต์สินค้าแบบเบาๆ ของหมวดหมู่หนึ่งๆ — ใช้ขับเคลื่อนส่วนขยาย "หมวดหมู่นี้

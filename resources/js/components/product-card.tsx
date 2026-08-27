@@ -1,17 +1,18 @@
 import { currency, productCsvHeaders, productImageUrl, productToCsvRow, type Product } from '@/data/products';
-import { useLocale } from '@/hooks/use-locale';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
 import { trackEvent } from '@/lib/track-event';
 import { Link } from '@inertiajs/react';
-import { useTranslation } from 'react-i18next';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
-import { Box, Chip, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { Box, Chip, IconButton, Paper, Stack, Typography } from '@mui/material';
+import { memo, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-export function ProductCard({ product, popular = false }: { product: Product; popular?: boolean }) {
+// Memoised: the storefront home grid mounts 150+ of these and grows the
+// visible slice on scroll — without this, every card re-renders on each batch.
+export const ProductCard = memo(function ProductCard({ product, popular = false }: { product: Product; popular?: boolean }) {
     const { t } = useTranslation();
     const Icon = product.icon ?? getCategoryIcon(product.category);
     const [imageFailed, setImageFailed] = useState(false);
@@ -142,7 +143,7 @@ export function ProductCard({ product, popular = false }: { product: Product; po
                         {product.color ? `${product.color} · ` : ''}
                         {product.size}
                     </Typography>
- 
+
                     {(product.canViewPricing !== false || product.canViewPackaging !== false) && (
                         <Stack direction="row" alignItems="center" justifyContent="space-between">
                             {product.canViewPricing !== false && (
@@ -159,28 +160,31 @@ export function ProductCard({ product, popular = false }: { product: Product; po
                         </Stack>
                     )}
 
-                    <Tooltip title={t('exportThisProduct')}>
-                        <IconButton
-                            size="small"
-                            onClick={handleExport}
-                            sx={{
-                                position: 'absolute',
-                                top: popular ? 44 : 8,
-                                right: 8,
-                                bgcolor: 'background.paper',
-                                border: 1,
-                                borderColor: 'divider',
-                                opacity: 0,
-                                transition: 'opacity 0.15s ease',
-                                '.MuiPaper-root:hover &': { opacity: 1 },
-                                '&:hover, &:focus-visible': { opacity: 1, bgcolor: 'action.hover' },
-                            }}
-                        >
-                            <FileDownloadOutlinedIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
+                    {/* Native title rather than MUI <Tooltip>: this card renders
+                        150+ times on the storefront home grid and each Tooltip
+                        carries its own Popper/listener setup. */}
+                    <IconButton
+                        size="small"
+                        onClick={handleExport}
+                        title={t('exportThisProduct')}
+                        aria-label={t('exportThisProduct')}
+                        sx={{
+                            position: 'absolute',
+                            top: popular ? 44 : 8,
+                            right: 8,
+                            bgcolor: 'background.paper',
+                            border: 1,
+                            borderColor: 'divider',
+                            opacity: 0,
+                            transition: 'opacity 0.15s ease',
+                            '.MuiPaper-root:hover &': { opacity: 1 },
+                            '&:hover, &:focus-visible': { opacity: 1, bgcolor: 'action.hover' },
+                        }}
+                    >
+                        <FileDownloadOutlinedIcon fontSize="small" />
+                    </IconButton>
                 </Box>
             </Paper>
         </Box>
     );
-}
+});

@@ -195,10 +195,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ShopeeAttributeMappingController สำหรับสอง route นี้
     Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    // ไม่มี route categories/search-tiktok แล้ว — TikTokCategoryPicker (ผู้เรียก
-    // ใช้เพียงตัวเดียวของมัน) ถูกเอาออกไปพร้อมกับหน้า tiktok-mapping.tsx แบบ
-    // fuzzy-match เก่าที่มันรองรับอยู่ ช่องค้นหาของหน้าใหม่จะ query ตาราง
-    // tiktok_categories โดยตรงผ่าน param `search` ของ categories/tiktok-mapping เอง
+    Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:categories,edit_categories');
     Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
@@ -212,8 +209,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('categories/tiktok-mapping/sync-attributes', [TikTokAttributeMappingController::class, 'syncTikTokAttributesForCategory'])->name('categories.tiktokMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('categories/{tiktokCategoryId}/tiktok-attributes', [TikTokAttributeMappingController::class, 'tiktokAttributesForCategory'])->name('categories.tiktokAttributesForCategory')->middleware('permission:attributes,edit_attributes');
     Route::post('categories/sync-woocommerce', [CategoryController::class, 'syncWoocommerceCategories'])->name('categories.syncWoocommerce')->middleware('permission:categories,edit_categories');
-    // ไม่มี route categories/search-woocommerce แล้ว — เหตุผลเดียวกับของ
-    // TikTok ด้านบน
+    Route::get('categories/search-woocommerce', [CategoryController::class, 'searchWoocommerceCategories'])->name('categories.searchWoocommerce')->middleware('permission:categories,edit_categories');
     Route::get('categories/woocommerce-mapping', [CategoryController::class, 'woocommerceMapping'])->name('categories.woocommerceMapping')->middleware('permission:categories,edit_categories');
     Route::post('categories/woocommerce-mapping', [CategoryController::class, 'bulkMapWoocommerce'])->name('categories.bulkMapWoocommerce')->middleware('permission:categories,edit_categories');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ

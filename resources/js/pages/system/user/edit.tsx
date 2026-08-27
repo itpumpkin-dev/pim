@@ -301,34 +301,15 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
     };
 
     return (
-        <AppLayout
-            breadcrumbs={breadcrumbs}
-            actions={
-                <>
-                    <Button
-                        type="button"
-                        onClick={cancel}
-                        variant="contained"
-                        color="inherit"
-                        sx={{ ...fioriDefaultSx, px: 4 }}
-                    >
-                        {t('cancel').toUpperCase()}
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={performSubmit}
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 4 }}
-                    >
-                        {processing ? t('saving').toUpperCase() : t('save').toUpperCase()}
-                    </Button>
-                </>
-            }
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('editUserTitle', { name: user.name })} />
-            <Box component="form" id="user-edit-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <Box
+                component="form"
+                id="user-edit-form"
+                onSubmit={submit}
+                sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', bgcolor: FIORI.pageBg }}
+            >
+                <Box sx={{ flex: 1, p: 4 }}>
                 <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
                     <Box
                         onClick={() => avatarPreview && setAvatarViewerOpen(true)}
@@ -676,6 +657,36 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                         </Box>
                     </Box>
                 )}
+                </Box>
+
+                {/* Fiori footer action bar — ปุ่มอยู่ล่างสุด ติดขอบ ไม่ใช่บน header */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        bottom: 0,
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: 1,
+                        px: 4,
+                        py: 2,
+                        bgcolor: FIORI.surface,
+                        borderTop: `1px solid ${FIORI.border}`,
+                    }}
+                >
+                    <Button type="button" onClick={cancel} variant="contained" color="inherit" sx={{ ...fioriDefaultSx, px: 4 }}>
+                        {t('cancel').toUpperCase()}
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={performSubmit}
+                        variant="contained"
+                        disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...fioriEmphasizedSx, px: 4 }}
+                    >
+                        {processing ? t('saving').toUpperCase() : t('save').toUpperCase()}
+                    </Button>
+                </Box>
             </Box>
         </AppLayout>
     );
