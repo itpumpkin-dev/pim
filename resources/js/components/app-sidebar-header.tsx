@@ -70,7 +70,7 @@ export function AppSidebarHeader({ breadcrumbs = [], actions, onSearch, searchPl
                 gap: 0.5,
                 height: shell.height,
                 minHeight: shell.height,
-                px: 1.5,
+                px: { xs: 1, sm: 1.5 },
                 bgcolor: shell.color,
                 color: shell.textColor,
                 boxShadow: shell.shadow,
@@ -82,7 +82,11 @@ export function AppSidebarHeader({ breadcrumbs = [], actions, onSearch, searchPl
                 </IconButton>
             </Tooltip>
 
-            <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder }} />
+            <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder, display: { xs: 'none', sm: 'block' } }}
+            />
 
             <Box
                 sx={{
@@ -90,14 +94,27 @@ export function AppSidebarHeader({ breadcrumbs = [], actions, onSearch, searchPl
                     flex: 1,
                     display: 'flex',
                     alignItems: 'center',
+                    overflow: 'hidden',
                     // Fiori title area: first crumb reads as the product title.
+                    '& .MuiBreadcrumbs-root': { minWidth: 0, overflow: 'hidden' },
                     '& .MuiBreadcrumbs-li:first-of-type': { fontWeight: 600 },
-                    '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap' },
+                    // never wrap a crumb by character (Thai has no spaces) — keep
+                    // it on one line and ellipsis the overflow instead
+                    '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap', whiteSpace: 'nowrap' },
+                    '& .MuiBreadcrumbs-li': { minWidth: 0, overflow: 'hidden' },
+                    '& .MuiBreadcrumbs-li a, & .MuiBreadcrumbs-li p': {
+                        display: 'block',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                    },
+                    '& .MuiBreadcrumbs-separator': { color: shell.secondaryTextColor, mx: 0.5, flexShrink: 0 },
                     '& a, & p': { color: shell.textColor },
-                    '& .MuiBreadcrumbs-separator': { color: shell.secondaryTextColor },
                 }}
             >
-                <Breadcrumbs breadcrumbs={breadcrumbs} />
+                {/* on mobile the full trail can't fit and clips from the wrong
+                    end — show just the current page instead */}
+                <Breadcrumbs breadcrumbs={isCompact ? breadcrumbs.slice(-1) : breadcrumbs} />
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
@@ -143,7 +160,11 @@ export function AppSidebarHeader({ breadcrumbs = [], actions, onSearch, searchPl
 
                 {actions}
 
-                <Divider orientation="vertical" flexItem sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder }} />
+                <Divider
+                    orientation="vertical"
+                    flexItem
+                    sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder, display: { xs: 'none', sm: 'block' } }}
+                />
 
                 <LocaleDropdown />
                 <AppearanceToggleDropdown />

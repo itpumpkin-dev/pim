@@ -195,7 +195,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                             {t('results', { count: gridData.total })}
                         </Typography>
                     </Box>
-                    <Stack direction="row" spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
                         {/* {canEdit && (
                             <Button variant="outlined" onClick={() => router.visit('/catalog/attributes/woocommerce-mapping')} sx={fioriDefaultSx}>
                                 {tCatalog('woocommerceContentMapping')}
@@ -246,7 +246,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                             }}
                         />
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
                             <Button
                                 variant="outlined"
                                 startIcon={<FilterListIcon />}

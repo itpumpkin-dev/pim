@@ -1,4 +1,4 @@
-import { Autocomplete, TextField } from '@mui/material';
+import { Autocomplete, TextField, type SxProps, type Theme } from '@mui/material';
 import { useEffect, useState } from 'react';
 
 export interface LazadaCategoryOption {
@@ -17,10 +17,12 @@ export function LazadaCategoryPicker({
     value,
     onChange,
     placeholder,
+    sx,
 }: {
     value: LazadaCategoryOption | null;
     onChange: (next: LazadaCategoryOption | null) => void;
     placeholder?: string;
+    sx?: SxProps<Theme>;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<LazadaCategoryOption[]>([]);
@@ -53,7 +55,7 @@ export function LazadaCategoryPicker({
             onChange={(_, val) => onChange(val)}
             inputValue={query}
             onInputChange={(_, val) => setQuery(val)}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
+            renderInput={(params) => <TextField {...params} placeholder={placeholder} sx={sx} />}
         />
     );
 }

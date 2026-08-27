@@ -7,19 +7,14 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import {
-    Alert,
     Box,
     Button,
     Checkbox,
     Chip,
     CircularProgress,
     FormControl,
-    FormHelperText,
-    InputLabel,
     ListItemText,
     MenuItem,
-    OutlinedInput,
-    Paper,
     Select,
     Stack,
     Tab,
@@ -29,7 +24,8 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface ChannelItem {
     id: number;
@@ -105,7 +101,7 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editChannel')}: ${channel.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
@@ -134,21 +130,15 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('generalTitle')}</Typography>
-                        <Stack spacing={3}>
-                            <TextField
-                                label={t('code')}
-                                fullWidth
-                                value={data.code}
-                                disabled
-                                helperText={t('codeLockedHelperText')}
-                            />
-                            <FormControl fullWidth>
-                                <InputLabel id="root-category-label">{t('rootCategoryOptional')}</InputLabel>
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField label={t('code')} htmlFor="channel-code" hint={t('codeLockedHelperText')}>
+                            <TextField id="channel-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        </FioriField>
+
+                        <FioriField label={t('rootCategoryOptional')} htmlFor="root-category">
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
                                 <Select
-                                    labelId="root-category-label"
-                                    label={t('rootCategoryOptional')}
+                                    id="root-category"
                                     value={data.root_category_id}
                                     onChange={(e) => setData('root_category_id', e.target.value)}
                                 >
@@ -162,8 +152,8 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                                     ))}
                                 </Select>
                             </FormControl>
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     <LocaleLabelFields
                         title={t('labelTitle')}
@@ -171,17 +161,21 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('currenciesAndLocalesTitle')}</Typography>
-                        <Stack spacing={3}>
-                            <FormControl fullWidth required error={Boolean(errors.locale_ids)}>
-                                <InputLabel id="channel-locales-label">{t('localesRequired')}</InputLabel>
+                    <FioriFormGroup title={t('currenciesAndLocalesTitle')}>
+                        <FioriField
+                            label={t('localesRequired')}
+                            htmlFor="channel-locales"
+                            required
+                            valueState={valueStateOf(errors.locale_ids)}
+                            message={errors.locale_ids}
+                            fullWidth
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.locale_ids))}>
                                 <Select
-                                    labelId="channel-locales-label"
+                                    id="channel-locales"
                                     multiple
                                     value={data.locale_ids}
                                     onChange={(e) => setData('locale_ids', e.target.value as number[])}
-                                    input={<OutlinedInput label={t('localesRequired')} />}
                                     renderValue={(selected) => (
                                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                             {(selected as number[]).map((id) => {
@@ -198,17 +192,23 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                                         </MenuItem>
                                     ))}
                                 </Select>
-                                {errors.locale_ids && <FormHelperText>{errors.locale_ids}</FormHelperText>}
                             </FormControl>
+                        </FioriField>
 
-                            <FormControl fullWidth required error={Boolean(errors.currency_ids)}>
-                                <InputLabel id="channel-currencies-label">{t('currenciesRequired')}</InputLabel>
+                        <FioriField
+                            label={t('currenciesRequired')}
+                            htmlFor="channel-currencies"
+                            required
+                            valueState={valueStateOf(errors.currency_ids)}
+                            message={errors.currency_ids}
+                            fullWidth
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.currency_ids))}>
                                 <Select
-                                    labelId="channel-currencies-label"
+                                    id="channel-currencies"
                                     multiple
                                     value={data.currency_ids}
                                     onChange={(e) => setData('currency_ids', e.target.value as number[])}
-                                    input={<OutlinedInput label={t('currenciesRequired')} />}
                                     renderValue={(selected) => (
                                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                                             {(selected as number[]).map((id) => {
@@ -225,17 +225,12 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                                         </MenuItem>
                                     ))}
                                 </Select>
-                                {errors.currency_ids && <FormHelperText>{errors.currency_ids}</FormHelperText>}
                             </FormControl>
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
                 </>
                 )}
             </Box>

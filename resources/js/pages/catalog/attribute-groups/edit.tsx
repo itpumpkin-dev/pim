@@ -5,11 +5,9 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
-    Alert,
     Box,
     Button,
     CircularProgress,
-    Paper,
     Stack,
     Tab,
     Tabs,
@@ -17,7 +15,8 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -101,21 +100,12 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                     </Stack>
                 </Stack>
 
-                <Stack spacing={3} sx={{ maxWidth: 800 }}>
-                    {/* ส่วนข้อมูลทั่วไป */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                            General
-                        </Typography>
-                        <TextField
-                            label="Code"
-                            fullWidth
-                            size="small"
-                            value={data.code}
-                            disabled
-                            helperText="This code is generated automatically and can't be changed."
-                        />
-                    </Paper>
+                <Stack spacing={3} sx={{ maxWidth: 760 }}>
+                    <FioriFormGroup title="General">
+                        <FioriField label="Code" htmlFor="attribute-group-code" hint="This code is generated automatically and can't be changed.">
+                            <TextField id="attribute-group-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        </FioriField>
+                    </FioriFormGroup>
 
                     <LocaleLabelFields
                         values={data.translations}
@@ -123,11 +113,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                     />
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        Please correct the highlighted fields before saving.
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message="Please correct the highlighted fields before saving." sx={{ mt: 3, maxWidth: 760 }} />
                 </>
                 )}
             </Box>

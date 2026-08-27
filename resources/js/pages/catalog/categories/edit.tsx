@@ -6,16 +6,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import UploadIcon from '@mui/icons-material/CloudUpload';
 import {
-    Alert,
     Box,
     Button,
     Checkbox,
     CircularProgress,
     FormControl,
     FormControlLabel,
-    InputLabel,
     MenuItem,
-    Paper,
     Select,
     Stack,
     Tab,
@@ -35,7 +32,8 @@ import { LazadaCategoryPicker, type LazadaCategoryOption } from '@/components/ca
 import { ShopeeCategoryPicker, type ShopeeCategoryOption } from '@/components/catalog/shopee-category-picker';
 import { TikTokCategoryPicker, type TikTokCategoryOption } from '@/components/catalog/tiktok-category-picker';
 import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/components/catalog/woocommerce-category-picker';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface CategoryItem {
     id: number;
@@ -120,7 +118,7 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editCategory')}: ${category.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
@@ -156,54 +154,67 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
-                        <Stack spacing={3}>
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField label={t('code')} htmlFor="category-code" hint={t('codeLockedHelperText')}>
+                            <TextField id="category-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        </FioriField>
+
+                        <FioriField
+                            label={t('slug')}
+                            htmlFor="category-slug"
+                            valueState={valueStateOf(errors.slug)}
+                            message={errors.slug}
+                            hint={t('slugHelperText')}
+                        >
                             <TextField
-                                label={t('code')}
+                                id="category-slug"
                                 fullWidth
-                                value={data.code}
-                                disabled
-                                helperText={t('codeLockedHelperText')}
-                            />
-                            <TextField
-                                label={t('slug')}
-                                fullWidth
+                                size="small"
                                 value={data.slug}
                                 onChange={(e) => setData('slug', e.target.value)}
-                                error={Boolean(errors.slug)}
-                                helperText={errors.slug || t('slugHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.slug))}
                             />
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                    {t('parentCategory')}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                    {t('parentCategoryHelperText')}
-                                </Typography>
-                                <CategoryParentTreePicker
-                                    value={typeof data.parent_id === 'number' ? data.parent_id : ''}
-                                    onChange={(id) => setData('parent_id', id)}
-                                    excludeId={category.id}
-                                    rootLabel={t('rootCategory')}
-                                />
-                                {errors.parent_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.parent_id}</Alert>}
-                            </Box>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('parentCategory')}
+                            valueState={valueStateOf(errors.parent_id)}
+                            message={errors.parent_id}
+                            hint={t('parentCategoryHelperText')}
+                            fullWidth
+                        >
+                            <CategoryParentTreePicker
+                                value={typeof data.parent_id === 'number' ? data.parent_id : ''}
+                                onChange={(id) => setData('parent_id', id)}
+                                excludeId={category.id}
+                                rootLabel={t('rootCategory')}
+                            />
+                        </FioriField>
+
+                        <FioriField
+                            label={t('description')}
+                            htmlFor="category-description"
+                            valueState={valueStateOf(errors.description)}
+                            message={errors.description}
+                            hint={t('descriptionHelperText')}
+                            fullWidth
+                        >
                             <TextField
-                                label={t('description')}
+                                id="category-description"
                                 fullWidth
+                                size="small"
                                 multiline
                                 rows={4}
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
-                                error={Boolean(errors.description)}
-                                helperText={errors.description || t('descriptionHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.description))}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel id="category-display-type-label">{t('displayType')}</InputLabel>
+                        </FioriField>
+
+                        <FioriField label={t('displayType')} htmlFor="category-display-type">
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
                                 <Select
-                                    labelId="category-display-type-label"
-                                    label={t('displayType')}
+                                    id="category-display-type"
                                     value={data.display_type}
                                     onChange={(e) => setData('display_type', e.target.value as typeof data.display_type)}
                                 >
@@ -213,138 +224,136 @@ export default function CategoryEdit({ category, thumbnailUrl, translations, cat
                                     <MenuItem value="both">{t('displayTypeBoth')}</MenuItem>
                                 </Select>
                             </FormControl>
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                    {t('thumbnail')}
-                                </Typography>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
-                                        {t('chooseFile')}
-                                        <input
-                                            type="file"
-                                            hidden
-                                            accept="image/*"
-                                            onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
-                                        />
-                                    </Button>
-                                    {data.thumbnail ? (
-                                        <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
-                                    ) : thumbnailUrl ? (
-                                        <Box component="img" src={thumbnailUrl} alt="" sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }} />
-                                    ) : null}
-                                </Stack>
-                                {errors.thumbnail && <Alert severity="error" sx={{ mt: 1 }}>{errors.thumbnail}</Alert>}
-                            </Box>
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
-                                label={t('aiTranslate')}
+                        </FioriField>
+
+                        <FioriField label={t('thumbnail')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
+                                    {t('chooseFile')}
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
+                                    />
+                                </Button>
+                                {data.thumbnail ? (
+                                    <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
+                                ) : thumbnailUrl ? (
+                                    <Box component="img" src={thumbnailUrl} alt="" sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }} />
+                                ) : null}
+                            </Stack>
+                        </FioriField>
+
+                        <FioriField label="">
+                            <Stack>
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                    label={t('aiTranslate')}
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
+                                    label={t('active')}
+                                />
+                            </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('marketplaceCategoryTitle')} description={t('marketplaceCategoryHelperText')}>
+                        <FioriField
+                            label={t('lazadaCategoryLabel')}
+                            valueState={valueStateOf(errors.lazada_category_id)}
+                            message={errors.lazada_category_id}
+                        >
+                            <LazadaCategoryPicker
+                                value={lazadaCategory}
+                                onChange={(next) => {
+                                    setLazadaCategory(next);
+                                    setData('lazada_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('lazadaCategoryPlaceholder')}
+                                sx={fioriFieldStateSx('none')}
                             />
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                label={t('active')}
+                        </FioriField>
+
+                        <FioriField
+                            label={t('shopeeCategoryLabel')}
+                            valueState={valueStateOf(errors.shopee_category_id)}
+                            message={errors.shopee_category_id}
+                        >
+                            <ShopeeCategoryPicker
+                                value={shopeeCategory}
+                                onChange={(next) => {
+                                    setShopeeCategory(next);
+                                    setData('shopee_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('shopeeCategoryPlaceholder')}
+                                sx={fioriFieldStateSx('none')}
                             />
-                            <Box>
-                                <Typography variant="body2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                    {t('marketplaceCategoryTitle')}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                                    {t('marketplaceCategoryHelperText')}
-                                </Typography>
-                                <Stack spacing={2}>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                            {t('lazadaCategoryLabel')}
-                                        </Typography>
-                                        <LazadaCategoryPicker
-                                            value={lazadaCategory}
-                                            onChange={(next) => {
-                                                setLazadaCategory(next);
-                                                setData('lazada_category_id', next?.id ?? null);
-                                            }}
-                                            placeholder={t('lazadaCategoryPlaceholder')}
-                                        />
-                                        {errors.lazada_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.lazada_category_id}</Alert>}
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                            {t('shopeeCategoryLabel')}
-                                        </Typography>
-                                        <ShopeeCategoryPicker
-                                            value={shopeeCategory}
-                                            onChange={(next) => {
-                                                setShopeeCategory(next);
-                                                setData('shopee_category_id', next?.id ?? null);
-                                            }}
-                                            placeholder={t('shopeeCategoryPlaceholder')}
-                                        />
-                                        {errors.shopee_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.shopee_category_id}</Alert>}
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                            {t('tiktokCategoryLabel')}
-                                        </Typography>
-                                        <TikTokCategoryPicker
-                                            value={tiktokCategory}
-                                            onChange={(next) => {
-                                                setTiktokCategory(next);
-                                                setData('tiktok_category_id', next?.id ?? null);
-                                            }}
-                                            placeholder={t('tiktokCategoryPlaceholder')}
-                                        />
-                                        {errors.tiktok_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.tiktok_category_id}</Alert>}
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                            {t('woocommerceCategoryLabel')}
-                                        </Typography>
-                                        <WooCommerceCategoryPicker
-                                            value={woocommerceCategory}
-                                            onChange={(next) => {
-                                                setWoocommerceCategory(next);
-                                                setData('woocommerce_category_id', next?.id ?? null);
-                                            }}
-                                            placeholder={t('woocommerceCategoryPlaceholder')}
-                                        />
-                                        {errors.woocommerce_category_id && <Alert severity="error" sx={{ mt: 1 }}>{errors.woocommerce_category_id}</Alert>}
-                                    </Box>
-                                </Stack>
-                            </Box>
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('tiktokCategoryLabel')}
+                            valueState={valueStateOf(errors.tiktok_category_id)}
+                            message={errors.tiktok_category_id}
+                        >
+                            <TikTokCategoryPicker
+                                value={tiktokCategory}
+                                onChange={(next) => {
+                                    setTiktokCategory(next);
+                                    setData('tiktok_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('tiktokCategoryPlaceholder')}
+                                sx={fioriFieldStateSx('none')}
+                            />
+                        </FioriField>
+
+                        <FioriField
+                            label={t('woocommerceCategoryLabel')}
+                            valueState={valueStateOf(errors.woocommerce_category_id)}
+                            message={errors.woocommerce_category_id}
+                        >
+                            <WooCommerceCategoryPicker
+                                value={woocommerceCategory}
+                                onChange={(next) => {
+                                    setWoocommerceCategory(next);
+                                    setData('woocommerce_category_id', next?.id ?? null);
+                                }}
+                                placeholder={t('woocommerceCategoryPlaceholder')}
+                                sx={fioriFieldStateSx('none')}
+                            />
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {categoryFields.length > 0 && (
-                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)</Typography>
-                            <Stack spacing={3}>
-                                {categoryFields.map((field) => {
-                                    const fieldLabel = field.labels[currentLocaleId] || Object.values(field.labels)[0] || field.code;
-                                    const fieldValue = data.additional_data[field.code] ?? '';
-                                    const fieldError = errors[`additional_data.${field.code}` as keyof typeof errors];
+                        <FioriFormGroup title="หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)">
+                            {categoryFields.map((field) => {
+                                const fieldLabel = field.labels[currentLocaleId] || Object.values(field.labels)[0] || field.code;
+                                const fieldValue = data.additional_data[field.code] ?? '';
+                                const fieldError = errors[`additional_data.${field.code}` as keyof typeof errors];
 
-                                    return (
-                                        <Box key={field.id}>
-                                            <Typography variant="caption" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5, display: 'block' }}>
-                                                {fieldLabel} {field.is_required && '*'}
-                                            </Typography>
-                                            <CategoryFieldInput
-                                                field={field}
-                                                value={fieldValue}
-                                                onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
-                                                error={fieldError}
-                                            />
-                                        </Box>
-                                    );
-                                })}
-                            </Stack>
-                        </Paper>
+                                return (
+                                    <FioriField
+                                        key={field.id}
+                                        label={fieldLabel}
+                                        required={field.is_required}
+                                        valueState={valueStateOf(fieldError)}
+                                        message={fieldError}
+                                    >
+                                        <CategoryFieldInput
+                                            field={field}
+                                            value={fieldValue}
+                                            onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
+                                            error={fieldError}
+                                        />
+                                    </FioriField>
+                                );
+                            })}
+                        </FioriFormGroup>
                     )}
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
                 </>
                 )}
             </Box>

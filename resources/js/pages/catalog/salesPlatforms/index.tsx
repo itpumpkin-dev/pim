@@ -283,17 +283,17 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <SalesChannelSectionTabs active="platforms" />
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, gap: 2, mb: 3, flexWrap: 'wrap' }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                             {t('salesPlatformsTitle')}
                         </Typography>
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('salesPlatformsSubtitle')}</Typography>
                     </Box>
-                    <Stack direction="row" spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
                         <Button
                             variant="outlined"
                             startIcon={anySyncing ? <CircularProgress size={16} /> : <SyncIcon />}

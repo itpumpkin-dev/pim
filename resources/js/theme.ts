@@ -48,7 +48,7 @@ export function getFioriShell(mode: PaletteMode) {
     const isDark = mode === 'dark';
 
     return {
-        height: 44, //                                         2.75rem — Horizon shell-bar height
+        height: 57, //                                         จับให้เท่ากับ Toolbar โลโก้ของ sidebar (app-sidebar.tsx: minHeight 57px)
         color: isDark ? '#1c2228' : '#ffffff', //              --sapShellColor
         textColor: isDark ? '#eaecee' : '#1d2d3e', //          --sapShell_TextColor
         secondaryTextColor: isDark ? '#a9b4be' : '#556b82', // muted title / breadcrumb

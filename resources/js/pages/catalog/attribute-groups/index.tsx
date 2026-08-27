@@ -201,7 +201,7 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                             }}
                         />
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
+                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
                             <Button
                                 variant="outlined"
                                 startIcon={<FilterListIcon />}

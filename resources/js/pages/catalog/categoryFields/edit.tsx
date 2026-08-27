@@ -7,10 +7,11 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface CategoryFieldItem {
     id: number;
@@ -68,7 +69,7 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Category Field: ${field.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
                     <Tabs
                         value={tabIndex}
@@ -97,25 +98,14 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>General Config</Typography>
-                        <Stack spacing={3}>
-                            <TextField
-                                label="Code"
-                                fullWidth
-                                value={data.code}
-                                disabled
-                                helperText="This code is generated automatically and can't be changed."
-                            />
+                    <FioriFormGroup title="General Config">
+                        <FioriField label="Code" htmlFor="field-code" hint="This code is generated automatically and can't be changed.">
+                            <TextField id="field-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        </FioriField>
 
-                            <FormControl fullWidth required>
-                                <InputLabel id="field-type-label">Field Type</InputLabel>
-                                <Select
-                                    labelId="field-type-label"
-                                    label="Field Type"
-                                    value={data.type}
-                                    onChange={(e) => setData('type', e.target.value)}
-                                >
+                        <FioriField label="Field Type" htmlFor="field-type" required>
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
+                                <Select id="field-type" value={data.type} onChange={(e) => setData('type', e.target.value)}>
                                     <MenuItem value="Text">Text</MenuItem>
                                     <MenuItem value="Textarea">Textarea</MenuItem>
                                     <MenuItem value="Boolean">Boolean</MenuItem>
@@ -128,36 +118,45 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                                     <MenuItem value="Checkbox">Checkbox</MenuItem>
                                 </Select>
                             </FormControl>
+                        </FioriField>
 
-                            {(data.type === 'Select' || data.type === 'Multiselect') && (
-                                <Box>
-                                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                                        Options
-                                    </Typography>
-                                    <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
-                                </Box>
-                            )}
+                        {(data.type === 'Select' || data.type === 'Multiselect') && (
+                            <FioriField label="Options" fullWidth>
+                                <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
+                            </FioriField>
+                        )}
 
+                        <FioriField label="Position" htmlFor="field-position" valueState={valueStateOf(errors.position)} message={errors.position}>
                             <TextField
-                                label="Position"
+                                id="field-position"
                                 type="number"
                                 fullWidth
+                                size="small"
                                 value={data.position}
                                 onChange={(e) => setData('position', Number(e.target.value))}
-                                error={Boolean(errors.position)}
-                                helperText={errors.position}
+                                sx={fioriFieldStateSx(valueStateOf(errors.position))}
                             />
+                        </FioriField>
 
+                        <FioriField
+                            label="Display Section"
+                            htmlFor="field-display-section"
+                            valueState={valueStateOf(errors.display_section)}
+                            message={errors.display_section}
+                            hint="Optional UI grouping name"
+                        >
                             <TextField
-                                label="Display Section"
+                                id="field-display-section"
                                 fullWidth
+                                size="small"
                                 value={data.display_section}
                                 onChange={(e) => setData('display_section', e.target.value)}
-                                error={Boolean(errors.display_section)}
-                                helperText={errors.display_section ?? 'Optional UI grouping name'}
+                                sx={fioriFieldStateSx(valueStateOf(errors.display_section))}
                             />
+                        </FioriField>
 
-                            <Stack direction="row" spacing={3}>
+                        <FioriField label="">
+                            <Stack direction="row" spacing={3} flexWrap="wrap">
                                 <FormControlLabel
                                     control={<Checkbox checked={data.is_required} onChange={(e) => setData('is_required', e.target.checked)} />}
                                     label="Required field"
@@ -171,8 +170,8 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                                     label="Status Active"
                                 />
                             </Stack>
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     <LocaleLabelFields
                         title="Field Labels"
@@ -181,11 +180,7 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
                     />
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
                 </>
                 )}
             </Box>

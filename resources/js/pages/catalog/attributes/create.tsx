@@ -5,10 +5,11 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, FormHelperText, InputLabel, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 const attributeTypeKeys: Record<string, string> = {
     text: 'attrTypeText',
@@ -101,7 +102,7 @@ export default function AttributeCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('addAttributeTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%' }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%', maxWidth: 760 }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('addAttributeTitle')}</Typography>
                     <Stack direction="row" spacing={1}>
@@ -119,45 +120,51 @@ export default function AttributeCreate() {
                 </Stack>
 
                 <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>{t('generalTitle')}</Typography>
-                        <Stack spacing={2}>
-                            <FormControl fullWidth required error={Boolean(errors.type)}>
-                                <InputLabel id="attribute-type-label">{t('typeLabel')}</InputLabel>
-                                <Select labelId="attribute-type-label" label={t('typeLabel')} value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField label={t('typeLabel')} htmlFor="attribute-type" required valueState={valueStateOf(errors.type)} message={errors.type}>
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.type))}>
+                                <Select id="attribute-type" value={data.type} onChange={(event) => handleTypeChange(event.target.value)}>
                                     {attributeTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                                 </Select>
-                                {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
                             </FormControl>
-                            {showSwatchType && (
-                                <FormControl fullWidth required error={Boolean(errors.swatch_type)}>
-                                    <InputLabel id="attribute-swatch-type-label">{t('swatchTypeLabel')}</InputLabel>
-                                    <Select labelId="attribute-swatch-type-label" label={t('swatchTypeLabel')} value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
+                        </FioriField>
+
+                        {showSwatchType && (
+                            <FioriField
+                                label={t('swatchTypeLabel')}
+                                htmlFor="attribute-swatch-type"
+                                required
+                                valueState={valueStateOf(errors.swatch_type)}
+                                message={errors.swatch_type}
+                            >
+                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.swatch_type))}>
+                                    <Select id="attribute-swatch-type" value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
                                         {swatchTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
                                     </Select>
-                                    {errors.swatch_type && <FormHelperText>{errors.swatch_type}</FormHelperText>}
                                 </FormControl>
-                            )}
-                        </Stack>
-                    </Paper>
+                            </FioriField>
+                        )}
+                    </FioriFormGroup>
 
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>{t('validationsTitle')}</Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                            <FormControlLabel control={<Checkbox checked={data.is_required} onChange={(event) => setData('is_required', event.target.checked)} />} label={t('isRequired')} />
-                            {/* <FormControlLabel control={<Checkbox checked={data.is_unique} onChange={(event) => setData('is_unique', event.target.checked)} />} label={t('isUnique')} /> */}
-                        </Stack>
-                    </Paper>
+                    <FioriFormGroup title={t('validationsTitle')}>
+                        <FioriField label="">
+                            <FormControlLabel
+                                control={<Checkbox checked={data.is_required} onChange={(event) => setData('is_required', event.target.checked)} />}
+                                label={t('isRequired')}
+                            />
+                        </FioriField>
+                    </FioriFormGroup>
 
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>{t('configurationTitle')}</Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} flexWrap="wrap">
-                            <FormControlLabel control={<Checkbox checked={data.is_locale_based} onChange={(event) => setData('is_locale_based', event.target.checked)} />} label={t('valuePerLocale')} />
-                            <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />
-                            <FormControlLabel control={<Checkbox checked={data.is_channel_based} onChange={(event) => setData('is_channel_based', event.target.checked)} />} label={t('valuePerChannel')} />
-                            <FormControlLabel control={<Checkbox checked={data.is_filterable} onChange={(event) => setData('is_filterable', event.target.checked)} />} label={t('isFilterable')} />
-                        </Stack>
-                    </Paper>
+                    <FioriFormGroup title={t('configurationTitle')}>
+                        <FioriField label="">
+                            <Stack direction={{ xs: 'column', sm: 'row' }} flexWrap="wrap">
+                                <FormControlLabel control={<Checkbox checked={data.is_locale_based} onChange={(event) => setData('is_locale_based', event.target.checked)} />} label={t('valuePerLocale')} />
+                                <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />
+                                <FormControlLabel control={<Checkbox checked={data.is_channel_based} onChange={(event) => setData('is_channel_based', event.target.checked)} />} label={t('valuePerChannel')} />
+                                <FormControlLabel control={<Checkbox checked={data.is_filterable} onChange={(event) => setData('is_filterable', event.target.checked)} />} label={t('isFilterable')} />
+                            </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     <LocaleLabelFields
                         title={t('labelTitle')}
@@ -166,7 +173,7 @@ export default function AttributeCreate() {
                     />
                 </Stack>
 
-                {Object.keys(errors).length > 0 && <Alert severity="error" sx={{ mt: 2 }}>{t('correctHighlightedFields')}</Alert>}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
             </Box>
         </AppLayout>
     );

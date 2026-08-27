@@ -282,6 +282,23 @@ class BrandController extends Controller
         $attribute = $this->brandAttribute();
         abort_unless($brand->attribute_id === $attribute->id, 404);
 
+        // แบรนด์ที่ไม่มีแถว AttributeOptionTranslation เลย (เช่นที่สร้างผ่าน import
+        // / เขียนแค่คอลัมน์ `admin_label` ดิบๆ) จะโชว์ช่อง Name ว่างสำหรับ locale
+        // ปัจจุบันของแอดมิน ทั้งที่มีชื่ออยู่จริง — เลียนแบบ fallback เดียวกับ
+        // CategoryController::edit() คือถ้า locale ปัจจุบันยังไม่มีคำแปล ให้ดึง
+        // ค่า raw `admin_label` มาเป็นค่าเริ่มต้นของฟอร์มหน้านี้ (เฉพาะหน้านี้)
+        $translations = $brand->translations
+            ->mapWithKeys(fn (AttributeOptionTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        if ($activeLocaleId && trim((string) ($translations[$activeLocaleId] ?? '')) === '') {
+            $rawLabel = trim((string) $brand->getRawOriginal('admin_label'));
+            if ($rawLabel !== '') {
+                $translations[(string) $activeLocaleId] = $rawLabel;
+            }
+        }
+
         return Inertia::render('catalog/brands/edit', [
             'brand' => [
                 'id' => $brand->id,
@@ -292,7 +309,7 @@ class BrandController extends Controller
                 'parent_id' => $brand->parent_id,
                 'thumbnail_url' => AttributeValueFormatter::resolveStorageUrl($brand->thumbnail),
             ],
-            'translations' => $brand->translations->mapWithKeys(fn (AttributeOptionTranslation $t) => [(string) $t->locale_id => $t->label])->all(),
+            'translations' => $translations,
             'parentOptions' => $this->parentOptionsList($attribute, excludeId: $brand->id),
         ]);
     }

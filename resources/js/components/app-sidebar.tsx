@@ -68,11 +68,11 @@ function useMainNavItems(): NavItem[] {
                                 '/catalog/categories/woocommerce-mapping',
                             ],
                         },
-                        {
-                            title: t('categoryFields'),
-                            url: '/catalog/categoryFields',
-                            permission: 'category_fields.list_category_fields',
-                        },
+                        // {
+                        //     title: t('categoryFields'),
+                        //     url: '/catalog/categoryFields',
+                        //     permission: 'category_fields.list_category_fields',
+                        // },
                     ],
                 },
                 {

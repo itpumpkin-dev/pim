@@ -5,14 +5,11 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import UploadIcon from '@mui/icons-material/CloudUpload';
 import {
-    Alert,
     Box,
     Button,
     CircularProgress,
     FormControl,
-    InputLabel,
     MenuItem,
-    Paper,
     Select,
     Stack,
     TextField,
@@ -23,7 +20,8 @@ import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface BrandDetail {
     id: number;
@@ -82,7 +80,7 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editBrand')}: ${brand.admin_label || brand.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 640, bgcolor: FIORI.pageBg }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editBrand')}</Typography>
                     <Stack direction="row" spacing={1}>
@@ -103,22 +101,35 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
-                        <Stack spacing={3}>
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField
+                            label={t('slug')}
+                            htmlFor="brand-slug"
+                            valueState={valueStateOf(errors.slug)}
+                            message={errors.slug}
+                            hint={t('slugHelperText')}
+                        >
                             <TextField
-                                label={t('slug')}
+                                id="brand-slug"
                                 fullWidth
+                                size="small"
                                 value={data.slug}
                                 onChange={(e) => setData('slug', e.target.value)}
-                                error={Boolean(errors.slug)}
-                                helperText={errors.slug || t('slugHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.slug))}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel id="brand-parent-label">{t('parentBrand')}</InputLabel>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('parentBrand')}
+                            htmlFor="brand-parent"
+                            valueState={valueStateOf(errors.parent_id)}
+                            message={errors.parent_id}
+                            hint={t('parentBrandHelperText')}
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.parent_id))}>
                                 <Select
-                                    labelId="brand-parent-label"
-                                    label={t('parentBrand')}
+                                    id="brand-parent"
+                                    displayEmpty
                                     value={data.parent_id}
                                     onChange={(e) => setData('parent_id', e.target.value === '' ? '' : Number(e.target.value))}
                                 >
@@ -127,49 +138,51 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                                         <MenuItem key={opt.id} value={opt.id}>{opt.name}</MenuItem>
                                     ))}
                                 </Select>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, px: 1.5 }}>
-                                    {t('parentBrandHelperText')}
-                                </Typography>
                             </FormControl>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('description')}
+                            htmlFor="brand-description"
+                            valueState={valueStateOf(errors.description)}
+                            message={errors.description}
+                            hint={t('descriptionHelperText')}
+                            fullWidth
+                        >
                             <TextField
-                                label={t('description')}
+                                id="brand-description"
                                 fullWidth
+                                size="small"
                                 multiline
                                 rows={4}
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
-                                error={Boolean(errors.description)}
-                                helperText={errors.description || t('descriptionHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.description))}
                             />
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>{t('imageLabel')}</Typography>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
-                                        {t('chooseFile')}
-                                        <input
-                                            type="file"
-                                            hidden
-                                            accept="image/*"
-                                            onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
-                                        />
-                                    </Button>
-                                    {data.thumbnail ? (
-                                        <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
-                                    ) : brand.thumbnail_url ? (
-                                        <Box component="img" src={brand.thumbnail_url} alt="" sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }} />
-                                    ) : null}
-                                </Stack>
-                                {errors.thumbnail && <Alert severity="error" sx={{ mt: 1 }}>{errors.thumbnail}</Alert>}
-                            </Box>
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+
+                        <FioriField label={t('imageLabel')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
+                                    {t('chooseFile')}
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/*"
+                                        onChange={(e) => setData('thumbnail', e.target.files?.[0] ?? null)}
+                                    />
+                                </Button>
+                                {data.thumbnail ? (
+                                    <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
+                                ) : brand.thumbnail_url ? (
+                                    <Box component="img" src={brand.thumbnail_url} alt="" sx={{ height: 40, width: 40, objectFit: 'cover', borderRadius: 1 }} />
+                                ) : null}
+                            </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
             </Box>
         </AppLayout>
     );

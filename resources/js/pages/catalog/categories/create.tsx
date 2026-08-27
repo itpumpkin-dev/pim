@@ -5,16 +5,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import UploadIcon from '@mui/icons-material/CloudUpload';
 import {
-    Alert,
     Box,
     Button,
     Checkbox,
     CircularProgress,
     FormControl,
     FormControlLabel,
-    InputLabel,
     MenuItem,
-    Paper,
     Select,
     Stack,
     TextField,
@@ -28,7 +25,8 @@ import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import { CategoryParentTreePicker } from '@/components/category-parent-tree-picker';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface Props {
     categoryFields: CategoryFieldItem[];
@@ -48,7 +46,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
 
     const { data, setData, post, processing, errors, transform, isDirty } = useForm({
         translations: {} as Record<string, string>,
-        is_ai_translate: false,
+        is_ai_translate: true as boolean,
         description: '',
         parent_id: 'root' as string | number,
         additional_data: {} as Record<string, any>,
@@ -77,7 +75,7 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createCategory')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg }}>
+            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createCategory')}</Typography>
                     <Stack direction="row" spacing={1}>
@@ -98,45 +96,62 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>{t('generalTitle')}</Typography>
-                        <Stack spacing={3}>
+                    <FioriFormGroup title={t('generalTitle')}>
+                        <FioriField
+                            label={t('slug')}
+                            htmlFor="category-slug"
+                            valueState={valueStateOf(errors.slug)}
+                            message={errors.slug}
+                            hint={t('slugHelperText')}
+                        >
                             <TextField
-                                label={t('slug')}
+                                id="category-slug"
                                 fullWidth
+                                size="small"
                                 value={data.slug}
                                 onChange={(e) => setData('slug', e.target.value)}
-                                error={Boolean(errors.slug)}
-                                helperText={errors.slug || t('slugHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.slug))}
                             />
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                    {t('parentCategory')}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                    {t('parentCategoryHelperText')}
-                                </Typography>
-                                <CategoryParentTreePicker
-                                    value={typeof data.parent_id === 'number' ? data.parent_id : ''}
-                                    onChange={(id) => setData('parent_id', id === '' ? 'root' : id)}
-                                    rootLabel={t('rootCategory')}
-                                />
-                            </Box>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('parentCategory')}
+                            valueState={valueStateOf(errors.parent_id)}
+                            message={errors.parent_id}
+                            hint={t('parentCategoryHelperText')}
+                            fullWidth
+                        >
+                            <CategoryParentTreePicker
+                                value={typeof data.parent_id === 'number' ? data.parent_id : ''}
+                                onChange={(id) => setData('parent_id', id === '' ? 'root' : id)}
+                                rootLabel={t('rootCategory')}
+                            />
+                        </FioriField>
+
+                        <FioriField
+                            label={t('description')}
+                            htmlFor="category-description"
+                            valueState={valueStateOf(errors.description)}
+                            message={errors.description}
+                            hint={t('descriptionHelperText')}
+                            fullWidth
+                        >
                             <TextField
-                                label={t('description')}
+                                id="category-description"
                                 fullWidth
+                                size="small"
                                 multiline
                                 rows={4}
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
-                                error={Boolean(errors.description)}
-                                helperText={errors.description || t('descriptionHelperText')}
+                                sx={fioriFieldStateSx(valueStateOf(errors.description))}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel id="category-display-type-label">{t('displayType')}</InputLabel>
+                        </FioriField>
+
+                        <FioriField label={t('displayType')} htmlFor="category-display-type">
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
                                 <Select
-                                    labelId="category-display-type-label"
-                                    label={t('displayType')}
+                                    id="category-display-type"
                                     value={data.display_type}
                                     onChange={(e) => setData('display_type', e.target.value as typeof data.display_type)}
                                 >
@@ -146,10 +161,10 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                     <MenuItem value="both">{t('displayTypeBoth')}</MenuItem>
                                 </Select>
                             </FormControl>
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                    {t('thumbnail')}
-                                </Typography>
+                        </FioriField>
+
+                        <FioriField label={t('thumbnail')} valueState={valueStateOf(errors.thumbnail)} message={errors.thumbnail}>
+                            <Stack direction="row" spacing={1.5} alignItems="center">
                                 <Button component="label" variant="outlined" startIcon={<UploadIcon />} sx={fioriDefaultSx}>
                                     {t('chooseFile')}
                                     <input
@@ -160,56 +175,54 @@ export default function CategoryCreate({ categoryFields = [] }: Props) {
                                     />
                                 </Button>
                                 {data.thumbnail && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                        {data.thumbnail.name}
-                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">{data.thumbnail.name}</Typography>
                                 )}
-                                {errors.thumbnail && <Alert severity="error" sx={{ mt: 1 }}>{errors.thumbnail}</Alert>}
-                            </Box>
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
-                                label={t('aiTranslate')}
-                            />
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                label={t('active')}
-                            />
-                        </Stack>
-                    </Paper>
+                            </Stack>
+                        </FioriField>
+
+                        <FioriField label="">
+                            <Stack>
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
+                                    label={t('aiTranslate')}
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
+                                    label={t('active')}
+                                />
+                            </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {categoryFields.length > 0 && (
-                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)</Typography>
-                            <Stack spacing={3}>
-                                {categoryFields.map((field) => {
-                                    const fieldLabel = field.labels[currentLocaleId] || Object.values(field.labels)[0] || field.code;
-                                    const fieldValue = data.additional_data[field.code] ?? '';
-                                    const fieldError = errors[`additional_data.${field.code}` as keyof typeof errors];
+                        <FioriFormGroup title="หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)">
+                            {categoryFields.map((field) => {
+                                const fieldLabel = field.labels[currentLocaleId] || Object.values(field.labels)[0] || field.code;
+                                const fieldValue = data.additional_data[field.code] ?? '';
+                                const fieldError = errors[`additional_data.${field.code}` as keyof typeof errors];
 
-                                    return (
-                                        <Box key={field.id}>
-                                            <Typography variant="caption" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5, display: 'block' }}>
-                                                {fieldLabel} {field.is_required && '*'}
-                                            </Typography>
-                                            <CategoryFieldInput
-                                                field={field}
-                                                value={fieldValue}
-                                                onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
-                                                error={fieldError}
-                                            />
-                                        </Box>
-                                    );
-                                })}
-                            </Stack>
-                        </Paper>
+                                return (
+                                    <FioriField
+                                        key={field.id}
+                                        label={fieldLabel}
+                                        required={field.is_required}
+                                        valueState={valueStateOf(fieldError)}
+                                        message={fieldError}
+                                    >
+                                        <CategoryFieldInput
+                                            field={field}
+                                            value={fieldValue}
+                                            onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
+                                            error={fieldError}
+                                        />
+                                    </FioriField>
+                                );
+                            })}
+                        </FioriFormGroup>
                     )}
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
             </Box>
         </AppLayout>
     );

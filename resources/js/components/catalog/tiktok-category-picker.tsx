@@ -1,4 +1,4 @@
-import { Autocomplete, TextField } from '@mui/material';
+import { Autocomplete, TextField, type SxProps, type Theme } from '@mui/material';
 import { useEffect, useState } from 'react';
 
 export interface TikTokCategoryOption {
@@ -18,10 +18,12 @@ export function TikTokCategoryPicker({
     value,
     onChange,
     placeholder,
+    sx,
 }: {
     value: TikTokCategoryOption | null;
     onChange: (next: TikTokCategoryOption | null) => void;
     placeholder?: string;
+    sx?: SxProps<Theme>;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<TikTokCategoryOption[]>([]);
@@ -54,7 +56,7 @@ export function TikTokCategoryPicker({
             onChange={(_, val) => onChange(val)}
             inputValue={query}
             onInputChange={(_, val) => setQuery(val)}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
+            renderInput={(params) => <TextField {...params} placeholder={placeholder} sx={sx} />}
         />
     );
 }

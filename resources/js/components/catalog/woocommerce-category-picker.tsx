@@ -1,4 +1,4 @@
-import { Autocomplete, TextField } from '@mui/material';
+import { Autocomplete, TextField, type SxProps, type Theme } from '@mui/material';
 import { useEffect, useState } from 'react';
 
 export interface WooCommerceCategoryOption {
@@ -16,10 +16,12 @@ export function WooCommerceCategoryPicker({
     value,
     onChange,
     placeholder,
+    sx,
 }: {
     value: WooCommerceCategoryOption | null;
     onChange: (next: WooCommerceCategoryOption | null) => void;
     placeholder?: string;
+    sx?: SxProps<Theme>;
 }) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<WooCommerceCategoryOption[]>([]);
@@ -52,7 +54,7 @@ export function WooCommerceCategoryPicker({
             onChange={(_, val) => onChange(val)}
             inputValue={query}
             onInputChange={(_, val) => setQuery(val)}
-            renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
+            renderInput={(params) => <TextField {...params} placeholder={placeholder} sx={sx} />}
         />
     );
 }

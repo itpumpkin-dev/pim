@@ -160,10 +160,10 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('channels')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 <SalesChannelSectionTabs active="channels" />
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('channels')}</Typography>
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: channels.total })}</Typography>

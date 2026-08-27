@@ -4,7 +4,6 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
-    Alert,
     Box,
     Button,
     CircularProgress,
@@ -13,6 +12,7 @@ import {
 } from '@mui/material';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriFormErrorSummary } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 export default function AttributeGroupCreate() {
@@ -71,7 +71,7 @@ export default function AttributeGroupCreate() {
                     </Stack>
                 </Stack>
 
-                <Stack spacing={3} sx={{ maxWidth: 800 }}>
+                <Stack spacing={3} sx={{ maxWidth: 760 }}>
                     <LocaleLabelFields
                         title={t('labelTitle')}
                         values={data.translations}
@@ -79,11 +79,7 @@ export default function AttributeGroupCreate() {
                     />
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        {t('correctHighlightedFields')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 3, maxWidth: 760 }} />
             </Box>
         </AppLayout>
     );

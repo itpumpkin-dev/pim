@@ -289,13 +289,13 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
         <ImagePreviewProvider>
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categories')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('categories')}</Typography>
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: categories.total })}</Typography>
                     </Box>
-                    <Stack direction="row" spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
                         <Button
                             variant="outlined"
                             startIcon={<DownloadIcon />}
@@ -324,7 +324,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={t('searchCategories')}
                         size="small"
-                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
+                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 280 } }}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
@@ -334,7 +334,7 @@ export default function CategoryIndex({ categories, filters, filterColumns }: Pr
                         }}
                     />
 
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
                         <Select
                             value={platformFilter}
                             onChange={(e) => applyPlatformFilter(e.target.value)}

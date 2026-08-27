@@ -195,8 +195,8 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('categoryFields')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, gap: 2, mb: 3 }}>
                     <Box>
                         <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{tNav('categoryFields')}</Typography>
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{tGrid('results', { count: fields.total })}</Typography>
@@ -219,7 +219,7 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder="Search fields..."
                         size="small"
-                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
+                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 280 } }}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
@@ -229,7 +229,7 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
                         }}
                     />
 
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
                         <Button
                             variant="outlined"
                             startIcon={<FilterListIcon />}
