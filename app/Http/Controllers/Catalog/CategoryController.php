@@ -51,6 +51,22 @@ class CategoryController extends Controller
     private const DISPLAY_TYPES = ['default', 'products', 'subcategories', 'both'];
 
     /**
+     * ตัว platform ที่รองรับสำหรับ marketplaceCategoryChildren()/
+     * marketplaceCategoryPath() ด้านล่าง — ต้นไม้ของแต่ละ marketplace เอง
+     * (ไม่ใช่ PIM category tree ของ tree() ด้านบน) ที่ผูกกับหน้า "Marketplace
+     * Categories" ของ Edit Product ตัวไม้พวกนี้ใหญ่เกินกว่าจะส่งทั้งต้นแบบ
+     * nested JSON เหมือน tree() ได้ (shopee_categories/lazada_categories/
+     * tiktok_categories/woocommerce_categories มีหลักพันแถวต่อตัว เทียบกับ
+     * ~1,100 ของ PIM category เอง) เลยต้องโหลดทีละ level ตาม parent_id แทน
+     */
+    private const MARKETPLACE_CATEGORY_MODELS = [
+        'shopee' => ShopeeCategory::class,
+        'lazada' => LazadaCategory::class,
+        'tiktok' => TikTokCategory::class,
+        'woocommerce' => WooCommerceCategory::class,
+    ];
+
+    /**
      * แสดงลิสต์หมวดหมู่ทั้งหมด
      */
     public function index(Request $request): Response
@@ -467,6 +483,85 @@ class CategoryController extends Controller
                 return $node;
             })
             ->values();
+    }
+
+    /**
+     * โหลด node ลูกของ marketplace category tree ทีละ level (parent_id=null
+     * คือ root) — คู่หูของ tree() ด้านบนแต่โหลดแบบ lazy แทนที่จะส่งทั้งต้นไม้
+     * เดียว ใช้โดยตัวเลือกหมวดหมู่แบบ multi-column ของแต่ละ marketplace ใน
+     * Edit Product (resources/js/components/marketplace-category-picker.tsx)
+     */
+    public function marketplaceCategoryChildren(Request $request, string $platform): JsonResponse
+    {
+        abort_unless(array_key_exists($platform, self::MARKETPLACE_CATEGORY_MODELS), 404);
+
+        $parentId = $request->integer('parent_id') ?: null;
+        $model = self::MARKETPLACE_CATEGORY_MODELS[$platform];
+
+        $nodes = $model::where('parent_id', $parentId)
+            ->orderBy('name')
+            ->get(['id', 'parent_id', 'name', 'is_leaf'])
+            ->map(fn ($node) => [
+                'id' => $node->id,
+                'name' => $node->name,
+                'is_leaf' => (bool) $node->is_leaf,
+            ]);
+
+        return response()->json($nodes);
+    }
+
+    /**
+     * ค้นหาชื่อ leaf category ของ marketplace หนึ่งตัว (เฉพาะ is_leaf=true —
+     * มีแต่ leaf เท่านั้นที่เลือกเป็น category จริงของสินค้าได้) พร้อมชื่อ parent
+     * ชั้นเดียว (ไม่ใช่ path เต็ม — ต้นไม้พวกนี้ใหญ่เกินกว่าจะ resolve path เต็ม
+     * ให้ผลค้นหาทุกแถวโดยไม่กระทบ performance) ให้พอเห็น context คร่าวๆ
+     */
+    public function marketplaceCategorySearch(Request $request, string $platform): JsonResponse
+    {
+        abort_unless(array_key_exists($platform, self::MARKETPLACE_CATEGORY_MODELS), 404);
+
+        $query = trim((string) $request->query('q', ''));
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        $model = self::MARKETPLACE_CATEGORY_MODELS[$platform];
+
+        $results = $model::where('is_leaf', true)
+            ->where('name', 'like', "%{$query}%")
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name', 'parent_id']);
+
+        $parentNames = $model::whereIn('id', $results->pluck('parent_id')->filter()->unique())->pluck('name', 'id');
+
+        return response()->json($results->map(fn ($node) => [
+            'id' => $node->id,
+            'name' => $node->name,
+            'parent_name' => $node->parent_id ? ($parentNames[$node->parent_id] ?? null) : null,
+        ]));
+    }
+
+    /**
+     * root-to-node path ของ marketplace category id หนึ่งตัว (เดินขึ้นตาม
+     * parent_id) — ใช้แสดง breadcrumb ของค่าที่เลือกไว้แล้ว (ทั้งตอนโชว์เฉยๆ
+     * และตอนเปิด picker เพื่อ preload คอลัมน์ให้ตรงกับที่เคยเลือกไว้)
+     */
+    public function marketplaceCategoryPath(Request $request, string $platform): JsonResponse
+    {
+        abort_unless(array_key_exists($platform, self::MARKETPLACE_CATEGORY_MODELS), 404);
+
+        $id = $request->integer('id');
+        $model = self::MARKETPLACE_CATEGORY_MODELS[$platform];
+
+        $path = [];
+        $node = $id ? $model::find($id, ['id', 'parent_id', 'name']) : null;
+        while ($node) {
+            array_unshift($path, ['id' => $node->id, 'name' => $node->name]);
+            $node = $node->parent_id ? $model::find($node->parent_id, ['id', 'parent_id', 'name']) : null;
+        }
+
+        return response()->json($path);
     }
 
     /**
@@ -1125,6 +1220,18 @@ class CategoryController extends Controller
      * searchShopeeCategories() ด้านล่าง การแมปตรงนั้นเริ่มจาก node ของ Shopee
      * แล้วถามว่า "ตรงกับหมวดหมู่ *ของเรา* ตัวไหน" ตัวเลือกเลยต้องค้นหาหมวดหมู่
      * แบบ leaf ในระบบเรา ไม่ใช่ของ marketplace
+     *
+     * "leaf" ที่นี่หมายถึงกลุ่มสินค้าจริงๆ (ระดับที่ 3: หมวดหมู่สินค้า > หมวดย่อย
+     * สินค้า > กลุ่มสินค้า) ไม่ใช่แค่ "ไม่มีลูก" เฉยๆ — เดิมเช็คแค่ whereDoesntHave
+     * ('children') ซึ่งเผลอรับหมวดหมู่/หมวดย่อยที่บังเอิญยังไม่มีลูกเลย (พบจริง 124
+     * รายการ: 3 root + 121 หมวดย่อย) เข้ามาปนด้วย ทั้งที่ไม่ใช่กลุ่มสินค้า จึงต้อง
+     * เช็คเพิ่มว่ามีทั้ง parent และ parent ของ parent (whereNotNull('parent_id')
+     * ซ้อนกัน 2 ชั้น) ด้วย
+     *
+     * เช็ค is_active ทั้งสายบรรพบุรุษ (ตัวเอง + หมวดย่อย + หมวดหมู่หลัก) ไม่ใช่แค่
+     * ตัวเองอย่างเดียว — กลุ่มสินค้าที่ active แต่หมวดย่อย/หมวดหมู่หลักที่ครอบมันถูกปิด
+     * ใช้งานไปแล้ว ไม่ควรโผล่มาให้เลือก map ต่อ เพราะจะดูเหมือนหมวดหมู่นั้นยังใช้งาน
+     * ได้อยู่ทั้งที่จริงๆ ทั้งสายถูกปิดไปแล้ว
      */
     public function searchCategories(Request $request): JsonResponse
     {
@@ -1133,6 +1240,12 @@ class CategoryController extends Controller
         $categories = Category::query()->without('translations')
             ->where('is_active', true)
             ->whereDoesntHave('children')
+            ->whereNotNull('parent_id')
+            ->whereHas('parent', function ($q) {
+                $q->where('is_active', true)
+                    ->whereNotNull('parent_id')
+                    ->whereHas('parent', fn ($q2) => $q2->where('is_active', true));
+            })
             ->when($query !== '', fn ($q) => $q->where(function ($q2) use ($query) {
                 $q2->where('name', 'like', "%{$query}%")
                     ->orWhereRaw("additional_data->>'name_eng' ILIKE ?", ["%{$query}%"]);
@@ -1723,6 +1836,18 @@ class CategoryController extends Controller
             );
 
             $updated++;
+        }
+
+        // tree()'s cached payload (key: Category::treeCacheVersion(), up to
+        // 6h TTL) now carries each node's mapped_platforms — feeds
+        // CategoryCascadeSelect's chips on the Edit Product page. Without
+        // bumping the version here, a mapping saved on this page (shopee/
+        // lazada/tiktok/woocommerce-mapping.tsx) wouldn't show up there
+        // until that cache naturally expired — same staleness
+        // bumpTreeCacheVersion() already guards against for the tree's own
+        // shape/label changes (see tree()'s docblock).
+        if ($updated > 0) {
+            Category::bumpTreeCacheVersion();
         }
 
         return back()->with('success', "Updated {$updated} category mapping(s).");

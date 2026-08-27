@@ -20,6 +20,14 @@ class Product extends Model
         'type',
         'enabled',
         'configurable_attributes',
+        'shopee_category_id',
+        'lazada_category_id',
+        'tiktok_category_id',
+        'woocommerce_category_id',
+        'shopee_brand_id',
+        'lazada_brand_id',
+        'tiktok_brand_id',
+        'woocommerce_brand_id',
     ];
 
     protected function casts(): array
@@ -54,6 +62,61 @@ class Product extends Model
     public function categories(): BelongsToMany
     {
         return $this->belongsToMany(Category::class, 'product_category');
+    }
+
+    /**
+     * Per-product overrides of which marketplace category this product
+     * pushes under — nullable; when unset, each sync service falls back to
+     * the mapping on this product's PIM `categories()` instead (see
+     * ShopeeProductSyncService::resolveCategoryId() and its Lazada/TikTok
+     * counterparts).
+     */
+    public function shopeeCategory(): BelongsTo
+    {
+        return $this->belongsTo(ShopeeCategory::class, 'shopee_category_id');
+    }
+
+    public function lazadaCategory(): BelongsTo
+    {
+        return $this->belongsTo(LazadaCategory::class, 'lazada_category_id');
+    }
+
+    public function tiktokCategory(): BelongsTo
+    {
+        return $this->belongsTo(TikTokCategory::class, 'tiktok_category_id');
+    }
+
+    public function woocommerceCategory(): BelongsTo
+    {
+        return $this->belongsTo(WooCommerceCategory::class, 'woocommerce_category_id');
+    }
+
+    /**
+     * Per-product overrides of which marketplace brand this product pushes
+     * under — nullable; when unset, each sync service falls back to the
+     * marketplace mapping on whichever AttributeOption this product's
+     * `pbrand` attribute value points to instead (see
+     * ShopeeProductSyncService::resolveShopeeBrandId() and its Lazada/
+     * TikTok/WooCommerce counterparts).
+     */
+    public function shopeeBrand(): BelongsTo
+    {
+        return $this->belongsTo(ShopeeBrand::class, 'shopee_brand_id');
+    }
+
+    public function lazadaBrand(): BelongsTo
+    {
+        return $this->belongsTo(LazadaBrand::class, 'lazada_brand_id');
+    }
+
+    public function tiktokBrand(): BelongsTo
+    {
+        return $this->belongsTo(TikTokBrand::class, 'tiktok_brand_id');
+    }
+
+    public function woocommerceBrand(): BelongsTo
+    {
+        return $this->belongsTo(WooCommerceBrand::class, 'woocommerce_brand_id');
     }
 
     /**

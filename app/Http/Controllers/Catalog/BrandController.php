@@ -50,9 +50,69 @@ use Inertia\Response;
  */
 class BrandController extends Controller
 {
+    /**
+     * ตัว platform ที่รองรับสำหรับ marketplaceBrandSearch()/
+     * marketplaceBrandLookup() ด้านล่าง — คู่หูของ CategoryController::
+     * MARKETPLACE_CATEGORY_MODELS แต่สำหรับ brand แทน brand ของแต่ละ
+     * marketplace เป็น flat list ไม่ใช่ tree (ไม่เหมือน category) เลยไม่ต้อง
+     * มี children()/path() แบบนั้น มีแค่ search + lookup-by-id ก็พอ
+     */
+    private const MARKETPLACE_BRAND_MODELS = [
+        'shopee' => ShopeeBrand::class,
+        'lazada' => LazadaBrand::class,
+        'tiktok' => TikTokBrand::class,
+        'woocommerce' => WooCommerceBrand::class,
+    ];
+
     private function brandAttribute(): Attribute
     {
         return Attribute::where('code', 'pbrand')->firstOrFail();
+    }
+
+    /**
+     * ค้นหาแบรนด์ของ marketplace หนึ่งตัวโดยชื่อ — ใช้โดยตัวเลือกแบรนด์แบบ
+     * search ของแต่ละ marketplace ใน Edit Product (resources/js/components/
+     * marketplace-brand-picker.tsx) เฉพาะ Shopee เท่านั้นที่รับ `category_id`
+     * เพิ่ม (informational, ไม่ใช่ FK จริง — ดู docblock ของ ShopeeBrand) เพื่อ
+     * กรองให้ตรงกับหมวดหมู่ Shopee ที่สินค้านี้ resolve ไว้อยู่แล้ว ตาม UX เดียว
+     * กับที่ shopeeBrandsForCategory() ด้านล่างใช้อยู่ก่อนแล้วสำหรับหน้า mapping
+     */
+    public function marketplaceBrandSearch(Request $request, string $platform): JsonResponse
+    {
+        abort_unless(array_key_exists($platform, self::MARKETPLACE_BRAND_MODELS), 404);
+
+        $query = trim((string) $request->query('q', ''));
+        if ($query === '') {
+            return response()->json([]);
+        }
+
+        $model = self::MARKETPLACE_BRAND_MODELS[$platform];
+        $categoryId = $platform === 'shopee' ? ($request->integer('category_id') ?: null) : null;
+
+        $results = $model::query()
+            ->where('name', 'like', "%{$query}%")
+            ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
+            ->orderBy('name')
+            ->limit(50)
+            ->get(['id', 'name']);
+
+        return response()->json($results);
+    }
+
+    /**
+     * ชื่อของแบรนด์ marketplace หนึ่งตัวจาก id — ใช้แสดงชื่อของค่าที่เคยเลือกไว้
+     * แล้วในกล่อง trigger ของ picker (เก็บแค่ id ไว้บน product เอง เลยต้อง
+     * resolve ชื่อกลับมาแสดงทีหลัง)
+     */
+    public function marketplaceBrandLookup(Request $request, string $platform): JsonResponse
+    {
+        abort_unless(array_key_exists($platform, self::MARKETPLACE_BRAND_MODELS), 404);
+
+        $id = $request->integer('id');
+        $model = self::MARKETPLACE_BRAND_MODELS[$platform];
+        $brand = $id ? $model::find($id, ['id', 'name']) : null;
+
+        return response()->json($brand ? ['id' => $brand->id, 'name' => $brand->name] : null);
     }
 
     /**

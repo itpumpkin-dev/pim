@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -127,5 +128,34 @@ trait ResolvesProductAttributeValues
         }
 
         return null;
+    }
+
+    /**
+     * Marketplace brand id (e.g. shopee_brand_id/lazada_brand_id/
+     * tiktok_brand_id/woocommerce_brand_id) mapped to this product's
+     * `pbrand` attribute value's AttributeOption row — null if the product
+     * has no `pbrand` value set, or that option has no mapping for this
+     * platform's $column yet. Shared by every {Platform}ProductSyncService's
+     * resolve*BrandId(), each of which prefers a per-product override
+     * (products.{platform}_brand_id) over this shared, brand-option-level
+     * default when the product has one of its own.
+     */
+    private function mappedBrandOptionId(Product $product, string $column): ?int
+    {
+        $brandCode = $this->attributeValue($product, 'pbrand', null);
+        if (!$brandCode) {
+            return null;
+        }
+
+        $pbrandAttributeId = Attribute::where('code', 'pbrand')->value('id');
+        if (!$pbrandAttributeId) {
+            return null;
+        }
+
+        $mapped = AttributeOption::where('attribute_id', $pbrandAttributeId)
+            ->where('code', $brandCode)
+            ->value($column);
+
+        return $mapped !== null ? (int) $mapped : null;
     }
 }

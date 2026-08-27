@@ -3,6 +3,7 @@
 namespace App\Services\Lazada;
 
 use App\Models\LazadaAttributeMapping;
+use App\Models\LazadaBrand;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
@@ -41,10 +42,7 @@ class LazadaProductSyncService
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
-        $category = $product->categories()->whereNotNull('lazada_category_id')->first();
-        if (!$category) {
-            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Lazada category yet.");
-        }
+        $lazadaCategoryId = $this->resolveLazadaCategoryId($product);
 
         // Admin-configurable (LazadaAttributeMappingController) — replaces
         // the old hardcoded pname/price_std/qty/attribute_6/SKU_FIELD_SOURCE
@@ -89,21 +87,22 @@ class LazadaProductSyncService
             'package_height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
         ];
 
+        // เดิม hardcode 'No Brand' ไว้ตรงๆ (ดูประวัติไฟล์นี้) เพราะตอนนั้น
+        // catalog ของ Lazada (153,482 รายการผ่าน /category/brands/query)
+        // ยังไม่มี local sync ให้ค้นหาด้วยชื่อได้ — ตอนนี้ lazada_brands sync
+        // ไว้ในเครื่องแล้วทั้งชุด (~153,600 แถว) resolveLazadaBrandId() เลย
+        // ค้นหาในนั้นแทนได้จริง — ต้องมีค่าเสมอก่อน push ได้ (ดู
+        // ProductController::hasMarketplaceBrandMapped()) รวมถึงกรณีแอดมิน
+        // ตั้งใจ map ไปที่แถว "No Brand" ของ Lazada เอง ถ้ามีอยู่ในชุดที่ sync มา
+        $lazadaBrandId = $this->resolveLazadaBrandId($product);
         $normalAttributes = [
             'name' => $name,
             'short_description' => $name,
-            // Confirmed live, 2026-08-13: Lazada's `brand` field must
-            // match its own controlled brand catalog exactly
-            // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — our local pbrand
-            // select-option value (e.g. "option_1"/"พัมคิน") was never
-            // going to match that. The catalog has 153,482 entries via
-            // /category/brands/query with no confirmed name-search
-            // parameter (tried name/keyword/brand_name/search — none
-            // filtered), so matching our brand to a real Lazada brand_id
-            // isn't currently feasible. "No Brand" is Lazada's own
-            // documented universal fallback (present in their official
-            // /product/create example payload) for exactly this case.
-            'brand' => 'No Brand',
+            // Confirmed live, 2026-08-13: Lazada's `brand` field must match
+            // its own controlled brand catalog exactly by NAME
+            // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — it's a string field, not
+            // an id, so this looks up the resolved brand's name here.
+            'brand' => LazadaBrand::find($lazadaBrandId)?->name ?? 'No Brand',
         ];
         if ($videoUrl) {
             $normalAttributes['video'] = $videoUrl;
@@ -123,7 +122,7 @@ class LazadaProductSyncService
         }
 
         $payload = [
-            'primary_category_id' => $category->lazada_category_id,
+            'primary_category_id' => $lazadaCategoryId,
             'attributes' => array_filter($normalAttributes),
             // Confirmed via a real official /product/create example: Product
             // carries its own main-image list separate from each Sku's own
@@ -135,7 +134,7 @@ class LazadaProductSyncService
             ],
         ];
 
-        $this->assertMandatoryFieldsPresent($category->lazada_category_id, $payload);
+        $this->assertMandatoryFieldsPresent($lazadaCategoryId, $payload);
 
         return $payload;
     }
@@ -471,6 +470,48 @@ class LazadaProductSyncService
             ->update(['status' => null, 'last_synced_at' => $now]);
 
         return ['matched' => $productIdBySku->count(), 'total_live' => count($liveItemIdBySku)];
+    }
+
+    /**
+     * A product's own `lazada_category_id` override (set directly from
+     * Lazada's synced tree on the Edit Product page) wins when present;
+     * otherwise falls back to whichever of the product's PIM categories has
+     * a Lazada mapping configured (the shared, category-level default every
+     * product without its own override still relies on).
+     */
+    private function resolveLazadaCategoryId(Product $product): int
+    {
+        if ($product->lazada_category_id) {
+            return (int) $product->lazada_category_id;
+        }
+
+        $category = $product->categories()->whereNotNull('lazada_category_id')->first();
+        if (!$category) {
+            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Lazada category yet.");
+        }
+
+        return (int) $category->lazada_category_id;
+    }
+
+    /**
+     * A product's own `lazada_brand_id` override (set directly from
+     * Lazada's synced brand list on the Edit Product page) wins when
+     * present; otherwise falls back to whichever marketplace brand this
+     * product's `pbrand` attribute value's AttributeOption is mapped to —
+     * same resolve-then-throw shape as resolveLazadaCategoryId().
+     */
+    private function resolveLazadaBrandId(Product $product): int
+    {
+        if ($product->lazada_brand_id) {
+            return (int) $product->lazada_brand_id;
+        }
+
+        $mapped = $this->mappedBrandOptionId($product, 'lazada_brand_id');
+        if ($mapped === null) {
+            throw new RuntimeException("Product '{$product->sku}' has no brand mapped to a Lazada brand yet.");
+        }
+
+        return (int) $mapped;
     }
 
     /**

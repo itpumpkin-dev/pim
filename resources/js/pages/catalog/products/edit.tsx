@@ -1,5 +1,7 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { CategoryCascadeSelect } from '@/components/category-cascade-select';
+import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
+import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
@@ -8,10 +10,11 @@ import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
+import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -55,6 +58,8 @@ import {
     Tab,
     Tabs,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
     Tooltip,
     Typography,
 } from '@mui/material';
@@ -135,6 +140,14 @@ interface Product {
     type: string;
     enabled: boolean;
     configurable_attributes?: number[];
+    shopee_category_id?: number | null;
+    lazada_category_id?: number | null;
+    tiktok_category_id?: number | null;
+    woocommerce_category_id?: number | null;
+    shopee_brand_id?: number | null;
+    lazada_brand_id?: number | null;
+    tiktok_brand_id?: number | null;
+    woocommerce_brand_id?: number | null;
     created_at: string;
     updated_at: string;
     translation_completeness?: number | null;
@@ -176,6 +189,14 @@ interface ProductForm {
     variants: VariantItem[];
     configurable_attributes: number[];
     category_ids: number[];
+    shopee_category_id: number | null;
+    lazada_category_id: number | null;
+    tiktok_category_id: number | null;
+    woocommerce_category_id: number | null;
+    shopee_brand_id: number | null;
+    lazada_brand_id: number | null;
+    tiktok_brand_id: number | null;
+    woocommerce_brand_id: number | null;
     published_shop_ids: number[];
     associations: { related: number[]; up_sell: number[]; cross_sell: number[] };
     [key: string]: any;
@@ -377,6 +398,14 @@ export default function ProductEdit({
         variants: variants,
         configurable_attributes: product.configurable_attributes ?? [],
         category_ids: categoryIds,
+        shopee_category_id: product.shopee_category_id ?? null,
+        lazada_category_id: product.lazada_category_id ?? null,
+        tiktok_category_id: product.tiktok_category_id ?? null,
+        woocommerce_category_id: product.woocommerce_category_id ?? null,
+        shopee_brand_id: product.shopee_brand_id ?? null,
+        lazada_brand_id: product.lazada_brand_id ?? null,
+        tiktok_brand_id: product.tiktok_brand_id ?? null,
+        woocommerce_brand_id: product.woocommerce_brand_id ?? null,
         published_shop_ids: publishedShopIds,
         associations: {
             related: associations.related.map((p) => p.id),
@@ -384,6 +413,20 @@ export default function ProductEdit({
             cross_sell: associations.cross_sell.map((p) => p.id),
         },
     });
+
+    // สลับได้แค่ทางเดียวว่าจะให้ "System Categories" (PIM category tree ด้านล่าง
+    // ที่ผูก mapping ระดับ category กับทุก platform ไว้เป็นค่า default) หรือ
+    // "Marketplace Categories" (override เฉพาะรายสินค้าต่อแพลตฟอร์ม) เป็นตัวที่
+    // ใช้งานจริงสำหรับสินค้านี้ — อีกฝั่งจะแค่ถูก disable (ไม่ถูกล้างค่า) ไม่ใช่ซ่อนไป
+    // ค่าเริ่มต้นตั้งเป็น "marketplace" เสมอ (ไม่ว่าสินค้านี้จะเคยตั้ง override ไว้
+    // หรือไม่ก็ตาม) ตามที่ต้องการให้หน้า Edit เปิดมาที่แท็บนี้เป็นค่าเริ่มต้น
+    const [categorySource, setCategorySource] = useState<'system' | 'marketplace'>('marketplace');
+
+    // เหตุผลเดียวกับ categorySource ด้านบน แต่สำหรับ Brand แยกต่างหาก — สินค้าอาจ
+    // ใช้ System Categories สำหรับหมวดหมู่ แต่ยังอยาก override เฉพาะ Brand ต่อ
+    // แพลตฟอร์มก็ได้ (หรือกลับกัน) เลยไม่ผูกโหมดทั้งสองไว้ด้วยกัน — ค่าเริ่มต้นเป็น
+    // "marketplace" เสมอเหมือนกัน
+    const [brandSource, setBrandSource] = useState<'system' | 'marketplace'>('marketplace');
 
     const toggleShopPublished = (shopId: number) => {
         const current = data.published_shop_ids;
@@ -1034,7 +1077,6 @@ export default function ProductEdit({
         transform((formData) => ({ ...formData, _method: 'put' }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/products/${product.id}`, {
-            onSuccess: () => router.visit('/catalog/products', { replace: true }),
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
@@ -1344,6 +1386,7 @@ export default function ProductEdit({
                                                                         activeChannelName={activeChannelName}
                                                                         canAddOptions={canAddAttributeOptions}
                                                                         sku={data.sku}
+                                                                        productId={product.id}
                                                                     />
                                                                 );
                                                             })}
@@ -1412,8 +1455,8 @@ export default function ProductEdit({
                                 <Grid item xs={12} md={3.5}>
                                     <Stack spacing={3}>
                                         {/* แผง Product Info */}
-                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                                 Product Info
                                             </Typography>
                                             <Stack spacing={2}>
@@ -1492,107 +1535,300 @@ export default function ProductEdit({
                                             </Stack>
                                         </Paper>
 
-                                        {/* แผง Categories */}
-                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                                                <Typography variant="h6" fontWeight={700} color="text.primary">
-                                                    Categories
+                                        {/* แผง Categories — สลับได้ว่าจะให้ System Categories (PIM category tree
+                                        ที่ mapping ระดับ category เป็นค่า default ให้ทุก platform) หรือ
+                                        Marketplace Categories (override เฉพาะรายสินค้าต่อแพลตฟอร์ม) เป็นตัวที่
+                                        ใช้งานจริง — ฝั่ง System Categories แค่ disable ไว้เฉยๆ ไม่ล้างค่า
+                                        (category_ids มีประโยชน์อื่นนอกเหนือจาก push เช่น storefront/grid filter
+                                        เลยต้องคงอยู่เสมอ) แต่สลับกลับไป "System Categories" จะล้างค่า override
+                                        ทั้ง 4 platform ทิ้งจริงๆ (ไม่ใช่แค่ disable เฉยๆ) เพราะ field พวกนั้นมีไว้
+                                        ทำหน้าที่ override การ push อย่างเดียว ไม่งั้นค่าเก่าจะยังถูกใช้จริงตอน push
+                                        อยู่ดี (resolve*CategoryId() ฝั่ง backend เลือก override ก่อนเสมอ) ทั้งที่
+                                        UI บอกว่าเปลี่ยนไปใช้ System Categories แล้ว ดู categorySource ด้านบนของ
+                                        component นี้ */}
+                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 2 }}>
+                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                    {t('categoriesBlockTitle')}
                                                 </Typography>
-                                                <Button
-                                                    component={Link}
-                                                    href="/catalog/categories/marketplace-sync"
-                                                    size="small"
-                                                    startIcon={<LinkIcon fontSize="small" />}
-                                                    sx={{ textTransform: 'none' }}
+                                                <Tooltip
+                                                    title={t('categoriesSourceInfoTooltip')}
+                                                    arrow
                                                 >
-                                                    {t('marketplaceMappingButton')}
-                                                </Button>
+                                                    <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+                                                </Tooltip>
                                             </Stack>
-                                            <CategoryCascadeSelect value={data.category_ids} onChange={(ids) => setData('category_ids', ids)} />
+
+                                            <ToggleButtonGroup
+                                                exclusive
+                                                fullWidth
+                                                size="small"
+                                                value={categorySource}
+                                                onChange={(_, next) => {
+                                                    if (!next) return;
+                                                    setCategorySource(next);
+                                                    // เคลียร์ override ทั้ง 4 platform ทิ้งจริงๆ ตอนสลับกลับไปใช้
+                                                    // System Categories — field พวกนี้มีหน้าที่ override การ push
+                                                    // อย่างเดียว ไม่งั้นค่าเก่าจะยังถูกใช้จริงอยู่ (resolve*CategoryId()
+                                                    // ฝั่ง backend เลือก override ก่อนเสมอถ้ายังมีค่าอยู่) ทั้งที่ UI
+                                                    // บอกว่าเปลี่ยนมาใช้ System Categories แล้ว — category_ids (PIM)
+                                                    // ไม่ต้องเคลียร์แบบเดียวกัน เพราะมีประโยชน์อื่นอยู่ (storefront/
+                                                    // grid filter) นอกเหนือจาก push
+                                                    if (next === 'system') {
+                                                        setData('shopee_category_id', null);
+                                                        setData('lazada_category_id', null);
+                                                        setData('tiktok_category_id', null);
+                                                        setData('woocommerce_category_id', null);
+                                                    }
+                                                }}
+                                                sx={{
+                                                    mb: 2.5,
+                                                    '& .MuiToggleButton-root': {
+                                                        textTransform: 'none',
+                                                        fontWeight: 600,
+                                                        color: FIORI.textSecondary,
+                                                        borderColor: FIORI.border,
+                                                        '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
+                                                    },
+                                                }}
+                                            >
+                                                <ToggleButton value="system">
+                                                    {t('systemCategoriesLabel')}
+                                                </ToggleButton>
+                                                <ToggleButton value="marketplace">
+                                                    {t('marketplaceCategoriesLabel')}
+                                                </ToggleButton>
+                                            </ToggleButtonGroup>
+
+                                            <Divider sx={{ my: 1 }} />
+                                            
+                                            <Stack spacing={1}>
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
+                                                        {t('systemCategoriesLabel')}
+                                                    </Typography>
+                                                    <Button
+                                                        component={Link}
+                                                        href="/catalog/categories/marketplace-sync"
+                                                        size="small"
+                                                        startIcon={<LinkIcon fontSize="small" />}
+                                                        sx={{ textTransform: 'none' }}
+                                                    >
+                                                        {t('marketplaceMappingButton')}
+                                                    </Button>
+                                                </Stack>
+                                                <CategoryCascadeSelect
+                                                    value={data.category_ids}
+                                                    onChange={(ids) => setData('category_ids', ids)}
+                                                    disabled={categorySource !== 'system'}
+                                                />
+                                            </Stack>
+                                            <Divider sx={{ mt: 3 }} />
+                                            <Stack spacing={1} sx={{ mt: 3 }}>
+                                                <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
+                                                    {t('marketplaceCategoriesLabel')}
+                                                </Typography>
+                                                <MarketplaceCategoryPicker
+                                                    platform="shopee"
+                                                    label="Shopee"
+                                                    value={data.shopee_category_id}
+                                                    onChange={(id) => setData('shopee_category_id', id)}
+                                                    disabled={categorySource !== 'marketplace'}
+                                                />
+                                                <MarketplaceCategoryPicker
+                                                    platform="lazada"
+                                                    label="Lazada"
+                                                    value={data.lazada_category_id}
+                                                    onChange={(id) => setData('lazada_category_id', id)}
+                                                    disabled={categorySource !== 'marketplace'}
+                                                />
+                                                <MarketplaceCategoryPicker
+                                                    platform="tiktok"
+                                                    label="TikTok"
+                                                    value={data.tiktok_category_id}
+                                                    onChange={(id) => setData('tiktok_category_id', id)}
+                                                    disabled={categorySource !== 'marketplace'}
+                                                />
+                                                <MarketplaceCategoryPicker
+                                                    platform="woocommerce"
+                                                    label="WooCommerce"
+                                                    value={data.woocommerce_category_id}
+                                                    onChange={(id) => setData('woocommerce_category_id', id)}
+                                                    disabled={categorySource !== 'marketplace'}
+                                                />
+                                            </Stack>
                                         </Paper>
 
-                                        {/* แผง Brand — คือ pbrand ที่แยกออกมาจากลูปของ attribute ทั่วไป (ดู
-                                    เงื่อนไข `attr.code === 'pbrand'` ที่กันออกด้านบน) เพื่อให้อยู่ต่อจาก
-                                    Categories ทันที และโชว์สถานะการผูก marketplace ของตัวเองได้แบบเดียว
-                                    กับที่ Categories ทำ */}
+                                        {/* แผง Brand — ใช้หลักการเดียวกับ Categories ทุกประการ: สลับได้ว่าจะให้
+                                        System Brand (pbrand ที่แยกออกมาจากลูปของ attribute ทั่วไป — ดูเงื่อนไข
+                                        `attr.code === 'pbrand'` ที่กันออกด้านบน — mapping ระดับ brand option
+                                        เป็นค่า default ให้ทุก platform) หรือ Marketplace Brand (override เฉพาะ
+                                        รายสินค้าต่อแพลตฟอร์ม จากชุดแบรนด์จริงที่ sync มา) เป็นตัวที่ใช้งานจริง
+                                        ฝั่งที่ไม่ได้เลือกจะถูก dim ไว้เฉยๆ (ไม่ล้างค่า) ยกเว้นสลับกลับไป System
+                                        Brand จะล้างค่า override ทั้ง 4 platform ทิ้งจริงๆ เหตุผลเดียวกับ
+                                        categorySource: field พวกนี้มีหน้าที่ override การ push อย่างเดียว */}
                                         {brandAttr && (
-                                            <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                                <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
-                                                    Brand
-                                                </Typography>
-                                                {(() => {
-                                                    const { channelKey, localeKey } = getValueKeys(brandAttr);
-                                                    const val =
-                                                        data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
-                                                        data.values[brandAttr.id]?.[channelKey]?.['default'] ??
-                                                        '';
-                                                    const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                    const activeChannelName =
-                                                        activeChannelId === null
-                                                            ? 'Default (All Channels)'
-                                                            : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
-                                                    const stringValue = typeof val === 'string' ? val : '';
-                                                    const selectedOption = brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
-                                                    const mapped = selectedOption?.mapped_platforms ?? [];
+                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 2 }}>
+                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                        {t('brandBlockTitle')}
+                                                    </Typography>
+                                                    <Tooltip title={t('brandSourceInfoTooltip')} arrow>
+                                                        <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+                                                    </Tooltip>
+                                                </Stack>
 
-                                                    return (
-                                                        <Stack spacing={1.5}>
-                                                            <RenderAttributeInput
-                                                                attr={brandAttr}
-                                                                value={val}
-                                                                channelKey={channelKey}
-                                                                localeKey={localeKey}
-                                                                onValueChange={setAttributeValue}
-                                                                label={localizedLabel(brandAttr, activeLocaleId)}
-                                                                activeLocaleCode={activeLocaleCode}
-                                                                activeChannelName={activeChannelName}
-                                                                canAddOptions={canAddAttributeOptions}
-                                                                sku={data.sku}
-                                                            />
-                                                            {selectedOption && (
-                                                                <Stack direction="row" spacing={1} alignItems="center">
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        การผูก Marketplace:
-                                                                    </Typography>
-                                                                    {mapped.length > 0 ? (
-                                                                        <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                                                            {BRAND_MAPPED_PLATFORMS.filter((p) => mapped.includes(p.value)).map(
-                                                                                (p) => (
-                                                                                    <Chip
-                                                                                        key={p.value}
-                                                                                        label={p.label}
-                                                                                        size="small"
-                                                                                        sx={{
-                                                                                            bgcolor: p.color,
-                                                                                            color: '#fff',
-                                                                                            fontWeight: 600,
-                                                                                            height: 20,
-                                                                                            fontSize: 11,
-                                                                                        }}
-                                                                                    />
-                                                                                ),
-                                                                            )}
-                                                                        </Stack>
-                                                                    ) : (
-                                                                        <Typography
-                                                                            variant="caption"
-                                                                            color="text.disabled"
-                                                                            sx={{ fontStyle: 'italic' }}
-                                                                        >
-                                                                            ยังไม่ผูก marketplace ใดๆ
+                                                <ToggleButtonGroup
+                                                    exclusive
+                                                    fullWidth
+                                                    size="small"
+                                                    value={brandSource}
+                                                    onChange={(_, next) => {
+                                                        if (!next) return;
+                                                        setBrandSource(next);
+                                                        if (next === 'system') {
+                                                            setData('shopee_brand_id', null);
+                                                            setData('lazada_brand_id', null);
+                                                            setData('tiktok_brand_id', null);
+                                                            setData('woocommerce_brand_id', null);
+                                                        }
+                                                    }}
+                                                    sx={{
+                                                        mb: 2.5,
+                                                        '& .MuiToggleButton-root': {
+                                                            textTransform: 'none',
+                                                            fontWeight: 600,
+                                                            color: FIORI.textSecondary,
+                                                            borderColor: FIORI.border,
+                                                            '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
+                                                        },
+                                                    }}
+                                                >
+                                                    <ToggleButton value="system">{t('systemBrandLabel')}</ToggleButton>
+                                                    <ToggleButton value="marketplace">{t('marketplaceBrandLabel')}</ToggleButton>
+                                                </ToggleButtonGroup>
+
+                                                <Box sx={{ opacity: brandSource === 'system' ? 1 : 0.5, pointerEvents: brandSource === 'system' ? 'auto' : 'none' }}>
+                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                                        {t('systemBrandLabel')}
+                                                    </Typography>
+                                                    {(() => {
+                                                        const { channelKey, localeKey } = getValueKeys(brandAttr);
+                                                        const val =
+                                                            data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
+                                                            data.values[brandAttr.id]?.[channelKey]?.['default'] ??
+                                                            '';
+                                                        const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                                                        const activeChannelName =
+                                                            activeChannelId === null
+                                                                ? 'Default (All Channels)'
+                                                                : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
+                                                        const stringValue = typeof val === 'string' ? val : '';
+                                                        const selectedOption = brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
+                                                        const mapped = selectedOption?.mapped_platforms ?? [];
+
+                                                        return (
+                                                            <Stack spacing={1.5}>
+                                                                <RenderAttributeInput
+                                                                    attr={brandAttr}
+                                                                    value={val}
+                                                                    channelKey={channelKey}
+                                                                    localeKey={localeKey}
+                                                                    onValueChange={setAttributeValue}
+                                                                    label={localizedLabel(brandAttr, activeLocaleId)}
+                                                                    activeLocaleCode={activeLocaleCode}
+                                                                    activeChannelName={activeChannelName}
+                                                                    canAddOptions={canAddAttributeOptions}
+                                                                    sku={data.sku}
+                                                                    productId={product.id}
+                                                                />
+                                                                {selectedOption && (
+                                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            {t('marketplaceMappingLabel')}
                                                                         </Typography>
-                                                                    )}
-                                                                </Stack>
-                                                            )}
-                                                        </Stack>
-                                                    );
-                                                })()}
+                                                                        {mapped.length > 0 ? (
+                                                                            <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                                                                                {BRAND_MAPPED_PLATFORMS.filter((p) => mapped.includes(p.value)).map(
+                                                                                    (p) => (
+                                                                                        <Chip
+                                                                                            key={p.value}
+                                                                                            label={p.label}
+                                                                                            size="small"
+                                                                                            sx={{
+                                                                                                bgcolor: p.color,
+                                                                                                color: '#fff',
+                                                                                                fontWeight: 600,
+                                                                                                height: 20,
+                                                                                                fontSize: 11,
+                                                                                            }}
+                                                                                        />
+                                                                                    ),
+                                                                                )}
+                                                                            </Stack>
+                                                                        ) : (
+                                                                            <Typography
+                                                                                variant="caption"
+                                                                                color="text.disabled"
+                                                                                sx={{ fontStyle: 'italic' }}
+                                                                            >
+                                                                                {t('notMappedToAnyMarketplace')}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </Stack>
+                                                                )}
+                                                            </Stack>
+                                                        );
+                                                    })()}
+                                                </Box>
+                                                <Divider sx={{ mt: 3, mb: 2 }} />
+                                                <Stack
+                                                    spacing={1}
+                                                    sx={{
+                                                        mt: 3,
+                                                        opacity: brandSource === 'marketplace' ? 1 : 0.5,
+                                                        pointerEvents: brandSource === 'marketplace' ? 'auto' : 'none',
+                                                    }}
+                                                >
+                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
+                                                        {t('marketplaceBrandLabel')}
+                                                    </Typography>
+                                                    <MarketplaceBrandPicker
+                                                        platform="shopee"
+                                                        label="Shopee"
+                                                        value={data.shopee_brand_id}
+                                                        onChange={(id) => setData('shopee_brand_id', id)}
+                                                        disabled={brandSource !== 'marketplace'}
+                                                        shopeeCategoryId={data.shopee_category_id}
+                                                    />
+                                                    <MarketplaceBrandPicker
+                                                        platform="lazada"
+                                                        label="Lazada"
+                                                        value={data.lazada_brand_id}
+                                                        onChange={(id) => setData('lazada_brand_id', id)}
+                                                        disabled={brandSource !== 'marketplace'}
+                                                    />
+                                                    <MarketplaceBrandPicker
+                                                        platform="tiktok"
+                                                        label="TikTok"
+                                                        value={data.tiktok_brand_id}
+                                                        onChange={(id) => setData('tiktok_brand_id', id)}
+                                                        disabled={brandSource !== 'marketplace'}
+                                                    />
+                                                    <MarketplaceBrandPicker
+                                                        platform="woocommerce"
+                                                        label="WooCommerce"
+                                                        value={data.woocommerce_brand_id}
+                                                        onChange={(id) => setData('woocommerce_brand_id', id)}
+                                                        disabled={brandSource !== 'marketplace'}
+                                                    />
+                                                </Stack>
                                             </Paper>
                                         )}
 
                                         {/* แผง Associations */}
-                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                        {/* <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                                 Associations
                                             </Typography>
 
@@ -1651,11 +1887,11 @@ export default function ProductEdit({
                                                     />
                                                 </Box>
                                             </Stack>
-                                        </Paper>
+                                        </Paper> */}
 
                                         {/* แผง Sales Channels */}
-                                        <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, bgcolor: '#fff' }}>
-                                            <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 2 }}>
+                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                                 Sales Channels
                                             </Typography>
                                             <Stack spacing={0.5}>
@@ -1672,9 +1908,9 @@ export default function ProductEdit({
                                                         mb: 0.5,
                                                         borderRadius: 1,
                                                         cursor: 'pointer',
-                                                        bgcolor: activeChannelId === null ? 'grey.800' : 'transparent',
+                                                        bgcolor: activeChannelId === null ? FIORI.brand : 'transparent',
                                                         color: activeChannelId === null ? '#fff' : 'text.primary',
-                                                        '&:hover': { bgcolor: activeChannelId === null ? 'grey.900' : 'action.hover' },
+                                                        '&:hover': { bgcolor: activeChannelId === null ? FIORI.brandDark : 'action.hover' },
                                                     }}
                                                 >
                                                     <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
@@ -1787,9 +2023,9 @@ export default function ProductEdit({
                                                                                     pl: isShop ? 0.5 : 1.5,
                                                                                     borderRadius: 1,
                                                                                     cursor: 'pointer',
-                                                                                    bgcolor: active ? 'grey.800' : 'transparent',
+                                                                                    bgcolor: active ? FIORI.brand : 'transparent',
                                                                                     color: active ? '#fff' : 'text.primary',
-                                                                                    '&:hover': { bgcolor: active ? 'grey.900' : 'action.hover' },
+                                                                                    '&:hover': { bgcolor: active ? FIORI.brandDark : 'action.hover' },
                                                                                 }}
                                                                             >
                                                                                 {isShop && (
@@ -1851,7 +2087,7 @@ export default function ProductEdit({
                                                                                             });
                                                                                             checkPlatformStatus(ch.shop_id as number, group.platform);
                                                                                         }}
-                                                                                        sx={{ color: active ? '#fff' : 'grey.800' }}
+                                                                                        sx={{ color: active ? '#fff' : FIORI.textSecondary }}
                                                                                     >
                                                                                         <PublishIcon fontSize="small" />
                                                                                     </IconButton>
@@ -2374,10 +2610,12 @@ const RichTextControl = memo(function RichTextControl({
     placeholder,
     readOnly,
     onValueChange,
+    productId,
 }: FieldControlProps & {
     value: string;
     placeholder: string;
     readOnly: boolean;
+    productId: number;
 }) {
     return (
         <RichTextEditor
@@ -2385,6 +2623,7 @@ const RichTextControl = memo(function RichTextControl({
             onChange={(val) => onValueChange(attributeId, channelKey, localeKey, val)}
             placeholder={placeholder}
             readOnly={readOnly}
+            imageUploadUrl={readOnly ? undefined : `/catalog/products/${productId}/upload-description-image`}
         />
     );
 });
@@ -2400,6 +2639,7 @@ function RenderAttributeInput({
     activeChannelName,
     canAddOptions,
     sku,
+    productId,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
@@ -2411,6 +2651,7 @@ function RenderAttributeInput({
     activeChannelName?: string;
     canAddOptions?: boolean;
     sku: string;
+    productId: number;
 }) {
     // ใช้กับทุกประเภทฟิลด์ด้านล่าง ยกเว้น SelectControl / RichTextControl ที่
     // memoize ไว้ (สองตัวนี้เรียก onValueChange ตรงๆ พร้อม
@@ -2548,6 +2789,7 @@ function RenderAttributeInput({
                     value={stringValue}
                     placeholder={`Enter ${label.toLowerCase()}`}
                     readOnly={isReadOnly}
+                    productId={productId}
                     onValueChange={onValueChange}
                 />
             </Box>

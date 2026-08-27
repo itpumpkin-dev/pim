@@ -5,6 +5,7 @@ namespace App\Services\Shopee;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\ShopeeAttributeMapping;
+use App\Models\ShopeeBrand;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -74,10 +75,7 @@ class ShopeeProductSyncService
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
-        $category = $product->categories()->whereNotNull('shopee_category_id')->first();
-        if (!$category) {
-            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Shopee category yet.");
-        }
+        $shopeeCategoryId = $this->resolveShopeeCategoryId($product);
 
         // Admin-configurable (ShopeeAttributeMappingController) — replaces
         // the old hardcoded pname/price_std/qty/weight_pcs/
@@ -121,7 +119,7 @@ class ShopeeProductSyncService
             throw new RuntimeException("Shop '{$shop->name}' has no enabled Shopee logistics channel — cannot push.");
         }
 
-        $attributes = $this->resolveAttributes($mappings, $product, $shop->channel_id, (int) $category->shopee_category_id);
+        $attributes = $this->resolveAttributes($mappings, $product, $shop->channel_id, $shopeeCategoryId);
         if (!empty($attributes['missing'])) {
             throw new RuntimeException(
                 'Shopee category requires attribute(s) this app has no data for and cannot auto-fill: '
@@ -137,12 +135,21 @@ class ShopeeProductSyncService
             'package_height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
         ]);
 
-        $brand = $this->resolveBrand((int) $category->shopee_category_id);
+        // เดิม resolveBrand() ค้นหา "No Brand" placeholder ของหมวดหมู่นี้ผ่าน
+        // live get_brand_list call แทน — ยังไม่เคยใช้ mapping ของ attribute_options
+        // เลยจริงๆ (ดู docblock เก่าของมัน: "not yet supported by this auto-push")
+        // ตอนนี้แทนที่ด้วย resolveShopeeBrandId() ที่ใช้ override เฉพาะ product
+        // หรือ mapping ของ pbrand จริงๆ แทน — ต้องมีค่าเสมอก่อน push ได้ (ดู
+        // ProductController::hasMarketplaceBrandMapped()) รวมถึงกรณีที่แอดมิน
+        // ตั้งใจ map ไปที่แถว "No Brand" ของ Shopee เอง (ถ้า sync มาแล้วมีแถวนั้นจริง)
+        // — ยังเป็นการเลือกที่ชัดเจนของแอดมิน ไม่ใช่ auto-detect แบบเดิมอีกต่อไป
+        $shopeeBrandId = $this->resolveShopeeBrandId($product);
+        $brand = ['brand_id' => $shopeeBrandId, 'original_brand_name' => ShopeeBrand::find($shopeeBrandId)?->name ?? ''];
 
         return array_filter([
             'item_name' => $name,
             'description' => $description,
-            'category_id' => (int) $category->shopee_category_id,
+            'category_id' => $shopeeCategoryId,
             'item_sku' => $product->sku,
             'weight' => (float) ($weight ?: 0.1),
             'brand' => $brand,
@@ -176,6 +183,27 @@ class ShopeeProductSyncService
             ),
             'dimension' => count($dimension) === 3 ? array_map('intval', $dimension) : null,
         ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * A product's own `shopee_category_id` override (set directly from
+     * Shopee's synced tree on the Edit Product page) wins when present;
+     * otherwise falls back to whichever of the product's PIM categories has
+     * a Shopee mapping configured (the shared, category-level default every
+     * product without its own override still relies on).
+     */
+    private function resolveShopeeCategoryId(Product $product): int
+    {
+        if ($product->shopee_category_id) {
+            return (int) $product->shopee_category_id;
+        }
+
+        $category = $product->categories()->whereNotNull('shopee_category_id')->first();
+        if (!$category) {
+            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a Shopee category yet.");
+        }
+
+        return (int) $category->shopee_category_id;
     }
 
     /**
@@ -461,33 +489,27 @@ class ShopeeProductSyncService
      * of guessing a real brand" fallback Lazada's own buildPayload() accepts
      * for attributes outside its SKU_FIELD_SOURCE map.
      */
-    private function resolveBrand(int $categoryId): ?array
+    /**
+     * A product's own `shopee_brand_id` override (set directly from
+     * Shopee's synced brand list on the Edit Product page) wins when
+     * present; otherwise falls back to whichever marketplace brand this
+     * product's `pbrand` attribute value's AttributeOption is mapped to
+     * (the shared, brand-option-level default every product without its
+     * own override still relies on) — same resolve-then-throw shape as
+     * resolveShopeeCategoryId().
+     */
+    private function resolveShopeeBrandId(Product $product): int
     {
-        $response = $this->client->getBrandList($categoryId, 0, 50);
-        $isMandatory = (bool) ($response['response']['is_mandatory'] ?? false);
-        $brands = $response['response']['brand_list'] ?? [];
-
-        $noBrand = collect($brands)->first(function (array $b) {
-            if ((int) ($b['brand_id'] ?? -1) === 0) {
-                return true;
-            }
-
-            $normalized = strtolower(str_replace(' ', '', (string) ($b['original_brand_name'] ?? '')));
-
-            return str_contains($normalized, 'nobrand');
-        });
-
-        if ($noBrand) {
-            return ['brand_id' => (int) $noBrand['brand_id'], 'original_brand_name' => $noBrand['original_brand_name']];
+        if ($product->shopee_brand_id) {
+            return (int) $product->shopee_brand_id;
         }
 
-        if ($isMandatory) {
-            throw new RuntimeException(
-                "Shopee category {$categoryId} requires a specific brand and has no generic \"No Brand\" option — assign a real brand manually before pushing (not yet supported by this auto-push)."
-            );
+        $mapped = $this->mappedBrandOptionId($product, 'shopee_brand_id');
+        if ($mapped === null) {
+            throw new RuntimeException("Product '{$product->sku}' has no brand mapped to a Shopee brand yet.");
         }
 
-        return null;
+        return (int) $mapped;
     }
 
     /**

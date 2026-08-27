@@ -9,6 +9,7 @@ use App\Jobs\AutoTranslateProductValueJob;
 use App\Jobs\SyncProductToMarketplaceJob;
 use App\Models\AssociationType;
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
 use App\Models\AuditLog;
@@ -1493,6 +1494,53 @@ class ProductController extends Controller
 
     public function edit(Product $product): Response
     {
+        return Inertia::render('catalog/products/edit', $this->buildProductFormProps($product));
+    }
+
+    /**
+     * Read-only counterpart to edit() — same exact data (see
+     * buildProductFormProps()), rendered by a separate page
+     * (resources/js/pages/catalog/products/show.tsx) with every field
+     * displayed as plain text/chips instead of form controls. update()
+     * redirects here after a successful save so an admin sees a plain
+     * confirmation of what was actually stored, without re-deriving a
+     * second, possibly-drifting view of the same product from scratch.
+     */
+    public function show(Product $product): Response
+    {
+        return Inertia::render('catalog/products/show', $this->buildProductFormProps($product));
+    }
+
+    /**
+     * อัปโหลดรูปเดี่ยวสำหรับฝังลงในเนื้อหา HTML ของ attribute แบบ rich-text
+     * (textarea) โดยตรง — เช่นตอนกดปุ่มรูปภาพในตัวแก้ไขรายละเอียดสินค้า (ดู
+     * resources/js/components/rich-text-editor.tsx) คนละกรณีกับไฟล์ของ
+     * attribute ชนิด image/gallery ที่ update() จัดการอยู่แล้ว (ตัวนั้นเก็บ
+     * ทั้ง value ของ attribute เป็น path เดียวหรือ JSON array ของ path)
+     * เพราะรูปที่ฝังในเนื้อหาต้องได้ URL กลับมาทันทีเพื่อแทรกเข้า editor
+     * ระหว่างที่ยังแก้ไขอยู่ ก่อนที่จะกด Save ฟอร์มทั้งหน้าด้วยซ้ำ
+     */
+    public function uploadDescriptionImage(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'image' => ['required', 'image', 'max:4096'],
+        ]);
+
+        $path = $validated['image']->store('product-descriptions', 'public');
+
+        return response()->json(['url' => Storage::url($path)]);
+    }
+
+    /**
+     * Everything the Edit/Read product pages need — split out from edit()
+     * (which used to build this inline) purely so show() can render the
+     * exact same data read-only instead of maintaining a second, parallel
+     * query path that could quietly drift out of sync with what edit() (and
+     * therefore what a save through update() actually persists) considers
+     * "this product's full data".
+     */
+    private function buildProductFormProps(Product $product): array
+    {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
         // ดึง pivot family_attributes ของ family ของสินค้านี้ ตามลำดับที่ตั้งไว้
@@ -1700,7 +1748,7 @@ class ProductController extends Controller
 
         $categoryIds = $product->categories()->pluck('categories.id')->all();
 
-        return Inertia::render('catalog/products/edit', [
+        return [
             'product' => [
                 'id' => $product->id,
                 'sku' => $product->sku,
@@ -1709,6 +1757,14 @@ class ProductController extends Controller
                 'type' => ucfirst($product->type),
                 'enabled' => (bool) $product->enabled,
                 'configurable_attributes' => $product->configurable_attributes ?? [],
+                'shopee_category_id' => $product->shopee_category_id,
+                'lazada_category_id' => $product->lazada_category_id,
+                'tiktok_category_id' => $product->tiktok_category_id,
+                'woocommerce_category_id' => $product->woocommerce_category_id,
+                'shopee_brand_id' => $product->shopee_brand_id,
+                'lazada_brand_id' => $product->lazada_brand_id,
+                'tiktok_brand_id' => $product->tiktok_brand_id,
+                'woocommerce_brand_id' => $product->woocommerce_brand_id,
                 // ใช้ ISO 8601 ที่มี UTC offset ระบุชัดเจน เพื่อให้ frontend
                 // แปลงเป็นเวลาท้องถิ่นได้ ไม่ใช่แค่โชว์ string ดิบๆ ตรงๆ
                 'created_at' => ($product->created_at ?? now())->toIso8601String(),
@@ -1726,7 +1782,7 @@ class ProductController extends Controller
             'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
-        ]);
+        ];
     }
 
     public function history(Product $product): JsonResponse
@@ -2009,6 +2065,31 @@ class ProductController extends Controller
             ], 422);
         }
 
+        // Fail fast, synchronously, instead of letting a doomed job get
+        // queued and only discovering "no category mapped" once
+        // SyncProductToMarketplaceJob runs it — each
+        // {Platform}ProductSyncService::resolve{Platform}CategoryId()
+        // method throws the exact same check, but only *after* dispatch.
+        // Checked for 'push' only (deactivate/delete never touch category).
+        if ($action === 'push' && ! $this->hasMarketplaceCategoryMapped($product, $platform)) {
+            return response()->json([
+                'message' => "This product has no {$platform} category set — set one under Marketplace Categories before pushing.",
+            ], 422);
+        }
+
+        // เช็คแบบเดียวกันกับ category ด้านบน แต่สำหรับ brand — เพิ่งเพิ่มเข้ามา
+        // ทีหลัง (เดิม brand ไม่เคยเป็นเงื่อนไขบังคับก่อน push เลยสักแพลตฟอร์ม)
+        // ตอนนี้บังคับเหมือน category ทุกแพลตฟอร์ม แม้ในความเป็นจริง brand จะเป็น
+        // ข้อมูล optional สำหรับ marketplace ส่วนใหญ่ (สินค้าจำนวนมากไม่มีแบรนด์จริง
+        // ก็ยังขายได้) — เป็นการตัดสินใจของแอปนี้เองให้บังคับต้องเลือกอะไรสักอย่าง
+        // ก่อนเสมอ (รวมถึงเลือกแถว "No Brand" ของ platform นั้นเองได้ ถ้ามีอยู่ใน
+        // ชุดที่ sync มา) ไม่ใช่ปล่อยว่างเงียบๆ เหมือนที่เคยเป็นมา
+        if ($action === 'push' && ! $this->hasMarketplaceBrandMapped($product, $platform)) {
+            return response()->json([
+                'message' => "This product has no {$platform} brand set — set one under Brand before pushing.",
+            ], 422);
+        }
+
         $syncJob = $this->dispatchMarketplaceSyncJob($product, $shop, $platform, $action);
 
         $message = match ($action) {
@@ -2022,6 +2103,61 @@ class ProductController extends Controller
             'status' => 'queued',
             'message' => $message,
         ], 202);
+    }
+
+    /**
+     * เช็คแบบเดียวกับที่ Shopee/Lazada/TikTok/WooCommerceProductSyncService::
+     * resolve*CategoryId() ใช้จริงตอน build payload: ใช้ค่า override เฉพาะสินค้า
+     * (products.{platform}_category_id) ถ้ามี ไม่งั้น fallback ไปดูว่า
+     * PIM category ที่สินค้าผูกอยู่ มี mapping ของ platform นี้หรือเปล่า —
+     * เขียนซ้ำเป็น query ตรงนี้ (ไม่เรียก sync service ตรงๆ) เพราะ sync
+     * service ต้อง instantiate ด้วย shop/account credentials จริง ส่วนตรงนี้
+     * แค่ต้องการเช็คแบบ synchronous เบาๆ ก่อน dispatch job เท่านั้น
+     */
+    private function hasMarketplaceCategoryMapped(Product $product, string $platform): bool
+    {
+        $column = "{$platform}_category_id";
+        if ($product->{$column}) {
+            return true;
+        }
+
+        return $product->categories()->whereNotNull($column)->exists();
+    }
+
+    /**
+     * เช็คแบบเดียวกับที่ mappedBrandOptionId() (ResolvesProductAttributeValues
+     * trait ที่ sync service ทุกตัวใช้ตอน build payload จริง) ใช้: ค่า override
+     * เฉพาะสินค้า (products.{platform}_brand_id) ถ้ามี ไม่งั้น fallback ไปดูว่า
+     * ค่า attribute `pbrand` ของสินค้านี้ ชี้ไปที่ AttributeOption ที่มี mapping
+     * ของ platform นี้หรือเปล่า — เขียนซ้ำเป็น query ตรงนี้ (ไม่เรียก sync service
+     * ตรงๆ) ด้วยเหตุผลเดียวกับ hasMarketplaceCategoryMapped() ด้านบน
+     */
+    private function hasMarketplaceBrandMapped(Product $product, string $platform): bool
+    {
+        $column = "{$platform}_brand_id";
+        if ($product->{$column}) {
+            return true;
+        }
+
+        $pbrandAttributeId = Attribute::idForCode('pbrand');
+        if (! $pbrandAttributeId) {
+            return false;
+        }
+
+        $brandCode = ProductValue::where('product_id', $product->id)
+            ->where('attribute_id', $pbrandAttributeId)
+            ->whereNull('channel_id')
+            ->whereNull('locale_id')
+            ->value('value');
+
+        if (! $brandCode) {
+            return false;
+        }
+
+        return AttributeOption::where('attribute_id', $pbrandAttributeId)
+            ->where('code', $brandCode)
+            ->whereNotNull($column)
+            ->exists();
     }
 
     /**
@@ -2158,6 +2294,14 @@ class ProductController extends Controller
             'enabled' => ['required', 'boolean'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
+            'shopee_category_id' => ['nullable', 'integer', 'exists:shopee_categories,id'],
+            'lazada_category_id' => ['nullable', 'integer', 'exists:lazada_categories,id'],
+            'tiktok_category_id' => ['nullable', 'integer', 'exists:tiktok_categories,id'],
+            'woocommerce_category_id' => ['nullable', 'integer', 'exists:woocommerce_categories,id'],
+            'shopee_brand_id' => ['nullable', 'integer', 'exists:shopee_brands,id'],
+            'lazada_brand_id' => ['nullable', 'integer', 'exists:lazada_brands,id'],
+            'tiktok_brand_id' => ['nullable', 'integer', 'exists:tiktok_brands,id'],
+            'woocommerce_brand_id' => ['nullable', 'integer', 'exists:woocommerce_brands,id'],
             'published_shop_ids' => ['nullable', 'array'],
             'published_shop_ids.*' => ['exists:sales_platform_shops,id'],
             'associations' => ['nullable', 'array'],
@@ -2210,6 +2354,14 @@ class ProductController extends Controller
                 'type' => strtolower($validated['type']),
                 'enabled' => $validated['enabled'],
                 'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
+                'shopee_category_id' => $validated['shopee_category_id'] ?? null,
+                'lazada_category_id' => $validated['lazada_category_id'] ?? null,
+                'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
+                'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
+                'shopee_brand_id' => $validated['shopee_brand_id'] ?? null,
+                'lazada_brand_id' => $validated['lazada_brand_id'] ?? null,
+                'tiktok_brand_id' => $validated['tiktok_brand_id'] ?? null,
+                'woocommerce_brand_id' => $validated['woocommerce_brand_id'] ?? null,
                 'updated_by' => $request->user()?->id,
             ]);
 
@@ -2649,7 +2801,10 @@ class ProductController extends Controller
             $this->recordProductValueChanges($product, $oldVariantValues, $newVariantValues, 'variant_values_updated');
         });
 
-        return to_route('catalog.products.index')->with('success', 'Product updated successfully.');
+        // ไปหน้า Read (แสดงข้อมูลที่เพิ่งบันทึกแบบ read-only) แทนที่จะกลับไปหน้า
+        // รายการสินค้า — ให้ผู้แก้ไขเห็นทันทีว่าสิ่งที่กรอกไปถูกบันทึกไว้ครบถ้วน
+        // ถูกต้องจริงๆ ก่อนออกจากหน้านี้
+        return to_route('catalog.products.show', $product)->with('success', 'Product updated successfully.');
     }
 
     public function destroy(Product $product): RedirectResponse

@@ -1,22 +1,19 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteIcon from '@mui/icons-material/Delete';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import ViewColumnOutlinedIcon from '@mui/icons-material/ViewColumnOutlined';
-import FilterListIcon from '@mui/icons-material/FilterList';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import CloseIcon from '@mui/icons-material/Close';
+// Pilot batch (see resources/js/components/icon.tsx's docblock) — Search/
+// Edit/ContentCopy(→copy)/Delete/FilterList(→filter)/FirstPage/LastPage/
+// ChevronLeft/ChevronRight/Close now render via SAP-icons instead of MUI's
+// icon set. The rest of this file's icons (FactCheckOutlined,
+// ViewColumnOutlined, ...) aren't in the pilot's curated name list yet —
+// left as MUI icons rather than guessing an unreviewed mapping for them.
+import { Icon } from '@/components/icon';
 import {
     Alert,
     Autocomplete,
@@ -759,14 +756,14 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                     {canEdit && (
                         <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/products/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
+                            <Icon name="edit" fontSize="small" />
                         </IconButton>
                     )}
                     {canCreate && (
                         <Tooltip title={t('duplicateProduct')}>
                             <span>
                                 <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDuplicateProductId(row.id)}>
-                                    <ContentCopyIcon fontSize="small" />
+                                    <Icon name="copy" fontSize="small" />
                                 </IconButton>
                             </span>
                         </Tooltip>
@@ -787,7 +784,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     )}
                     {canDelete && (
                         <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteProductId(row.id)}>
-                            <DeleteIcon fontSize="small" />
+                            <Icon name="delete" fontSize="small" />
                         </IconButton>
                     )}
                 </Stack>
@@ -863,7 +860,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                                 InputProps={{
                                     endAdornment: (
                                         <InputAdornment position="end">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
+                                            <Icon name="search" sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
                                         </InputAdornment>
                                     ),
                                 }}
@@ -890,7 +887,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                             </Button>
                             <Button
                                 variant="outlined"
-                                startIcon={<FilterListIcon />}
+                                startIcon={<Icon name="filter" />}
                                 onClick={() => setFilterDrawerOpen(true)}
                                 sx={fioriDefaultSx}
                             >
@@ -933,16 +930,16 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
 
                             <Stack direction="row" spacing={0.2}>
                                 <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
+                                    <Icon name="firstPage" fontSize="small" />
                                 </IconButton>
                                 <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
+                                    <Icon name="chevronLeft" fontSize="small" />
                                 </IconButton>
                                 <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
+                                    <Icon name="chevronRight" fontSize="small" />
                                 </IconButton>
                                 <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
+                                    <Icon name="lastPage" fontSize="small" />
                                 </IconButton>
                             </Stack>
                         </Stack>
@@ -967,7 +964,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
                     {t('quickExport')}
                     <IconButton size="small" onClick={() => setQuickExportOpen(false)}>
-                        <CloseIcon fontSize="small" />
+                        <Icon name="close" fontSize="small" />
                     </IconButton>
                 </DialogTitle>
                 <Divider />
@@ -1056,7 +1053,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 700 }}>
                     {t('shareToChannels')}
                     <IconButton size="small" onClick={() => setShareDialogOpen(false)} disabled={sharing || deactivating}>
-                        <CloseIcon fontSize="small" />
+                        <Icon name="close" fontSize="small" />
                     </IconButton>
                 </DialogTitle>
                 <Divider />

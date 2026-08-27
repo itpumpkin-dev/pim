@@ -22,8 +22,10 @@ use RuntimeException;
  *    server can reach this app's storage URLs directly over the internal
  *    network). Unlike Lazada/Shopee, which both reject external image URLs.
  * 2. No live mandatory-field schema check — WooCommerce has no per-category
- *    required-attribute concept the way Lazada/Shopee do; a product can be
- *    created with just a name and price, category included or not.
+ *    required-attribute concept the way Lazada/Shopee do. Category itself
+ *    IS required, though — not by WooCommerce's own API, but by this app
+ *    (see resolveWooCommerceCategoryId()), for consistency with the other
+ *    three platforms' per-product override.
  * 3. Create-vs-update is decided by asking WooCommerce directly by SKU
  *    (findProductBySku(), same as Lazada) rather than trusting a locally
  *    cached platform_item_id (Shopee's approach, forced by Shopee having no
@@ -62,12 +64,16 @@ class WooCommerceProductSyncService
 
     /**
      * Gathers our own data into WooCommerce's product payload shape.
-     * Read-only — safe to call any time for inspection. Category is included
-     * when mapped but not required (see class docblock point 2) — every
-     * category this product is assigned to with a woocommerce_category_id
-     * mapping is sent, not just one (WooCommerce supports multiple
-     * categories per product natively, unlike Lazada's single
-     * primary_category_id).
+     * Read-only — safe to call any time for inspection. Category is now
+     * required, same as Shopee/Lazada/TikTok (CHANGED 2026-08-26 — this used
+     * to send every PIM category the product was assigned to that had a
+     * woocommerce_category_id mapping, never blocking on an empty one,
+     * since WooCommerce natively supports multiple categories per product.
+     * That's still technically true of WooCommerce's API, but this app now
+     * resolves to a single category per product — see
+     * resolveWooCommerceCategoryId() — for consistency with the other three
+     * platforms' per-product override, at the cost of that native
+     * multi-category flexibility).
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
@@ -97,11 +103,16 @@ class WooCommerceProductSyncService
             throw new RuntimeException("Product '{$product->sku}' is missing a name or price — cannot push to WooCommerce.");
         }
 
-        $categoryIds = $product->categories()
-            ->whereNotNull('woocommerce_category_id')
-            ->pluck('woocommerce_category_id')
-            ->map(fn ($id) => ['id' => (int) $id])
-            ->all();
+        $categoryIds = [['id' => $this->resolveWooCommerceCategoryId($product)]];
+
+        // ADDED 2026-08-27, NOT confirmed live — WooCommerce never had any
+        // brand-related code at all until now. Shape (`brands: [{id}]`)
+        // mirrors `categories` above on the assumption the site's brand
+        // taxonomy (see WooCommerceBrand's docblock — a native/plugin
+        // "Product Brands" taxonomy, not a core WooCommerce REST field) is
+        // exposed the same way categories are; not verified against a real
+        // push yet.
+        $brandIds = [['id' => $this->resolveWooCommerceBrandId($product)]];
 
         $dimensions = array_filter([
             'length' => $length,
@@ -121,9 +132,55 @@ class WooCommerceProductSyncService
             'dimensions' => count($dimensions) ? array_map('strval', $dimensions) : null,
             'images' => $imageUrl ? [['src' => $imageUrl]] : null,
             'categories' => count($categoryIds) ? $categoryIds : null,
+            'brands' => count($brandIds) ? $brandIds : null,
             'attributes' => count($wcAttributes) ? $wcAttributes : null,
             'meta_data' => $videoUrl ? [['key' => 'youtube_url', 'value' => $videoUrl]] : null,
         ], fn ($v) => $v !== null && $v !== []);
+    }
+
+    /**
+     * A product's own `woocommerce_category_id` override (set directly from
+     * WooCommerce's synced tree on the Edit Product page) wins when present;
+     * otherwise falls back to whichever of the product's PIM categories has
+     * a WooCommerce mapping configured (the shared, category-level default
+     * every product without its own override still relies on) — same
+     * resolve-then-throw shape as Shopee/Lazada/TikTok's equivalents, see
+     * buildPayload()'s docblock for why this replaced the old
+     * every-mapped-category pluck().
+     */
+    private function resolveWooCommerceCategoryId(Product $product): int
+    {
+        if ($product->woocommerce_category_id) {
+            return (int) $product->woocommerce_category_id;
+        }
+
+        $category = $product->categories()->whereNotNull('woocommerce_category_id')->first();
+        if (! $category) {
+            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a WooCommerce category yet.");
+        }
+
+        return (int) $category->woocommerce_category_id;
+    }
+
+    /**
+     * A product's own `woocommerce_brand_id` override (set directly from
+     * WooCommerce's synced brand list on the Edit Product page) wins when
+     * present; otherwise falls back to whichever marketplace brand this
+     * product's `pbrand` attribute value's AttributeOption is mapped to —
+     * same resolve-then-throw shape as resolveWooCommerceCategoryId().
+     */
+    private function resolveWooCommerceBrandId(Product $product): int
+    {
+        if ($product->woocommerce_brand_id) {
+            return (int) $product->woocommerce_brand_id;
+        }
+
+        $mapped = $this->mappedBrandOptionId($product, 'woocommerce_brand_id');
+        if ($mapped === null) {
+            throw new RuntimeException("Product '{$product->sku}' has no brand mapped to a WooCommerce brand yet.");
+        }
+
+        return (int) $mapped;
     }
 
     /**

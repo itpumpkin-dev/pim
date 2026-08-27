@@ -38,10 +38,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');
+    Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show')->middleware('permission:products,list_products');
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:products,edit_products');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/upload-description-image', [ProductController::class, 'uploadDescriptionImage'])->name('products.uploadDescriptionImage')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
     Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:products,edit_products');
@@ -105,6 +107,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // กลุ่ม categories/ ด้านล่างแล้ว
     Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
     Route::get('brands/search-pim', [BrandController::class, 'searchPimBrands'])->name('brands.searchPim')->middleware('permission:brands,edit_brands');
+    Route::get('marketplace-brands/{platform}/search', [BrandController::class, 'marketplaceBrandSearch'])->name('marketplaceBrands.search')->middleware('permission:brands,list_brands');
+    Route::get('marketplace-brands/{platform}/lookup', [BrandController::class, 'marketplaceBrandLookup'])->name('marketplaceBrands.lookup')->middleware('permission:brands,list_brands');
     Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
     // ไม่มีหน้า GET brands/woocommerce-mapping หรือ endpoint
     // brands/search-woocommerce แล้ว — ย้ายแบบเดียวกับของ Lazada ด้านบน
@@ -146,6 +150,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::get('categories/tree', [CategoryController::class, 'tree'])->name('categories.tree')->middleware('permission:categories,list_categories');
     Route::get('categories/search', [CategoryController::class, 'searchCategories'])->name('categories.search')->middleware('permission:categories,edit_categories');
+    Route::get('marketplace-categories/{platform}/children', [CategoryController::class, 'marketplaceCategoryChildren'])->name('marketplaceCategories.children')->middleware('permission:categories,list_categories');
+    Route::get('marketplace-categories/{platform}/path', [CategoryController::class, 'marketplaceCategoryPath'])->name('marketplaceCategories.path')->middleware('permission:categories,list_categories');
+    Route::get('marketplace-categories/{platform}/search', [CategoryController::class, 'marketplaceCategorySearch'])->name('marketplaceCategories.search')->middleware('permission:categories,list_categories');
     Route::get('categories', [CategoryController::class, 'index'])->name('categories.index')->middleware('permission:categories,list_categories');
     Route::get('categories/export', [CategoryController::class, 'exportCategories'])->name('categories.export')->middleware('permission:categories,list_categories');
     Route::get('categories/create', [CategoryController::class, 'create'])->name('categories.create')->middleware('permission:categories,create_categories');

@@ -86,10 +86,7 @@ class TikTokProductSyncService
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
-        $category = $product->categories()->whereNotNull('tiktok_category_id')->first();
-        if (! $category) {
-            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a TikTok category yet.");
-        }
+        $tiktokCategoryId = $this->resolveTikTokCategoryId($product);
 
         // Admin-configurable (TikTokAttributeMappingController) — replaces
         // the old hardcoded pname/price_std/qty/weight_pcs/
@@ -136,7 +133,7 @@ class TikTokProductSyncService
 
         $warehouseId = $this->resolveWarehouseId();
 
-        $attributes = $this->resolveProductAttributes($mappings, $product, $shop->channel_id, (string) $category->tiktok_category_id);
+        $attributes = $this->resolveProductAttributes($mappings, $product, $shop->channel_id, (string) $tiktokCategoryId);
         if (! empty($attributes['missing'])) {
             throw new RuntimeException(
                 'TikTok category requires product attribute(s) this app has no data for and cannot auto-fill: '
@@ -151,10 +148,20 @@ class TikTokProductSyncService
             'height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
         ]);
 
+        $tiktokBrandId = $this->resolveTikTokBrandId($product);
+
         return array_filter([
             'title' => $name,
             'description' => $description,
-            'category_id' => (string) $category->tiktok_category_id,
+            'category_id' => (string) $tiktokCategoryId,
+            // ADDED 2026-08-27, NOT confirmed live — TikTok never had any
+            // brand-related code at all until now (see class docblock
+            // history). Shape (`brand.id`, an object like `video`/warehouse
+            // references elsewhere in this payload) is a best guess from
+            // TikTok Shop's published Create Product schema, not verified
+            // against a real push yet — the first real product with a
+            // brand set is a test of this path.
+            'brand' => ['id' => (string) $tiktokBrandId],
             // Matches the default already used when syncing the category
             // tree itself (see TikTokClient::getCategoryTree()) — Thailand
             // is a SEA market, which the docs say must use v2.
@@ -364,6 +371,48 @@ class TikTokProductSyncService
      * buildPayload() — no local caching, same as resolveProductAttributes()
      * below and Shopee's own resolveBrand()/resolveAttributes().
      */
+    /**
+     * A product's own `tiktok_category_id` override (set directly from
+     * TikTok's synced tree on the Edit Product page) wins when present;
+     * otherwise falls back to whichever of the product's PIM categories has
+     * a TikTok mapping configured (the shared, category-level default every
+     * product without its own override still relies on).
+     */
+    private function resolveTikTokCategoryId(Product $product): int
+    {
+        if ($product->tiktok_category_id) {
+            return (int) $product->tiktok_category_id;
+        }
+
+        $category = $product->categories()->whereNotNull('tiktok_category_id')->first();
+        if (! $category) {
+            throw new RuntimeException("Product '{$product->sku}' has no category mapped to a TikTok category yet.");
+        }
+
+        return (int) $category->tiktok_category_id;
+    }
+
+    /**
+     * A product's own `tiktok_brand_id` override (set directly from
+     * TikTok's synced brand list on the Edit Product page) wins when
+     * present; otherwise falls back to whichever marketplace brand this
+     * product's `pbrand` attribute value's AttributeOption is mapped to —
+     * same resolve-then-throw shape as resolveTikTokCategoryId().
+     */
+    private function resolveTikTokBrandId(Product $product): int
+    {
+        if ($product->tiktok_brand_id) {
+            return (int) $product->tiktok_brand_id;
+        }
+
+        $mapped = $this->mappedBrandOptionId($product, 'tiktok_brand_id');
+        if ($mapped === null) {
+            throw new RuntimeException("Product '{$product->sku}' has no brand mapped to a TikTok brand yet.");
+        }
+
+        return (int) $mapped;
+    }
+
     private function resolveWarehouseId(): string
     {
         $warehouses = collect($this->client->getWarehouseList()['data']['warehouses'] ?? []);
