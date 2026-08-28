@@ -179,6 +179,16 @@ export default function CategoryIndex({ categories, parentCategory, filters, fil
             render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name}</Typography>,
         },
         {
+            key: 'code',
+            header: (
+                <TableSortLabel active={sortField === 'code'} direction={sortField === 'code' ? sortDir : 'asc'} onClick={() => handleSort('code')}>
+                    {t('code')}
+                </TableSortLabel>
+            ),
+            priority: 'medium',
+            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.code || '-'}</Typography>,
+        },
+        {
             key: 'parent',
             header: t('parent'),
             priority: 'medium',

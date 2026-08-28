@@ -49,6 +49,7 @@ interface CategoryItem {
 
 interface SubcategoryItem {
     id: number;
+    code: string;
     name: string;
     is_active: boolean;
 }
@@ -128,6 +129,12 @@ export default function CategoryEdit({
             header: t('subcategoryNameColumn'),
             priority: 'always',
             render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name}</Typography>,
+        },
+        {
+            key: 'code',
+            header: t('code'),
+            priority: 'medium',
+            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.code || '-'}</Typography>,
         },
         {
             key: 'actions',

@@ -429,15 +429,27 @@ export default function ProductEdit({
     // ที่ผูก mapping ระดับ category กับทุก platform ไว้เป็นค่า default) หรือ
     // "Marketplace Categories" (override เฉพาะรายสินค้าต่อแพลตฟอร์ม) เป็นตัวที่
     // ใช้งานจริงสำหรับสินค้านี้ — อีกฝั่งจะแค่ถูก disable (ไม่ถูกล้างค่า) ไม่ใช่ซ่อนไป
-    // ค่าเริ่มต้นตั้งเป็น "marketplace" เสมอ (ไม่ว่าสินค้านี้จะเคยตั้ง override ไว้
-    // หรือไม่ก็ตาม) ตามที่ต้องการให้หน้า Edit เปิดมาที่แท็บนี้เป็นค่าเริ่มต้น
-    const [categorySource, setCategorySource] = useState<'system' | 'marketplace'>('marketplace');
+    // ค่าเริ่มต้นเป็น "system" (หมวดหมู่ของระบบ) เว้นแต่สินค้านี้เคยตั้ง override
+    // ระดับ platform ไว้แล้ว — กรณีนั้นเปิดมาที่ "marketplace" เพื่อไม่ให้ override
+    // เดิมถูกส่งไป push ต่อทั้งที่ UI โชว์ว่าใช้ System (resolve*CategoryId() ฝั่ง
+    // backend เลือก override ก่อนเสมอถ้ายังมีค่าอยู่)
+    const hasCategoryOverride = Boolean(
+        product.shopee_category_id || product.lazada_category_id || product.tiktok_category_id || product.woocommerce_category_id,
+    );
+    const [categorySource, setCategorySource] = useState<'system' | 'marketplace'>(
+        hasCategoryOverride ? 'marketplace' : 'system',
+    );
 
     // เหตุผลเดียวกับ categorySource ด้านบน แต่สำหรับ Brand แยกต่างหาก — สินค้าอาจ
     // ใช้ System Categories สำหรับหมวดหมู่ แต่ยังอยาก override เฉพาะ Brand ต่อ
     // แพลตฟอร์มก็ได้ (หรือกลับกัน) เลยไม่ผูกโหมดทั้งสองไว้ด้วยกัน — ค่าเริ่มต้นเป็น
-    // "marketplace" เสมอเหมือนกัน
-    const [brandSource, setBrandSource] = useState<'system' | 'marketplace'>('marketplace');
+    // "system" เว้นแต่มี override ระดับ platform อยู่แล้ว เหมือนกัน
+    const hasBrandOverride = Boolean(
+        product.shopee_brand_id || product.lazada_brand_id || product.tiktok_brand_id || product.woocommerce_brand_id,
+    );
+    const [brandSource, setBrandSource] = useState<'system' | 'marketplace'>(
+        hasBrandOverride ? 'marketplace' : 'system',
+    );
 
     const toggleShopPublished = (shopId: number) => {
         const current = data.published_shop_ids;
