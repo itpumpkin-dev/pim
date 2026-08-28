@@ -20,6 +20,7 @@ class ImportConfig extends Model
         'validation_strategy',
         'ai_translate',
         'source_locale',
+        'family_code',
         'allowed_errors',
         'image_directory_path',
         'source_file_path',

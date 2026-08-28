@@ -19,14 +19,21 @@ class SampleTemplateBuilder
      * fill in by hand. RowHeaderNormalizer maps it straight back to the code
      * on import, so this is purely cosmetic for the importer side.
      *
+     * $familyCode (products only) narrows the columns to that Attribute
+     * Family and is pre-filled into the example row's family_code cell.
+     *
      * @return array{columns: array<int, string>, rows: array<int, array<string, string>>}
      */
-    public static function build(string $type, ?User $user = null): array
+    public static function build(string $type, ?User $user = null, ?string $familyCode = null): array
     {
-        $importer = ImportExportRegistry::importer($type, $user);
+        $importer = ImportExportRegistry::importer($type, $user, null, $familyCode);
         $columns = $importer->columns();
         $labels = $importer->columnLabels();
         $example = self::exampleRow($type);
+
+        if ($type === 'products' && trim((string) $familyCode) !== '') {
+            $example['family_code'] = trim((string) $familyCode);
+        }
 
         $headerLabels = array_map(fn ($col) => $labels[$col] ?? $col, $columns);
         $row = [];

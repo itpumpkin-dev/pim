@@ -26,11 +26,14 @@ class ImportExportRegistry
      * $jobTrackerId is likewise only meaningful for 'products': it's how
      * ProductRowImporter reports AI-translate dispatch progress back onto
      * the import's own JobTracker row (see its total_translations_* columns).
+     * $familyCode is products-only too: the import wizard's chosen Attribute
+     * Family, which narrows columns()/requiredColumns() to that family and is
+     * filed onto every row that doesn't carry its own `family_code`.
      */
-    public static function importer(string $type, ?User $user = null, ?int $jobTrackerId = null): RowImporterInterface
+    public static function importer(string $type, ?User $user = null, ?int $jobTrackerId = null, ?string $familyCode = null): RowImporterInterface
     {
         return match ($type) {
-            'products' => new ProductRowImporter($user, $jobTrackerId),
+            'products' => new ProductRowImporter($user, $jobTrackerId, $familyCode),
             'categories' => new CategoryRowImporter(),
             'attributes' => new AttributeRowImporter(),
             'attribute_families' => new AttributeFamilyRowImporter(),

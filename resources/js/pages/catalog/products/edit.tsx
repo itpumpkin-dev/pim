@@ -1,16 +1,16 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { CategoryCascadeSelect } from '@/components/category-cascade-select';
-import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
-import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
-import { ProductPicker, type ProductOption } from '@/components/product-picker';
+import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
+import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
+import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -212,6 +212,17 @@ function formatLocalDateTime(value: string): string {
 
 function cartesian(sets: any[][]): any[][] {
     return sets.reduce((acc, set) => acc.flatMap((x) => set.map((y) => [...x, y])), [[]]);
+}
+
+// Guard against a cartesian blow-up: some option-bearing attributes have
+// hundreds of options, and every combination renders as a table row with
+// three text fields, so an unguarded generate can freeze the tab. Past this
+// many combinations we refuse and ask the user to narrow the selection.
+const MAX_VARIANT_COMBINATIONS = 200;
+
+/** Size of the cartesian product without building it. */
+function comboCount(sets: unknown[][]): number {
+    return sets.reduce((n, set) => n * Math.max(set.length, 1), 1);
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -458,11 +469,20 @@ export default function ProductEdit({
         return keys.map((k) => optionLabelFor(Number(k), attrs[Number(k)])).join(' / ');
     };
 
+    // Configurable products are turned off for new/simple products (the variant
+    // matrix can explode on this catalog's option-heavy attributes). A product
+    // that's already configurable keeps the type available so it stays editable.
+    const isAlreadyConfigurable = (product.type || '').toLowerCase() === 'configurable';
+
     const [variantDialogOpen, setVariantDialogOpen] = useState(false);
     const [pendingVariantAttrIds, setPendingVariantAttrIds] = useState<number[]>(data.configurable_attributes);
+    // Rejected combination count when the pending selection is too large to
+    // generate — shown in the dialog, no rows built, dialog stays open.
+    const [variantOverflow, setVariantOverflow] = useState<number | null>(null);
 
     const openVariantDialog = () => {
         setPendingVariantAttrIds(data.configurable_attributes);
+        setVariantOverflow(null);
         setVariantDialogOpen(true);
     };
 
@@ -484,10 +504,20 @@ export default function ProductEdit({
         );
 
         if (optionSets.length === 0) {
+            setVariantOverflow(null);
             setData((prev) => ({ ...prev, configurable_attributes: [], variants: [] }));
             setVariantDialogOpen(false);
             return;
         }
+
+        const total = comboCount(optionSets);
+        if (total > MAX_VARIANT_COMBINATIONS) {
+            // Don't build the row set or close the dialog — let the user trim
+            // the selection first. This is what was freezing the page.
+            setVariantOverflow(total);
+            return;
+        }
+        setVariantOverflow(null);
 
         const combos = cartesian(optionSets);
         const generated: VariantItem[] = combos.map((combo) => {
@@ -1505,10 +1535,17 @@ export default function ProductEdit({
                                                     size="small"
                                                     fullWidth
                                                     error={Boolean(errors.type)}
-                                                    helperText={errors.type}
+                                                    helperText={
+                                                        errors.type || (!isAlreadyConfigurable ? t('configurableTemporarilyDisabled') : undefined)
+                                                    }
                                                 >
                                                     <MenuItem value="simple">Simple</MenuItem>
-                                                    <MenuItem value="configurable">Configurable</MenuItem>
+                                                    {/* Turned off for now (see create.tsx). A product that's
+                                                        already configurable keeps the option so it can still
+                                                        be saved or switched back to simple. */}
+                                                    <MenuItem value="configurable" disabled={!isAlreadyConfigurable}>
+                                                        Configurable
+                                                    </MenuItem>
                                                 </TextField>
 
                                                 <TextField
@@ -1551,10 +1588,7 @@ export default function ProductEdit({
                                                 <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
                                                     {t('categoriesBlockTitle')}
                                                 </Typography>
-                                                <Tooltip
-                                                    title={t('categoriesSourceInfoTooltip')}
-                                                    arrow
-                                                >
+                                                <Tooltip title={t('categoriesSourceInfoTooltip')} arrow>
                                                     <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
                                                 </Tooltip>
                                             </Stack>
@@ -1588,20 +1622,20 @@ export default function ProductEdit({
                                                         fontWeight: 600,
                                                         color: FIORI.textSecondary,
                                                         borderColor: FIORI.border,
-                                                        '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
+                                                        '&.Mui-selected': {
+                                                            bgcolor: FIORI.brand,
+                                                            color: '#fff',
+                                                            '&:hover': { bgcolor: FIORI.brandDark },
+                                                        },
                                                     },
                                                 }}
                                             >
-                                                <ToggleButton value="system">
-                                                    {t('systemCategoriesLabel')}
-                                                </ToggleButton>
-                                                <ToggleButton value="marketplace">
-                                                    {t('marketplaceCategoriesLabel')}
-                                                </ToggleButton>
+                                                <ToggleButton value="system">{t('systemCategoriesLabel')}</ToggleButton>
+                                                <ToggleButton value="marketplace">{t('marketplaceCategoriesLabel')}</ToggleButton>
                                             </ToggleButtonGroup>
 
                                             <Divider sx={{ my: 1 }} />
-                                            
+
                                             <Stack spacing={1}>
                                                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                                                     <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
@@ -1700,7 +1734,11 @@ export default function ProductEdit({
                                                             fontWeight: 600,
                                                             color: FIORI.textSecondary,
                                                             borderColor: FIORI.border,
-                                                            '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
+                                                            '&.Mui-selected': {
+                                                                bgcolor: FIORI.brand,
+                                                                color: '#fff',
+                                                                '&:hover': { bgcolor: FIORI.brandDark },
+                                                            },
                                                         },
                                                     }}
                                                 >
@@ -1708,8 +1746,19 @@ export default function ProductEdit({
                                                     <ToggleButton value="marketplace">{t('marketplaceBrandLabel')}</ToggleButton>
                                                 </ToggleButtonGroup>
 
-                                                <Box sx={{ opacity: brandSource === 'system' ? 1 : 0.5, pointerEvents: brandSource === 'system' ? 'auto' : 'none' }}>
-                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                                                <Box
+                                                    sx={{
+                                                        opacity: brandSource === 'system' ? 1 : 0.5,
+                                                        pointerEvents: brandSource === 'system' ? 'auto' : 'none',
+                                                    }}
+                                                >
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={800}
+                                                        fontSize="large"
+                                                        color="text.secondary"
+                                                        sx={{ display: 'block', mb: 1 }}
+                                                    >
                                                         {t('systemBrandLabel')}
                                                     </Typography>
                                                     {(() => {
@@ -1724,7 +1773,8 @@ export default function ProductEdit({
                                                                 ? 'Default (All Channels)'
                                                                 : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
                                                         const stringValue = typeof val === 'string' ? val : '';
-                                                        const selectedOption = brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
+                                                        const selectedOption =
+                                                            brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
                                                         const mapped = selectedOption?.mapped_platforms ?? [];
 
                                                         return (
@@ -2430,6 +2480,11 @@ export default function ProductEdit({
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
+                    {variantOverflow !== null && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
+                        </Alert>
+                    )}
                     {data.variants.length > 0 && (
                         <Alert severity="warning" sx={{ mb: 2 }}>
                             การสร้างใหม่จะแทนที่ตารางตัวเลือกสินค้าปัจจุบัน — ตัวเลือกที่ยังคงอยู่ (attribute/ค่าเดิม) จะเก็บ SKU/ราคา/สต๊อกเดิมไว้ให้

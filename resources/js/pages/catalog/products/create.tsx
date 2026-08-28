@@ -1,10 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
+import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
 import { type FormDataConvertible } from '@inertiajs/core';
-import CloseIcon from '@mui/icons-material/Close';
+import { Head, Link, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
 import SaveIcon from '@mui/icons-material/Save';
 import {
     Alert,
@@ -30,10 +32,8 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 
 interface AttributeFamily {
     id: number;
@@ -78,7 +78,20 @@ interface ProductForm {
 }
 
 function cartesian(sets: any[][]): any[][] {
-    return sets.reduce((acc, set) => acc.flatMap(x => set.map(y => [...x, y])), [[]]);
+    return sets.reduce((acc, set) => acc.flatMap((x) => set.map((y) => [...x, y])), [[]]);
+}
+
+// Every combination becomes a table row with three MUI text fields. A few of
+// the option-bearing attributes have hundreds of options (taxonomy/brand
+// fields), so an unguarded cartesian of two of them is tens of thousands of
+// rows — enough to freeze the tab the instant an attribute is ticked. Past
+// this many combinations we refuse to generate and tell the user to narrow
+// the selection.
+const MAX_VARIANT_COMBINATIONS = 200;
+
+/** Size of the cartesian product without building it. */
+function comboCount(sets: unknown[][]): number {
+    return sets.reduce((n, set) => n * Math.max(set.length, 1), 1);
 }
 
 export default function ProductCreate({ families, attributes }: Props) {
@@ -101,24 +114,27 @@ export default function ProductCreate({ families, attributes }: Props) {
     });
 
     const [configModalOpen, setConfigModalOpen] = useState(false);
+    // Set to the rejected combination count when a selection would produce too
+    // many variant rows to render — surfaced as a warning, no rows generated.
+    const [variantOverflow, setVariantOverflow] = useState<number | null>(null);
 
     // กรองเอาเฉพาะ attribute ที่มี options ให้เลือก (เช่น สี, ไซส์)
-    const selectedAttributeObjects = attributes.filter((attr) =>
-        data.configurable_attributes.includes(attr.id)
+    const selectedAttributeObjects = useMemo(
+        () => attributes.filter((attr) => data.configurable_attributes.includes(attr.id)),
+        [attributes, data.configurable_attributes],
     );
 
     // จำกัดตัวเลือกใน variant-attribute picker ให้เหลือแค่ attribute ที่ผูกกับ
     // family ที่เลือกไว้จริงๆ — แต่ก่อนเลือก attribute ระบบไหนก็ได้ที่มี options
     // มาใช้ตรงนี้ได้หมด ถึงจะไม่เกี่ยวกับ family ที่เลือกเลยก็ตาม สุดท้าย value
     // ของ variant ที่ได้ก็จะไม่โผล่ในกลุ่ม attribute ของ family นั้นตอนไปหน้า Edit
-    const familyScopedAttributeOptions = attributes.filter(
-        (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
+    const familyScopedAttributeOptions = useMemo(
+        () => attributes.filter((attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id))),
+        [attributes, data.family_id],
     );
 
     const handleGenerateVariants = (selectedAttrIds: number[]) => {
-        const selectedAttrs = attributes.filter((attr) =>
-            selectedAttrIds.includes(attr.id)
-        );
+        const selectedAttrs = attributes.filter((attr) => selectedAttrIds.includes(attr.id));
 
         const optionSets = selectedAttrs.map((attr) => {
             return (attr.options || []).map((opt) => ({
@@ -131,19 +147,33 @@ export default function ProductCreate({ families, attributes }: Props) {
         });
 
         if (optionSets.length === 0) {
-            setData((prev) => ({ ...prev, variants: [] }));
+            setVariantOverflow(null);
+            setData((prev) => ({ ...prev, configurable_attributes: selectedAttrIds, variants: [] }));
             return;
         }
+
+        const total = comboCount(optionSets);
+        if (total > MAX_VARIANT_COMBINATIONS) {
+            // Keep the picked attributes so the user sees what they chose, but
+            // don't build the (huge) row set — that's what locks the browser.
+            setVariantOverflow(total);
+            setData((prev) => ({ ...prev, configurable_attributes: selectedAttrIds, variants: [] }));
+            return;
+        }
+        setVariantOverflow(null);
 
         const combos = cartesian(optionSets);
         const generated = combos.map((combo) => {
             const suffix = combo.map((c) => String(c.option_code).toUpperCase()).join('-');
             const varSku = data.sku ? `${data.sku}-${suffix}` : suffix;
 
-            const combinationAttrs = combo.reduce((acc, c) => {
-                acc[c.attribute_id] = c.option_code;
-                return acc;
-            }, {} as Record<number, string>);
+            const combinationAttrs = combo.reduce(
+                (acc, c) => {
+                    acc[c.attribute_id] = c.option_code;
+                    return acc;
+                },
+                {} as Record<number, string>,
+            );
 
             return {
                 sku: varSku,
@@ -281,21 +311,11 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 </Typography>
                                 <Stack direction="row" spacing={3}>
                                     <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={data.enabled === true}
-                                                onChange={() => setData('enabled', true)}
-                                            />
-                                        }
+                                        control={<Checkbox checked={data.enabled === true} onChange={() => setData('enabled', true)} />}
                                         label={t('active')}
                                     />
                                     <FormControlLabel
-                                        control={
-                                            <Checkbox
-                                                checked={data.enabled === false}
-                                                onChange={() => setData('enabled', false)}
-                                            />
-                                        }
+                                        control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
                                         label={t('nonActive')}
                                     />
                                 </Stack>
@@ -346,9 +366,14 @@ export default function ProductCreate({ families, attributes }: Props) {
                                     }}
                                 >
                                     <MenuItem value="simple">{t('simple')}</MenuItem>
-                                    <MenuItem value="configurable">{t('configurable')}</MenuItem>
+                                    {/* Configurable products are turned off for now — the variant
+                                        matrix can blow up on the option-heavy attributes in this
+                                        catalog. Re-enable once the picker is restricted. */}
+                                    <MenuItem value="configurable" disabled>
+                                        {t('configurable')}
+                                    </MenuItem>
                                 </Select>
-                                {errors.type && <FormHelperText>{errors.type}</FormHelperText>}
+                                <FormHelperText>{errors.type || t('configurableTemporarilyDisabled')}</FormHelperText>
                             </FormControl>
 
                             {/* SKU หลัก */}
@@ -372,21 +397,12 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 <Typography variant="h6" fontWeight={700}>
                                     สร้างตัวเลือกสินค้าย่อย (Variants Cartesian List)
                                 </Typography>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => setConfigModalOpen(true)}
-                                >
+                                <Button variant="outlined" size="small" onClick={() => setConfigModalOpen(true)}>
                                     เลือกคุณสมบัติย่อยเพิ่ม ({selectedAttributeObjects.length})
                                 </Button>
                             </Stack>
 
-                            <FioriResponsiveTable
-                                variant="plain"
-                                columns={variantColumns}
-                                rows={variantRows}
-                                getRowKey={(row) => row.__index}
-                            />
+                            <FioriResponsiveTable variant="plain" columns={variantColumns} rows={variantRows} getRowKey={(row) => row.__index} />
                         </Paper>
                     )}
                 </Stack>
@@ -415,6 +431,11 @@ export default function ProductCreate({ families, attributes }: Props) {
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
+                    {variantOverflow !== null && (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
+                        </Alert>
+                    )}
                     <Autocomplete
                         multiple
                         options={familyScopedAttributeOptions}
@@ -426,28 +447,14 @@ export default function ProductCreate({ families, attributes }: Props) {
                         }}
                         renderTags={(value, getTagProps) =>
                             value.map((option, index) => (
-                                <Chip
-                                    label={option.name || option.code}
-                                    {...getTagProps({ index })}
-                                    key={option.id}
-                                    sx={mappedChipSx}
-                                />
+                                <Chip label={option.name || option.code} {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
                             ))
                         }
-                        renderInput={(params) => (
-                            <TextField
-                                {...params}
-                                placeholder={t('selectAttributesPlaceholder')}
-                                variant="outlined"
-                            />
-                        )}
+                        renderInput={(params) => <TextField {...params} placeholder={t('selectAttributesPlaceholder')} variant="outlined" />}
                     />
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
-                    <Button
-                        onClick={() => setConfigModalOpen(false)}
-                        sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}
-                    >
+                    <Button onClick={() => setConfigModalOpen(false)} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
                         {t('back')}
                     </Button>
                     <Button

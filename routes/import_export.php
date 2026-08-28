@@ -11,6 +11,7 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::get('imports/create', [ImportConfigController::class, 'create'])->name('imports.create')->middleware('permission:import_configs,create_import_configs');
     Route::post('imports', [ImportConfigController::class, 'store'])->name('imports.store')->middleware('permission:import_configs,create_import_configs');
     Route::get('imports/sample/{type}', [ImportConfigController::class, 'sample'])->name('imports.sample')->middleware('permission:import_configs,list_import_configs');
+    Route::get('imports/schema/{type}', [ImportConfigController::class, 'schema'])->name('imports.schema')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/{importConfig}/edit', [ImportConfigController::class, 'edit'])->name('imports.edit')->middleware('permission:import_configs,edit_import_configs');
     Route::put('imports/{importConfig}', [ImportConfigController::class, 'update'])->name('imports.update')->middleware('permission:import_configs,edit_import_configs');
     Route::put('imports/{importConfig}/edit', [ImportConfigController::class, 'update'])->middleware('permission:import_configs,edit_import_configs');

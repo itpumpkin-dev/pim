@@ -69,6 +69,8 @@
     "saveProduct": "บันทึกสินค้า",
     "configurableAttributesTitle": "แอตทริบิวต์ที่กำหนดค่าได้",
     "selectAttributesPlaceholder": "เลือกแอตทริบิวต์ (เช่น สี, ขนาด, แบรนด์)",
+    "tooManyVariantCombinations": "ตัวเลือกนี้จะสร้างตัวเลือกสินค้าย่อย {{count}} แถว (จำกัด {{max}} แถว) กรุณาเลือกแอตทริบิวต์ที่มีตัวเลือกน้อยลง หรือเลือกจำนวนแอตทริบิวต์ให้น้อยลง",
+    "configurableTemporarilyDisabled": "ประเภทสินค้าแบบกำหนดค่าได้ถูกปิดใช้งานชั่วคราว",
     "generalTitle": "ทั่วไป",
     "codeRequired": "โค้ด *",
     "labelTitle": "ป้ายกำกับ",

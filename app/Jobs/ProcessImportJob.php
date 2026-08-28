@@ -46,7 +46,7 @@ class ProcessImportJob implements ShouldQueue
 
         $tracker->update(['status' => 'processing', 'started_at' => now()]);
 
-        $importer = ImportExportRegistry::importer($config->type, $tracker->user, $tracker->id);
+        $importer = ImportExportRegistry::importer($config->type, $tracker->user, $tracker->id, $config->family_code);
         $columnLabels = $importer->columnLabels();
 
         $rowNumber = 1; // header is row 1, data starts at row 2

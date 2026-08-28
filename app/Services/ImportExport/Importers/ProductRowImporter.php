@@ -21,6 +21,9 @@ class ProductRowImporter implements RowImporterInterface
 
     private ?array $allowedAttributeCodesCache = null;
 
+    /** null = not resolved yet; false = no family scoping; array = the family's non-locale/non-channel codes. */
+    private array|false|null $familyAttributeCodesCache = null;
+
     /**
      * $user, when given, restricts columns()/importRow() to attributes this
      * user's role can *edit* (per AttributeAccessPolicy — both the
@@ -36,7 +39,33 @@ class ProductRowImporter implements RowImporterInterface
     public function __construct(
         private readonly ?User $user = null,
         private readonly ?int $jobTrackerId = null,
+        private readonly ?string $familyCode = null,
     ) {
+    }
+
+    /**
+     * When the import is scoped to an Attribute Family, the subset of that
+     * family's attributes this importer can actually handle (non-locale/
+     * non-channel — see baseAttributeCodes()). Returns null when no family
+     * was chosen, meaning "don't narrow the column set at all".
+     *
+     * @return array<int, string>|null
+     */
+    private function familyAttributeCodes(): ?array
+    {
+        if ($this->familyAttributeCodesCache === null) {
+            $code = trim((string) $this->familyCode);
+            if ($code === '') {
+                $this->familyAttributeCodesCache = false;
+            } else {
+                $family = AttributeFamily::where('code', $code)->with('attributes:id,code')->first();
+                $this->familyAttributeCodesCache = $family
+                    ? array_values(array_intersect(self::baseAttributeCodes(), $family->attributes->pluck('code')->all()))
+                    : [];
+            }
+        }
+
+        return $this->familyAttributeCodesCache === false ? null : $this->familyAttributeCodesCache;
     }
 
     /**
@@ -63,8 +92,19 @@ class ProductRowImporter implements RowImporterInterface
 
     private function allowedAttributeCodes(): array
     {
-        return $this->allowedAttributeCodesCache ??= app(AttributeAccessPolicy::class)
-            ->filterAttributeCodes($this->user, self::baseAttributeCodes(), 'edit');
+        if ($this->allowedAttributeCodesCache === null) {
+            $codes = app(AttributeAccessPolicy::class)
+                ->filterAttributeCodes($this->user, self::baseAttributeCodes(), 'edit');
+
+            $familyCodes = $this->familyAttributeCodes();
+            if ($familyCodes !== null) {
+                $codes = array_values(array_intersect($codes, $familyCodes));
+            }
+
+            $this->allowedAttributeCodesCache = $codes;
+        }
+
+        return $this->allowedAttributeCodesCache;
     }
 
     /**
@@ -121,7 +161,23 @@ class ProductRowImporter implements RowImporterInterface
 
     public function requiredColumns(): array
     {
-        return ['sku'];
+        $required = ['sku'];
+
+        // With a family chosen in the wizard, surface that family's required
+        // attributes too (limited to ones this import can actually write —
+        // see allowedAttributeCodes()) so the review step lists every column
+        // the file must carry a value for, not just the SKU.
+        $familyCodes = $this->familyAttributeCodes();
+        if ($familyCodes !== null) {
+            $allowed = $this->allowedAttributeCodes();
+            $requiredFamilyCodes = Attribute::whereIn('code', array_intersect($familyCodes, $allowed))
+                ->where('is_required', true)
+                ->pluck('code')
+                ->all();
+            $required = array_values(array_merge($required, $requiredFamilyCodes));
+        }
+
+        return $required;
     }
 
     public function importRow(array $row, ImportConfig $config): array
@@ -141,7 +197,12 @@ class ProductRowImporter implements RowImporterInterface
             return [];
         }
 
+        // A per-row family_code column still wins; otherwise fall back to the
+        // family the whole import was scoped to in the wizard.
         $familyCode = trim((string) ($row['family_code'] ?? ''));
+        if ($familyCode === '') {
+            $familyCode = trim((string) $this->familyCode);
+        }
         $family = null;
         if ($familyCode !== '') {
             $family = AttributeFamily::where('code', $familyCode)->first();

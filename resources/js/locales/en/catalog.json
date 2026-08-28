@@ -71,6 +71,8 @@
     "saveProduct": "Save Product",
     "configurableAttributesTitle": "Configurable Attributes",
     "selectAttributesPlaceholder": "Select attributes (e.g. Color, Size, Brand)",
+    "tooManyVariantCombinations": "That selection would create {{count}} variant rows (limit {{max}}). Pick attributes with fewer options, or fewer attributes, so the table stays manageable.",
+    "configurableTemporarilyDisabled": "Configurable products are temporarily disabled.",
 
     "generalTitle": "General",
     "codeRequired": "Code *",

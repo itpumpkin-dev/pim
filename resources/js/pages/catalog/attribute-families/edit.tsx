@@ -101,6 +101,9 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     });
 
     const [attrSearch, setAttrSearch] = useState('');
+    // ค้นหาแอตทริบิวต์ในคอลัมน์หลัก (กลุ่มที่จัดไว้แล้ว) — คนละช่องกับ attrSearch
+    // ของคอลัมน์ Unassigned
+    const [groupAttrSearch, setGroupAttrSearch] = useState('');
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
     const [selectedGroupId, setSelectedGroupId] = useState<number | string>('');
     const [assignedGroups, setAssignedGroups] = useState<AssignedGroup[]>([]);
@@ -161,6 +164,11 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
         const title = attr.name || attr.code;
         return title.toLowerCase().includes(attrSearch.toLowerCase());
     });
+
+    const groupQuery = groupAttrSearch.trim().toLowerCase();
+    const matchesGroupQuery = (attr: AttributeItem) => (attr.name || attr.code).toLowerCase().includes(groupQuery);
+    // เมื่อมีคำค้น: กลุ่มที่ยังมีแอตทริบิวต์ตรงกันอย่างน้อยหนึ่งตัว
+    const groupSearchHasResults = !groupQuery || assignedGroups.some((g) => g.attributes.some(matchesGroupQuery));
 
     const toggleGroupExpand = (groupId: number) => {
         setAssignedGroups((prev) =>
@@ -364,9 +372,23 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                             <Grid container spacing={3} sx={{ mt: 1 }}>
                                 {/* ส่วนคอลัมน์หลัก */}
                                 <Grid item xs={12} sm={6}>
-                                    <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1.5 }}>
-                                        Main Column
-                                    </Typography>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                                        <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                            Main Column
+                                        </Typography>
+                                        <TextField
+                                            value={groupAttrSearch}
+                                            onChange={(e) => setGroupAttrSearch(e.target.value)}
+                                            size="small"
+                                            variant="standard"
+                                            placeholder="Search"
+                                            InputProps={{
+                                                disableUnderline: true,
+                                                endAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />,
+                                            }}
+                                            sx={{ width: 100 }}
+                                        />
+                                    </Stack>
 
                                     <Box
                                         sx={{
@@ -382,9 +404,21 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                     No groups assigned yet. Click "Assign Attribute Group" to add groups.
                                                 </Typography>
                                             </Box>
+                                        ) : !groupSearchHasResults ? (
+                                            <Box sx={{ border: `1px dashed ${FIORI.border}`, borderRadius: '8px', p: 4, textAlign: 'center' }}>
+                                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                                    No attributes match “{groupAttrSearch.trim()}”.
+                                                </Typography>
+                                            </Box>
                                         ) : (
                                             <Stack spacing={1}>
-                                                {assignedGroups.map((group) => (
+                                                {assignedGroups.map((group) => {
+                                                    const visibleAttrs = groupQuery
+                                                        ? group.attributes.filter(matchesGroupQuery)
+                                                        : group.attributes;
+                                                    if (groupQuery && visibleAttrs.length === 0) return null;
+                                                    const isExpanded = groupQuery ? true : group.expanded;
+                                                    return (
                                                     <Box
                                                         key={group.id}
                                                         onDragOver={(e) => e.preventDefault()}
@@ -419,7 +453,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                         >
                                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                                 <IconButton size="small" sx={{ p: 0.2 }} onClick={() => toggleGroupExpand(group.id)}>
-                                                                    {group.expanded ? (
+                                                                    {isExpanded ? (
                                                                         <KeyboardArrowDownIcon fontSize="small" />
                                                                     ) : (
                                                                         <KeyboardArrowRightIcon fontSize="small" />
@@ -454,9 +488,9 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                         </Stack>
 
                                                         {/* รายการแอตทริบิวต์ในกลุ่ม */}
-                                                        <Collapse in={group.expanded} timeout="auto" unmountOnExit>
+                                                        <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                                                             <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
-                                                                {group.attributes.map((attr, attrIndex) => (
+                                                                {visibleAttrs.map((attr, attrIndex) => (
                                                                     <Stack
                                                                         key={attr.id}
                                                                         draggable
@@ -498,7 +532,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                                         </IconButton>
                                                                     </Stack>
                                                                 ))}
-                                                                {group.attributes.length === 0 && (
+                                                                {!groupQuery && group.attributes.length === 0 && (
                                                                     <Typography variant="caption" sx={{ color: FIORI.textSecondary, pl: 1, fontStyle: 'italic' }}>
                                                                         Drop attribute here
                                                                     </Typography>
@@ -506,7 +540,8 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                                             </Stack>
                                                         </Collapse>
                                                     </Box>
-                                                ))}
+                                                    );
+                                                })}
                                             </Stack>
                                         )}
                                     </Box>

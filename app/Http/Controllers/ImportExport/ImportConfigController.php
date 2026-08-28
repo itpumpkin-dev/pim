@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessImportJob;
+use App\Models\AttributeFamily;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Models\Locale;
@@ -44,6 +45,35 @@ class ImportConfigController extends Controller
             'types' => ImportExportRegistry::TYPES,
             'requiredColumnsByType' => $this->requiredColumnsByType(),
             'columnLabelsByType' => $this->columnLabelsByType(),
+            'families' => AttributeFamily::cachedList()->map(fn ($f) => [
+                'code' => $f->code,
+                'name' => $f->name,
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Column schema for one import type, resolved for the current user and
+     * (products only) an optional Attribute Family — powers the wizard's
+     * "review" step: which columns exist, which are required, their labels,
+     * and a one-row sample preview. Kept as a plain JSON endpoint so the
+     * wizard can refetch it when the family changes without a full reload.
+     */
+    public function schema(Request $request, string $type): JsonResponse
+    {
+        abort_unless(in_array($type, ImportExportRegistry::TYPES, true), 404);
+
+        $family = $type === 'products' ? $request->string('family')->toString() : '';
+        $family = $family !== '' ? $family : null;
+
+        $importer = ImportExportRegistry::importer($type, $request->user(), null, $family);
+        $sample = SampleTemplateBuilder::build($type, $request->user(), $family);
+
+        return response()->json([
+            'columns' => $importer->columns(),
+            'required' => $importer->requiredColumns(),
+            'labels' => $importer->columnLabels(),
+            'sample' => $sample,
         ]);
     }
 
@@ -136,10 +166,12 @@ class ImportConfigController extends Controller
 
         $validated = $request->validate([
             'format' => ['nullable', Rule::in(['csv', 'xlsx'])],
+            'family' => ['nullable', 'string'],
         ]);
         $format = $validated['format'] ?? 'csv';
+        $family = $type === 'products' ? ($validated['family'] ?? null) : null;
 
-        $table = SampleTemplateBuilder::build($type, auth()->user());
+        $table = SampleTemplateBuilder::build($type, auth()->user(), $family);
 
         $tempPath = sys_get_temp_dir().'/import_sample_'.Str::uuid().'.'.$format;
         SpreadsheetWriter::write($tempPath, $format, $table['columns'], $table['rows']);
@@ -180,6 +212,7 @@ class ImportConfigController extends Controller
             'validation_strategy' => ['required', 'in:skip_errors,stop_on_errors'],
             'ai_translate' => ['nullable', 'boolean'],
             'source_locale' => ['required', 'string', Rule::in(Locale::active()->pluck('code')->all())],
+            'family_code' => ['nullable', 'string', Rule::exists('attribute_families', 'code')],
             'allowed_errors' => ['required', 'integer', 'min:0'],
             'image_directory_path' => ['nullable', 'string', 'max:255'],
             'file' => ['nullable', 'file', 'max:20480'],
