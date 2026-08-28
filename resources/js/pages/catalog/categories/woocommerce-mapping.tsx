@@ -1,15 +1,20 @@
+import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { xsrfToken } from '@/lib/csrf';
+import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import CancelIcon from '@mui/icons-material/Cancel';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import SearchIcon from '@mui/icons-material/Search';
+import SyncIcon from '@mui/icons-material/Sync';
 import {
     Box,
     Button,
@@ -29,12 +34,6 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
-import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
-import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
 // ใช้ตารางแบบ marketplace-tree-row-centric เหมือนกับ categories/shopee-mapping.tsx/
 // categories/lazada-mapping.tsx/categories/tiktok-mapping.tsx (ดู docblock ของ
@@ -176,13 +175,17 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     const triggerWoocommerceBrandSync = () => {
         setWoocommerceBrandSyncing(true);
         setWoocommerceBrandSyncMessage('');
-        router.post('/catalog/brands/sync-woocommerce', {}, {
-            preserveScroll: true,
-            onFinish: () => {
-                setWoocommerceBrandSyncing(false);
-                loadWoocommerceBrands({ page: 1 });
+        router.post(
+            '/catalog/brands/sync-woocommerce',
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setWoocommerceBrandSyncing(false);
+                    loadWoocommerceBrands({ page: 1 });
+                },
             },
-        });
+        );
     };
 
     // `optionId` คือแถว PIM AttributeOption ที่จะถูกเขียนค่าลงไปจริงๆ
@@ -190,7 +193,12 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     // แบรนด์ PIM ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping
     // เดิมนั้น ไม่ใช่อะไรที่คำนวณมาจาก `woocommerceBrandId` ส่วน `display` คือสิ่งที่จะ
     // โชว์ในแถวหลังจากนั้น รูปแบบเดียวกับ persistBrand() ของอีก 3 แพลตฟอร์ม
-    const persistWoocommerceBrand = (woocommerceBrandId: number, optionId: number, newWoocommerceId: number | null, display: { id: number; name: string } | null) => {
+    const persistWoocommerceBrand = (
+        woocommerceBrandId: number,
+        optionId: number,
+        newWoocommerceId: number | null,
+        display: { id: number; name: string } | null,
+    ) => {
         setSavingWoocommerceBrandId(woocommerceBrandId);
         fetch('/catalog/brands/woocommerce-mapping', {
             method: 'POST',
@@ -373,7 +381,8 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         );
                     }
 
-                    const label = staged && staged.woocommerceId === row.id ? `${t('willMapTo')}: ${pc.name}` : `${t('willClearMapping')}: ${pc.name}`;
+                    const label =
+                        staged && staged.woocommerceId === row.id ? `${t('willMapTo')}: ${pc.name}` : `${t('willClearMapping')}: ${pc.name}`;
                     return (
                         <Chip
                             key={pc.id}
@@ -419,7 +428,11 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
 
                         {assigningFor === row.id ? (
                             <Box sx={{ maxWidth: 360 }}>
-                                <CategoryPicker value={null} onChange={(val) => val && stageAssign(row, val)} placeholder={t('searchPimCategoryPlaceholder')} />
+                                <CategoryPicker
+                                    value={null}
+                                    onChange={(val) => val && stageAssign(row, val)}
+                                    placeholder={t('searchPimCategoryPlaceholder')}
+                                />
                             </Box>
                         ) : (
                             <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
@@ -500,7 +513,10 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         >
                             {t('marketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('woocommerceMappingTitle')}</Typography><Divider sx={{ my: 2 }} />
+                        <Typography variant="h4" fontWeight={700}>
+                            {t('woocommerceMappingTitle')}
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
@@ -524,8 +540,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={solidActionSx}
                         >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                    </Button>
+                            {t('saveChanges')}
+                            {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                        </Button>
                     </Stack>
                 </Stack>
 
@@ -545,7 +562,13 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
                             <Typography
                                 variant="caption"
-                                sx={{ color: FIORI.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}
+                                sx={{
+                                    color: FIORI.textSecondary,
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    display: 'block',
+                                }}
                             >
                                 {tile.label}
                             </Typography>
@@ -603,24 +626,41 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                             <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
                         </ToggleButtonGroup>
 
-                        <Select value={perPage} onChange={(e) => handlePerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                        <Select
+                            value={perPage}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                            size="small"
+                            sx={{ minWidth: 60, height: 36 }}
+                        >
                             <MenuItem value={10}>10</MenuItem>
                             <MenuItem value={25}>25</MenuItem>
                             <MenuItem value={50}>50</MenuItem>
                             <MenuItem value={100}>100</MenuItem>
                         </Select>
-                        <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('perPage')}
+                        </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                             <Typography variant="body2">{currentPage}</Typography>
                         </Paper>
-                        <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage })}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('pageOf', { lastPage })}
+                        </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}><LastPageIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                <FirstPageIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                <LastPageIcon fontSize="small" />
+                            </IconButton>
                         </Stack>
                     </Stack>
                 </Stack>
@@ -636,11 +676,15 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                 {canEditBrands && (
                     <>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>{t('woocommerceBrandsSectionTitle')}</Typography>
+                            <Typography variant="h6" fontWeight={700}>
+                                {t('woocommerceBrandsSectionTitle')}
+                            </Typography>
 
                             <Stack direction="row" spacing={1.5} alignItems="center">
                                 {woocommerceBrandSyncMessage && (
-                                    <Typography variant="caption" color="text.secondary">{woocommerceBrandSyncMessage}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {woocommerceBrandSyncMessage}
+                                    </Typography>
                                 )}
                                 <Button
                                     size="small"
@@ -674,24 +718,57 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                             <Stack direction="row" alignItems="center" spacing={1.5}>
                                 {loadingWoocommerceBrands && <CircularProgress size={18} />}
 
-                                <Select value={woocommerceBrandPerPage} onChange={(e) => handleWoocommerceBrandPerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                                <Select
+                                    value={woocommerceBrandPerPage}
+                                    onChange={(e) => handleWoocommerceBrandPerPageChange(Number(e.target.value))}
+                                    size="small"
+                                    sx={{ minWidth: 60, height: 36 }}
+                                >
                                     <MenuItem value={10}>10</MenuItem>
                                     <MenuItem value={25}>25</MenuItem>
                                     <MenuItem value={50}>50</MenuItem>
                                     <MenuItem value={100}>100</MenuItem>
                                 </Select>
-                                <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {tGrid('perPage')}
+                                </Typography>
 
                                 <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                                     <Typography variant="body2">{woocommerceBrands?.current_page ?? 1}</Typography>
                                 </Paper>
-                                <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage: woocommerceBrands?.last_page ?? 1 })}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {tGrid('pageOf', { lastPage: woocommerceBrands?.last_page ?? 1 })}
+                                </Typography>
 
                                 <Stack direction="row" spacing={0.2}>
-                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) <= 1} onClick={() => goToWoocommerceBrandPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) <= 1} onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)} onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)} onClick={() => goToWoocommerceBrandPage(woocommerceBrands?.last_page ?? 1)}><LastPageIcon fontSize="small" /></IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(woocommerceBrands?.current_page ?? 1) <= 1}
+                                        onClick={() => goToWoocommerceBrandPage(1)}
+                                    >
+                                        <FirstPageIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(woocommerceBrands?.current_page ?? 1) <= 1}
+                                        onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) - 1)}
+                                    >
+                                        <ChevronLeftIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)}
+                                        onClick={() => goToWoocommerceBrandPage((woocommerceBrands?.current_page ?? 1) + 1)}
+                                    >
+                                        <ChevronRightIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(woocommerceBrands?.current_page ?? 1) >= (woocommerceBrands?.last_page ?? 1)}
+                                        onClick={() => goToWoocommerceBrandPage(woocommerceBrands?.last_page ?? 1)}
+                                    >
+                                        <LastPageIcon fontSize="small" />
+                                    </IconButton>
                                 </Stack>
                             </Stack>
                         </Stack>

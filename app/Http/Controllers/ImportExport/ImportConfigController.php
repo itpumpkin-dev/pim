@@ -39,10 +39,19 @@ class ImportConfigController extends Controller
         ]);
     }
 
+    /**
+     * Import types held back from the create wizard for now — categories,
+     * attributes, attribute families and attribute options. Remove entries
+     * here to re-enable them; the importers/registry still support them.
+     */
+    private const CREATE_DISABLED_TYPES = ['categories', 'attributes', 'attribute_families', 'attribute_options'];
+
     public function create(): Response
     {
         return Inertia::render('import-export/imports/create', [
-            'types' => ImportExportRegistry::TYPES,
+            'types' => collect(ImportExportRegistry::TYPES)
+                ->reject(fn (string $type) => in_array($type, self::CREATE_DISABLED_TYPES, true))
+                ->values(),
             'requiredColumnsByType' => $this->requiredColumnsByType(),
             'columnLabelsByType' => $this->columnLabelsByType(),
             'families' => AttributeFamily::cachedList()->map(fn ($f) => [

@@ -119,8 +119,16 @@ class CategoryController extends Controller
         // `products_count` ไปเรียงลำดับได้ด้านล่าง (เป็นคอลัมน์ alias จาก
         // withCount() — Postgres อนุญาตให้ ORDER BY อ้างถึง alias ของ SELECT ได้
         // ต่างจาก HAVING ที่ทำไม่ได้)
+        // The list shows top-level categories only. Drilling into a root
+        // (?parent=<id>) shows that root's direct children (subcategories).
+        // A free-text search spans every level so deeper nodes stay findable.
+        $parentId = $request->integer('parent') ?: null;
+        $parentCategory = $parentId ? Category::find($parentId, ['id', 'name', 'parent_id']) : null;
+
         $query = Category::with('parent')
             ->withCount(['children', 'products'])
+            ->when($parentId, fn ($q) => $q->where('parent_id', $parentId))
+            ->when(!$parentId && !$search, fn ($q) => $q->whereNull('parent_id'))
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('code', 'like', "%{$search}%")
@@ -135,36 +143,6 @@ class CategoryController extends Controller
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
                 });
             });
-
-        // "แมปกับ marketplace ไหนบ้าง" ไม่ใช่คอลัมน์จริงๆ — มันคำนวณมาจาก FK
-        // แบบ nullable 4 คอลัมน์ (ดู mapped_platforms ด้านล่าง) เลยส่งผ่าน
-        // GridManager::applyFilters() เหมือน $filterColumns ตัวอื่นไม่ได้ เพราะตัวนั้น
-        // จะทำแค่ where() ธรรมดาโดยใช้ key ของ filter เป็นชื่อคอลัมน์เท่านั้น เลย
-        // จัดการเป็น request input ของตัวเองแยกต่างหากแทน แบบเดียวกับที่ 'filter'
-        // (all/leaf/parent/flagged) ของ shopeeMapping() จัดการนอกระบบกรองแบบ
-        // ทั่วไปของ grid
-        $platformColumns = [
-            'lazada' => 'lazada_category_id',
-            'shopee' => 'shopee_category_id',
-            'tiktok' => 'tiktok_category_id',
-            'woocommerce' => 'woocommerce_category_id',
-        ];
-        $platformFilter = $request->input('platform');
-        $query->when($platformFilter, function ($query, $platformFilter) use ($platformColumns) {
-            if ($platformFilter === 'unmapped') {
-                foreach ($platformColumns as $column) {
-                    $query->whereNull($column);
-                }
-            } elseif ($platformFilter === 'mapped') {
-                $query->where(function ($q) use ($platformColumns) {
-                    foreach ($platformColumns as $column) {
-                        $q->orWhereNotNull($column);
-                    }
-                });
-            } elseif (isset($platformColumns[$platformFilter])) {
-                $query->whereNotNull($platformColumns[$platformFilter]);
-            }
-        });
 
         GridManager::applyFilters($query, $filterColumns, $filtersWithoutName);
 
@@ -192,29 +170,17 @@ class CategoryController extends Controller
         $categories->getCollection()->transform(function (Category $category) {
             $category->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($category->thumbnail);
 
-            // FK ทั้ง 4 คอลัมน์ของ marketplace (lazada/shopee/tiktok/woocommerce_
-            // category_id) มีอยู่ใน model อยู่แล้ว (query ด้านบนไม่ได้จำกัดด้วย
-            // select()) เพราะฉะนั้นตรงนี้แค่อ่านค่าที่มีอยู่แล้ว ไม่ต้อง query เพิ่ม
-            // ส่งออกไปแค่ว่าแมปกับแพลตฟอร์มไหนบ้าง ไม่ใช่ FK id ตรงๆ เพราะหน้าลิสต์
-            // ต้องการแค่โชว์ว่า "แมปกับ X แล้ว" ไม่ได้ลิงก์ไปหาหมวดหมู่พวกนั้นเลย
-            $category->mapped_platforms = collect([
-                'lazada' => $category->lazada_category_id,
-                'shopee' => $category->shopee_category_id,
-                'tiktok' => $category->tiktok_category_id,
-                'woocommerce' => $category->woocommerce_category_id,
-            ])->filter()->keys()->values()->all();
-
             return $category;
         });
 
         return Inertia::render('catalog/categories/index', [
             'categories' => $categories,
+            'parentCategory' => $parentCategory,
             'filters' => [
                 'search' => $request->input('search', ''),
                 'filters' => $originalFilters,
                 'sort' => $sortField ?? '',
                 'dir' => $sortField ? $sortDir : '',
-                'platform' => $platformFilter ?? '',
             ],
             'filterColumns' => $filterColumns,
         ]);
@@ -259,12 +225,14 @@ class CategoryController extends Controller
     /**
      * แสดงฟอร์มสำหรับสร้างหมวดหมู่ใหม่
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
         return Inertia::render('catalog/categories/create', [
             'categoryFields' => $categoryFields,
+            'rootCategories' => Category::whereNull('parent_id')->orderBy('name')->get(['id', 'name']),
+            'defaultParentId' => $request->integer('parent') ?: null,
         ]);
     }
 
@@ -276,16 +244,16 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
+            'code' => ['nullable', 'string', 'max:100', Rule::unique('categories', 'code')],
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
             'is_ai_translate' => ['boolean'],
             'description' => ['nullable', 'string'],
-            'parent_id' => ['nullable', 'exists:categories,id'],
-            'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
-            'shopee_category_id' => ['nullable', 'exists:shopee_categories,id'],
-            'tiktok_category_id' => ['nullable', 'exists:tiktok_categories,id'],
-            'woocommerce_category_id' => ['nullable', 'exists:woocommerce_categories,id'],
+            // The Categories page only manages roots + subcategories — a
+            // category's parent must be a root. The leaf level (product
+            // groups) is created on its own page (ProductGroupController).
+            'parent_id' => ['nullable', Rule::exists('categories', 'id')->whereNull('parent_id')],
             'additional_data' => ['nullable', 'array'],
             'slug' => ['nullable', 'string', 'max:255'],
             'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
@@ -322,7 +290,11 @@ class CategoryController extends Controller
 
         $translations = $validated['translations'] ?? [];
 
-        $category = CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create([
+        $typedCode = trim((string) ($validated['code'] ?? ''));
+
+        // Shared attributes for both the hand-typed-code and the
+        // auto-generated-code paths below.
+        $attributes = fn (string $code) => [
             'code' => $code,
             'name' => $this->resolveName($translations, $validated['name'] ?? null, $code),
             'slug' => $validated['slug'] ?? null,
@@ -332,14 +304,17 @@ class CategoryController extends Controller
             'description' => $validated['description'],
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
-            'lazada_category_id' => $validated['lazada_category_id'] ?? null,
-            'shopee_category_id' => $validated['shopee_category_id'] ?? null,
-            'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
-            'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
             'additional_data' => $validated['additional_data'],
             'created_by' => $request->user()?->id,
             'updated_by' => $request->user()?->id,
-        ]));
+        ];
+
+        // A hand-typed code is the ERP category code (e.g. a025001) that
+        // ProductCategoryLinker matches products against; use it verbatim.
+        // Otherwise fall back to an auto-generated category_N code.
+        $category = $typedCode !== ''
+            ? Category::create($attributes($typedCode))
+            : CodeGenerator::createWithRetry('categories', 'category', fn ($code) => Category::create($attributes($code)));
 
         $this->syncTranslations($category, $translations);
         $this->autoTranslate($category, $translations);
@@ -386,8 +361,16 @@ class CategoryController extends Controller
     /**
      * แสดงฟอร์มสำหรับแก้ไขหมวดหมู่ที่ระบุ
      */
-    public function edit(Category $category): Response
+    public function edit(Category $category): Response|RedirectResponse
     {
+        // Level-3 categories are product groups — they have their own editor
+        // with Category + Subcategory pickers. Bounce there so this page only
+        // ever deals with roots and subcategories.
+        $parent = $category->parent_id ? Category::find($category->parent_id) : null;
+        if ($parent && $parent->parent_id !== null) {
+            return to_route('catalog.productGroups.edit', $category->id);
+        }
+
         $categoryFields = CategoryField::where('status', true)->orderBy('position')->get();
 
         // หมวดหมู่ที่ไม่มีแถว CategoryTranslation เลยสักแถว (เช่นทุกตัวที่สร้างผ่าน
@@ -409,15 +392,13 @@ class CategoryController extends Controller
         }
 
         return Inertia::render('catalog/categories/edit', [
-            'category' => $category->load([
-                'lazadaCategory:id,name,parent_id',
-                'shopeeCategory:id,name,name_th,parent_id',
-                'tiktokCategory:id,name,name_th,parent_id',
-                'woocommerceCategory:id,name,parent_id',
-            ]),
+            'category' => $category,
             'thumbnailUrl' => AttributeValueFormatter::resolveStorageUrl($category->thumbnail),
             'translations' => $translations,
             'categoryFields' => $categoryFields,
+            'rootCategories' => Category::whereNull('parent_id')->where('id', '!=', $category->id)->orderBy('name')->get(['id', 'name']),
+            // Direct children shown as a quick-jump list on the edit page.
+            'subcategories' => $category->children()->orderBy('name')->get(['id', 'name', 'is_active']),
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
     }
@@ -583,16 +564,18 @@ class CategoryController extends Controller
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
+            // `code` is set once at creation and never editable afterwards —
+            // it is the key ProductCategoryLinker matches products on. Any
+            // `code` sent by an edit form is ignored.
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
             'is_ai_translate' => ['boolean'],
             'description' => ['nullable', 'string'],
-            'parent_id' => ['nullable', 'exists:categories,id'],
-            'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
-            'shopee_category_id' => ['nullable', 'exists:shopee_categories,id'],
-            'tiktok_category_id' => ['nullable', 'exists:tiktok_categories,id'],
-            'woocommerce_category_id' => ['nullable', 'exists:woocommerce_categories,id'],
+            // A category's parent must be a root (Categories page manages the
+            // top two levels only) — unless this row is itself a product group
+            // being edited elsewhere, in which case parent_id isn't posted.
+            'parent_id' => ['nullable', Rule::exists('categories', 'id')->whereNull('parent_id')],
             'additional_data' => ['nullable', 'array'],
             'slug' => ['nullable', 'string', 'max:255'],
             'display_type' => ['nullable', Rule::in(self::DISPLAY_TYPES)],
@@ -682,10 +665,6 @@ class CategoryController extends Controller
             'description' => $validated['description'],
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'parent_id' => $validated['parent_id'],
-            'lazada_category_id' => $validated['lazada_category_id'] ?? null,
-            'shopee_category_id' => $validated['shopee_category_id'] ?? null,
-            'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
-            'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
             'additional_data' => $validated['additional_data'] ?? [],
             'updated_by' => $request->user()?->id,
         ]);

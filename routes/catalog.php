@@ -9,6 +9,7 @@ use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
 use App\Http\Controllers\Catalog\ChannelController;
 use App\Http\Controllers\Catalog\ProductController;
+use App\Http\Controllers\Catalog\ProductGroupController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
 use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
@@ -161,6 +162,17 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('categories/{category}', [CategoryController::class, 'update'])->name('categories.update')->middleware('permission:categories,edit_categories');
     Route::delete('categories/{category}', [CategoryController::class, 'destroy'])->name('categories.destroy')->middleware('permission:categories,delete_categories');
     Route::get('categories/{category}/history', [CategoryController::class, 'history'])->name('categories.history')->middleware('permission:categories,view_history');
+
+    // Product Groups (กลุ่มสินค้า) — CRUD over the leaf level of the category
+    // tree. `{category}` route-model-binds to Category; the controller 404s
+    // any row that isn't a depth-3 node.
+    Route::get('product-groups', [ProductGroupController::class, 'index'])->name('productGroups.index')->middleware('permission:product_groups,list_product_groups');
+    Route::get('product-groups/create', [ProductGroupController::class, 'create'])->name('productGroups.create')->middleware('permission:product_groups,create_product_groups');
+    Route::post('product-groups', [ProductGroupController::class, 'store'])->name('productGroups.store')->middleware('permission:product_groups,create_product_groups');
+    Route::get('product-groups/{category}/edit', [ProductGroupController::class, 'edit'])->name('productGroups.edit')->middleware('permission:product_groups,edit_product_groups');
+    Route::put('product-groups/{category}', [ProductGroupController::class, 'update'])->name('productGroups.update')->middleware('permission:product_groups,edit_product_groups');
+    Route::delete('product-groups/{category}', [ProductGroupController::class, 'destroy'])->name('productGroups.destroy')->middleware('permission:product_groups,delete_product_groups');
+    Route::get('product-groups/{category}/history', [ProductGroupController::class, 'history'])->name('productGroups.history')->middleware('permission:product_groups,view_history');
     Route::get('categories/marketplace-sync', [CategoryController::class, 'marketplaceSync'])->name('categories.marketplaceSync')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:categories,edit_categories');

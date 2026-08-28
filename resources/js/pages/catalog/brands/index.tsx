@@ -298,9 +298,9 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                               <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/brands/${row.id}/edit`)}>
                                   <EditIcon fontSize="small" />
                               </IconButton>
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
+                              {/* <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteBrandId(row.id)}>
                                   <DeleteIcon fontSize="small" />
-                              </IconButton>
+                              </IconButton> */}
                           </Stack>
                       ),
                   },

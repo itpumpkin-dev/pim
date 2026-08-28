@@ -25,5 +25,6 @@
     "imports": "Imports",
     "exports": "Exports",
     "jobTracker": "Job Tracker",
-    "wooConvert": "WooCommerce Converter"
+    "wooConvert": "WooCommerce Converter",
+    "productGroups": "Product Groups"
 }

@@ -17,34 +17,29 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CategoryFieldInput, type CategoryFieldItem } from '@/components/catalog/category-field-input';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface Props {
-    categoryFields: CategoryFieldItem[];
-    rootCategories: { id: number; name: string }[];
-    defaultParentId: number | null;
+    categories: { id: number; name: string }[];
+    subcategories: { id: number; name: string; parent_id: number }[];
+    defaultCategoryId: number | null;
+    defaultSubcategoryId: number | null;
 }
 
-export default function CategoryCreate({ categoryFields = [], rootCategories = [], defaultParentId = null }: Props) {
+export default function ProductGroupCreate({ categories = [], subcategories = [], defaultCategoryId = null, defaultSubcategoryId = null }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
-    const { locales, locale: currentLocaleCode } = useLocale();
-    const currentLocaleId = locales.find((l) => l.code === currentLocaleCode)?.id || 1;
-
-    const isSubcategory = defaultParentId != null;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('categories'), href: '/catalog/categories' },
-        { title: isSubcategory ? t('createSubcategory') : t('createCategory'), href: '/catalog/categories/create' },
+        { title: tNav('productGroups'), href: '/catalog/product-groups' },
+        { title: t('createProductGroup'), href: '/catalog/product-groups/create' },
     ];
 
     const { data, setData, post, processing, errors, isDirty } = useForm({
@@ -52,18 +47,23 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
         is_ai_translate: true as boolean,
         code: '',
         description: '',
-        parent_id: (defaultParentId ?? '') as number | '',
-        additional_data: {} as Record<string, any>,
+        category_id: (defaultCategoryId ?? '') as number | '',
+        subcategory_id: (defaultSubcategoryId ?? '') as number | '',
         thumbnail: null as File | null,
         is_active: true as boolean,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
+    const subcategoryOptions = useMemo(
+        () => (data.category_id === '' ? [] : subcategories.filter((s) => s.parent_id === data.category_id)),
+        [subcategories, data.category_id],
+    );
+
     const submit = (event: FormEvent) => {
         event.preventDefault();
         skipNavigationGuardRef.current = true;
-        post('/catalog/categories', {
-            onSuccess: () => router.visit('/catalog/categories', { replace: true }),
+        post('/catalog/product-groups', {
+            onSuccess: () => router.visit('/catalog/product-groups', { replace: true }),
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
@@ -72,7 +72,7 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={isSubcategory ? t('createSubcategory') : t('createCategory')} />
+            <Head title={t('createProductGroup')} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 <Stack
                     direction={{ xs: 'column', sm: 'row' }}
@@ -82,10 +82,10 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
                     sx={{ mb: 3 }}
                 >
                     <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {isSubcategory ? t('createSubcategory') : t('createCategory')}
+                        {t('createProductGroup')}
                     </Typography>
                     <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/categories" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+                        <Button component={Link} href="/catalog/product-groups" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
                             {t('back')}
                         </Button>
                         <Button
@@ -102,7 +102,7 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
 
                 <Stack spacing={2}>
                     <LocaleLabelFields
-                        title={t('name')}
+                        title={t('productGroupName')}
                         description={t('nameHelperText')}
                         values={data.translations}
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
@@ -111,13 +111,13 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
                     <FioriFormGroup title={t('generalTitle')}>
                         <FioriField
                             label={t('code')}
-                            htmlFor="category-code"
+                            htmlFor="pg-code"
                             valueState={valueStateOf(errors.code)}
                             message={errors.code}
                             hint={t('categoryCodeHelperText')}
                         >
                             <TextField
-                                id="category-code"
+                                id="pg-code"
                                 fullWidth
                                 size="small"
                                 value={data.code}
@@ -126,21 +126,19 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
                             />
                         </FioriField>
 
-                        <FioriField
-                            label={t('parentCategory')}
-                            valueState={valueStateOf(errors.parent_id)}
-                            message={errors.parent_id}
-                            hint={t('categoryParentHelperText')}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.parent_id))}>
+                        <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.category_id))}>
                                 <Select
-                                    id="category-parent"
+                                    id="pg-category"
                                     displayEmpty
-                                    value={data.parent_id === '' ? '' : String(data.parent_id)}
-                                    onChange={(e) => setData('parent_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                    value={data.category_id === '' ? '' : String(data.category_id)}
+                                    onChange={(e) => {
+                                        const next = e.target.value === '' ? '' : Number(e.target.value);
+                                        setData((prev) => ({ ...prev, category_id: next, subcategory_id: '' }));
+                                    }}
                                 >
-                                    <MenuItem value="">{t('noneRootCategory')}</MenuItem>
-                                    {rootCategories.map((c) => (
+                                    <MenuItem value="">{t('selectCategory')}</MenuItem>
+                                    {categories.map((c) => (
                                         <MenuItem key={c.id} value={String(c.id)}>
                                             {c.name}
                                         </MenuItem>
@@ -149,16 +147,34 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
                             </FormControl>
                         </FioriField>
 
+                        <FioriField label={t('subcategory')} valueState={valueStateOf(errors.subcategory_id)} message={errors.subcategory_id}>
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.subcategory_id))}>
+                                <Select
+                                    id="pg-subcategory"
+                                    displayEmpty
+                                    disabled={data.category_id === ''}
+                                    value={data.subcategory_id === '' ? '' : String(data.subcategory_id)}
+                                    onChange={(e) => setData('subcategory_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                >
+                                    <MenuItem value="">{data.category_id === '' ? t('selectCategoryFirst') : t('selectSubcategory')}</MenuItem>
+                                    {subcategoryOptions.map((s) => (
+                                        <MenuItem key={s.id} value={String(s.id)}>
+                                            {s.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </FioriField>
+
                         <FioriField
                             label={t('description')}
-                            htmlFor="category-description"
+                            htmlFor="pg-description"
                             valueState={valueStateOf(errors.description)}
                             message={errors.description}
-                            hint={t('descriptionHelperText')}
                             fullWidth
                         >
                             <TextField
-                                id="category-description"
+                                id="pg-description"
                                 fullWidth
                                 size="small"
                                 multiline
@@ -198,33 +214,6 @@ export default function CategoryCreate({ categoryFields = [], rootCategories = [
                             </Stack>
                         </FioriField>
                     </FioriFormGroup>
-
-                    {categoryFields.length > 0 && (
-                        <FioriFormGroup title="หมวดหมู่แอตทริบิวต์เพิ่มเติม (Dynamic Fields)">
-                            {categoryFields.map((field) => {
-                                const fieldLabel = field.labels[currentLocaleId] || Object.values(field.labels)[0] || field.code;
-                                const fieldValue = data.additional_data[field.code] ?? '';
-                                const fieldError = errors[`additional_data.${field.code}` as keyof typeof errors];
-
-                                return (
-                                    <FioriField
-                                        key={field.id}
-                                        label={fieldLabel}
-                                        required={field.is_required}
-                                        valueState={valueStateOf(fieldError)}
-                                        message={fieldError}
-                                    >
-                                        <CategoryFieldInput
-                                            field={field}
-                                            value={fieldValue}
-                                            onChange={(value) => setData('additional_data', { ...data.additional_data, [field.code]: value })}
-                                            error={fieldError}
-                                        />
-                                    </FioriField>
-                                );
-                            })}
-                        </FioriFormGroup>
-                    )}
                 </Stack>
 
                 <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />

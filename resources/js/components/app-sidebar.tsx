@@ -2,18 +2,18 @@ import { NavPrimary } from '@/components/nav-primary';
 import { NavSecondary } from '@/components/nav-secondary';
 import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON, useSidebar } from '@/hooks/use-sidebar';
+import { FIORI } from '@/lib/fiori-style';
 import { getTheme } from '@/theme';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ImportExportIcon from '@mui/icons-material/ImportExport';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, Drawer, ThemeProvider, Toolbar, Typography } from '@mui/material';
-import { useState, useMemo, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
-import { FIORI } from '@/lib/fiori-style';
 
 function useMainNavItems(): NavItem[] {
     const { t } = useTranslation('nav');
@@ -26,213 +26,221 @@ function useMainNavItems(): NavItem[] {
     // render, which is an unbounded render loop (surfaced as React's "Maximum
     // update depth exceeded", most visibly under the product edit page's
     // useTransition-driven re-render churn, but not actually specific to it).
-    return useMemo(() => [
-        {
-            title: t('dashboard'),
-            url: '/dashboard',
-            icon: DashboardIcon,
-            permission: 'dashboards.list_dashboards',
-        },
-        {
-            title: t('catalog'),
-            icon: MenuBookIcon,
-            items: [
-                {
-                    title: t('products'),
-                    items: [
-                        {
-                            title: t('products'),
-                            url: '/catalog/products',
-                            permission: 'products.list_products',
-                        },
-                    ],
-                },
-                {
-                    title: t('categories'),
-                    items: [
-                        {
-                            title: t('categories'),
-                            url: '/catalog/categories',
-                            permission: 'categories.list_categories',
-                            // Otherwise these prefix-match this item too
-                            // (they're routed under the Categories CRUD
-                            // prefix) and both this item and "จัดการ" would
-                            // highlight as active at once — the whole
-                            // marketplace-sync + per-platform mapping flow
-                            // belongs to the Management hub now.
-                            excludeUrls: [
-                                '/catalog/categories/marketplace-sync',
-                                '/catalog/categories/lazada-mapping',
-                                '/catalog/categories/shopee-mapping',
-                                '/catalog/categories/tiktok-mapping',
-                                '/catalog/categories/woocommerce-mapping',
-                            ],
-                        },
-                        // {
-                        //     title: t('categoryFields'),
-                        //     url: '/catalog/categoryFields',
-                        //     permission: 'category_fields.list_category_fields',
-                        // },
-                    ],
-                },
-                {
-                    title: t('brands'),
-                    items: [
-                        {
-                            title: t('brands'),
-                            url: '/catalog/brands',
-                            permission: 'brands.list_brands',
-                            // No /catalog/brands/shopee-mapping or
-                            // /catalog/brands/marketplace-sync entries here
-                            // anymore — both pages are gone; brand mapping
-                            // and sync now live on /catalog/categories/
-                            // shopee-mapping, /catalog/categories/
-                            // lazada-mapping, and /catalog/categories/
-                            // marketplace-sync instead (already covered by
-                            // the Categories excludeUrls above).
-                        },
-                    ],
-                },
-                {
-                    title: t('attributes'),
-                    items: [
-                        {
-                            title: t('attributes'),
-                            url: '/catalog/attributes',
-                            permission: 'attributes.list_attributes',
-                        },
-                        {
-                            title: t('attributeGroups'),
-                            url: '/catalog/attributeGroups',
-                            permission: 'attribute_groups.list_attribute_groups',
-                        },
-                        {
-                            title: t('attributeFamilies'),
-                            url: '/catalog/attributeFamilies',
-                            permission: 'attribute_families.list_attribute_families',
-                        },
-                    ],
-                },
-                {
-                    title: t('management'),
-                    items: [
-                        {
-                            // No single permission gates this hub — it's a
-                            // launcher for missing-translations + the
-                            // Categories/Brands marketplace-sync pages, each
-                            // behind its own permission, and the page itself
-                            // hides whichever tiles the user can't reach.
-                            // Gating this entry on products.list_products
-                            // keeps it visible for the same audience as the
-                            // rest of the Catalog section rather than
-                            // requiring a brand-new "management" permission
-                            // resource just for a link list.
-                            title: t('management'),
-                            url: '/catalog/management',
-                            permission: 'products.list_products',
-                            // These pages are only reachable via a card on
-                            // the Management hub now (their own sidebar/tab
-                            // entries were removed) — without this, visiting
-                            // one directly leaves no sidebar item matching
-                            // its URL, so findActiveGroup falls back to
-                            // Dashboard and the whole secondary sidebar
-                            // collapses instead of staying on "จัดการ".
-                            matchUrls: [
-                                '/catalog/product-translations',
-                                '/catalog/management/marketplace',
-                                '/catalog/categories/marketplace-sync',
-                                '/catalog/categories/lazada-mapping',
-                                '/catalog/categories/shopee-mapping',
-                                '/catalog/categories/tiktok-mapping',
-                                '/catalog/categories/woocommerce-mapping',
-                            ],
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            title: t('importExport'),
-            icon: ImportExportIcon,
-            items: [
-                {
-                    title: t('imports'),
-                    url: '/import-export/imports',
-                    permission: 'import_configs.list_import_configs',
-                },
-                {
-                    title: t('exports'),
-                    url: '/import-export/exports',
-                    permission: 'export_configs.list_export_configs',
-                },
-                {
-                    title: t('jobTracker'),
-                    url: '/import-export/jobs',
-                    permission: 'job_trackers.list_job_trackers',
-                },
-                {
-                    title: t('wooConvert'),
-                    url: '/import-export/woo-convert',
-                    permission: 'woo_conversions.list_woo_conversions',
-                },
-            ],
-        },
-        {
-            title: t('system'),
-            icon: SettingsIcon,
-            items: [
-                {
-                    title: t('channels'),
-                    url: '/catalog/channels',
-                    // "Sales Platforms" is a tab on the Channels page, not
-                    // its own sidebar entry — without this, viewing it makes
-                    // the whole sidebar lose its highlighted section.
-                    matchUrls: ['/catalog/sales-platforms'],
-                    permission: 'channels.list_channels',
-                },
-                {
-                    title: t('users'),
-                    url: '/system/user',
-                    permission: 'users.list_users',
-                },
-                {
-                    title: t('userGroups'),
-                    url: '/system/userGroup',
-                    permission: 'user_groups.list_user_groups',
-                },
-                {
-                    title: t('departments'),
-                    url: '/system/department',
-                    permission: 'departments.list_departments',
-                },
-                {
-                    title: t('jobPositions'),
-                    url: '/system/jobPosition',
-                    permission: 'job_positions.list_job_positions',
-                },
-                {
-                    title: t('roles'),
-                    url: '/system/roles',
-                    permission: 'roles.list_roles',
-                },
-                {
-                    title: t('locales'),
-                    url: '/system/locales',
-                    permission: 'locales.list_locales',
-                },
-                {
-                    title: t('translationProviders'),
-                    url: '/system/translationProviders',
-                    permission: 'translation_providers.list_translation_providers',
-                },
-                {
-                    title: t('activityLogs'),
-                    url: '/system/activity-logs',
-                    permission: 'activity_logs.list_activity_logs',
-                },
-            ],
-        },
-    ], [t]);
+    return useMemo(
+        () => [
+            {
+                title: t('dashboard'),
+                url: '/dashboard',
+                icon: DashboardIcon,
+                permission: 'dashboards.list_dashboards',
+            },
+            {
+                title: t('catalog'),
+                icon: MenuBookIcon,
+                items: [
+                    {
+                        title: t('products'),
+                        items: [
+                            {
+                                title: t('products'),
+                                url: '/catalog/products',
+                                permission: 'products.list_products',
+                            },
+                        ],
+                    },
+                    {
+                        title: t('categories'),
+                        items: [
+                            {
+                                title: t('categories'),
+                                url: '/catalog/categories',
+                                permission: 'categories.list_categories',
+                                // Otherwise these prefix-match this item too
+                                // (they're routed under the Categories CRUD
+                                // prefix) and both this item and "จัดการ" would
+                                // highlight as active at once — the whole
+                                // marketplace-sync + per-platform mapping flow
+                                // belongs to the Management hub now.
+                                excludeUrls: [
+                                    '/catalog/categories/marketplace-sync',
+                                    '/catalog/categories/lazada-mapping',
+                                    '/catalog/categories/shopee-mapping',
+                                    '/catalog/categories/tiktok-mapping',
+                                    '/catalog/categories/woocommerce-mapping',
+                                ],
+                            },
+                            {
+                                title: t('productGroups'),
+                                url: '/catalog/product-groups',
+                                permission: 'product_groups.list_product_groups',
+                            },
+                            // {
+                            //     title: t('categoryFields'),
+                            //     url: '/catalog/categoryFields',
+                            //     permission: 'category_fields.list_category_fields',
+                            // },
+                        ],
+                    },
+                    {
+                        title: t('brands'),
+                        items: [
+                            {
+                                title: t('brands'),
+                                url: '/catalog/brands',
+                                permission: 'brands.list_brands',
+                                // No /catalog/brands/shopee-mapping or
+                                // /catalog/brands/marketplace-sync entries here
+                                // anymore — both pages are gone; brand mapping
+                                // and sync now live on /catalog/categories/
+                                // shopee-mapping, /catalog/categories/
+                                // lazada-mapping, and /catalog/categories/
+                                // marketplace-sync instead (already covered by
+                                // the Categories excludeUrls above).
+                            },
+                        ],
+                    },
+                    {
+                        title: t('attributes'),
+                        items: [
+                            {
+                                title: t('attributes'),
+                                url: '/catalog/attributes',
+                                permission: 'attributes.list_attributes',
+                            },
+                            {
+                                title: t('attributeGroups'),
+                                url: '/catalog/attributeGroups',
+                                permission: 'attribute_groups.list_attribute_groups',
+                            },
+                            {
+                                title: t('attributeFamilies'),
+                                url: '/catalog/attributeFamilies',
+                                permission: 'attribute_families.list_attribute_families',
+                            },
+                        ],
+                    },
+                    {
+                        title: t('management'),
+                        items: [
+                            {
+                                // No single permission gates this hub — it's a
+                                // launcher for missing-translations + the
+                                // Categories/Brands marketplace-sync pages, each
+                                // behind its own permission, and the page itself
+                                // hides whichever tiles the user can't reach.
+                                // Gating this entry on products.list_products
+                                // keeps it visible for the same audience as the
+                                // rest of the Catalog section rather than
+                                // requiring a brand-new "management" permission
+                                // resource just for a link list.
+                                title: t('management'),
+                                url: '/catalog/management',
+                                permission: 'products.list_products',
+                                // These pages are only reachable via a card on
+                                // the Management hub now (their own sidebar/tab
+                                // entries were removed) — without this, visiting
+                                // one directly leaves no sidebar item matching
+                                // its URL, so findActiveGroup falls back to
+                                // Dashboard and the whole secondary sidebar
+                                // collapses instead of staying on "จัดการ".
+                                matchUrls: [
+                                    '/catalog/product-translations',
+                                    '/catalog/management/marketplace',
+                                    '/catalog/categories/marketplace-sync',
+                                    '/catalog/categories/lazada-mapping',
+                                    '/catalog/categories/shopee-mapping',
+                                    '/catalog/categories/tiktok-mapping',
+                                    '/catalog/categories/woocommerce-mapping',
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                title: t('importExport'),
+                icon: ImportExportIcon,
+                items: [
+                    {
+                        title: t('imports'),
+                        url: '/import-export/imports',
+                        permission: 'import_configs.list_import_configs',
+                    },
+                    {
+                        title: t('exports'),
+                        url: '/import-export/exports',
+                        permission: 'export_configs.list_export_configs',
+                    },
+                    {
+                        title: t('jobTracker'),
+                        url: '/import-export/jobs',
+                        permission: 'job_trackers.list_job_trackers',
+                    },
+                    {
+                        title: t('wooConvert'),
+                        url: '/import-export/woo-convert',
+                        permission: 'woo_conversions.list_woo_conversions',
+                    },
+                ],
+            },
+            {
+                title: t('system'),
+                icon: SettingsIcon,
+                items: [
+                    {
+                        title: t('channels'),
+                        url: '/catalog/channels',
+                        // "Sales Platforms" is a tab on the Channels page, not
+                        // its own sidebar entry — without this, viewing it makes
+                        // the whole sidebar lose its highlighted section.
+                        matchUrls: ['/catalog/sales-platforms'],
+                        permission: 'channels.list_channels',
+                    },
+                    {
+                        title: t('users'),
+                        url: '/system/user',
+                        permission: 'users.list_users',
+                    },
+                    {
+                        title: t('userGroups'),
+                        url: '/system/userGroup',
+                        permission: 'user_groups.list_user_groups',
+                    },
+                    {
+                        title: t('departments'),
+                        url: '/system/department',
+                        permission: 'departments.list_departments',
+                    },
+                    {
+                        title: t('jobPositions'),
+                        url: '/system/jobPosition',
+                        permission: 'job_positions.list_job_positions',
+                    },
+                    {
+                        title: t('roles'),
+                        url: '/system/roles',
+                        permission: 'roles.list_roles',
+                    },
+                    {
+                        title: t('locales'),
+                        url: '/system/locales',
+                        permission: 'locales.list_locales',
+                    },
+                    {
+                        title: t('translationProviders'),
+                        url: '/system/translationProviders',
+                        permission: 'translation_providers.list_translation_providers',
+                    },
+                    {
+                        title: t('activityLogs'),
+                        url: '/system/activity-logs',
+                        permission: 'activity_logs.list_activity_logs',
+                    },
+                ],
+            },
+        ],
+        [t],
+    );
 }
 
 // Nav items only list each section's top-level URL (e.g. /catalog/products)
@@ -242,8 +250,7 @@ function useMainNavItems(): NavItem[] {
 // /catalog/products doesn't also match an unrelated /catalog/productsX).
 function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
     const currentPath = pageUrl.split('?')[0];
-    const matchesCurrentPath = (url?: string) =>
-        !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
+    const matchesCurrentPath = (url?: string) => !!url && (currentPath === url || currentPath.startsWith(url.endsWith('/') ? url : url + '/'));
 
     // Recurses through any depth of nesting (e.g. Catalog > "หมวดหมู่" group >
     // its leaf links) rather than checking just one level down — the
@@ -308,7 +315,7 @@ export function AppSidebar() {
     // Keep selectedGroup in sync with new translated items when language changes
     useEffect(() => {
         if (selectedGroup) {
-            const updatedGroup = filteredMainNavItems.find(item => item.icon === selectedGroup.icon);
+            const updatedGroup = filteredMainNavItems.find((item) => item.icon === selectedGroup.icon);
             if (updatedGroup) {
                 setSelectedGroup(updatedGroup);
             }
@@ -317,7 +324,7 @@ export function AppSidebar() {
     }, [filteredMainNavItems]);
 
     const hasSubmenus = selectedGroup && selectedGroup.items && selectedGroup.items.length > 0;
-    const width = collapsed ? SIDEBAR_WIDTH_ICON : (hasSubmenus ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON);
+    const width = collapsed ? SIDEBAR_WIDTH_ICON : hasSubmenus ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON;
 
     const content = (
         <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
@@ -399,9 +406,7 @@ export function AppSidebar() {
                 </Toolbar>
                 <Divider sx={{ borderColor: FIORI.border }} />
                 <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-                    {selectedGroup && (
-                        <NavSecondary title={selectedGroup.title} items={selectedGroup.items ?? []} />
-                    )}
+                    {selectedGroup && <NavSecondary title={selectedGroup.title} items={selectedGroup.items ?? []} />}
                 </Box>
             </Box>
         </Box>
@@ -447,4 +452,3 @@ export function AppSidebar() {
         </ThemeProvider>
     );
 }
-

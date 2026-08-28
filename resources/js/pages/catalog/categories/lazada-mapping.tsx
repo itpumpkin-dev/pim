@@ -1,15 +1,22 @@
+import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { xsrfToken } from '@/lib/csrf';
+import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
 import CancelIcon from '@mui/icons-material/Cancel';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import SearchIcon from '@mui/icons-material/Search';
+import SyncIcon from '@mui/icons-material/Sync';
 import {
     Box,
     Button,
@@ -29,13 +36,6 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
-import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
-import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
-import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
 // ใช้ตารางแบบ marketplace-tree-row-centric เหมือนกับ categories/shopee-mapping.tsx
 // (ดูเหตุผลได้ใน docblock ของ CategoryController::lazadaMapping()) รวมถึงส่วน
@@ -270,7 +270,12 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
     // ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping เดิมนั้น
     // ไม่ใช่อะไรที่คำนวณมาจาก `lazadaBrandId` ส่วน `display` คือสิ่งที่จะโชว์ในแถวหลังจากนั้น
     // รูปแบบเดียวกับ persistBrand() ของ ShopeeCategoryMapping
-    const persistLazadaBrand = (lazadaBrandId: number, optionId: number, newLazadaId: number | null, display: { id: number; name: string } | null) => {
+    const persistLazadaBrand = (
+        lazadaBrandId: number,
+        optionId: number,
+        newLazadaId: number | null,
+        display: { id: number; name: string } | null,
+    ) => {
         setSavingLazadaBrandId(lazadaBrandId);
         fetch('/catalog/brands/lazada-mapping', {
             method: 'POST',
@@ -367,9 +372,7 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
         })
             .then((res) => {
                 if (!res.ok) return;
-                setLazadaAttributes((prev) =>
-                    prev ? prev.map((a) => (a.name === lazadaAttributeName ? { ...a, mapped: display } : a)) : prev,
-                );
+                setLazadaAttributes((prev) => (prev ? prev.map((a) => (a.name === lazadaAttributeName ? { ...a, mapped: display } : a)) : prev));
             })
             .finally(() => setSavingLazadaAttributeName(null));
     };
@@ -587,7 +590,11 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
 
                         {assigningFor === row.id ? (
                             <Box sx={{ maxWidth: 360 }}>
-                                <CategoryPicker value={null} onChange={(val) => val && stageAssign(row, val)} placeholder={t('searchPimCategoryPlaceholder')} />
+                                <CategoryPicker
+                                    value={null}
+                                    onChange={(val) => val && stageAssign(row, val)}
+                                    placeholder={t('searchPimCategoryPlaceholder')}
+                                />
                             </Box>
                         ) : (
                             <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
@@ -730,7 +737,10 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                         >
                             {t('marketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('lazadaMappingTitle')}</Typography><Divider sx={{ my: 2 }} />
+                        <Typography variant="h4" fontWeight={700}>
+                            {t('lazadaMappingTitle')}
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
@@ -754,8 +764,9 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={solidActionSx}
                         >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                    </Button>
+                            {t('saveChanges')}
+                            {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                        </Button>
                     </Stack>
                 </Stack>
 
@@ -775,7 +786,13 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                         <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
                             <Typography
                                 variant="caption"
-                                sx={{ color: FIORI.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}
+                                sx={{
+                                    color: FIORI.textSecondary,
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    display: 'block',
+                                }}
                             >
                                 {tile.label}
                             </Typography>
@@ -833,24 +850,41 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                             <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
                         </ToggleButtonGroup>
 
-                        <Select value={perPage} onChange={(e) => handlePerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                        <Select
+                            value={perPage}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                            size="small"
+                            sx={{ minWidth: 60, height: 36 }}
+                        >
                             <MenuItem value={10}>10</MenuItem>
                             <MenuItem value={25}>25</MenuItem>
                             <MenuItem value={50}>50</MenuItem>
                             <MenuItem value={100}>100</MenuItem>
                         </Select>
-                        <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('perPage')}
+                        </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                             <Typography variant="body2">{currentPage}</Typography>
                         </Paper>
-                        <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage })}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('pageOf', { lastPage })}
+                        </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}><LastPageIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                <FirstPageIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                <LastPageIcon fontSize="small" />
+                            </IconButton>
                         </Stack>
                     </Stack>
                 </Stack>
@@ -871,11 +905,15 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                 {canEditBrands && (
                     <>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>{t('lazadaBrandsSectionTitle')}</Typography>
+                            <Typography variant="h6" fontWeight={700}>
+                                {t('lazadaBrandsSectionTitle')}
+                            </Typography>
 
                             <Stack direction="row" spacing={1.5} alignItems="center">
                                 {lazadaBrandSyncMessage && (
-                                    <Typography variant="caption" color="text.secondary">{lazadaBrandSyncMessage}</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {lazadaBrandSyncMessage}
+                                    </Typography>
                                 )}
                                 <Button
                                     size="small"
@@ -921,24 +959,53 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                             <Stack direction="row" alignItems="center" spacing={1.5}>
                                 {loadingLazadaBrands && <CircularProgress size={18} />}
 
-                                <Select value={lazadaBrandPerPage} onChange={(e) => handleLazadaBrandPerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                                <Select
+                                    value={lazadaBrandPerPage}
+                                    onChange={(e) => handleLazadaBrandPerPageChange(Number(e.target.value))}
+                                    size="small"
+                                    sx={{ minWidth: 60, height: 36 }}
+                                >
                                     <MenuItem value={10}>10</MenuItem>
                                     <MenuItem value={25}>25</MenuItem>
                                     <MenuItem value={50}>50</MenuItem>
                                     <MenuItem value={100}>100</MenuItem>
                                 </Select>
-                                <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {tGrid('perPage')}
+                                </Typography>
 
                                 <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                                     <Typography variant="body2">{lazadaBrands?.current_page ?? 1}</Typography>
                                 </Paper>
-                                <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage: lazadaBrands?.last_page ?? 1 })}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {tGrid('pageOf', { lastPage: lazadaBrands?.last_page ?? 1 })}
+                                </Typography>
 
                                 <Stack direction="row" spacing={0.2}>
-                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) <= 1} onClick={() => goToLazadaBrandPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) <= 1} onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)} onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)} onClick={() => goToLazadaBrandPage(lazadaBrands?.last_page ?? 1)}><LastPageIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" disabled={(lazadaBrands?.current_page ?? 1) <= 1} onClick={() => goToLazadaBrandPage(1)}>
+                                        <FirstPageIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(lazadaBrands?.current_page ?? 1) <= 1}
+                                        onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) - 1)}
+                                    >
+                                        <ChevronLeftIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)}
+                                        onClick={() => goToLazadaBrandPage((lazadaBrands?.current_page ?? 1) + 1)}
+                                    >
+                                        <ChevronRightIcon fontSize="small" />
+                                    </IconButton>
+                                    <IconButton
+                                        size="small"
+                                        disabled={(lazadaBrands?.current_page ?? 1) >= (lazadaBrands?.last_page ?? 1)}
+                                        onClick={() => goToLazadaBrandPage(lazadaBrands?.last_page ?? 1)}
+                                    >
+                                        <LastPageIcon fontSize="small" />
+                                    </IconButton>
                                 </Stack>
                             </Stack>
                         </Stack>
@@ -956,13 +1023,17 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                     <>
                         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
                             <Typography variant="h6" fontWeight={700}>
-                                {selectedCategory ? t('lazadaAttributesForCategory', { name: selectedCategory.name }) : t('lazadaAttributesSectionTitle')}
+                                {selectedCategory
+                                    ? t('lazadaAttributesForCategory', { name: selectedCategory.name })
+                                    : t('lazadaAttributesSectionTitle')}
                             </Typography>
 
                             {selectedCategory && (
                                 <Stack direction="row" spacing={1.5} alignItems="center">
                                     {lazadaAttributeSyncMessage && (
-                                        <Typography variant="caption" color="text.secondary">{lazadaAttributeSyncMessage}</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {lazadaAttributeSyncMessage}
+                                        </Typography>
                                     )}
                                     <Button
                                         size="small"

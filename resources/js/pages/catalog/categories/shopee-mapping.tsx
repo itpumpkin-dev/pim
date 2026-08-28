@@ -1,14 +1,21 @@
+import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { xsrfToken } from '@/lib/csrf';
+import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CloseIcon from '@mui/icons-material/Close';
+import FirstPageIcon from '@mui/icons-material/FirstPage';
+import LastPageIcon from '@mui/icons-material/LastPage';
+import SearchIcon from '@mui/icons-material/Search';
+import SyncIcon from '@mui/icons-material/Sync';
 import {
     Box,
     Button,
@@ -28,13 +35,6 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
-import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
-import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
-import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
-import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 
 type ShopeeFilter = 'all' | 'leaf' | 'parent' | 'flagged';
 
@@ -630,7 +630,11 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
 
                         {assigningFor === row.id ? (
                             <Box sx={{ maxWidth: 360 }}>
-                                <CategoryPicker value={null} onChange={(val) => val && stageAssign(row, val)} placeholder={t('searchPimCategoryPlaceholder')} />
+                                <CategoryPicker
+                                    value={null}
+                                    onChange={(val) => val && stageAssign(row, val)}
+                                    placeholder={t('searchPimCategoryPlaceholder')}
+                                />
                             </Box>
                         ) : (
                             <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
@@ -787,7 +791,10 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                         >
                             {t('marketplaceSyncTitle')}
                         </Button>
-                        <Typography variant="h4" fontWeight={700}>{t('shopeeMappingTitle')}</Typography><Divider sx={{ my: 2 }} />
+                        <Typography variant="h4" fontWeight={700}>
+                            {t('shopeeMappingTitle')}
+                        </Typography>
+                        <Divider sx={{ my: 2 }} />
                         <Typography color="text.secondary">
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
@@ -811,8 +818,9 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
                             sx={solidActionSx}
                         >
-                        {t('saveChanges')}{pendingCount > 0 ? ` (${pendingCount})` : ''}
-                    </Button>
+                            {t('saveChanges')}
+                            {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                        </Button>
                     </Stack>
                 </Stack>
 
@@ -832,7 +840,13 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                         <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
                             <Typography
                                 variant="caption"
-                                sx={{ color: FIORI.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block' }}
+                                sx={{
+                                    color: FIORI.textSecondary,
+                                    fontWeight: 600,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    display: 'block',
+                                }}
                             >
                                 {tile.label}
                             </Typography>
@@ -890,24 +904,41 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                             <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
                         </ToggleButtonGroup>
 
-                        <Select value={perPage} onChange={(e) => handlePerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                        <Select
+                            value={perPage}
+                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                            size="small"
+                            sx={{ minWidth: 60, height: 36 }}
+                        >
                             <MenuItem value={10}>10</MenuItem>
                             <MenuItem value={25}>25</MenuItem>
                             <MenuItem value={50}>50</MenuItem>
                             <MenuItem value={100}>100</MenuItem>
                         </Select>
-                        <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('perPage')}
+                        </Typography>
 
                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                             <Typography variant="body2">{currentPage}</Typography>
                         </Paper>
-                        <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage })}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {tGrid('pageOf', { lastPage })}
+                        </Typography>
 
                         <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}><LastPageIcon fontSize="small" /></IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
+                                <FirstPageIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
+                                <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
+                                <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
+                                <LastPageIcon fontSize="small" />
+                            </IconButton>
                         </Stack>
                     </Stack>
                 </Stack>
@@ -959,7 +990,13 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                             </Paper>
                         ) : (
                             <>
-                                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+                                <Stack
+                                    direction={{ xs: 'column', md: 'row' }}
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                    spacing={2}
+                                    sx={{ mb: 2 }}
+                                >
                                     <TextField
                                         value={brandSearch}
                                         onChange={(event) => setBrandSearch(event.target.value)}
@@ -978,24 +1015,53 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                                     <Stack direction="row" alignItems="center" spacing={1.5}>
                                         {loadingBrands && <CircularProgress size={18} />}
 
-                                        <Select value={brandPerPage} onChange={(e) => handleBrandPerPageChange(Number(e.target.value))} size="small" sx={{ minWidth: 60, height: 36 }}>
+                                        <Select
+                                            value={brandPerPage}
+                                            onChange={(e) => handleBrandPerPageChange(Number(e.target.value))}
+                                            size="small"
+                                            sx={{ minWidth: 60, height: 36 }}
+                                        >
                                             <MenuItem value={10}>10</MenuItem>
                                             <MenuItem value={25}>25</MenuItem>
                                             <MenuItem value={50}>50</MenuItem>
                                             <MenuItem value={100}>100</MenuItem>
                                         </Select>
-                                        <Typography variant="body2" color="text.secondary">{tGrid('perPage')}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {tGrid('perPage')}
+                                        </Typography>
 
                                         <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
                                             <Typography variant="body2">{brandsMeta?.currentPage ?? 1}</Typography>
                                         </Paper>
-                                        <Typography variant="body2" color="text.secondary">{tGrid('pageOf', { lastPage: brandsMeta?.lastPage ?? 1 })}</Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {tGrid('pageOf', { lastPage: brandsMeta?.lastPage ?? 1 })}
+                                        </Typography>
 
                                         <Stack direction="row" spacing={0.2}>
-                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToBrandPage(1)}><FirstPageIcon fontSize="small" /></IconButton>
-                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) - 1)}><ChevronLeftIcon fontSize="small" /></IconButton>
-                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)} onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) + 1)}><ChevronRightIcon fontSize="small" /></IconButton>
-                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)} onClick={() => goToBrandPage(brandsMeta?.lastPage ?? 1)}><LastPageIcon fontSize="small" /></IconButton>
+                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToBrandPage(1)}>
+                                                <FirstPageIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                disabled={(brandsMeta?.currentPage ?? 1) <= 1}
+                                                onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) - 1)}
+                                            >
+                                                <ChevronLeftIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
+                                                onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) + 1)}
+                                            >
+                                                <ChevronRightIcon fontSize="small" />
+                                            </IconButton>
+                                            <IconButton
+                                                size="small"
+                                                disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
+                                                onClick={() => goToBrandPage(brandsMeta?.lastPage ?? 1)}
+                                            >
+                                                <LastPageIcon fontSize="small" />
+                                            </IconButton>
                                         </Stack>
                                     </Stack>
                                 </Stack>
