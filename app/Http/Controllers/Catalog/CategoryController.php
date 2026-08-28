@@ -153,14 +153,14 @@ class CategoryController extends Controller
         // เรียงตามคอลัมน์ fallback แบบดิบ (ดูคอมเมนต์ `$nameFilter` ด้านบน)
         // ไม่ใช่ label ที่แปลแล้ว เป็นข้อจำกัดเดียวกับที่ช่องค้นหาแบบพิมพ์อิสระของ
         // คอลัมน์นี้ยอมรับอยู่แล้ว จนกว่าจะมีการเรียงตาม locale จริงๆ
-        $sortableColumns = ['name', 'description', 'slug', 'products_count'];
+        $sortableColumns = ['code', 'name', 'description', 'slug', 'products_count'];
         $sortField = $request->input('sort');
         $sortDir = strtolower((string) $request->input('dir')) === 'desc' ? 'desc' : 'asc';
 
         if ($sortField && in_array($sortField, $sortableColumns, true)) {
             $query->orderBy($sortField, $sortDir);
         } else {
-            $query->orderBy('id', 'desc');
+            $query->orderBy('code', 'asc');
         }
 
         $categories = $query->paginate($perPage)->withQueryString();
@@ -179,8 +179,8 @@ class CategoryController extends Controller
             'filters' => [
                 'search' => $request->input('search', ''),
                 'filters' => $originalFilters,
-                'sort' => $sortField ?? '',
-                'dir' => $sortField ? $sortDir : '',
+                'sort' => $sortField && in_array($sortField, $sortableColumns, true) ? $sortField : 'code',
+                'dir' => $sortField && in_array($sortField, $sortableColumns, true) ? $sortDir : 'asc',
             ],
             'filterColumns' => $filterColumns,
         ]);
@@ -398,7 +398,7 @@ class CategoryController extends Controller
             'categoryFields' => $categoryFields,
             'rootCategories' => Category::whereNull('parent_id')->where('id', '!=', $category->id)->orderBy('name')->get(['id', 'name']),
             // Direct children shown as a quick-jump list on the edit page.
-            'subcategories' => $category->children()->orderBy('name')->get(['id', 'name', 'is_active']),
+            'subcategories' => $category->children()->orderBy('code')->get(['id', 'code', 'name', 'is_active']),
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
         ]);
     }
