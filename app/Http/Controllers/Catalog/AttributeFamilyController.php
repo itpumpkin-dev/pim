@@ -85,7 +85,7 @@ class AttributeFamilyController extends Controller
 
     public function create(): Response
     {
-        $groups = AttributeGroup::select('id', 'code')->get();
+        $groups = AttributeGroup::select('id', 'code', 'name')->get();
         $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
 
         return Inertia::render('catalog/attribute-families/create', [
@@ -145,7 +145,7 @@ class AttributeFamilyController extends Controller
 
     public function edit(AttributeFamily $attributeFamily): Response
     {
-        $groups = AttributeGroup::select('id', 'code')->get();
+        $groups = AttributeGroup::select('id', 'code', 'name')->get();
         $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
 
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])

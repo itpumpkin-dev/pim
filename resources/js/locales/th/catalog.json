@@ -249,7 +249,7 @@
     "isUnique": "ไม่ซ้ำกัน",
     "configurationTitle": "การตั้งค่า",
     "valuePerLocale": "ค่าตามภาษา",
-    "aiTranslate": "แปลด้วย AI",
+    "aiTranslate": "แปลภาษาอัตโนมัติ",
     "valuePerChannel": "ค่าตามช่องทาง",
     "isFilterable": "กรองได้",
     "saveAttribute": "บันทึกแอตทริบิวต์",

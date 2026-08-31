@@ -16,6 +16,7 @@ import {
     Alert,
     Box,
     Button,
+    Checkbox,
     CircularProgress,
     Collapse,
     Dialog,
@@ -105,7 +106,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     // ของคอลัมน์ Unassigned
     const [groupAttrSearch, setGroupAttrSearch] = useState('');
     const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-    const [selectedGroupId, setSelectedGroupId] = useState<number | string>('');
+    const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
     const [assignedGroups, setAssignedGroups] = useState<AssignedGroup[]>([]);
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>([]);
     const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
@@ -181,29 +182,36 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
     };
 
     const handleAssignGroup = () => {
-        if (!selectedGroupId) return;
+        if (selectedGroupIds.length === 0) return;
 
-        const groupObj = groups.find((g) => g.id === Number(selectedGroupId));
-        if (groupObj) {
-            const exists = assignedGroups.some((g) => g.id === groupObj.id);
-            if (!exists) {
-                setGroupsDirty(true);
-                setAssignedGroups((prev) => [
-                    ...prev,
-                    {
-                        id: groupObj.id,
-                        code: groupObj.code,
-                        name: groupObj.name || groupObj.code.charAt(0).toUpperCase() + groupObj.code.slice(1),
-                        attributes: [],
-                        expanded: true,
-                    },
-                ]);
-            }
+        const toAdd = selectedGroupIds
+            .map((id) => groups.find((g) => g.id === id))
+            .filter((g): g is AttributeGroup => Boolean(g))
+            .filter((g) => !assignedGroups.some((a) => a.id === g.id))
+            .map((g) => ({
+                id: g.id,
+                code: g.code,
+                name: g.name || g.code.charAt(0).toUpperCase() + g.code.slice(1),
+                attributes: [] as AttributeItem[],
+                expanded: true,
+            }));
+
+        if (toAdd.length > 0) {
+            setGroupsDirty(true);
+            setAssignedGroups((prev) => [...prev, ...toAdd]);
         }
 
-        setSelectedGroupId('');
+        setSelectedGroupIds([]);
         setAssignDialogOpen(false);
     };
+
+    const closeAssignDialog = () => {
+        setSelectedGroupIds([]);
+        setAssignDialogOpen(false);
+    };
+
+    // เฉพาะกลุ่มที่ยังไม่ถูกกำหนดให้ family นี้ — กันไม่ให้เลือกซ้ำจากใน dropdown
+    const assignableGroups = groups.filter((g) => !assignedGroups.some((a) => a.id === g.id));
 
     // ฟังก์ชันนี้จัดการทั้งกรณี "กำหนดเข้ากลุ่ม" (ไม่ส่ง targetIndex มา -> จะเพิ่มต่อท้ายให้)
     // และกรณี "จัดเรียงใหม่ภายใน/เข้าไปในกลุ่มที่ตำแหน่งที่ระบุ" (ลากไปวางทับ
@@ -680,7 +688,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
             {/* ไดอะล็อกสำหรับกำหนดกลุ่มแอตทริบิวต์ */}
             <Dialog
                 open={assignDialogOpen}
-                onClose={() => setAssignDialogOpen(false)}
+                onClose={closeAssignDialog}
                 fullWidth
                 maxWidth="xs"
                 PaperProps={{ sx: { borderRadius: 2 } }}
@@ -689,7 +697,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                     <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
                         Assign Attribute Group
                     </Typography>
-                    <IconButton onClick={() => setAssignDialogOpen(false)} size="small">
+                    <IconButton onClick={closeAssignDialog} size="small">
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
@@ -699,28 +707,35 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                     </Typography>
                     <FormControl fullWidth size="small">
                         <Select
+                            multiple
                             displayEmpty
-                            value={selectedGroupId}
-                            onChange={(e) => setSelectedGroupId(e.target.value)}
+                            value={selectedGroupIds}
+                            onChange={(e) =>
+                                setSelectedGroupIds(
+                                    (typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value).map(Number),
+                                )
+                            }
                             renderValue={(selected) => {
-                                if (!selected) {
+                                if (selected.length === 0) {
                                     return <Typography color="text.secondary">Select option</Typography>;
                                 }
-                                const g = groups.find((item) => item.id === Number(selected));
-                                return g ? (g.name || g.code) : String(selected);
+                                return selected
+                                    .map((id) => {
+                                        const g = groups.find((item) => item.id === id);
+                                        return g ? g.name || g.code : String(id);
+                                    })
+                                    .join(', ');
                             }}
                         >
-                            <MenuItem value="" disabled>
-                                Select option
-                            </MenuItem>
-                            {groups.map((grp) => (
+                            {assignableGroups.map((grp) => (
                                 <MenuItem key={grp.id} value={grp.id}>
+                                    <Checkbox size="small" checked={selectedGroupIds.includes(grp.id)} sx={{ py: 0, mr: 1 }} />
                                     {grp.name || grp.code}
                                 </MenuItem>
                             ))}
-                            {groups.length === 0 && (
+                            {assignableGroups.length === 0 && (
                                 <MenuItem value="" disabled>
-                                    No attribute groups available
+                                    {groups.length === 0 ? 'No attribute groups available' : 'All groups already assigned'}
                                 </MenuItem>
                             )}
                         </Select>
@@ -730,7 +745,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                     <Button
                         variant="contained"
                         onClick={handleAssignGroup}
-                        disabled={!selectedGroupId}
+                        disabled={selectedGroupIds.length === 0}
                         sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                     >
                         Assign Attribute Group
