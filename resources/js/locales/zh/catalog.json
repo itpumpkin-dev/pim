@@ -86,6 +86,7 @@
     "attrTypeText": "文本",
     "attrTypeTextarea": "文本区域",
     "attrTypePrice": "价格",
+    "attrTypeNumber": "数字",
     "attrTypeBoolean": "布尔",
     "attrTypeSelect": "选择",
     "attrTypeMultiselect": "多选择",

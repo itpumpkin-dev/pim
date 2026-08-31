@@ -36,6 +36,7 @@ interface EditableOption {
     id: number;
     code: string;
     translations: Record<string, string>;
+    adminLabel: string;
     swatchText: string;
     swatchImage: File | null;
     existingSwatchValue: string | null;
@@ -45,6 +46,7 @@ const toEditableOption = (option: AttributeOptionItem, swatchType: string): Edit
     id: option.id,
     code: option.code,
     translations: option.translations ?? {},
+    adminLabel: option.admin_label ?? '',
     swatchText: swatchType === 'color' ? (option.swatch_value ?? '') : '',
     swatchImage: null,
     existingSwatchValue: option.swatch_value,
@@ -199,6 +201,7 @@ export function AttributeOptionsPanel({
 
         return rows.filter((row) => {
             if (row.code.toLowerCase().includes(term)) return true;
+            if (row.adminLabel.toLowerCase().includes(term)) return true;
             return Object.values(row.translations).some((label) => label.toLowerCase().includes(term));
         });
     }, [rows, search]);
@@ -255,7 +258,16 @@ export function AttributeOptionsPanel({
                     <TextField
                         size="small"
                         fullWidth
-                        value={activeLocaleId !== undefined ? (row.option.translations[String(activeLocaleId)] ?? '') : ''}
+                        // ไม่มีแถว translation สำหรับ locale นี้ ก็ fall back ไปที่ admin_label
+                        // แบบเดียวกับ accessor AttributeOption::adminLabel() ที่ที่อื่นทั้งหมดใช้
+                        // (เช่น option ของ pbaseunit ถูก seed ใส่ไว้แค่ที่คอลัมน์ admin_label
+                        // ไม่มี translation row) fallback อยู่แค่ในค่าที่แสดง ไม่ได้เข้าไปใน state
+                        // เพราะงั้นการสลับภาษาแล้วกด Save all จะไม่เขียนค่า fallback ทับภาษาอื่น
+                        value={
+                            activeLocaleId !== undefined
+                                ? (row.option.translations[String(activeLocaleId)] ?? row.option.adminLabel ?? '')
+                                : ''
+                        }
                         onChange={(e) =>
                             activeLocaleId !== undefined &&
                             updateRow(row.option.id, {

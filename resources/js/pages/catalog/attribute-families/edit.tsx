@@ -132,7 +132,11 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
 
     useEffect(() => {
         // สร้าง assignedGroups และ unassignedAttrs จากข้อมูลจริงใน DB (familyAttributes กับ attributes props)
-        const groupsMap: Record<number, AssignedGroup> = {};
+        // familyAttributes มาจาก backend เรียงตาม sort_order แล้ว — ต้องใช้ Map เพื่อ
+        // รักษาลำดับ "กลุ่มที่เจอก่อน" ไว้ตามนั้น ถ้าใช้ object ธรรมดา Object.values()
+        // จะเรียง key ที่เป็นตัวเลข (group id) ใหม่จากน้อยไปมากเสมอ ทำให้การจัดเรียง
+        // กลุ่มที่ผู้ใช้บันทึกไว้หายไปทุกครั้งที่กลับเข้าหน้านี้
+        const groupsMap = new Map<number, AssignedGroup>();
         const assignedAttrIds = new Set<number>();
 
         familyAttributes.forEach((item) => {
@@ -140,23 +144,23 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
             const grpCode = item.attribute_group?.code || `Group ${grpId}`;
             const grpName = item.attribute_group?.name || grpCode.charAt(0).toUpperCase() + grpCode.slice(1);
 
-            if (!groupsMap[grpId]) {
-                groupsMap[grpId] = {
+            if (!groupsMap.has(grpId)) {
+                groupsMap.set(grpId, {
                     id: grpId,
                     code: grpCode,
                     name: grpName,
                     attributes: [],
                     expanded: true,
-                };
+                });
             }
 
             if (item.attribute) {
-                groupsMap[grpId].attributes.push(item.attribute);
+                groupsMap.get(grpId)!.attributes.push(item.attribute);
                 assignedAttrIds.add(item.attribute.id);
             }
         });
 
-        setAssignedGroups(Object.values(groupsMap));
+        setAssignedGroups(Array.from(groupsMap.values()));
         setUnassignedAttrs(attributes.filter((a) => !assignedAttrIds.has(a.id)));
     }, [familyAttributes, attributes]);
 

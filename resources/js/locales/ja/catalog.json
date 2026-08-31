@@ -86,6 +86,7 @@
     "attrTypeText": "テキスト",
     "attrTypeTextarea": "テキストエリア",
     "attrTypePrice": "価格",
+    "attrTypeNumber": "数値",
     "attrTypeBoolean": "布尔值",
     "attrTypeSelect": "選択",
     "attrTypeMultiselect": "多选",

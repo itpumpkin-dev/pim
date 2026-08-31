@@ -70,6 +70,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         { value: 'text', label: t('attrTypeText') },
         { value: 'textarea', label: t('attrTypeTextarea') },
         { value: 'price', label: t('attrTypePrice') },
+        { value: 'number', label: t('attrTypeNumber') },
         { value: 'boolean', label: t('attrTypeBoolean') },
         { value: 'select', label: t('attrTypeSelect') },
         { value: 'multiselect', label: t('attrTypeMultiselect') },

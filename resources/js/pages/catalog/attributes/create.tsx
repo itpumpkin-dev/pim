@@ -15,6 +15,7 @@ const attributeTypeKeys: Record<string, string> = {
     text: 'attrTypeText',
     textarea: 'attrTypeTextarea',
     price: 'attrTypePrice',
+    number: 'attrTypeNumber',
     boolean: 'attrTypeBoolean',
     select: 'attrTypeSelect',
     multiselect: 'attrTypeMultiselect',

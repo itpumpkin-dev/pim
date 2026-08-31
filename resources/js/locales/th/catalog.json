@@ -221,6 +221,7 @@
     "attrTypeText": "ข้อความ",
     "attrTypeTextarea": "ข้อความหลายบรรทัด",
     "attrTypePrice": "ราคา",
+    "attrTypeNumber": "ตัวเลข",
     "attrTypeBoolean": "บูลีน",
     "attrTypeSelect": "ตัวเลือก",
     "attrTypeMultiselect": "ตัวเลือกหลายค่า",

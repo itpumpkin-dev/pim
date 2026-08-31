@@ -1,8 +1,8 @@
 import { TimelinePanel } from '@/components/timeline-panel';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
 import ImageIcon from '@mui/icons-material/Image';
 import {
@@ -161,9 +161,23 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
     const { t } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
 
+    // Anyone can open their own account here (it's the "Settings" page from the
+    // user menu), but the user list at /system/user is gated by
+    // `users.list_users`. Without it, sending them there — via the breadcrumb or
+    // Cancel — lands on a 403 page, so fall back to the dashboard (or home, if
+    // they can't see that either).
+    const { auth } = usePage<SharedData>().props;
+    const viewerPermissions = auth.permissions ?? [];
+    const canListUsers = viewerPermissions.includes('users.list_users');
+    const cancelHref = canListUsers
+        ? '/system/user'
+        : viewerPermissions.includes('dashboards.list_dashboards')
+          ? '/dashboard'
+          : '/';
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('system'), href: '#' },
-        { title: tNav('users'), href: '/system/user' },
+        { title: tNav('users'), href: canListUsers ? '/system/user' : '#' },
     ];
 
     const tabLabels: Record<TabKey, string> = {
@@ -290,7 +304,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
         performSubmit();
     };
 
-    const cancel = () => router.visit('/system/user');
+    const cancel = () => router.visit(cancelHref);
 
     const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

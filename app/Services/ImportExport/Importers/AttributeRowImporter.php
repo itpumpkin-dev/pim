@@ -13,7 +13,7 @@ class AttributeRowImporter implements RowImporterInterface
     use HasStaticColumnLabels;
     use WritesLocalizedTranslation;
 
-    private const TYPES = ['text', 'textarea', 'price', 'boolean', 'select', 'multiselect', 'datetime', 'date', 'image', 'gallery', 'file', 'checkbox'];
+    private const TYPES = ['text', 'textarea', 'price', 'number', 'boolean', 'select', 'multiselect', 'datetime', 'date', 'image', 'gallery', 'file', 'checkbox'];
 
     public function columns(): array
     {

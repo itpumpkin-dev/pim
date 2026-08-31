@@ -225,6 +225,7 @@
     "attrTypeText": "Text",
     "attrTypeTextarea": "Textarea",
     "attrTypePrice": "Price",
+    "attrTypeNumber": "Number",
     "attrTypeBoolean": "Boolean",
     "attrTypeSelect": "Select",
     "attrTypeMultiselect": "Multiselect",

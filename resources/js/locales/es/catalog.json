@@ -86,6 +86,7 @@
     "attrTypeText": "Texto",
     "attrTypeTextarea": "Texto en múltiples líneas",
     "attrTypePrice": "Precio",
+    "attrTypeNumber": "Número",
     "attrTypeBoolean": "Booleano",
     "attrTypeSelect": "Seleccionar",
     "attrTypeMultiselect": "Multiseleccionar",

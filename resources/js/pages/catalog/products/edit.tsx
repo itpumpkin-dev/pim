@@ -2886,6 +2886,28 @@ function RenderAttributeInput({
         );
     }
 
+    if (attr.type === 'number') {
+        return (
+            <Box>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600} color="#334155">
+                        {label} {attr.is_required && '*'}
+                    </Typography>
+                    {renderChips()}
+                </Stack>
+                <TextField
+                    size="small"
+                    fullWidth
+                    type="number"
+                    disabled={isReadOnly}
+                    value={stringValue}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={`Enter ${label.toLowerCase()}`}
+                />
+            </Box>
+        );
+    }
+
     if (attr.type === 'boolean') {
         return (
             <Box>
