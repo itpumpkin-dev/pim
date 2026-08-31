@@ -29,6 +29,10 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     // "Groups and Roles" tab has its own Save). Strictly a manager action, so —
     // unlike the self-service edit/update routes above — it is permission-gated.
     Route::put('user/{user}/access', [UserController::class, 'updateAccess'])->name('user.updateAccess')->middleware('permission:users,edit_users');
+    // From the edit form's "reports to" warning: mirror {user}'s groups and
+    // directly-assigned roles onto their selected manager so the manager can
+    // do at least as much.
+    Route::put('user/{user}/copy-access-to-manager', [UserController::class, 'copyAccessToManager'])->name('user.copyAccessToManager')->middleware('permission:users,edit_users');
     Route::delete('user/{user}', [UserController::class, 'destroy'])->name('user.destroy')->middleware('permission:users,delete_users');
 
     Route::get('userGroup', [UserGroupController::class, 'index'])->name('userGroup.index')->middleware('permission:user_groups,list_user_groups');

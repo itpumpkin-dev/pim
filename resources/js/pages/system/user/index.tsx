@@ -59,9 +59,10 @@ interface UserIndexProps {
     };
     departments: DepartmentOption[];
     jobPositions: JobPositionOption[];
+    managerOptions: { id: number; name: string }[];
 }
 
-export default function UserIndex({ gridConfig, gridData, filters, departments, jobPositions }: UserIndexProps) {
+export default function UserIndex({ gridConfig, gridData, filters, departments, jobPositions, managerOptions }: UserIndexProps) {
     const { t } = useTranslation('grid');
     const { t: tSystem } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
@@ -198,6 +199,7 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                     onClose={() => setCreateOpen(false)}
                     departments={departments}
                     jobPositions={jobPositions}
+                    managerOptions={managerOptions}
                 />
 
                 <FioriResponsiveTable

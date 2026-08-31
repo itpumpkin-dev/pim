@@ -29,10 +29,11 @@ function useMainNavItems(): NavItem[] {
     return useMemo(
         () => [
             {
+                // Reachable by every signed-in user — the dashboard page
+                // itself hides whatever the viewer has no permission for.
                 title: t('dashboard'),
                 url: '/dashboard',
                 icon: DashboardIcon,
-                permission: 'dashboards.list_dashboards',
             },
             {
                 title: t('catalog'),

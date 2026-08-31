@@ -15,6 +15,11 @@ interface JobPositionOption {
     name: string;
 }
 
+interface ManagerOption {
+    id: number;
+    name: string;
+}
+
 interface CreateUserForm {
     username: string;
     employee_id: string;
@@ -25,6 +30,7 @@ interface CreateUserForm {
     email: string;
     department_id: number | '';
     job_position_id: number | '';
+    manager_id: number | '';
     [key: string]: string | number;
 }
 
@@ -33,6 +39,7 @@ interface CreateUserDialogProps {
     onClose: () => void;
     departments?: DepartmentOption[];
     jobPositions?: JobPositionOption[];
+    managerOptions?: ManagerOption[];
 }
 
 const fields: { key: keyof CreateUserForm; label: string; type?: string }[] = [
@@ -45,7 +52,7 @@ const fields: { key: keyof CreateUserForm; label: string; type?: string }[] = [
     { key: 'email', label: 'Email', type: 'email' },
 ];
 
-export default function CreateUserDialog({ open, onClose, departments = [], jobPositions = [] }: CreateUserDialogProps) {
+export default function CreateUserDialog({ open, onClose, departments = [], jobPositions = [], managerOptions = [] }: CreateUserDialogProps) {
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm<CreateUserForm>({
         username: '',
         employee_id: '',
@@ -56,6 +63,7 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
         email: '',
         department_id: '',
         job_position_id: '',
+        manager_id: '',
     });
 
     const handleClose = () => {
@@ -159,6 +167,31 @@ export default function CreateUserDialog({ open, onClose, departments = [], jobP
                             {jobPositions.map((jobPosition) => (
                                 <MenuItem key={jobPosition.id} value={jobPosition.id}>
                                     {jobPosition.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    </Box>
+
+                    <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
+                            Reports to
+                        </Typography>
+                        <TextField
+                            select
+                            fullWidth
+                            size="small"
+                            value={data.manager_id}
+                            onChange={(e) => {
+                                setData('manager_id', e.target.value === '' ? '' : Number(e.target.value));
+                                clearErrors('manager_id');
+                            }}
+                            error={Boolean(errors.manager_id)}
+                            helperText={errors.manager_id}
+                        >
+                            <MenuItem value="">—</MenuItem>
+                            {managerOptions.map((option) => (
+                                <MenuItem key={option.id} value={option.id}>
+                                    {option.name}
                                 </MenuItem>
                             ))}
                         </TextField>

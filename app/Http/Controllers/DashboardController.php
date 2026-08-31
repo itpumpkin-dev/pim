@@ -90,9 +90,8 @@ class DashboardController extends Controller
         $channelStat = $canChannels ? $this->cachedStat('channel', Channel::query()) : self::EMPTY_STAT;
 
         // Currencies has no dedicated management page/permission yet, so the
-        // count is informational only and visible to anyone who can reach
-        // the dashboard (same as the "dashboards.list_dashboards" gate on
-        // the route itself).
+        // count is informational only and visible to any signed-in user who
+        // opens the dashboard (the route carries no permission gate).
         $currencyStat = $this->cachedStat('currency', Currency::query());
 
         $failedJobsCount = $canJobTrackers ? $this->cacheRemember('failedJobs', fn () => JobTracker::where('status', 'failed')->count()) : 0;

@@ -32,6 +32,7 @@ class StoreUserRequest extends FormRequest
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
+            'manager_id' => ['nullable', 'integer', 'exists:users,id'],
         ];
     }
 }

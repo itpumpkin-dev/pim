@@ -6,6 +6,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
 import ImageIcon from '@mui/icons-material/Image';
 import {
+    Alert,
     Autocomplete,
     Box,
     Button,
@@ -87,6 +88,7 @@ interface EditUserProps {
         email: string;
         department_id: number | null;
         job_position_id: number | null;
+        manager_id: number | null;
         enabled: boolean;
         avatar_url: string | null;
         ui_locale_id: number | null;
@@ -104,6 +106,9 @@ interface EditUserProps {
     timezones: string[];
     departments: DepartmentOption[];
     jobPositions: JobPositionOption[];
+    managerOptions: { id: number; name: string }[];
+    /** effective "resource.action" list per candidate manager, for the excess-permission warning */
+    managerPermissionsById: Record<number, string[]>;
     canManageAccess: boolean;
     permissions: UserPermissions;
 }
@@ -116,6 +121,7 @@ interface UserForm {
     email: string;
     department_id: number | '';
     job_position_id: number | '';
+    manager_id: number | '';
     enabled: boolean;
     avatar: File | null;
     password: string;
@@ -155,23 +161,31 @@ function localeLabel(code: string) {
     }
 }
 
-export default function UserEdit({ user, groups, roles, localeOptions, timezones, departments, jobPositions, canManageAccess, permissions }: EditUserProps) {
+export default function UserEdit({
+    user,
+    groups,
+    roles,
+    localeOptions,
+    timezones,
+    departments,
+    jobPositions,
+    managerOptions,
+    managerPermissionsById,
+    canManageAccess,
+    permissions,
+}: EditUserProps) {
     const { t } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
 
     // Anyone can open their own account here (it's the "Settings" page from the
     // user menu), but the user list at /system/user is gated by
     // `users.list_users`. Without it, sending them there — via the breadcrumb or
-    // Cancel — lands on a 403 page, so fall back to the dashboard (or home, if
-    // they can't see that either).
+    // Cancel — lands on a 403 page, so fall back to the dashboard, which every
+    // signed-in user can reach.
     const { auth } = usePage<SharedData>().props;
     const viewerPermissions = auth.permissions ?? [];
     const canListUsers = viewerPermissions.includes('users.list_users');
-    const cancelHref = canListUsers
-        ? '/system/user'
-        : viewerPermissions.includes('dashboards.list_dashboards')
-          ? '/dashboard'
-          : '/';
+    const cancelHref = canListUsers ? '/system/user' : '/dashboard';
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('system'), href: '#' },
@@ -271,6 +285,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
         email: user.email,
         department_id: user.department_id ?? '',
         job_position_id: user.job_position_id ?? '',
+        manager_id: user.manager_id ?? '',
         enabled: user.enabled,
         avatar: null,
         password: '',
@@ -292,6 +307,38 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
     const update = (key: keyof UserForm, value: UserForm[keyof UserForm]) => {
         setData(key, value);
         clearErrors(key as string);
+    };
+
+    // Permissions this user has that the chosen manager doesn't — a heads-up
+    // that the reporting line puts someone under a manager with less access
+    // than their own report. Warning only; it never blocks saving.
+    const managerExcessPermissions = useMemo(() => {
+        if (data.manager_id === '') return [];
+        const managerPerms = new Set(managerPermissionsById[data.manager_id] ?? []);
+        return permissions.effective_permissions.filter((p) => !managerPerms.has(p));
+    }, [data.manager_id, managerPermissionsById, permissions.effective_permissions]);
+
+    const [copyingAccess, setCopyingAccess] = useState(false);
+
+    // "Give the manager these too": mirror this user's groups + directly-
+    // assigned roles onto the selected manager right away (separate PUT).
+    // preserveState keeps the form as-is; the refreshed managerPermissionsById
+    // prop makes the warning recompute.
+    const copyAccessToManager = () => {
+        if (data.manager_id === '') return;
+        const managerName = managerOptions.find((o) => o.id === data.manager_id)?.name ?? '';
+        if (!window.confirm(t('copyRolesToManagerConfirm', { name: managerName }))) return;
+
+        setCopyingAccess(true);
+        router.put(
+            route('system.user.copyAccessToManager', user.id),
+            { manager_id: data.manager_id },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setCopyingAccess(false),
+            },
+        );
     };
 
     const saveAccess = () => {
@@ -517,6 +564,60 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                             </Select>
                         </Box>
 
+                        {canManageAccess && (
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
+                                    {t('reportsTo')}
+                                </Typography>
+                                <Select
+                                    fullWidth
+                                    size="small"
+                                    displayEmpty
+                                    value={data.manager_id}
+                                    onChange={(e) => update('manager_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                    error={Boolean(errors.manager_id)}
+                                >
+                                    <MenuItem value="">—</MenuItem>
+                                    {managerOptions.map((option) => (
+                                        <MenuItem key={option.id} value={option.id}>
+                                            {option.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                                {Boolean(errors.manager_id) && (
+                                    <Typography variant="caption" color="error">
+                                        {errors.manager_id}
+                                    </Typography>
+                                )}
+                                {managerExcessPermissions.length > 0 && (
+                                    <Alert severity="warning" sx={{ mt: 1 }}>
+                                        {t('managerExcessPermissionsWarning', { count: managerExcessPermissions.length })}
+                                        <Box component="ul" sx={{ m: '4px 0 0', pl: 2.5 }}>
+                                            {managerExcessPermissions.slice(0, 8).map((p) => (
+                                                <li key={p}>{p}</li>
+                                            ))}
+                                            {managerExcessPermissions.length > 8 && (
+                                                <li>
+                                                    {t('andNMore', { count: managerExcessPermissions.length - 8 })}
+                                                </li>
+                                            )}
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="warning"
+                                            disabled={copyingAccess}
+                                            startIcon={copyingAccess ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                            onClick={copyAccessToManager}
+                                            sx={{ mt: 1 }}
+                                        >
+                                            {t('copyRolesToManager')}
+                                        </Button>
+                                    </Alert>
+                                )}
+                            </Box>
+                        )}
+
                         <Box
                             onClick={() => fileInputRef.current?.click()}
                             sx={{
@@ -561,6 +662,9 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
 
                 {tab === 'groupsAndRoles' && canManageAccess && (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 500 }}>
+                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                            {t('groupsOrRolesHint')}
+                        </Typography>
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                 {t('userGroups')}
@@ -584,7 +688,7 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
 
                         <Box>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                {t('rolesRequired')}
+                                {t('roles')}
                             </Typography>
                             <Autocomplete
                                 multiple

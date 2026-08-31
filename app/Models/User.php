@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
@@ -36,6 +37,7 @@ class User extends Authenticatable
         'avatar_path',
         'department_id',
         'job_position_id',
+        'manager_id',
         'enabled',
         'catalog_locale_id',
         'ui_locale_id',
@@ -140,6 +142,46 @@ class User extends Authenticatable
     public function jobPosition(): BelongsTo
     {
         return $this->belongsTo(JobPosition::class);
+    }
+
+    /** The user this user reports to (their manager / supervisor). */
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'manager_id');
+    }
+
+    /** Users who report directly to this user. */
+    public function subordinates(): HasMany
+    {
+        return $this->hasMany(self::class, 'manager_id');
+    }
+
+    /**
+     * IDs of every user below this one in the reporting tree (direct and
+     * indirect). Used to keep the manager picker from creating a loop.
+     *
+     * @return array<int, int>
+     */
+    public function descendantIds(): array
+    {
+        $ids = [];
+        $frontier = [$this->id];
+
+        while ($frontier !== []) {
+            $children = self::whereIn('manager_id', $frontier)
+                ->whereNotIn('id', $ids)
+                ->pluck('id')
+                ->all();
+
+            if ($children === []) {
+                break;
+            }
+
+            $ids = array_merge($ids, $children);
+            $frontier = $children;
+        }
+
+        return $ids;
     }
 
     public function roles(): BelongsToMany

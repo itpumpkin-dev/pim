@@ -54,6 +54,43 @@ class PermissionCatalog
             }
         }
 
+        $this->addControllerEnforcedPermissions($modules);
+
         return $modules;
+    }
+
+    /**
+     * Permissions that are enforced inside a controller rather than by route
+     * `permission:` middleware, so the route scan above can't discover them.
+     *
+     * `users.edit_users`: the user edit routes deliberately carry no
+     * middleware so a user can always reach their own account (Settings);
+     * UserController gates editing *someone else's* account on this
+     * permission. Declared here so it still appears in the Roles picker and
+     * gets granted to Administrator by `permissions:sync`.
+     */
+    private function addControllerEnforcedPermissions(array &$modules): void
+    {
+        $extra = [
+            'system' => [
+                'users' => ['edit_users'],
+            ],
+        ];
+
+        foreach ($extra as $module => $resources) {
+            $modules[$module]['label'] ??= Str::headline($module);
+            $modules[$module]['resources'] ??= [];
+
+            foreach ($resources as $resource => $actions) {
+                $modules[$module]['resources'][$resource]['label'] ??= Str::headline($resource);
+                $modules[$module]['resources'][$resource]['actions'] ??= [];
+
+                foreach ($actions as $action) {
+                    $modules[$module]['resources'][$resource]['actions'][$action] ??= [
+                        'label' => Str::headline($action),
+                    ];
+                }
+            }
+        }
     }
 }

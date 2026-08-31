@@ -10,7 +10,12 @@ Route::get('/', [StorefrontController::class, 'home'])->name('home');
 Route::put('locale', [LocaleController::class, 'update'])->name('locale.update');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('permission:dashboards,list_dashboards');
+    // No permission gate: every signed-in user can open the dashboard (it's
+    // the post-login landing page). DashboardController::index() resolves
+    // each stat/section against the viewer's permissions on its own, so a
+    // user with little or no access just sees a near-empty dashboard rather
+    // than a 403.
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 });
 
 // Public product detail page. Anonymous visitors always see the full mapped

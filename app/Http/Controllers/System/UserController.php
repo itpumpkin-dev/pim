@@ -35,6 +35,9 @@ class UserController extends Controller
             'filters' => $request->only(['search', 'sort', 'dir']),
             'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
+            'managerOptions' => User::orderBy('first_name')->orderBy('last_name')
+                ->get(['id', 'first_name', 'last_name', 'username'])
+                ->map(fn (User $u) => ['id' => $u->id, 'name' => trim("{$u->first_name} {$u->last_name}") ?: $u->username]),
         ]);
     }
 
@@ -152,6 +155,7 @@ class UserController extends Controller
             'email' => $request->email,
             'department_id' => $request->department_id,
             'job_position_id' => $request->job_position_id,
+            'manager_id' => $request->manager_id,
         ]);
 
         return to_route('system.user.index')->with('success', 'User created successfully.');
@@ -174,6 +178,7 @@ class UserController extends Controller
                 'email' => $user->email,
                 'department_id' => $user->department_id,
                 'job_position_id' => $user->job_position_id,
+                'manager_id' => $user->manager_id,
                 'enabled' => $user->enabled,
                 'avatar_url' => $user->avatar_url,
                 'ui_locale_id' => $user->ui_locale_id,
@@ -199,7 +204,42 @@ class UserController extends Controller
             'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'canManageAccess' => $request->user()->hasPermission('users', 'edit_users'),
             'permissions' => $this->permissionsPayload($user),
+            ...$this->managerPickerProps($user),
         ]);
+    }
+
+    /**
+     * Data for the "reports to" picker on the edit form: every user that
+     * could be this one's manager (everyone except themselves and anyone
+     * already below them — that would loop), each with the flattened list of
+     * permissions they hold. The form uses the latter to warn when the user
+     * being edited can do things their chosen manager can't.
+     *
+     * @return array{managerOptions: \Illuminate\Support\Collection, managerPermissionsById: array<int, array<int, string>>}
+     */
+    private function managerPickerProps(User $user): array
+    {
+        $excludedIds = array_merge([$user->id], $user->descendantIds());
+
+        // `permissions_version` must be loaded: getAllPermissions() keys its
+        // forever-cache by it, so selecting without it caches every
+        // candidate's permissions under a versionless key that SessionInvalidator
+        // never busts — the excess-permission warning would then stay frozen
+        // even after the manager's roles change.
+        $candidates = User::whereNotIn('id', $excludedIds)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'username', 'permissions_version']);
+
+        return [
+            'managerOptions' => $candidates->map(fn (User $u) => [
+                'id' => $u->id,
+                'name' => trim("{$u->first_name} {$u->last_name}") ?: $u->username,
+            ])->values(),
+            'managerPermissionsById' => $candidates->mapWithKeys(
+                fn (User $u) => [$u->id => $u->getAllPermissions()],
+            )->all(),
+        ];
     }
 
     /**
@@ -314,7 +354,10 @@ class UserController extends Controller
 
         $fields = ['name_prefix', 'first_name', 'last_name', 'phone', 'email', 'department_id', 'job_position_id', 'ui_locale_id', 'timezone'];
         if ($canManageAccess) {
+            // The reporting line is org structure, not a personal detail —
+            // same gate as enabled/groups/roles.
             $fields[] = 'enabled';
+            $fields[] = 'manager_id';
         }
         $data = $request->safe()->only($fields);
 
@@ -366,10 +409,13 @@ class UserController extends Controller
     {
         abort_unless($request->user()->hasPermission('users', 'edit_users'), 403);
 
+        // Groups and roles are both optional — an account may be saved with
+        // neither (it just can't do anything until one is assigned; the
+        // dashboard is the only page such a user can reach).
         $validated = $request->validate([
             'groups' => ['array'],
             'groups.*' => ['integer', 'exists:user_groups,id'],
-            'roles' => ['required', 'array', 'min:1'],
+            'roles' => ['array'],
             'roles.*' => ['integer', 'exists:roles,id'],
         ]);
 
@@ -396,6 +442,53 @@ class UserController extends Controller
         }
 
         return back()->with('success', 'Groups and roles updated successfully.');
+    }
+
+    /**
+     * "Give the manager these too" from the edit form's reporting-line
+     * warning: mirrors this user's access onto their chosen manager (on top
+     * of whatever the manager already has) so the manager can do at least as
+     * much as the person reporting to them — same group memberships, plus the
+     * user's directly-assigned roles. Roles the user only holds through a
+     * group come along via the shared group membership, so they aren't also
+     * pinned directly.
+     */
+    public function copyAccessToManager(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->hasPermission('users', 'edit_users'), 403);
+
+        $validated = $request->validate([
+            'manager_id' => ['required', 'integer', 'exists:users,id', 'different:'.$user->id],
+        ]);
+
+        $manager = User::findOrFail($validated['manager_id']);
+
+        $subGroupIds = $user->groups()->pluck('user_groups.id')->all();
+        $subRoleIds = $user->roles()->pluck('roles.id')->all();
+
+        $oldGroupIds = $manager->groups()->pluck('user_groups.id')->all();
+        $manager->groups()->syncWithoutDetaching($subGroupIds);
+        $newGroupIds = $manager->groups()->pluck('user_groups.id')->all();
+        $groupsChanged = $this->idsChanged($oldGroupIds, $newGroupIds);
+
+        $oldRoleIds = $manager->roles()->pluck('roles.id')->all();
+        $manager->roles()->syncWithoutDetaching($subRoleIds);
+        $newRoleIds = $manager->roles()->pluck('roles.id')->all();
+        $rolesChanged = $this->idsChanged($oldRoleIds, $newRoleIds);
+
+        if (! $groupsChanged && ! $rolesChanged) {
+            return back()->with('success', 'The manager already had all of that access.');
+        }
+
+        if ($groupsChanged) {
+            AuditLog::record('groups_updated', $manager, ['group_ids' => $oldGroupIds], ['group_ids' => $newGroupIds]);
+        }
+        if ($rolesChanged) {
+            AuditLog::record('roles_updated', $manager, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
+        }
+        SessionInvalidator::usersExceptCurrentActor([$manager->id]);
+
+        return back()->with('success', "Copied {$user->name}'s groups and roles to {$manager->name}.");
     }
 
     /**

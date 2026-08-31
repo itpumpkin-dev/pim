@@ -33,6 +33,29 @@ class UpdateUserRequest extends FormRequest
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', Rule::unique(\App\Models\User::class)->ignore($user->id)],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'job_position_id' => ['nullable', 'integer', 'exists:job_positions,id'],
+            'manager_id' => [
+                'nullable',
+                'integer',
+                'exists:users,id',
+                // No self-reference and no loop: the chosen manager must not
+                // be this user, nor anyone who already reports (directly or
+                // indirectly) to this user.
+                function ($attribute, $value, $fail) use ($user) {
+                    if ($user === null || $value === null) {
+                        return;
+                    }
+
+                    if ((int) $value === (int) $user->id) {
+                        $fail('A user cannot report to themselves.');
+
+                        return;
+                    }
+
+                    if (in_array((int) $value, $user->descendantIds(), true)) {
+                        $fail('That user reports to this one — choosing them as manager would create a loop.');
+                    }
+                },
+            ],
             'enabled' => ['required', 'boolean'],
             'avatar' => ['nullable', 'image', 'max:2048'],
 
