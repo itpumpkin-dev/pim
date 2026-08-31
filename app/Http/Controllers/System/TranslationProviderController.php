@@ -75,7 +75,9 @@ class TranslationProviderController extends Controller
         $credentials = $this->requireCredentials($validated['type'], $validated['credentials'] ?? []);
 
         if ($validated['is_default'] ?? false) {
-            TranslationProvider::where('is_default', true)->update(['is_default' => false]);
+            // ปรับทีละแถวผ่าน model ให้ event `updated` ของ Auditable ทำงาน —
+            // การสลับ default ออกจาก provider เดิมจึงถูกบันทึกลง audit_logs
+            TranslationProvider::where('is_default', true)->get()->each->update(['is_default' => false]);
         }
 
         TranslationProvider::create([
@@ -127,9 +129,12 @@ class TranslationProviderController extends Controller
 
         DB::transaction(function () use ($validated, $credentials, $translationProvider) {
             if ($validated['is_default'] ?? false) {
+                // ปรับทีละแถวผ่าน model ให้ event `updated` ของ Auditable ทำงาน —
+                // การสลับ default ออกจาก provider เดิมจึงถูกบันทึกลง audit_logs
                 TranslationProvider::where('is_default', true)
                     ->where('id', '!=', $translationProvider->id)
-                    ->update(['is_default' => false]);
+                    ->get()
+                    ->each->update(['is_default' => false]);
             }
 
             $translationProvider->update([

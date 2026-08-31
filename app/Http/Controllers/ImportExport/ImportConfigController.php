@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ImportExport;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessImportJob;
 use App\Models\AttributeFamily;
+use App\Models\AuditLog;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Models\Locale;
@@ -165,6 +166,14 @@ class ImportConfigController extends Controller
         ]);
 
         ProcessImportJob::dispatch($tracker->id);
+
+        // งาน import แก้ข้อมูลจำนวนมากแบบ bulk (บางส่วนผ่าน upsert ที่ไม่ยิง
+        // model event) เลยบันทึกไว้ที่นี่ว่าใครสั่งรัน config ไหน ด้วยไฟล์อะไร
+        AuditLog::record('import_run', $importConfig, null, [
+            'job_tracker_id' => $tracker->id,
+            'type' => $importConfig->type,
+            'source_file_path' => $importConfig->source_file_path,
+        ]);
 
         return to_route('importExport.jobs.show', $tracker->id)->with('success', 'Import job queued.');
     }

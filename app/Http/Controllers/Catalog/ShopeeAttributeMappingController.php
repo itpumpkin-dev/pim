@@ -111,7 +111,10 @@ class ShopeeAttributeMappingController extends Controller
 
         foreach ($validated['mappings'] as $entry) {
             if (empty($entry['target_field'])) {
-                ShopeeAttributeMapping::where('attribute_id', $entry['attribute_id'])->delete();
+                // ลบทีละแถวผ่าน model ให้ event `deleted` ของ Auditable ทำงาน —
+                // `->where()->delete()` แบบ mass delete จะข้าม event ทำให้การ
+                // ยกเลิกการแมปไม่ถูกบันทึกลง audit_logs
+                ShopeeAttributeMapping::where('attribute_id', $entry['attribute_id'])->get()->each->delete();
                 continue;
             }
 

@@ -66,6 +66,11 @@ import {
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 
+// ระยะห่างจากขอบบนของพื้นที่ scroll ที่ section ของแต่ละ Attribute Group จะไปจอด
+// เมื่อคลิกแท็บ (scrollMarginTop ของ Paper) — ใช้ร่วมกับ scroll-spy ที่คำนวณว่า
+// แท็บไหนควรไฮไลต์ ค่าต้องตรงกันสองที่ ไม่งั้นแท็บกับเนื้อหาจะไม่ sync
+const GROUP_SECTION_SCROLL_MARGIN = 80;
+
 // ใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับ MAPPED_PLATFORMS ใน category-cascade-select.tsx /
 // MAPPED_PLATFORMS ใน categories/index.tsx (Lazada, Shopee, TikTok,
 // WooCommerce) — ที่นี่แยกก็อปปี้เก็บไว้เอง ตามแนวทางเดิมที่ "เล็กพอจะก็อปปี้ซ้ำได้"
@@ -323,9 +328,14 @@ export default function ProductEdit({
 
             // section ที่ขอบบนเพิ่งจะข้ามเส้นนี้ล่าสุด (คือ section สุดท้ายที่ยัง <=
             // threshold) คือ section ที่ผู้ใช้กำลังอ่านอยู่ — threshold คือขอบล่าง
-            // ของแถบแท็บที่ sticky อยู่ ดังนั้น section จะถือว่า "active" ทันทีที่มัน
-            // เลื่อนเข้าไปซ่อนใต้แถบแท็บ ไม่ต้องรอให้เลื่อนขึ้นไปสุดจริงๆ ก่อน
-            const threshold = groupTabBarRef.current ? groupTabBarRef.current.getBoundingClientRect().bottom : 0;
+            // ของแถบแท็บที่ sticky อยู่ บวก scroll-margin ของ section (80px ที่ตั้งไว้
+            // บน Paper แต่ละอัน) เพราะ scrollToGroup() จะจอด section ให้ห่างจากขอบบน
+            // เท่านั้น ถ้าไม่บวกกลับ section ที่เพิ่งคลิกไปจะยังนับว่า "ยังมาไม่ถึง"
+            // แล้วแท็บที่ไฮไลต์จะค้างอยู่ที่ section ก่อนหน้า (ตามที่เห็นว่าแท็บกับ
+            // เนื้อหาไม่ตรงกัน) — บวกเพิ่มอีกนิดเป็น slack ให้สลับแท็บตอนหัวข้อถัดไป
+            // เลื่อนมาใกล้แถบแท็บ ตรงกับที่ตาผู้ใช้เห็น
+            const barBottom = groupTabBarRef.current ? groupTabBarRef.current.getBoundingClientRect().bottom : 0;
+            const threshold = barBottom + GROUP_SECTION_SCROLL_MARGIN + 16;
             let activeIdx = 0;
             for (let i = 0; i < groupSectionRefs.current.length; i++) {
                 const el = groupSectionRefs.current[i];
@@ -1350,7 +1360,7 @@ export default function ProductEdit({
                                                         groupSectionRefs.current[idx] = el;
                                                     }}
                                                     variant="outlined"
-                                                    sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: '80px' }}
+                                                    sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
                                                 >
                                                     <Stack
                                                         direction="row"
