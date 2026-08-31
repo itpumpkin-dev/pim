@@ -134,6 +134,71 @@ export function fioriMultiInputSx(state: FioriValueState): SxProps<Theme> {
     };
 }
 
+/**
+ * `sx` for a single-select MUI `Autocomplete` styled as a SAP Fiori Horizon
+ * **ComboBox** web component: compact 2rem field, 0.375rem corners, darker
+ * border with brand hover/focus, a chevron popup button and a subtle clear
+ * button, plus the value-state border/tint. Pair with
+ * `popupIcon={<KeyboardArrowDownIcon />}` and
+ * `slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}`.
+ * ref: sap.com/design-system/fiori-design-web → UI elements → ComboBox
+ */
+export function fioriComboBoxSx(state: FioriValueState): SxProps<Theme> {
+    const border = state === 'none' ? FIORI.borderStrong : STATE_COLOR[state].fg;
+    const borderWidth = state === 'none' ? '1px' : STATE_COLOR[state].borderWidth;
+    const bg = state === 'none' ? FIORI.surface : STATE_COLOR[state].bg;
+
+    return {
+        // Match the exact rendered height of a fiori Text/Select field (2rem):
+        // same 6px top/bottom input padding + 0.875rem/1.4375 line-height, with
+        // no extra vertical padding on the flex row. Nested one level deeper
+        // than MUI's own `.MuiAutocomplete-inputRoot .MuiAutocomplete-input`
+        // rule so this wins on specificity.
+        '& .MuiOutlinedInput-root.MuiAutocomplete-inputRoot': {
+            bgcolor: bg,
+            borderRadius: '0.375rem',
+            fontSize: '0.875rem',
+            minHeight: '2rem',
+            paddingTop: 0,
+            paddingBottom: 0,
+            paddingLeft: 0,
+            '& .MuiAutocomplete-input': {
+                padding: '6px 4px 6px 8px',
+                lineHeight: '1.4375em',
+                '&::placeholder': { color: FIORI.textSecondary, opacity: 1 },
+            },
+            '& fieldset': { borderColor: border, borderWidth, transition: 'border-color 0.1s ease' },
+            '&:hover fieldset': { borderColor: state === 'none' ? FIORI.brand : border, borderWidth },
+            '&.Mui-focused fieldset': { borderColor: state === 'none' ? FIORI.brand : border, borderWidth },
+            '&.Mui-disabled': { bgcolor: FIORI.headerBg },
+            '&.Mui-disabled fieldset': { borderColor: FIORI.border },
+        },
+        '& .MuiAutocomplete-endAdornment': { right: 6 },
+        '& .MuiAutocomplete-popupIndicator, & .MuiAutocomplete-clearIndicator': {
+            color: FIORI.textSecondary,
+            '&:hover': { backgroundColor: 'transparent', color: FIORI.brand },
+            '& svg': { fontSize: 18 },
+        },
+    };
+}
+
+/** `sx` for the ComboBox dropdown surface — a Fiori popover list. */
+export const fioriComboBoxPaperSx: SxProps<Theme> = {
+    mt: '2px',
+    borderRadius: '0.375rem',
+    border: `1px solid ${FIORI.borderStrong}`,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+    '& .MuiAutocomplete-listbox': { padding: 0 },
+    '& .MuiAutocomplete-option': {
+        fontSize: '0.875rem',
+        minHeight: 32,
+        color: FIORI.textPrimary,
+        '&.Mui-focused': { backgroundColor: FIORI.hover },
+        '&[aria-selected="true"]': { backgroundColor: FIORI.selected },
+        '&[aria-selected="true"].Mui-focused': { backgroundColor: FIORI.selected },
+    },
+};
+
 interface FioriFormGroupProps {
     title?: ReactNode;
     description?: ReactNode;

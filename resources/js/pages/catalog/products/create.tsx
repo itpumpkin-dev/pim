@@ -3,10 +3,13 @@ import {
     FioriField,
     FioriFormErrorSummary,
     FioriFormGroup,
+    fioriComboBoxPaperSx,
+    fioriComboBoxSx,
     fioriFieldStateSx,
     fioriMultiInputSx,
     valueStateOf,
 } from '@/components/fiori-form';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
@@ -15,6 +18,7 @@ import { type FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import SaveIcon from '@mui/icons-material/Save';
 import {
     Alert,
@@ -282,7 +286,8 @@ export default function ProductCreate({ families, attributes }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createProductTitle')} />
-            <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 1000, mx: 'auto' }}>
+            {/* <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 1000, mx: 'auto' }}> */}
+            <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%', maxWidth: 760 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700}>
                         {t('createProductTitle')}
@@ -327,32 +332,36 @@ export default function ProductCreate({ families, attributes }: Props) {
                             valueState={valueStateOf(errors.family_id)}
                             message={errors.family_id}
                         >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.family_id))}>
-                                <Select
-                                    id="product-family"
-                                    displayEmpty
-                                    value={data.family_id}
-                                    onChange={(e) =>
-                                        setData((prev) => ({
-                                            ...prev,
-                                            family_id: e.target.value,
-                                            // แกน variant ที่เลือกไว้จาก family เดิม อาจใช้ไม่ได้กับ
-                                            // family ใหม่ เลยต้องล้าง matrix ที่ generate ไว้ทิ้งไปด้วย
-                                            configurable_attributes: [],
-                                            variants: [],
-                                        }))
-                                    }
-                                >
-                                    <MenuItem value="" disabled>
-                                        —
-                                    </MenuItem>
-                                    {families.map((fam) => (
-                                        <MenuItem key={fam.id} value={fam.id}>
-                                            {fam.name || fam.code}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
+                            <Autocomplete
+                                id="product-family"
+                                fullWidth
+                                size="small"
+                                options={families}
+                                autoHighlight
+                                popupIcon={<KeyboardArrowDownIcon />}
+                                getOptionLabel={(fam) => fam.name || fam.code}
+                                isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                                value={families.find((fam) => fam.id === Number(data.family_id)) ?? null}
+                                onChange={(_, fam) =>
+                                    setData((prev) => ({
+                                        ...prev,
+                                        family_id: fam ? fam.id : '',
+                                        // แกน variant ที่เลือกไว้จาก family เดิม อาจใช้ไม่ได้กับ
+                                        // family ใหม่ เลยต้องล้าง matrix ที่ generate ไว้ทิ้งไปด้วย
+                                        configurable_attributes: [],
+                                        variants: [],
+                                    }))
+                                }
+                                sx={fioriComboBoxSx(valueStateOf(errors.family_id))}
+                                slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        placeholder={t('selectOption')}
+                                        error={Boolean(errors.family_id)}
+                                    />
+                                )}
+                            />
                         </FioriField>
 
                         {/* ประเภทสินค้า */}
@@ -367,6 +376,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                             <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.type))}>
                                 <Select
                                     id="product-type"
+                                    IconComponent={KeyboardArrowDownIcon}
                                     value={data.type}
                                     onChange={(e) => {
                                         const val = e.target.value;

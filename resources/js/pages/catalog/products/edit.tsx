@@ -1,7 +1,7 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { CategoryCascadeSelect } from '@/components/category-cascade-select';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
-import { FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriFormGroup, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
 import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
@@ -26,6 +26,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
 import TranslateIcon from '@mui/icons-material/Translate';
@@ -1529,25 +1530,30 @@ export default function ProductEdit({
                                                 <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
                                                     Family
                                                 </Typography>
-                                                <TextField
-                                                    select
-                                                    value={data.family_id}
-                                                    onChange={(e) => setData('family_id', Number(e.target.value))}
-                                                    size="small"
+                                                <Autocomplete
                                                     fullWidth
-                                                    error={Boolean(errors.family_id)}
-                                                    helperText={
-                                                        errors.family_id ||
-                                                        'Attribute groups below update the next time you open this product after saving.'
-                                                    }
-                                                    sx={fioriFieldStateSx(valueStateOf(errors.family_id))}
-                                                >
-                                                    {families.map((fam) => (
-                                                        <MenuItem key={fam.id} value={fam.id}>
-                                                            {localizedLabel(fam, activeLocaleId)}
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
+                                                    size="small"
+                                                    disableClearable
+                                                    autoHighlight
+                                                    options={families}
+                                                    popupIcon={<KeyboardArrowDownIcon />}
+                                                    getOptionLabel={(fam) => localizedLabel(fam, activeLocaleId)}
+                                                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                                                    value={families.find((f) => f.id === Number(data.family_id)) ?? families[0]}
+                                                    onChange={(_, fam) => fam && setData('family_id', fam.id)}
+                                                    sx={fioriComboBoxSx(valueStateOf(errors.family_id))}
+                                                    slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
+                                                    renderInput={(params) => (
+                                                        <TextField
+                                                            {...params}
+                                                            error={Boolean(errors.family_id)}
+                                                            helperText={
+                                                                errors.family_id ||
+                                                                'Attribute groups below update the next time you open this product after saving.'
+                                                            }
+                                                        />
+                                                    )}
+                                                />
                                             </Box>
 
                                             <Box>
@@ -1565,6 +1571,7 @@ export default function ProductEdit({
                                                         errors.type || (!isAlreadyConfigurable ? t('configurableTemporarilyDisabled') : undefined)
                                                     }
                                                     sx={fioriFieldStateSx(valueStateOf(errors.type))}
+                                                    SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
                                                 >
                                                     <MenuItem value="simple">Simple</MenuItem>
                                                     {/* Turned off for now (see create.tsx). A product that's
@@ -2668,10 +2675,13 @@ const SelectControl = memo(function SelectControl({
             disabled={disabled}
             options={options}
             value={selectedOption}
+            autoHighlight
+            popupIcon={<KeyboardArrowDownIcon />}
             getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
             isOptionEqualToValue={(opt, val) => opt.id === val.id}
             onChange={(_, newValue) => onValueChange(attributeId, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
-            sx={fioriFieldStateSx('none')}
+            sx={fioriComboBoxSx('none')}
+            slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
             renderInput={(params) => <TextField {...params} placeholder="Select option" />}
         />
     );
