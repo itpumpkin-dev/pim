@@ -145,6 +145,112 @@ export const fioriBodyCellSx: SxProps<Theme> = {
     py: 0.75,
 };
 
+/**
+ * SAP Fiori (Horizon) "Tab Bar" for a MUI `<Tabs>`: a full-width strip with a
+ * bottom hairline, non-uppercase labels, muted inactive text that darkens on
+ * hover, and the selected tab in brand colour with a 3px brand indicator.
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Tab Bar
+ * Spread onto `<Tabs sx={{ ...fioriTabsSx, mb: 3 }}>`.
+ */
+export const fioriTabsSx: SxProps<Theme> = {
+    minHeight: 44,
+    borderBottom: `1px solid ${FIORI.border}`,
+    '& .MuiTabs-indicator': {
+        height: 3,
+        borderRadius: '1.5px 1.5px 0 0',
+        backgroundColor: FIORI.brand,
+    },
+    '& .MuiTab-root': {
+        textTransform: 'none',
+        fontWeight: 500,
+        fontSize: '0.875rem',
+        minHeight: 44,
+        px: 2,
+        color: FIORI.textSecondary,
+        transition: 'color 0.1s ease, background-color 0.1s ease',
+        '&:hover': { color: FIORI.textPrimary, backgroundColor: FIORI.hover },
+        '&.Mui-selected': { color: FIORI.brand, fontWeight: 700 },
+        '&.Mui-focusVisible': { backgroundColor: FIORI.hover },
+    },
+};
+
+/**
+ * SAP Fiori (Horizon) "Toggle Button" for a MUI `<ToggleButtonGroup>` /
+ * `<ToggleButton>`: compact segmented control — non-uppercase labels, muted
+ * text on a surface, `hover` tint, and a pressed state that is a pale brand
+ * fill with brand text + brand border (same treatment as the RTE toolbar's
+ * active button and the Fiori field chips).
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Toggle Button
+ * Spread onto `<ToggleButtonGroup sx={{ ...fioriToggleButtonGroupSx, mb: 2 }}>`.
+ */
+/**
+ * SAP Fiori (Horizon) "Switch" for a MUI `<Switch>`: a compact pill track
+ * with a 1px border, white handle, and a brand-filled track when on (the app
+ * uses its brand blue as the single Fiori accent — see the tab indicator and
+ * toggle-button pressed state — rather than the spec's green).
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Switch
+ * Spread onto `<Switch sx={fioriSwitchSx} />`.
+ */
+export const fioriSwitchSx: SxProps<Theme> = {
+    width: 40,
+    height: 22,
+    padding: 0,
+    display: 'flex',
+    '& .MuiSwitch-switchBase': {
+        padding: 0,
+        margin: '3px',
+        transitionDuration: '150ms',
+        '&.Mui-checked': {
+            transform: 'translateX(18px)',
+            color: '#fff',
+            '& + .MuiSwitch-track': { backgroundColor: FIORI.brand, borderColor: FIORI.brand, opacity: 1 },
+            '& .MuiSwitch-thumb': { borderColor: FIORI.brand },
+        },
+        '&.Mui-disabled + .MuiSwitch-track': { opacity: 0.4 },
+        '&.Mui-focusVisible .MuiSwitch-thumb': { boxShadow: `0 0 0 2px ${FIORI.brand}` },
+    },
+    '& .MuiSwitch-thumb': {
+        boxSizing: 'border-box',
+        width: 16,
+        height: 16,
+        boxShadow: 'none',
+        color: '#fff',
+        border: `1px solid ${FIORI.borderStrong}`,
+    },
+    '& .MuiSwitch-track': {
+        borderRadius: 11,
+        border: `1px solid ${FIORI.borderStrong}`,
+        backgroundColor: FIORI.headerBg,
+        opacity: 1,
+        boxSizing: 'border-box',
+        transition: 'background-color 150ms, border-color 150ms',
+    },
+};
+
+export const fioriToggleButtonGroupSx: SxProps<Theme> = {
+    '& .MuiToggleButton-root': {
+        textTransform: 'none',
+        fontWeight: 500,
+        fontSize: '0.8125rem',
+        lineHeight: 1.4,
+        px: 1.5,
+        py: 0.5,
+        color: FIORI.textSecondary,
+        borderColor: FIORI.borderStrong,
+        transition: 'background-color 0.1s ease, color 0.1s ease, border-color 0.1s ease',
+        '&:hover': { backgroundColor: FIORI.hover, color: FIORI.textPrimary },
+        '&.Mui-selected': {
+            backgroundColor: FIORI.brandBg,
+            color: FIORI.brand,
+            borderColor: FIORI.brand,
+            fontWeight: 700,
+            zIndex: 1,
+            '&:hover': { backgroundColor: FIORI.brandBg, color: FIORI.brand },
+        },
+        '&.Mui-disabled': { color: FIORI.textSecondary, opacity: 0.5 },
+    },
+};
+
 export type FioriTone = 'success' | 'warning' | 'error' | 'neutral' | 'information';
 
 /**

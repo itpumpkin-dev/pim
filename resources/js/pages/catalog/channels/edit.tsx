@@ -25,7 +25,7 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface ChannelItem {
     id: number;
@@ -106,7 +106,7 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
+                        sx={{ ...fioriTabsSx, mb: 3 }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />

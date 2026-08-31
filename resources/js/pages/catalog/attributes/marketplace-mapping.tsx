@@ -9,7 +9,7 @@ import { LazadaAttributeMappingPanel, type LazadaAttributeMappingPanelProps } fr
 import { ShopeeAttributeMappingPanel, type ShopeeAttributeMappingPanelProps } from '@/components/catalog/shopee-attribute-mapping-panel';
 import { TikTokAttributeMappingPanel, type TikTokAttributeMappingPanelProps } from '@/components/catalog/tiktok-attribute-mapping-panel';
 import { WooCommerceAttributeMappingPanel, type WooCommerceAttributeMappingPanelProps } from '@/components/catalog/woocommerce-attribute-mapping-panel';
-import { FIORI, fioriGhostSx } from '@/lib/fiori-style';
+import { FIORI, fioriGhostSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface Props {
     woocommerce: WooCommerceAttributeMappingPanelProps;
@@ -82,16 +82,8 @@ export default function MarketplaceAttributeMapping({ woocommerce, shopee, lazad
                     {t('marketplaceAttributeMappingHelp')}
                 </Typography>
 
-                <Box sx={{ bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}`, display: 'flex', alignItems: 'center' }}>
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => handleTabChange(v)}
-                        sx={{
-                            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '0.95rem', minWidth: 100, color: FIORI.textSecondary },
-                            '& .Mui-selected': { color: FIORI.brand },
-                            '& .MuiTabs-indicator': { bgcolor: FIORI.brand, height: 2 },
-                        }}
-                    >
+                <Box sx={{ bgcolor: FIORI.surface, display: 'flex', alignItems: 'center' }}>
+                    <Tabs value={tabIndex} onChange={(_, v) => handleTabChange(v)} sx={fioriTabsSx}>
                         <Tab label="WooCommerce" />
                         <Tab label="Shopee" />
                         <Tab label="Lazada" />

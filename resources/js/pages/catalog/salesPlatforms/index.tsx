@@ -43,6 +43,8 @@ import {
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriIconButtonSx,
+    fioriSwitchSx,
+    fioriTabsSx,
 } from '@/lib/fiori-style';
 
 // วนสีตาม index ของ platform (ไม่ใช้สีตามแบรนด์) — เพราะ platform ในหน้านี้
@@ -339,7 +341,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                 setActivePlatformId(val);
                                 setShowAllShops(false);
                             }}
-                            sx={{ px: 2, borderBottom: `1px solid ${FIORI.border}` }}
+                            sx={{ ...fioriTabsSx, px: 2 }}
                         >
                             {platforms.map((platform, index) => (
                                 <Tab
@@ -531,7 +533,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                 onChange={(e) => setShopName(e.target.value)}
                             />
                             <FormControlLabel
-                                control={<Switch checked={shopActive} onChange={(e) => setShopActive(e.target.checked)} />}
+                                control={<Switch sx={fioriSwitchSx} checked={shopActive} onChange={(e) => setShopActive(e.target.checked)} />}
                                 label={t('shopActive')}
                             />
                         </Stack>

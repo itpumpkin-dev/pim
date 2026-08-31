@@ -4,7 +4,7 @@ import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-br
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, fioriSearchFieldSx, fioriToggleButtonGroupSx } from '@/lib/fiori-style';
 import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -832,17 +832,7 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                             value={filter}
                             exclusive
                             size="small"
-                            onChange={(_event, value: LazadaFilter | null) => value && applyFilter(value)}
-                            sx={{
-                                '& .MuiToggleButton-root': {
-                                    textTransform: 'none',
-                                    fontWeight: 600,
-                                    px: 1.5,
-                                    color: FIORI.textSecondary,
-                                    borderColor: FIORI.border,
-                                    '&.Mui-selected': { bgcolor: FIORI.brand, color: '#fff', '&:hover': { bgcolor: FIORI.brandDark } },
-                                },
-                            }}
+                            onChange={(_event, value: LazadaFilter | null) => value && applyFilter(value)} sx={fioriToggleButtonGroupSx}
                         >
                             <ToggleButton value="all">{t('statusAll')}</ToggleButton>
                             <ToggleButton value="leaf">{t('leafOnly')}</ToggleButton>

@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -63,7 +63,7 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
+                        sx={{ ...fioriTabsSx, mb: 3 }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />

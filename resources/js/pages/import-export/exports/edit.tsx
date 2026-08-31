@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriSwitchSx } from '@/lib/fiori-style';
 
 interface ExportConfigItem {
     id: number;
@@ -165,7 +165,7 @@ export default function ExportEdit({ config, types }: Props) {
                             </Select>
                         </FormControl>
                         <FormControlLabel
-                            control={<Switch checked={data.with_media} onChange={(e) => setData('with_media', e.target.checked)} />}
+                            control={<Switch sx={fioriSwitchSx} checked={data.with_media} onChange={(e) => setData('with_media', e.target.checked)} />}
                             label={t('withMedia')}
                         />
                     </Stack>

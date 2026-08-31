@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const CONTENT_NAMESPACE = 'content';
 
@@ -247,7 +247,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                         onChange={(_, value: string) => switchNamespace(value)}
                         variant="scrollable"
                         scrollButtons="auto"
-                        sx={{ px: 1, flex: 1, opacity: switchingTab ? 0.6 : 1, pointerEvents: switchingTab ? 'none' : 'auto' }}
+                        sx={{ ...fioriTabsSx, px: 1, flex: 1, opacity: switchingTab ? 0.6 : 1, pointerEvents: switchingTab ? 'none' : 'auto' }}
                     >
                         {namespaces.map((namespace) => (
                             <Tab key={namespace} value={namespace} label={namespaceLabel(namespace)} sx={{ textTransform: 'none' }} />

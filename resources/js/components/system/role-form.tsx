@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import { FormEventHandler, useState, useMemo } from 'react';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx } from '@/lib/fiori-style';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -522,7 +522,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                     {isEdit ? 'UPDATE' : 'CREATE'}
                 </Typography>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
+                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ ...fioriTabsSx, mb: 3 }}>
                     {TABS.map((label, index) => (
                         <Tab key={label} label={label} value={index} />
                     ))}

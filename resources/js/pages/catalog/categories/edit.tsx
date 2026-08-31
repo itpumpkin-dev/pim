@@ -32,7 +32,7 @@ import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, v
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { FIORI, FioriStatus, fioriDefaultSx, fioriEmphasizedSx, fioriIconButtonSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriDefaultSx, fioriEmphasizedSx, fioriIconButtonSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface CategoryItem {
     id: number;
@@ -154,7 +154,7 @@ export default function CategoryEdit({
             <Head title={`${t('editCategory')}: ${category.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ ...fioriTabsSx, mb: 3 }}>
                         <Tab label="General" />
                         <Tab label="History" />
                     </Tabs>

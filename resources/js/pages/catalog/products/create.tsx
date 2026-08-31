@@ -1,4 +1,12 @@
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import {
+    FioriField,
+    FioriFormErrorSummary,
+    FioriFormGroup,
+    fioriFieldStateSx,
+    fioriMultiInputSx,
+    valueStateOf,
+} from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
@@ -22,9 +30,7 @@ import {
     DialogTitle,
     FormControl,
     FormControlLabel,
-    FormHelperText,
     IconButton,
-    InputLabel,
     MenuItem,
     Paper,
     Select,
@@ -298,35 +304,33 @@ export default function ProductCreate({ families, attributes }: Props) {
                 </Stack>
 
                 <Stack spacing={3}>
-                    <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.5, borderColor: UI_BORDER }}>
-                        <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                            {t('productInfo')}
-                        </Typography>
+                    <FioriFormGroup title={t('productInfo')} sx={{ maxWidth: 760 }}>
+                        {/* สถานะ */}
+                        <FioriField label={t('status')}>
+                            <Stack direction="row" spacing={3}>
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.enabled === true} onChange={() => setData('enabled', true)} />}
+                                    label={t('active')}
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
+                                    label={t('nonActive')}
+                                />
+                            </Stack>
+                        </FioriField>
 
-                        <Stack spacing={3}>
-                            {/* สถานะ */}
-                            <Box>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 1 }}>
-                                    {t('status')}
-                                </Typography>
-                                <Stack direction="row" spacing={3}>
-                                    <FormControlLabel
-                                        control={<Checkbox checked={data.enabled === true} onChange={() => setData('enabled', true)} />}
-                                        label={t('active')}
-                                    />
-                                    <FormControlLabel
-                                        control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
-                                        label={t('nonActive')}
-                                    />
-                                </Stack>
-                            </Box>
-
-                            {/* Family (กลุ่มสินค้า) */}
-                            <FormControl fullWidth required error={Boolean(errors.family_id)}>
-                                <InputLabel id="family-label">{t('familyRequired')}</InputLabel>
+                        {/* Family (กลุ่มสินค้า) */}
+                        <FioriField
+                            label={t('fieldFamily')}
+                            htmlFor="product-family"
+                            required
+                            valueState={valueStateOf(errors.family_id)}
+                            message={errors.family_id}
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.family_id))}>
                                 <Select
-                                    labelId="family-label"
-                                    label={t('familyRequired')}
+                                    id="product-family"
+                                    displayEmpty
                                     value={data.family_id}
                                     onChange={(e) =>
                                         setData((prev) => ({
@@ -339,21 +343,30 @@ export default function ProductCreate({ families, attributes }: Props) {
                                         }))
                                     }
                                 >
+                                    <MenuItem value="" disabled>
+                                        —
+                                    </MenuItem>
                                     {families.map((fam) => (
                                         <MenuItem key={fam.id} value={fam.id}>
                                             {fam.name || fam.code}
                                         </MenuItem>
                                     ))}
                                 </Select>
-                                {errors.family_id && <FormHelperText>{errors.family_id}</FormHelperText>}
                             </FormControl>
+                        </FioriField>
 
-                            {/* ประเภทสินค้า */}
-                            <FormControl fullWidth required error={Boolean(errors.type)}>
-                                <InputLabel id="product-type-label">{t('productTypesRequired')}</InputLabel>
+                        {/* ประเภทสินค้า */}
+                        <FioriField
+                            label={t('fieldProductType')}
+                            htmlFor="product-type"
+                            required
+                            valueState={valueStateOf(errors.type)}
+                            message={errors.type}
+                            hint={t('configurableTemporarilyDisabled')}
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.type))}>
                                 <Select
-                                    labelId="product-type-label"
-                                    label={t('productTypesRequired')}
+                                    id="product-type"
                                     value={data.type}
                                     onChange={(e) => {
                                         const val = e.target.value;
@@ -373,22 +386,28 @@ export default function ProductCreate({ families, attributes }: Props) {
                                         {t('configurable')}
                                     </MenuItem>
                                 </Select>
-                                <FormHelperText>{errors.type || t('configurableTemporarilyDisabled')}</FormHelperText>
                             </FormControl>
+                        </FioriField>
 
-                            {/* SKU หลัก */}
+                        {/* SKU หลัก */}
+                        <FioriField
+                            label={t('sku')}
+                            htmlFor="product-sku"
+                            required
+                            valueState={valueStateOf(errors.sku)}
+                            message={errors.sku}
+                        >
                             <TextField
-                                label={t('skuRequired')}
-                                required
+                                id="product-sku"
                                 fullWidth
+                                size="small"
                                 value={data.sku}
                                 onChange={(e) => setData('sku', e.target.value)}
                                 placeholder={t('skuPlaceholder')}
-                                error={Boolean(errors.sku)}
-                                helperText={errors.sku}
+                                sx={fioriFieldStateSx(valueStateOf(errors.sku))}
                             />
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {/* ตาราง Variants ที่ generate แบบ cartesian */}
                     {data.type === 'configurable' && data.variants.length > 0 && (
@@ -407,11 +426,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                     )}
                 </Stack>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {t('correctErrorsBeforeSaving')}
-                    </Alert>
-                )}
+                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
             </Box>
 
             {/* Dialog เลือก Attribute สำหรับ Configurable */}
@@ -438,6 +453,7 @@ export default function ProductCreate({ families, attributes }: Props) {
                     )}
                     <Autocomplete
                         multiple
+                        size="small"
                         options={familyScopedAttributeOptions}
                         getOptionLabel={(option) => option.name || option.code}
                         value={selectedAttributeObjects}
@@ -445,9 +461,10 @@ export default function ProductCreate({ families, attributes }: Props) {
                             const newIds = newValue.map((item) => item.id);
                             handleGenerateVariants(newIds);
                         }}
+                        sx={fioriMultiInputSx('none')}
                         renderTags={(value, getTagProps) =>
                             value.map((option, index) => (
-                                <Chip label={option.name || option.code} {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
+                                <Chip label={option.name || option.code} size="small" {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
                             ))
                         }
                         renderInput={(params) => <TextField {...params} placeholder={t('selectAttributesPlaceholder')} variant="outlined" />}

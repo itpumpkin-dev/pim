@@ -46,6 +46,7 @@ import {
     fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
+    fioriTabsSx,
 } from '@/lib/fiori-style';
 
 interface GridColumn {
@@ -361,7 +362,7 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
                 <Tabs
                     value={view}
                     onChange={(_, v: 'locales' | 'jobs') => setView(v)}
-                    sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}`, '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 } }}
+                    sx={{ ...fioriTabsSx, mb: 3 }}
                 >
                     <Tab value="locales" label={tSystem('localesTitle')} />
                     <Tab value="jobs" label={tSystem('translationJobsTab')} />

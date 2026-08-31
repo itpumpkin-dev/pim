@@ -1,5 +1,7 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { CategoryCascadeSelect } from '@/components/category-cascade-select';
+import { FioriFileUploader } from '@/components/fiori-file-uploader';
+import { FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
 import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
@@ -9,7 +11,7 @@ import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+import { FIORI, fioriCardSx, fioriSwitchSx, fioriTabsSx, fioriToggleButtonGroupSx } from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
 import { PALETTE } from '@/theme';
@@ -20,7 +22,6 @@ import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -1151,15 +1152,7 @@ export default function ProductEdit({
                         px: { xs: 2, md: 4 },
                     }}
                 >
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
-                        sx={{
-                            '& .MuiTab-root': { textTransform: 'none', fontWeight: 700, fontSize: '0.95rem', minWidth: 100 },
-                            '& .Mui-selected': { color: 'text.primary' },
-                            '& .MuiTabs-indicator': { bgcolor: 'grey.800', height: 3 },
-                        }}
-                    >
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsSx}>
                         <Tab label="General" />
                         {canViewHistory && <Tab label="History" />}
                     </Tabs>
@@ -1288,12 +1281,7 @@ export default function ProductEdit({
                                     onChange={(_, v) => scrollToGroup(v)}
                                     variant="scrollable"
                                     scrollButtons="auto"
-                                    sx={{
-                                        px: 2,
-                                        '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, minHeight: 48 },
-                                        '& .Mui-selected': { color: 'text.primary' },
-                                        '& .MuiTabs-indicator': { bgcolor: 'grey.800' },
-                                    }}
+                                    sx={{ ...fioriTabsSx, px: 2 }}
                                 >
                                     {assignedGroups.map((group) => (
                                         <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
@@ -1383,16 +1371,25 @@ export default function ProductEdit({
                                                     <Collapse in={!isGroupCollapsed}>
                                                         <Stack spacing={2.5}>
                                                             {isGeneral && (
-                                                                <TextField
-                                                                    label="SKU *"
-                                                                    required
-                                                                    fullWidth
-                                                                    size="small"
-                                                                    value={data.sku}
-                                                                    onChange={(e) => setData('sku', e.target.value)}
-                                                                    error={Boolean(errors.sku)}
-                                                                    helperText={errors.sku}
-                                                                />
+                                                                <Box>
+                                                                    <Typography
+                                                                        variant="caption"
+                                                                        fontWeight={600}
+                                                                        color="#334155"
+                                                                        sx={{ display: 'block', mb: 0.5 }}
+                                                                    >
+                                                                        SKU *
+                                                                    </Typography>
+                                                                    <TextField
+                                                                        fullWidth
+                                                                        size="small"
+                                                                        value={data.sku}
+                                                                        onChange={(e) => setData('sku', e.target.value)}
+                                                                        error={Boolean(errors.sku)}
+                                                                        helperText={errors.sku}
+                                                                        sx={fioriFieldStateSx(valueStateOf(errors.sku))}
+                                                                    />
+                                                                </Box>
                                                             )}
 
                                                             {visibleAttrs.length === 0 &&
@@ -1506,32 +1503,34 @@ export default function ProductEdit({
                                 {/* Sidebar ฝั่งขวา */}
                                 <Grid item xs={12} md={3.5}>
                                     <Stack spacing={3}>
-                                        {/* แผง Product Info */}
-                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                Product Info
-                                            </Typography>
-                                            <Stack spacing={2}>
-                                                <Box>
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={600}
-                                                        color="text.secondary"
-                                                        display="block"
-                                                        sx={{ mb: 0.5 }}
-                                                    >
-                                                        Status
-                                                    </Typography>
-                                                    <Switch
-                                                        checked={data.enabled}
-                                                        onChange={(e) => setData('enabled', e.target.checked)}
-                                                        color="default"
-                                                    />
-                                                </Box>
+                                        {/* แผง Product Info — ฟอร์มสไตล์ Fiori: label ด้านบน + control
+                                            ทรง Horizon (สูง 2rem, ขอบเข้ม, hover/focus สีแบรนด์) + border/tint
+                                            ตาม value-state ตอน error. อยู่ใน sidebar แคบ เลยไม่ใช้ FioriField
+                                            แบบ label-ซ้าย (จะบีบเกินไป) */}
+                                        <FioriFormGroup title="Product Info">
+                                            <Box>
+                                                <Typography
+                                                    variant="caption"
+                                                    fontWeight={600}
+                                                    color="text.secondary"
+                                                    display="block"
+                                                    sx={{ mb: 0.5 }}
+                                                >
+                                                    Status
+                                                </Typography>
+                                                <Switch
+                                                    sx={fioriSwitchSx}
+                                                    checked={data.enabled}
+                                                    onChange={(e) => setData('enabled', e.target.checked)}
+                                                />
+                                            </Box>
 
+                                            <Box>
+                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                    Family
+                                                </Typography>
                                                 <TextField
                                                     select
-                                                    label="Family"
                                                     value={data.family_id}
                                                     onChange={(e) => setData('family_id', Number(e.target.value))}
                                                     size="small"
@@ -1541,6 +1540,7 @@ export default function ProductEdit({
                                                         errors.family_id ||
                                                         'Attribute groups below update the next time you open this product after saving.'
                                                     }
+                                                    sx={fioriFieldStateSx(valueStateOf(errors.family_id))}
                                                 >
                                                     {families.map((fam) => (
                                                         <MenuItem key={fam.id} value={fam.id}>
@@ -1548,10 +1548,14 @@ export default function ProductEdit({
                                                         </MenuItem>
                                                     ))}
                                                 </TextField>
+                                            </Box>
 
+                                            <Box>
+                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                    Product Type
+                                                </Typography>
                                                 <TextField
                                                     select
-                                                    label="Product Type"
                                                     value={data.type}
                                                     onChange={(e) => handleTypeChange(e.target.value)}
                                                     size="small"
@@ -1560,6 +1564,7 @@ export default function ProductEdit({
                                                     helperText={
                                                         errors.type || (!isAlreadyConfigurable ? t('configurableTemporarilyDisabled') : undefined)
                                                     }
+                                                    sx={fioriFieldStateSx(valueStateOf(errors.type))}
                                                 >
                                                     <MenuItem value="simple">Simple</MenuItem>
                                                     {/* Turned off for now (see create.tsx). A product that's
@@ -1569,30 +1574,40 @@ export default function ProductEdit({
                                                         Configurable
                                                     </MenuItem>
                                                 </TextField>
+                                            </Box>
 
+                                            <Box>
+                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                    Updated At
+                                                </Typography>
                                                 <TextField
-                                                    label="Updated At"
                                                     value={formatLocalDateTime(product.updated_at)}
                                                     disabled
                                                     size="small"
                                                     fullWidth
+                                                    sx={fioriFieldStateSx('none')}
                                                     InputProps={{
                                                         endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
                                                     }}
                                                 />
+                                            </Box>
 
+                                            <Box>
+                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                    Created At
+                                                </Typography>
                                                 <TextField
-                                                    label="Created At"
                                                     value={formatLocalDateTime(product.created_at)}
                                                     disabled
                                                     size="small"
                                                     fullWidth
+                                                    sx={fioriFieldStateSx('none')}
                                                     InputProps={{
                                                         endAdornment: <CalendarTodayIcon fontSize="small" sx={{ color: 'text.secondary' }} />,
                                                     }}
                                                 />
-                                            </Stack>
-                                        </Paper>
+                                            </Box>
+                                        </FioriFormGroup>
 
                                         {/* แผง Categories — สลับได้ว่าจะให้ System Categories (PIM category tree
                                         ที่ mapping ระดับ category เป็นค่า default ให้ทุก platform) หรือ
@@ -1637,20 +1652,7 @@ export default function ProductEdit({
                                                         setData('woocommerce_category_id', null);
                                                     }
                                                 }}
-                                                sx={{
-                                                    mb: 2.5,
-                                                    '& .MuiToggleButton-root': {
-                                                        textTransform: 'none',
-                                                        fontWeight: 600,
-                                                        color: FIORI.textSecondary,
-                                                        borderColor: FIORI.border,
-                                                        '&.Mui-selected': {
-                                                            bgcolor: FIORI.brand,
-                                                            color: '#fff',
-                                                            '&:hover': { bgcolor: FIORI.brandDark },
-                                                        },
-                                                    },
-                                                }}
+                                                sx={{ ...fioriToggleButtonGroupSx, mb: 2.5 }}
                                             >
                                                 <ToggleButton value="system">{t('systemCategoriesLabel')}</ToggleButton>
                                                 <ToggleButton value="marketplace">{t('marketplaceCategoriesLabel')}</ToggleButton>
@@ -1749,20 +1751,7 @@ export default function ProductEdit({
                                                             setData('woocommerce_brand_id', null);
                                                         }
                                                     }}
-                                                    sx={{
-                                                        mb: 2.5,
-                                                        '& .MuiToggleButton-root': {
-                                                            textTransform: 'none',
-                                                            fontWeight: 600,
-                                                            color: FIORI.textSecondary,
-                                                            borderColor: FIORI.border,
-                                                            '&.Mui-selected': {
-                                                                bgcolor: FIORI.brand,
-                                                                color: '#fff',
-                                                                '&:hover': { bgcolor: FIORI.brandDark },
-                                                            },
-                                                        },
-                                                    }}
+                                                    sx={{ ...fioriToggleButtonGroupSx, mb: 2.5 }}
                                                 >
                                                     <ToggleButton value="system">{t('systemBrandLabel')}</ToggleButton>
                                                     <ToggleButton value="marketplace">{t('marketplaceBrandLabel')}</ToggleButton>
@@ -1815,7 +1804,7 @@ export default function ProductEdit({
                                                                     productId={product.id}
                                                                 />
                                                                 {selectedOption && (
-                                                                    <Stack direction="row" spacing={1} alignItems="center">
+                                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                                                                         <Typography variant="caption" color="text.secondary">
                                                                             {t('marketplaceMappingLabel')}
                                                                         </Typography>
@@ -1847,6 +1836,17 @@ export default function ProductEdit({
                                                                                 {t('notMappedToAnyMarketplace')}
                                                                             </Typography>
                                                                         )}
+                                                                        <Button
+                                                                            component="a"
+                                                                            href={`/catalog/brands/${selectedOption.id}/edit`}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            size="small"
+                                                                            startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
+                                                                            sx={{ minWidth: 0, py: 0, px: 1, fontSize: 11, textTransform: 'none' }}
+                                                                        >
+                                                                            {t('mapMarketplaceBrandButton')}
+                                                                        </Button>
                                                                     </Stack>
                                                                 )}
                                                             </Stack>
@@ -2671,6 +2671,7 @@ const SelectControl = memo(function SelectControl({
             getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
             isOptionEqualToValue={(opt, val) => opt.id === val.id}
             onChange={(_, newValue) => onValueChange(attributeId, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
+            sx={fioriFieldStateSx('none')}
             renderInput={(params) => <TextField {...params} placeholder="Select option" />}
         />
     );
@@ -2888,8 +2889,9 @@ function RenderAttributeInput({
                     disabled={isReadOnly}
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
+                    sx={fioriFieldStateSx('none')}
                     InputProps={{
-                        startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                        startAdornment: <InputAdornment position="start">฿</InputAdornment>,
                     }}
                 />
             </Box>
@@ -2913,6 +2915,7 @@ function RenderAttributeInput({
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={`Enter ${label.toLowerCase()}`}
+                    sx={fioriFieldStateSx('none')}
                 />
             </Box>
         );
@@ -2928,6 +2931,7 @@ function RenderAttributeInput({
                     {renderChips()}
                 </Stack>
                 <Switch
+                    sx={fioriSwitchSx}
                     disabled={isReadOnly}
                     checked={stringValue === '1' || stringValue === 'true'}
                     onChange={(e) => onChange(e.target.checked ? '1' : '0')}
@@ -2977,6 +2981,7 @@ function RenderAttributeInput({
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     InputLabelProps={{ shrink: true }}
+                    sx={fioriFieldStateSx('none')}
                 />
             </Box>
         );
@@ -3079,34 +3084,16 @@ function RenderAttributeInput({
                         ))}
                     </Stack>
                 )}
-                <Button
-                    component="label"
-                    variant="outlined"
-                    size="small"
-                    disabled={isReadOnly || atLimit}
-                    startIcon={<CloudUploadIcon fontSize="small" />}
-                    sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
-                >
-                    Add images
-                    <input
-                        type="file"
-                        hidden
-                        disabled={isReadOnly || atLimit}
-                        multiple
+                <Box sx={{ maxWidth: 420 }}>
+                    <FioriFileUploader
+                        placeholder={atLimit ? `Maximum ${MAX_GALLERY_IMAGES} images reached` : 'Browse or drop images'}
                         accept="image/*"
-                        onChange={(e) => {
-                            const files = e.target.files;
-                            if (!files || files.length === 0) return;
-                            addFiles(files);
-                            e.target.value = '';
-                        }}
+                        multiple
+                        disabled={isReadOnly || atLimit}
+                        onSelect={(fl) => addFiles(fl)}
+                        error={galleryError ?? undefined}
                     />
-                </Button>
-                {galleryError && (
-                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                        {galleryError}
-                    </Typography>
-                )}
+                </Box>
             </Box>
         );
     }
@@ -3172,7 +3159,7 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap">
                     {previewSrc && (
                         <Box
                             component="video"
@@ -3181,47 +3168,18 @@ function RenderAttributeInput({
                             sx={{ width: 160, maxHeight: 100, borderRadius: 1, border: '1px solid #e2e8f0' }}
                         />
                     )}
-                    <Button
-                        component="label"
-                        variant="outlined"
-                        size="small"
-                        disabled={isReadOnly}
-                        startIcon={<CloudUploadIcon fontSize="small" />}
-                        sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
-                    >
-                        Choose file
-                        <input
-                            type="file"
-                            hidden
-                            disabled={isReadOnly}
+                    <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
+                        <FioriFileUploader
+                            placeholder="Browse or drop an MP4 video"
                             accept="video/mp4"
-                            onChange={(e) => {
-                                const files = e.target.files;
-                                if (!files || files.length === 0) return;
-                                handleVideoSelect(files[0]);
-                                // ต้องรีเซ็ตค่า เพื่อให้เลือกไฟล์เดิม (ที่โดนปฏิเสธไปแล้ว) ซ้ำแล้ว
-                                // ยังยิง handler นี้ได้อีก — ไม่งั้น browser จะไม่ยิง event change
-                                // ให้ เพราะ value ของ input ไม่ได้เปลี่ยน
-                                e.target.value = '';
-                            }}
+                            disabled={isReadOnly}
+                            onSelect={(fl) => handleVideoSelect(fl[0])}
+                            valueLabel={selectedName || (existingLabel ? `Current: ${existingLabel}` : null)}
+                            onClear={selectedName ? () => onChange('') : undefined}
+                            error={videoError ?? undefined}
                         />
-                    </Button>
-                    {selectedName && (
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
-                            {selectedName}
-                        </Typography>
-                    )}
-                    {existingLabel && (
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
-                            Current: {existingLabel}
-                        </Typography>
-                    )}
+                    </Box>
                 </Stack>
-                {videoError && (
-                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-                        {videoError}
-                    </Typography>
-                )}
             </Box>
         );
     }
@@ -3250,7 +3208,7 @@ function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+                <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap">
                     {isImage && previewSrc && (
                         <Box
                             component="img"
@@ -3268,37 +3226,16 @@ function RenderAttributeInput({
                             }}
                         />
                     )}
-                    <Button
-                        component="label"
-                        variant="outlined"
-                        size="small"
-                        disabled={isReadOnly}
-                        startIcon={<CloudUploadIcon fontSize="small" />}
-                        sx={{ textTransform: 'none', color: 'text.secondary', borderColor: UI_BORDER }}
-                    >
-                        Choose file
-                        <input
-                            type="file"
-                            hidden
-                            disabled={isReadOnly}
+                    <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
+                        <FioriFileUploader
+                            placeholder={isImage ? 'Browse or drop an image' : 'Browse or drop a file'}
                             accept={isImage ? 'image/*' : undefined}
-                            onChange={(e) => {
-                                const files = e.target.files;
-                                if (!files || files.length === 0) return;
-                                onChange(files[0]);
-                            }}
+                            disabled={isReadOnly}
+                            onSelect={(fl) => onChange(fl[0])}
+                            valueLabel={selectedName || (existingLabel ? `Current: ${existingLabel}` : null)}
+                            onClear={selectedName ? () => onChange('') : undefined}
                         />
-                    </Button>
-                    {selectedName && (
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
-                            {selectedName}
-                        </Typography>
-                    )}
-                    {existingLabel && (
-                        <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 260 }}>
-                            Current: {existingLabel}
-                        </Typography>
-                    )}
+                    </Box>
                 </Stack>
                 {isImage && previewSrc && (
                     <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="md">
@@ -3326,6 +3263,7 @@ function RenderAttributeInput({
                 value={stringValue}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : `Enter ${label.toLowerCase()}`}
+                sx={fioriFieldStateSx('none')}
             />
         </Box>
     );

@@ -12,7 +12,7 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const swatchTypeKeys: Record<string, string> = {
     text: 'swatchTypeText',
@@ -130,7 +130,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
+                        sx={{ ...fioriTabsSx, mb: 3 }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />

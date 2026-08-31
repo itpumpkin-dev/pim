@@ -1,3 +1,4 @@
+import { fioriSwitchSx } from '@/lib/fiori-style';
 import { Checkbox, MenuItem, Select, Switch, TextField } from '@mui/material';
 
 export interface CategoryFieldItem {
@@ -46,7 +47,7 @@ export function CategoryFieldInput({
                 />
             );
         case 'Boolean':
-            return <Switch checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
+            return <Switch sx={fioriSwitchSx} checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
         case 'Checkbox':
             return <Checkbox checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} />;
         case 'Select':

@@ -1,3 +1,4 @@
+import { fioriTabsSx } from '@/lib/fiori-style';
 import { router } from '@inertiajs/react';
 import { Tab, Tabs } from '@mui/material';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +21,7 @@ export function SalesChannelSectionTabs({ active }: { active: SalesChannelSectio
     const { t } = useTranslation('catalog');
 
     return (
-        <Tabs value={active} onChange={(_, value: SalesChannelSection) => router.visit(ROUTE_BY_SECTION[value])} sx={{ mb: 3 }}>
+        <Tabs value={active} onChange={(_, value: SalesChannelSection) => router.visit(ROUTE_BY_SECTION[value])} sx={{ ...fioriTabsSx, mb: 3 }}>
             <Tab value="channels" label={t('channelsTab')} />
             <Tab value="platforms" label={t('salesPlatformsTab')} />
             <Tab value="apiUsage" label={t('apiUsageTab')} />

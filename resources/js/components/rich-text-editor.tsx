@@ -1,5 +1,6 @@
 import { xsrfToken } from '@/lib/csrf';
-import { Box } from '@mui/material';
+import { FIORI } from '@/lib/fiori-style';
+import { Box, type SxProps, type Theme } from '@mui/material';
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -13,9 +14,127 @@ interface RichTextEditorProps {
      *  ทันที — ไม่กำหนดไว้แปลว่าซ่อนปุ่มรูปภาพไป (เช่นตอนที่ยังไม่มี product id
      *  ให้ผูก endpoint ด้วย) */
     imageUploadUrl?: string;
+    /** 'error' วาดกรอบ + พื้นแบบ value-state แดง ให้เข้าชุดกับ fioriFieldStateSx */
+    valueState?: 'none' | 'error';
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, readOnly, imageUploadUrl }: RichTextEditorProps) {
+/**
+ * SAP Fiori (Horizon) "Rich Text Editor" look for the Quill snow theme.
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Rich Text Editor
+ *
+ *  - one bordered control (Fiori field border, 0.375rem corners, surface bg)
+ *  - toolbar = flat strip with a bottom hairline only, grouped icon buttons
+ *    (2rem, subtle hover, brand-tinted when active)
+ *  - editor area = Fiori type ramp, comfortable padding, muted placeholder
+ *  - focus moves the whole control's border to the brand colour
+ *  - valueState="error" → 2px error border + light error tint (matches
+ *    fioriFieldStateSx so a rich-text field reads the same as every other)
+ */
+function fioriQuillSx(valueState: 'none' | 'error', readOnly: boolean): SxProps<Theme> {
+    const border = valueState === 'error' ? FIORI.error : FIORI.borderStrong;
+    const borderWidth = valueState === 'error' ? '2px' : '1px';
+
+    return {
+        borderRadius: '0.375rem',
+        border: `${borderWidth} solid ${border}`,
+        bgcolor: valueState === 'error' ? FIORI.errorBg : FIORI.surface,
+        overflow: 'hidden',
+        transition: 'border-color 0.1s ease',
+        '&:focus-within': {
+            borderColor: FIORI.brand,
+        },
+
+        // Quill draws its own borders on toolbar/container — drop them, the
+        // wrapper above owns the outline now.
+        '& .ql-toolbar.ql-snow, & .ql-container.ql-snow': {
+            border: 'none',
+        },
+        // Keep Quill's own float/inline-block toolbar layout — overriding it
+        // with flex is what made the groups collide. Only restyle the chrome.
+        '& .ql-toolbar.ql-snow': {
+            borderBottom: `1px solid ${FIORI.border}`,
+            bgcolor: FIORI.headerBg,
+            padding: '5px 8px',
+            fontFamily: 'inherit',
+        },
+        // groups of formats — a thin rule between them, Fiori toolbar rhythm
+        '& .ql-toolbar.ql-snow .ql-formats': {
+            marginRight: '8px',
+            paddingRight: '8px',
+            borderRight: `1px solid ${FIORI.border}`,
+            '&:last-child': { borderRight: 'none', marginRight: 0, paddingRight: 0 },
+        },
+
+        // buttons: keep Quill's native box, just round + tint on hover/active
+        '& .ql-toolbar.ql-snow button': {
+            height: 26,
+            borderRadius: '0.25rem',
+            color: FIORI.textSecondary,
+            transition: 'background-color 0.1s ease, color 0.1s ease',
+        },
+        '& .ql-toolbar.ql-snow button:hover': {
+            backgroundColor: FIORI.hover,
+            color: FIORI.textPrimary,
+        },
+        '& .ql-toolbar.ql-snow button.ql-active': {
+            backgroundColor: FIORI.brandBg,
+            color: FIORI.brand,
+        },
+        // the "Normal / Heading" dropdown label — round + tint, never a fixed width
+        '& .ql-toolbar.ql-snow .ql-picker.ql-header': {
+            color: FIORI.textSecondary,
+        },
+        '& .ql-toolbar.ql-snow .ql-picker-label': {
+            borderRadius: '0.25rem',
+            transition: 'background-color 0.1s ease',
+        },
+        '& .ql-toolbar.ql-snow .ql-picker-label:hover, & .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-label': {
+            backgroundColor: FIORI.hover,
+            color: FIORI.textPrimary,
+        },
+        // Quill renders button glyphs as inline SVG with stroke/fill classes —
+        // recolour those to follow the button state above (currentColor).
+        '& .ql-toolbar.ql-snow .ql-stroke': { stroke: 'currentColor' },
+        '& .ql-toolbar.ql-snow .ql-fill, & .ql-toolbar.ql-snow .ql-stroke.ql-fill': { fill: 'currentColor' },
+        '& .ql-toolbar.ql-snow .ql-picker-label .ql-stroke': { stroke: 'currentColor' },
+        '& .ql-toolbar.ql-snow .ql-picker-options': {
+            backgroundColor: FIORI.surface,
+            border: `1px solid ${FIORI.borderStrong}`,
+            borderRadius: '0.375rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            padding: '4px',
+        },
+
+        // editor body — Fiori type ramp + comfortable padding
+        '& .ql-container.ql-snow': {
+            fontFamily: 'inherit',
+            fontSize: '0.875rem',
+        },
+        '& .ql-editor': {
+            minHeight: 180,
+            padding: '10px 12px',
+            color: FIORI.textPrimary,
+            lineHeight: 1.5,
+        },
+        '& .ql-editor.ql-blank::before': {
+            color: FIORI.textSecondary,
+            fontStyle: 'normal',
+            left: 12,
+            right: 12,
+        },
+
+        // Fiori display mode: drop the editing chrome, show the formatted text
+        // on a muted surface. Spread last so it wins over the rules above.
+        ...(readOnly && {
+            bgcolor: FIORI.headerBg,
+            '&:focus-within': { borderColor: border },
+            '& .ql-toolbar.ql-snow': { display: 'none' },
+            '& .ql-editor': { minHeight: 'auto', color: FIORI.textPrimary, padding: '10px 12px' },
+        }),
+    };
+}
+
+export default function RichTextEditor({ value, onChange, placeholder, readOnly, imageUploadUrl, valueState = 'none' }: RichTextEditorProps) {
     const [Quill, setQuill] = useState<ComponentType<any> | null>(null);
     const quillRef = useRef<any>(null);
 
@@ -83,23 +202,20 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly,
     );
 
     if (!Quill) {
-        return <Box sx={{ minHeight: 200, border: 1, borderColor: 'divider', borderRadius: 1 }} />;
+        return (
+            <Box
+                sx={{
+                    minHeight: 220,
+                    border: `1px solid ${FIORI.borderStrong}`,
+                    borderRadius: '0.375rem',
+                    bgcolor: FIORI.surface,
+                }}
+            />
+        );
     }
 
     return (
-        <Box sx={{
-            '& .ql-container': {
-                minHeight: 200,
-                borderBottomLeftRadius: 4,
-                borderBottomRightRadius: 4,
-                fontFamily: 'inherit',
-                fontSize: '0.9rem',
-            },
-            '& .ql-toolbar': {
-                borderTopLeftRadius: 4,
-                borderTopRightRadius: 4,
-            }
-        }}>
+        <Box sx={fioriQuillSx(valueState, Boolean(readOnly))}>
             <Quill
                 ref={quillRef}
                 theme="snow"

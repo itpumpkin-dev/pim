@@ -29,7 +29,7 @@ import { HistoryPanel } from '@/components/history-panel';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { useLocale } from '@/hooks/use-locale';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 import { UI_BORDER } from '@/lib/ui-style';
 import type { MarketplacePlatform } from '@/components/marketplace-category-picker';
 
@@ -406,15 +406,7 @@ export default function ProductShow({
             <Head title={`View Product | SKU: ${product.sku}`} />
             <Box sx={{ bgcolor: FIORI.pageBg, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <Box sx={{ bgcolor: FIORI.surface, px: { xs: 2, md: 4 } }}>
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
-                        sx={{
-                            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '0.95rem', minWidth: 100, color: FIORI.textSecondary },
-                            '& .Mui-selected': { color: FIORI.brand },
-                            '& .MuiTabs-indicator': { bgcolor: FIORI.brand, height: 2 },
-                        }}
-                    >
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsSx}>
                         <Tab label="General" />
                         {canViewHistory && <Tab label="History" />}
                     </Tabs>

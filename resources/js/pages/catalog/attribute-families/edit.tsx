@@ -41,7 +41,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
+import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -306,7 +306,7 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                     <Tabs
                         value={tabIndex}
                         onChange={(_, v) => setTabIndex(v)}
-                        sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}
+                        sx={{ ...fioriTabsSx, mb: 3 }}
                     >
                         <Tab label="General" />
                         <Tab label="History" />

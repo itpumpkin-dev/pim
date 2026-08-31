@@ -85,6 +85,55 @@ export function fioriFieldStateSx(state: FioriValueState): SxProps<Theme> {
     };
 }
 
+/**
+ * `sx` for a MUI multi-select `Autocomplete` styled as a SAP Fiori
+ * "MultiInput": squared-off tokens (not pills) with a thin border sitting
+ * inside a compact Fiori field, plus the value-state border/tint on error.
+ * ref: sap.com/design-system/fiori-design-web → UI elements → MultiInput
+ */
+export function fioriMultiInputSx(state: FioriValueState): SxProps<Theme> {
+    const base = {
+        '& .MuiAutocomplete-inputRoot': {
+            bgcolor: FIORI.surface,
+            borderRadius: '0.375rem',
+            padding: '3px 8px',
+            gap: '4px',
+            '& fieldset': { borderColor: FIORI.borderStrong, transition: 'border-color 0.1s ease' },
+            '&:hover fieldset': { borderColor: FIORI.brand },
+            '&.Mui-focused fieldset': { borderColor: FIORI.brand, borderWidth: '1px' },
+        },
+        '& .MuiAutocomplete-input': { minWidth: 60, fontSize: '0.875rem', padding: '4px 0' },
+        // Fiori token: rectangular, subtle fill, 1px border — never a pill
+        '& .MuiAutocomplete-tag': {
+            margin: 0,
+            height: 22,
+            borderRadius: '0.25rem',
+            backgroundColor: FIORI.brandBg,
+            border: `1px solid ${FIORI.borderStrong}`,
+            color: FIORI.textPrimary,
+            fontSize: '0.8125rem',
+            '& .MuiChip-deleteIcon': { color: FIORI.textSecondary, fontSize: 16, '&:hover': { color: FIORI.error } },
+        },
+    } as const;
+
+    if (state === 'none') {
+        return base;
+    }
+
+    const { fg, bg, borderWidth } = STATE_COLOR[state];
+
+    return {
+        ...base,
+        '& .MuiAutocomplete-inputRoot': {
+            ...base['& .MuiAutocomplete-inputRoot'],
+            bgcolor: bg,
+            '& fieldset': { borderColor: fg, borderWidth },
+            '&:hover fieldset': { borderColor: fg, borderWidth },
+            '&.Mui-focused fieldset': { borderColor: fg, borderWidth },
+        },
+    };
+}
+
 interface FioriFormGroupProps {
     title?: ReactNode;
     description?: ReactNode;

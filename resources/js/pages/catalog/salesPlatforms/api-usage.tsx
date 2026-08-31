@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriCardSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriCardSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface Operation {
     method: string;
@@ -125,7 +125,7 @@ export default function MarketplaceApiUsage({ platforms }: Props) {
                     <Tabs
                         value={activeKey}
                         onChange={(_, value: string) => setActiveKey(value)}
-                        sx={{ px: 2, borderBottom: `1px solid ${FIORI.border}` }}
+                        sx={{ ...fioriTabsSx, px: 2 }}
                     >
                         {platformKeys.map((key) => (
                             <Tab

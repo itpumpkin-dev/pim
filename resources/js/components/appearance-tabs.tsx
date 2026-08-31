@@ -1,12 +1,13 @@
 import { type Appearance, useAppearance } from '@/hooks/use-appearance';
+import { fioriToggleButtonGroupSx } from '@/lib/fiori-style';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
-import { ToggleButton, ToggleButtonGroup, type ToggleButtonGroupProps } from '@mui/material';
+import { ToggleButton, ToggleButtonGroup, type ToggleButtonGroupProps, type SxProps, type Theme } from '@mui/material';
 
 type AppearanceTabsProps = Omit<ToggleButtonGroupProps, 'value' | 'onChange' | 'exclusive'>;
 
-export default function AppearanceToggleTab(props: AppearanceTabsProps) {
+export default function AppearanceToggleTab({ sx, ...props }: AppearanceTabsProps) {
     const { appearance, updateAppearance } = useAppearance();
 
     return (
@@ -19,6 +20,7 @@ export default function AppearanceToggleTab(props: AppearanceTabsProps) {
                     updateAppearance(value);
                 }
             }}
+            sx={[fioriToggleButtonGroupSx, ...(Array.isArray(sx) ? sx : [sx])] as SxProps<Theme>}
             {...props}
         >
             <ToggleButton value="light">

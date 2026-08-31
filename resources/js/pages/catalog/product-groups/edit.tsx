@@ -30,7 +30,7 @@ import { TikTokCategoryPicker, type TikTokCategoryOption } from '@/components/ca
 import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/components/catalog/woocommerce-category-picker';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface GroupData {
     id: number;
@@ -113,7 +113,7 @@ export default function ProductGroupEdit({ group, thumbnailUrl, translations, ca
             <Head title={`${t('editProductGroup')}: ${group.code}`} />
             <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
                 {canViewHistory && (
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ ...fioriTabsSx, mb: 3 }}>
                         <Tab label="General" />
                         <Tab label="History" />
                     </Tabs>

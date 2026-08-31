@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
@@ -31,6 +32,10 @@ interface BrandDetail {
     description: string | null;
     parent_id: number | null;
     thumbnail_url: string | null;
+    shopee_brand_id: number | null;
+    lazada_brand_id: number | null;
+    tiktok_brand_id: number | null;
+    woocommerce_brand_id: number | null;
 }
 
 interface ParentOption {
@@ -60,6 +65,10 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
         parent_id: (brand.parent_id !== null ? brand.parent_id : '') as string | number,
         description: brand.description || '',
         thumbnail: null as File | null,
+        shopee_brand_id: brand.shopee_brand_id,
+        lazada_brand_id: brand.lazada_brand_id,
+        tiktok_brand_id: brand.tiktok_brand_id,
+        woocommerce_brand_id: brand.woocommerce_brand_id,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -179,6 +188,38 @@ export default function BrandEdit({ brand, translations, parentOptions }: Props)
                                 ) : null}
                             </Stack>
                         </FioriField>
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('marketplaceBrandTitle')}>
+                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 1 }}>
+                            {t('marketplaceBrandHelperText')}
+                        </Typography>
+                        <Stack spacing={2}>
+                            <MarketplaceBrandPicker
+                                platform="shopee"
+                                label={t('shopeeBrandLabel')}
+                                value={data.shopee_brand_id}
+                                onChange={(id) => setData('shopee_brand_id', id)}
+                            />
+                            <MarketplaceBrandPicker
+                                platform="lazada"
+                                label={t('lazadaBrandLabel')}
+                                value={data.lazada_brand_id}
+                                onChange={(id) => setData('lazada_brand_id', id)}
+                            />
+                            <MarketplaceBrandPicker
+                                platform="tiktok"
+                                label={t('tiktokBrandLabel')}
+                                value={data.tiktok_brand_id}
+                                onChange={(id) => setData('tiktok_brand_id', id)}
+                            />
+                            <MarketplaceBrandPicker
+                                platform="woocommerce"
+                                label={t('woocommerceBrandLabel')}
+                                value={data.woocommerce_brand_id}
+                                onChange={(id) => setData('woocommerce_brand_id', id)}
+                            />
+                        </Stack>
                     </FioriFormGroup>
                 </Stack>
 

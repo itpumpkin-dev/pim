@@ -308,6 +308,12 @@ class BrandController extends Controller
                 'description' => $brand->description,
                 'parent_id' => $brand->parent_id,
                 'thumbnail_url' => AttributeValueFormatter::resolveStorageUrl($brand->thumbnail),
+                // Brand-level marketplace mapping (each platform's own brand id).
+                // The picker resolves the name from the id on its own.
+                'shopee_brand_id' => $brand->shopee_brand_id,
+                'lazada_brand_id' => $brand->lazada_brand_id,
+                'tiktok_brand_id' => $brand->tiktok_brand_id,
+                'woocommerce_brand_id' => $brand->woocommerce_brand_id,
             ],
             'translations' => $translations,
             'parentOptions' => $this->parentOptionsList($attribute, excludeId: $brand->id),
@@ -331,6 +337,10 @@ class BrandController extends Controller
                 Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
                 Rule::notIn([$brand->id]),
             ],
+            'shopee_brand_id' => ['nullable', 'integer', Rule::exists('shopee_brands', 'id')],
+            'lazada_brand_id' => ['nullable', 'integer', Rule::exists('lazada_brands', 'id')],
+            'tiktok_brand_id' => ['nullable', 'integer', Rule::exists('tiktok_brands', 'id')],
+            'woocommerce_brand_id' => ['nullable', 'integer', Rule::exists('woocommerce_brands', 'id')],
         ]);
 
         $translations = $validated['translations'] ?? [];
@@ -347,6 +357,10 @@ class BrandController extends Controller
             'slug' => $validated['slug'] ?? null,
             'description' => $validated['description'] ?? null,
             'thumbnail' => $thumbnailPath,
+            'shopee_brand_id' => $validated['shopee_brand_id'] ?? null,
+            'lazada_brand_id' => $validated['lazada_brand_id'] ?? null,
+            'tiktok_brand_id' => $validated['tiktok_brand_id'] ?? null,
+            'woocommerce_brand_id' => $validated['woocommerce_brand_id'] ?? null,
         ]);
 
         $this->syncTranslations($brand, $translations);
@@ -943,7 +957,10 @@ class BrandController extends Controller
     {
         $prefix = "option#{$option->id}";
 
-        return collect($option->only(['code', 'admin_label', 'slug', 'description', 'thumbnail', 'parent_id']))
+        return collect($option->only([
+            'code', 'admin_label', 'slug', 'description', 'thumbnail', 'parent_id',
+            'shopee_brand_id', 'lazada_brand_id', 'tiktok_brand_id', 'woocommerce_brand_id',
+        ]))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
             ->all();
     }

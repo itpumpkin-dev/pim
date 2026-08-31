@@ -128,6 +128,35 @@ export function getTheme(mode: PaletteMode) {
                     },
                 },
             },
+            // SAP Fiori (Horizon) "Checkbox": app-wide via the theme so every
+            // <Checkbox> matches without per-file changes — a bordered box that
+            // fills with the brand blue (the app's single Fiori accent, same as
+            // the switch/toggle/tab indicator) when checked or indeterminate.
+            // ref: sap.com/design-system/fiori-design-web → UI elements → Checkbox
+            MuiCheckbox: {
+                styleOverrides: {
+                    root: {
+                        color: 'var(--fiori-border-strong)',
+                        '&:hover': {
+                            color: 'var(--fiori-brand)',
+                            backgroundColor: 'var(--fiori-hover)',
+                        },
+                        '&.Mui-checked, &.MuiCheckbox-indeterminate': {
+                            color: 'var(--fiori-brand)',
+                        },
+                        '&.Mui-checked:hover, &.MuiCheckbox-indeterminate:hover': {
+                            color: 'var(--fiori-brand)',
+                            backgroundColor: 'var(--fiori-hover)',
+                        },
+                        '&.Mui-disabled': {
+                            color: 'var(--fiori-border)',
+                        },
+                        '&.Mui-focusVisible': {
+                            backgroundColor: 'var(--fiori-hover)',
+                        },
+                    },
+                },
+            },
         },
     };
 
