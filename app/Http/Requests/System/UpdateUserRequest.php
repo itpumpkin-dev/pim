@@ -36,10 +36,8 @@ class UpdateUserRequest extends FormRequest
             'enabled' => ['required', 'boolean'],
             'avatar' => ['nullable', 'image', 'max:2048'],
 
-            'groups' => ['array'],
-            'groups.*' => ['integer', 'exists:user_groups,id'],
-            'roles' => ['required', 'array', 'min:1'],
-            'roles.*' => ['integer', 'exists:roles,id'],
+            // Group/role assignments are saved separately — see
+            // UserController::updateAccess() and the "Groups and Roles" tab.
 
             'password' => ['nullable', 'confirmed', Password::defaults()],
 

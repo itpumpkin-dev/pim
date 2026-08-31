@@ -25,6 +25,10 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('user/{user}/edit', [UserController::class, 'edit'])->name('user.edit');
     Route::get('user/{user}/history', [UserController::class, 'history'])->name('user.history');
     Route::put('user/{user}', [UserController::class, 'update'])->name('user.update');
+    // Group/role assignment saves independently from the main profile form (the
+    // "Groups and Roles" tab has its own Save). Strictly a manager action, so —
+    // unlike the self-service edit/update routes above — it is permission-gated.
+    Route::put('user/{user}/access', [UserController::class, 'updateAccess'])->name('user.updateAccess')->middleware('permission:users,edit_users');
     Route::delete('user/{user}', [UserController::class, 'destroy'])->name('user.destroy')->middleware('permission:users,delete_users');
 
     Route::get('userGroup', [UserGroupController::class, 'index'])->name('userGroup.index')->middleware('permission:user_groups,list_user_groups');

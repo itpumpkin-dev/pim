@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateJsonLabelsJob;
 use App\Models\CategoryField;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
+use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -160,12 +160,15 @@ class CategoryFieldController extends Controller
             return;
         }
 
-        AutoTranslateJsonLabelsJob::dispatch(
+        TranslationTracking::dispatchJsonLabels(
             CategoryField::class,
             $field->id,
             'labels',
             $sourceLocaleId,
             $sourceLabel,
+            'category_fields',
+            $field->code,
+            auth()->id(),
         );
     }
 

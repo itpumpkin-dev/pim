@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Category;
 use App\Models\CategoryTranslation;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use Illuminate\Console\Command;
 
@@ -32,10 +33,12 @@ class TranslateMissingCategoryLabels extends Command
         $dispatched = 0;
         $skipped = 0;
 
+        $tracker = JobTracker::openTranslation('categories', 'console:translate-missing-category-labels', null);
+
         Category::query()
             ->with('translations')
             ->orderBy('id')
-            ->chunk(200, function ($categories) use ($defaultLocaleId, &$dispatched, &$skipped) {
+            ->chunk(200, function ($categories) use ($defaultLocaleId, $tracker, &$dispatched, &$skipped) {
                 foreach ($categories as $category) {
                     $translations = $category->translations
                         ->mapWithKeys(fn (CategoryTranslation $t) => [(string) $t->locale_id => $t->label])
@@ -48,16 +51,22 @@ class TranslateMissingCategoryLabels extends Command
                         continue;
                     }
 
+                    $tracker->noteTranslationQueued();
                     AutoTranslateLabelsJob::dispatch(
                         CategoryTranslation::class,
                         'category_id',
                         $category->id,
                         $sourceLocaleId,
                         $sourceLabel,
+                        $tracker->id,
                     );
                     $dispatched++;
                 }
             });
+
+        if ($dispatched === 0) {
+            $tracker->update(['status' => 'completed', 'completed_at' => now()]);
+        }
 
         $this->info("Queued {$dispatched} categories for translation; skipped {$skipped} with no label in any locale.");
 

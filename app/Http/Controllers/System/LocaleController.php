@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\System;
 
 use App\Http\Controllers\Controller;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use App\Services\GridManager;
 use App\Services\LocaleTranslationService;
@@ -26,6 +27,37 @@ class LocaleController extends Controller
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
             'filters' => $request->only(['search', 'sort', 'dir']),
+            // Standalone auto-translation runs (job_type = 'translation'),
+            // newest first — powers the "Translation Jobs" tab. Only the last
+            // 50 so the payload stays small; the tab is a live status view,
+            // not a full history log.
+            'translationJobs' => JobTracker::where('job_type', 'translation')
+                ->with('user:id,username,first_name,last_name')
+                ->latest('id')
+                ->limit(50)
+                ->get([
+                    'id', 'entity_type', 'config_code', 'status', 'user_id',
+                    'total_translations_queued', 'total_translations_completed',
+                    'error_log', 'started_at', 'completed_at', 'created_at',
+                ])
+                ->map(function (JobTracker $j) {
+                    $userName = $j->user?->username
+                        ?: trim(($j->user?->first_name ?? '') . ' ' . ($j->user?->last_name ?? ''));
+
+                    return [
+                        'id' => $j->id,
+                        'entity_type' => $j->entity_type,
+                        'reference' => $j->config_code,
+                        'status' => $j->status,
+                        'queued' => $j->total_translations_queued,
+                        'completed' => $j->total_translations_completed,
+                        'errors' => is_array($j->error_log) ? count($j->error_log) : 0,
+                        'user' => $userName !== '' ? $userName : null,
+                        'started_at' => $j->started_at?->toIso8601String(),
+                        'completed_at' => $j->completed_at?->toIso8601String(),
+                        'created_at' => $j->created_at?->toIso8601String(),
+                    ];
+                }),
         ]);
     }
 

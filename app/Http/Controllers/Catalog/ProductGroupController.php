@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\CategoryTranslation;
 use App\Models\Locale;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\CodeGenerator;
+use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -402,12 +402,15 @@ class ProductGroupController extends Controller
             return;
         }
 
-        AutoTranslateLabelsJob::dispatch(
+        TranslationTracking::dispatchLabels(
             CategoryTranslation::class,
             'category_id',
             $category->id,
             $sourceLocaleId,
             $sourceLabel,
+            'product_groups',
+            $category->code,
+            auth()->id(),
         );
     }
 

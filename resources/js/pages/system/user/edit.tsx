@@ -118,8 +118,6 @@ interface UserForm {
     job_position_id: number | '';
     enabled: boolean;
     avatar: File | null;
-    groups: number[];
-    roles: number[];
     password: string;
     password_confirmation: string;
     ui_locale_id: number | '';
@@ -275,18 +273,36 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
         job_position_id: user.job_position_id ?? '',
         enabled: user.enabled,
         avatar: null,
-        groups: user.group_ids,
-        roles: user.role_ids,
         password: '',
         password_confirmation: '',
         ui_locale_id: user.ui_locale_id ?? '',
         timezone: user.timezone,
     });
-    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
+
+    // The "Groups and Roles" tab saves on its own PUT (system.user.updateAccess),
+    // independent of the main profile form above — so its fields live in their
+    // own useForm with their own dirty/processing/errors state.
+    const accessForm = useForm<{ groups: number[]; roles: number[] }>({
+        groups: user.group_ids,
+        roles: user.role_ids,
+    });
+
+    const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty || accessForm.isDirty);
 
     const update = (key: keyof UserForm, value: UserForm[keyof UserForm]) => {
         setData(key, value);
         clearErrors(key as string);
+    };
+
+    const saveAccess = () => {
+        skipNavigationGuardRef.current = true;
+        accessForm.put(route('system.user.updateAccess', user.id), {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => {
+                skipNavigationGuardRef.current = false;
+            },
+        });
     };
 
     const performSubmit = () => {
@@ -554,12 +570,15 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                                 size="small"
                                 options={groups}
                                 getOptionLabel={(option) => option.name}
-                                value={groups.filter((g) => data.groups.includes(g.id))}
-                                onChange={(_, value) => update('groups', value.map((v) => v.id))}
+                                value={groups.filter((g) => accessForm.data.groups.includes(g.id))}
+                                onChange={(_, value) => {
+                                    accessForm.setData('groups', value.map((v) => v.id));
+                                    accessForm.clearErrors('groups');
+                                }}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => <Chip label={option.name} {...getTagProps({ index })} key={option.id} />)
                                 }
-                                renderInput={(params) => <TextField {...params} error={Boolean(errors.groups)} helperText={errors.groups} />}
+                                renderInput={(params) => <TextField {...params} error={Boolean(accessForm.errors.groups)} helperText={accessForm.errors.groups} />}
                             />
                         </Box>
 
@@ -572,13 +591,29 @@ export default function UserEdit({ user, groups, roles, localeOptions, timezones
                                 size="small"
                                 options={roles}
                                 getOptionLabel={(option) => option.label}
-                                value={roles.filter((r) => data.roles.includes(r.id))}
-                                onChange={(_, value) => update('roles', value.map((v) => v.id))}
+                                value={roles.filter((r) => accessForm.data.roles.includes(r.id))}
+                                onChange={(_, value) => {
+                                    accessForm.setData('roles', value.map((v) => v.id));
+                                    accessForm.clearErrors('roles');
+                                }}
                                 renderTags={(value, getTagProps) =>
                                     value.map((option, index) => <Chip label={option.label} {...getTagProps({ index })} key={option.id} />)
                                 }
-                                renderInput={(params) => <TextField {...params} error={Boolean(errors.roles)} helperText={errors.roles} />}
+                                renderInput={(params) => <TextField {...params} error={Boolean(accessForm.errors.roles)} helperText={accessForm.errors.roles} />}
                             />
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                            <Button
+                                type="button"
+                                onClick={saveAccess}
+                                variant="contained"
+                                disabled={accessForm.processing || !accessForm.isDirty}
+                                startIcon={accessForm.processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                                sx={{ ...fioriEmphasizedSx, px: 4 }}
+                            >
+                                {accessForm.processing ? t('saving').toUpperCase() : t('saveGroupsAndRoles').toUpperCase()}
+                            </Button>
                         </Box>
                     </Box>
                 )}

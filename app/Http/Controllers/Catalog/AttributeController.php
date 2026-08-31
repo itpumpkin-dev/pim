@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
@@ -14,6 +13,7 @@ use App\Models\Locale;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\SpreadsheetWriter;
+use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -382,12 +382,15 @@ class AttributeController extends Controller
             return;
         }
 
-        AutoTranslateLabelsJob::dispatch(
+        TranslationTracking::dispatchLabels(
             AttributeTranslation::class,
             'attribute_id',
             $attribute->id,
             $sourceLocaleId,
             $sourceLabel,
+            'attributes',
+            $attribute->code,
+            auth()->id(),
         );
     }
 

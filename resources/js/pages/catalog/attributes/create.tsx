@@ -72,7 +72,9 @@ export default function AttributeCreate() {
         swatch_type: '',
         is_required: false,
         is_unique: false,
-        is_locale_based: false,
+        // ตั้งค่าเริ่มต้นให้ติ๊ก "ค่าต่อภาษา" ไว้ — แอตทริบิวต์ส่วนใหญ่ที่สร้างใหม่
+        // ต้องการค่าแยกตามภาษาอยู่แล้ว ผู้ใช้ติ๊กออกเองได้ถ้าไม่ต้องการ
+        is_locale_based: true,
         is_ai_translate: true,
         is_channel_based: false,
         is_filterable: false,

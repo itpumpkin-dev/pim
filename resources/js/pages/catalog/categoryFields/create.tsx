@@ -27,7 +27,9 @@ export default function CategoryFieldCreate() {
         labels: {} as Record<string, string>,
         options: [] as string[],
         is_required: false,
-        is_ai_translate: false,
+        // ตั้งค่าเริ่มต้นให้ติ๊ก "AI translate" ไว้ — ฟิลด์หมวดหมู่ที่สร้างใหม่
+        // ส่วนใหญ่ต้องการ label ครบทุกภาษา (จับคู่พฤติกรรมกับหน้าสร้าง Attribute)
+        is_ai_translate: true,
         status: true,
         position: 0,
         display_section: 'General',

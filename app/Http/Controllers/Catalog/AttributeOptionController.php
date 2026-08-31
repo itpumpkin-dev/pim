@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
+use App\Support\TranslationTracking;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -237,12 +237,15 @@ class AttributeOptionController extends Controller
             return;
         }
 
-        AutoTranslateLabelsJob::dispatch(
+        TranslationTracking::dispatchLabels(
             AttributeOptionTranslation::class,
             'attribute_option_id',
             $option->id,
             $sourceLocaleId,
             $sourceLabel,
+            'attribute_options',
+            $option->code,
+            auth()->id(),
         );
     }
 

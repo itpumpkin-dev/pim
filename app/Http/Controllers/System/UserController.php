@@ -203,40 +203,101 @@ class UserController extends Controller
     }
 
     /**
-     * Full activity timeline for this user: profile changes, group/role
-     * assignments, password resets, and login/logout events - anything
-     * audited against the user record, newest first.
+     * Events recorded straight against the user record (login/logout are
+     * flagged separately from account changes downstream).
+     */
+    private const TIMELINE_SIGNIN_EVENTS = ['login', 'logout', 'login_failed'];
+
+    /**
+     * Full activity timeline for this user, newest first, split into three
+     * streams the UI can filter by:
+     *  - signin : login / logout / failed sign-in attempts
+     *  - account: changes to this user's own record (profile, password,
+     *             group & role assignments)
+     *  - work   : things this user did as the actor elsewhere in the app
+     *             (created/edited a product, a category, ...)
      */
     public function history(Request $request, User $user): JsonResponse
     {
         $this->authorizeUserAccess($request, $user);
 
-        $logs = AuditLog::where('auditable_type', $user->getMorphClass())
-            ->where('auditable_id', $user->getKey())
+        $logs = AuditLog::query()
+            ->where(function ($q) use ($user) {
+                // audited against this user's own record
+                $q->where(fn ($sub) => $sub
+                    ->where('auditable_type', $user->getMorphClass())
+                    ->where('auditable_id', $user->getKey()))
+                    // actions this user performed as the actor
+                    ->orWhere('user_id', $user->getKey())
+                    // failed sign-ins carry no actor/auditable, only the
+                    // attempted email (see AuditAuthEventSubscriber)
+                    ->orWhere(fn ($sub) => $sub
+                        ->where('event', 'login_failed')
+                        ->where('new_values->email', $user->email));
+            })
             ->orderByDesc('created_at')
             ->with('user:id,first_name,last_name,email')
+            ->limit(400)
             ->get();
 
         return response()->json([
-            'timeline' => $logs->map(fn (AuditLog $log) => [
-                'event' => $log->event,
-                // ISO 8601 with an explicit UTC offset — see the same fix
-                // in HasVersionHistory::versionHistoryFor().
-                'created_at' => $log->created_at?->toIso8601String(),
-                'actor' => $log->user ? ($log->user->name ?: $log->user->email) : 'System',
-                'diff' => $this->diffFor($log),
-            ])->values(),
+            'timeline' => $logs->map(function (AuditLog $log) use ($user) {
+                $category = $this->timelineCategory($log, $user);
+
+                return [
+                    'event' => $log->event,
+                    'category' => $category,
+                    // for 'work' rows: what was acted on, e.g. Product #123
+                    'subject_type' => $category === 'work' && $log->auditable_type
+                        ? class_basename($log->auditable_type)
+                        : null,
+                    'subject_id' => $category === 'work' ? $log->auditable_id : null,
+                    // ISO 8601 with an explicit UTC offset — see the same fix
+                    // in HasVersionHistory::versionHistoryFor().
+                    'created_at' => $log->created_at?->toIso8601String(),
+                    'actor' => $log->user ? ($log->user->name ?: $log->user->email) : 'System',
+                    'diff' => $this->diffFor($log),
+                ];
+            })->values(),
         ]);
+    }
+
+    private function timelineCategory(AuditLog $log, User $user): string
+    {
+        if (in_array($log->event, self::TIMELINE_SIGNIN_EVENTS, true)) {
+            return 'signin';
+        }
+
+        if ($log->auditable_type === $user->getMorphClass() && (int) $log->auditable_id === $user->getKey()) {
+            return 'account';
+        }
+
+        return 'work';
     }
 
     private function diffFor(AuditLog $log): array
     {
         $old = $log->old_values ?? [];
         $new = $log->new_values ?? [];
+
+        // Some events store a bare list rather than a field => value map
+        // (e.g. permissions_granted → [{resource, action}, ...]). A per-key
+        // table over 0, 1, 2, ... is meaningless there — and would blow up
+        // the frontend's humanize() — so collapse it to a single row.
+        $oldIsList = ! empty($old) && array_is_list($old);
+        $newIsList = ! empty($new) && array_is_list($new);
+        if ($oldIsList || $newIsList) {
+            return [[
+                'key' => 'items',
+                'old' => $old ?: null,
+                'new' => $new ?: null,
+            ]];
+        }
+
         $keys = array_unique(array_merge(array_keys($old), array_keys($new)));
 
         return collect($keys)->map(fn ($key) => [
-            'key' => $key,
+            'key' => (string) $key,
             'old' => $old[$key] ?? null,
             'new' => $new[$key] ?? null,
         ])->values()->all();
@@ -280,29 +341,12 @@ class UserController extends Controller
 
         // A disabled account must be logged out immediately, not just
         // blocked from logging in again — an already-open session shouldn't
-        // keep working.
+        // keep working. Group/role changes trigger the same invalidation, but
+        // those are saved through updateAccess() now, not here.
         $justDisabled = $canManageAccess && $wasEnabled && ! $user->enabled;
 
-        if ($canManageAccess) {
-            $oldGroupIds = $user->groups->pluck('id')->all();
-            $newGroupIds = array_map('intval', $request->input('groups', []));
-            $user->groups()->sync($newGroupIds);
-            $groupsChanged = $this->idsChanged($oldGroupIds, $newGroupIds);
-            if ($groupsChanged) {
-                AuditLog::record('groups_updated', $user, ['group_ids' => $oldGroupIds], ['group_ids' => $newGroupIds]);
-            }
-
-            $oldRoleIds = $user->roles->pluck('id')->all();
-            $newRoleIds = array_map('intval', $request->input('roles', []));
-            $user->roles()->sync($newRoleIds);
-            $rolesChanged = $this->idsChanged($oldRoleIds, $newRoleIds);
-            if ($rolesChanged) {
-                AuditLog::record('roles_updated', $user, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
-            }
-
-            if ($groupsChanged || $rolesChanged || $justDisabled) {
-                SessionInvalidator::usersExceptCurrentActor([$user->id]);
-            }
+        if ($justDisabled) {
+            SessionInvalidator::usersExceptCurrentActor([$user->id]);
         }
 
         if ($request->user()->hasPermission('users', 'list_users')) {
@@ -310,6 +354,48 @@ class UserController extends Controller
         }
 
         return to_route('system.user.edit', $user)->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Saves just the user's group and role assignments — the "Groups and Roles"
+     * tab on the edit screen has its own Save, independent of the main profile
+     * form. Route-gated by `users.edit_users`; the check is repeated here so the
+     * guarantee lives with the action too.
+     */
+    public function updateAccess(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->hasPermission('users', 'edit_users'), 403);
+
+        $validated = $request->validate([
+            'groups' => ['array'],
+            'groups.*' => ['integer', 'exists:user_groups,id'],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['integer', 'exists:roles,id'],
+        ]);
+
+        $oldGroupIds = $user->groups->pluck('id')->all();
+        $newGroupIds = array_map('intval', $validated['groups'] ?? []);
+        $user->groups()->sync($newGroupIds);
+        $groupsChanged = $this->idsChanged($oldGroupIds, $newGroupIds);
+        if ($groupsChanged) {
+            AuditLog::record('groups_updated', $user, ['group_ids' => $oldGroupIds], ['group_ids' => $newGroupIds]);
+        }
+
+        $oldRoleIds = $user->roles->pluck('id')->all();
+        $newRoleIds = array_map('intval', $validated['roles']);
+        $user->roles()->sync($newRoleIds);
+        $rolesChanged = $this->idsChanged($oldRoleIds, $newRoleIds);
+        if ($rolesChanged) {
+            AuditLog::record('roles_updated', $user, ['role_ids' => $oldRoleIds], ['role_ids' => $newRoleIds]);
+        }
+
+        // Same reasoning as update()'s $justDisabled path: a change to what an
+        // account can do must not keep applying to sessions already open.
+        if ($groupsChanged || $rolesChanged) {
+            SessionInvalidator::usersExceptCurrentActor([$user->id]);
+        }
+
+        return back()->with('success', 'Groups and roles updated successfully.');
     }
 
     /**

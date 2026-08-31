@@ -14,6 +14,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
+    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
@@ -27,6 +28,8 @@ import {
     Paper,
     Select,
     Stack,
+    Tab,
+    Tabs,
     TextField,
     Tooltip,
     Typography,
@@ -103,15 +106,48 @@ interface GridData {
     last_page?: number;
     per_page?: number;
 }
+
+type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+interface TranslationJob {
+    id: number;
+    entity_type: string;
+    reference: string;
+    status: JobStatus;
+    queued: number;
+    completed: number;
+    errors: number;
+    user: string | null;
+    started_at: string | null;
+    completed_at: string | null;
+    created_at: string | null;
+}
+
 interface Props {
     gridConfig: GridConfig;
     gridData: GridData;
     filters: { search?: string; sort?: string; dir?: string };
+    translationJobs: TranslationJob[];
 }
 
 const ACTIVE_TRANSLATION_STATUSES: TranslationStatus[] = ['queued', 'translating'];
+const ACTIVE_JOB_STATUSES: JobStatus[] = ['pending', 'processing'];
 
-export default function LocaleIndex({ gridData, filters }: Props) {
+const JOB_STATUS_TONE: Record<JobStatus, FioriTone> = {
+    pending: 'information',
+    processing: 'information',
+    completed: 'success',
+    failed: 'error',
+};
+
+const JOB_STATUS_LABEL_KEY: Record<JobStatus, string> = {
+    pending: 'translationQueued',
+    processing: 'translationTranslating',
+    completed: 'translationCompleted',
+    failed: 'translationFailed',
+};
+
+export default function LocaleIndex({ gridData, filters, translationJobs }: Props) {
     const { t } = useTranslation('grid');
     const { t: tSystem } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
@@ -130,6 +166,7 @@ export default function LocaleIndex({ gridData, filters }: Props) {
     const [perPage, setPerPage] = useState<number>(10);
     const [deleteLocaleId, setDeleteLocaleId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [view, setView] = useState<'locales' | 'jobs'>('locales');
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -162,6 +199,26 @@ export default function LocaleIndex({ gridData, filters }: Props) {
 
         return () => clearInterval(interval);
     }, [gridData]);
+
+    // Poll while any translation job is still running so its progress bar and
+    // status update live — same 3s cadence as the per-locale translation
+    // above. Only the translationJobs prop is refetched, not the whole page.
+    useEffect(() => {
+        if (view !== 'jobs') {
+            return;
+        }
+
+        const hasActive = translationJobs.some((job) => ACTIVE_JOB_STATUSES.includes(job.status));
+        if (!hasActive) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            router.reload({ only: ['translationJobs'] });
+        }, 3000);
+
+        return () => clearInterval(interval);
+    }, [view, translationJobs]);
 
     const startTranslation = (localeId: number) => {
         router.post(
@@ -286,11 +343,11 @@ export default function LocaleIndex({ gridData, filters }: Props) {
             <Head title={tSystem('localesTitle')} />
             <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
                 {/* Header Title & Create Button */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                     <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
                         {tSystem('localesTitle')}
                     </Typography>
-                    {canCreate && (
+                    {canCreate && view === 'locales' && (
                         <Button
                             variant="contained"
                             onClick={() => router.visit('/system/locales/create')}
@@ -301,6 +358,19 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                     )}
                 </Stack>
 
+                <Tabs
+                    value={view}
+                    onChange={(_, v: 'locales' | 'jobs') => setView(v)}
+                    sx={{ mb: 3, borderBottom: `1px solid ${FIORI.border}`, '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 } }}
+                >
+                    <Tab value="locales" label={tSystem('localesTitle')} />
+                    <Tab value="jobs" label={tSystem('translationJobsTab')} />
+                </Tabs>
+
+                {view === 'jobs' ? (
+                    <TranslationJobsPanel jobs={translationJobs} tSystem={tSystem} tGrid={t} />
+                ) : (
+                <>
                 {/* Search & Controls Row */}
                 <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
                     <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
@@ -379,6 +449,8 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                     getRowKey={(row) => row.id}
                     emptyMessage={tSystem('noLocalesFound')}
                 />
+                </>
+                )}
             </Box>
 
             {/* Delete Dialog */}
@@ -414,5 +486,130 @@ export default function LocaleIndex({ gridData, filters }: Props) {
                 </DialogActions>
             </Dialog>
         </AppLayout>
+    );
+}
+
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+    attributes: 'Attributes',
+    attribute_options: 'Attribute Options',
+    categories: 'Categories',
+    category_fields: 'Category Fields',
+    brands: 'Brands',
+    product_groups: 'Product Groups',
+};
+
+function jobDateTime(value: string | null): string {
+    if (!value) return '—';
+    return new Date(value).toLocaleString();
+}
+
+function TranslationJobsPanel({
+    jobs,
+    tSystem,
+    tGrid,
+}: {
+    jobs: TranslationJob[];
+    tSystem: (key: string) => string;
+    tGrid: (key: string) => string;
+}) {
+    const columns: FioriResponsiveColumn<TranslationJob>[] = [
+        {
+            key: 'entity_type',
+            header: tSystem('tjType'),
+            priority: 'always',
+            render: (row) => (
+                <Typography sx={{ fontWeight: 500 }}>{ENTITY_TYPE_LABELS[row.entity_type] ?? row.entity_type}</Typography>
+            ),
+        },
+        {
+            key: 'reference',
+            header: tSystem('tjReference'),
+            priority: 'medium',
+            render: (row) => (
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
+                    {row.reference}
+                </Typography>
+            ),
+        },
+        {
+            key: 'status',
+            header: tGrid('fields.status'),
+            priority: 'high',
+            render: (row) => (
+                <FioriStatus label={tSystem(JOB_STATUS_LABEL_KEY[row.status])} tone={JOB_STATUS_TONE[row.status]} />
+            ),
+        },
+        {
+            key: 'progress',
+            header: tSystem('tjProgress'),
+            priority: 'high',
+            minWidth: 160,
+            render: (row) => {
+                const percent = row.queued > 0 ? Math.round((row.completed / row.queued) * 100) : 100;
+                return (
+                    <Stack spacing={0.5} sx={{ minWidth: 120 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                                {row.completed} / {row.queued}
+                            </Typography>
+                            {row.errors > 0 && (
+                                <Chip
+                                    label={`${row.errors} ${tSystem('tjErrors')}`}
+                                    size="small"
+                                    color="error"
+                                    variant="outlined"
+                                    sx={{ height: 18, fontSize: '0.65rem' }}
+                                />
+                            )}
+                        </Stack>
+                        <LinearProgress
+                            variant="determinate"
+                            value={percent}
+                            sx={{
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: FIORI.border,
+                                '& .MuiLinearProgress-bar': { bgcolor: FIORI[JOB_STATUS_TONE[row.status]] },
+                            }}
+                        />
+                    </Stack>
+                );
+            },
+        },
+        {
+            key: 'user',
+            header: tSystem('tjBy'),
+            priority: 'low',
+            render: (row) => <Typography variant="body2">{row.user ?? '—'}</Typography>,
+        },
+        {
+            key: 'started_at',
+            header: tSystem('tjStarted'),
+            priority: 'low',
+            render: (row) => (
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary, whiteSpace: 'nowrap' }}>
+                    {jobDateTime(row.started_at)}
+                </Typography>
+            ),
+        },
+        {
+            key: 'completed_at',
+            header: tSystem('tjFinished'),
+            priority: 'low',
+            render: (row) => (
+                <Typography variant="body2" sx={{ color: FIORI.textSecondary, whiteSpace: 'nowrap' }}>
+                    {jobDateTime(row.completed_at)}
+                </Typography>
+            ),
+        },
+    ];
+
+    return (
+        <FioriResponsiveTable
+            columns={columns}
+            rows={jobs}
+            getRowKey={(row) => row.id}
+            emptyMessage={tSystem('translationJobsEmpty')}
+        />
     );
 }

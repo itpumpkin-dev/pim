@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\CategoryField;
@@ -26,6 +25,7 @@ use App\Services\Lazada\LazadaClient;
 use App\Services\Shopee\ShopeeClient;
 use App\Services\TikTok\TikTokClient;
 use App\Services\WooCommerce\WooCommerceClient;
+use App\Support\TranslationTracking;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -726,12 +726,15 @@ class CategoryController extends Controller
             return;
         }
 
-        AutoTranslateLabelsJob::dispatch(
+        TranslationTracking::dispatchLabels(
             CategoryTranslation::class,
             'category_id',
             $category->id,
             $sourceLocaleId,
             $sourceLabel,
+            'categories',
+            $category->code,
+            auth()->id(),
         );
     }
 

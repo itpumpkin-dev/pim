@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\JobTracker;
 use App\Services\AttributeAutoTranslator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,17 +33,35 @@ class AutoTranslateJsonLabelsJob implements ShouldQueue
         public string $column,
         public int $sourceLocaleId,
         public string $sourceLabel,
+        // See AutoTranslateLabelsJob::$jobTrackerId.
+        public ?int $jobTrackerId = null,
     ) {
     }
 
     public function handle(AttributeAutoTranslator $translator): void
     {
-        $translator->fillMissingJsonColumn(
-            $this->modelClass,
-            $this->ownerId,
-            $this->column,
-            $this->sourceLocaleId,
-            $this->sourceLabel,
-        );
+        $cancelled = $this->jobTrackerId
+            && JobTracker::where('id', $this->jobTrackerId)->whereNotNull('cancel_requested_at')->exists();
+
+        if (! $cancelled) {
+            $translator->fillMissingJsonColumn(
+                $this->modelClass,
+                $this->ownerId,
+                $this->column,
+                $this->sourceLocaleId,
+                $this->sourceLabel,
+            );
+        }
+
+        if ($this->jobTrackerId) {
+            JobTracker::find($this->jobTrackerId)?->noteTranslationDone();
+        }
+    }
+
+    public function failed(\Throwable $e): void
+    {
+        if ($this->jobTrackerId) {
+            JobTracker::find($this->jobTrackerId)?->noteTranslationDone($e->getMessage());
+        }
     }
 }

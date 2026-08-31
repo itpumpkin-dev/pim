@@ -62,7 +62,7 @@ class LocaleTranslationController extends Controller
             'type' => ['required', 'string', 'in:attributes,attribute_options,categories,category_fields'],
         ]);
 
-        $count = $this->contentCoverage->queueMissing($validated['type'], $locale->id);
+        $count = $this->contentCoverage->queueMissing($validated['type'], $locale->id, $request->user()?->id);
 
         return back()->with('success', "Queued {$count} record(s) for translation.");
     }
@@ -74,7 +74,7 @@ class LocaleTranslationController extends Controller
             'id' => ['required', 'integer'],
         ]);
 
-        $queued = $this->contentCoverage->queueOne($validated['type'], $validated['id']);
+        $queued = $this->contentCoverage->queueOne($validated['type'], $validated['id'], $request->user()?->id);
 
         return back()->with(
             $queued ? 'success' : 'error',

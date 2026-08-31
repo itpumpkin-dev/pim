@@ -11,6 +11,7 @@ use App\Models\AttributeTranslation;
 use App\Models\Category;
 use App\Models\CategoryField;
 use App\Models\CategoryTranslation;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use Illuminate\Database\Eloquent\Model;
 
@@ -28,13 +29,18 @@ class ContentTranslationCoverageService
      */
     public function coverage(int $localeId): array
     {
+        // `name` = the record's fallback label column (raw, not the target
+        // locale) — plain context so whoever's translating can tell what each
+        // row actually is instead of decoding the `code`. tableGroup() fetches
+        // these `without('translations')`, so these accessors return the raw
+        // column, not a locale-resolved value — no extra queries.
         return [
             $this->tableGroup('attributes', 'Attributes', Attribute::class, AttributeTranslation::class, 'attribute_id', $localeId,
-                fn (Attribute $a) => ['id' => $a->id, 'code' => $a->code, 'editUrl' => "/catalog/attributes/{$a->id}/edit"]),
+                fn (Attribute $a) => ['id' => $a->id, 'code' => $a->code, 'name' => (string) $a->name, 'editUrl' => "/catalog/attributes/{$a->id}/edit"]),
             $this->tableGroup('attribute_options', 'Attribute Options', AttributeOption::class, AttributeOptionTranslation::class, 'attribute_option_id', $localeId,
-                fn (AttributeOption $o) => ['id' => $o->id, 'code' => $o->code, 'editUrl' => "/catalog/attributes/{$o->attribute_id}/edit"]),
+                fn (AttributeOption $o) => ['id' => $o->id, 'code' => $o->code, 'name' => (string) ($o->admin_label ?: $o->code), 'editUrl' => "/catalog/attributes/{$o->attribute_id}/edit"]),
             $this->tableGroup('categories', 'Categories', Category::class, CategoryTranslation::class, 'category_id', $localeId,
-                fn (Category $c) => ['id' => $c->id, 'code' => $c->code, 'editUrl' => "/catalog/categories/{$c->id}/edit"]),
+                fn (Category $c) => ['id' => $c->id, 'code' => $c->code, 'name' => (string) $c->name, 'editUrl' => "/catalog/categories/{$c->id}/edit"]),
             $this->categoryFieldGroup($localeId),
         ];
     }
@@ -50,30 +56,48 @@ class ContentTranslationCoverageService
      *
      * @return int number of records queued
      */
-    public function queueMissing(string $type, int $localeId): int
+    public function queueMissing(string $type, int $localeId, ?int $userId = null): int
     {
-        return match ($type) {
-            'attributes' => $this->queueTableGroup(Attribute::class, AttributeTranslation::class, 'attribute_id', $localeId),
-            'attribute_options' => $this->queueTableGroup(AttributeOption::class, AttributeOptionTranslation::class, 'attribute_option_id', $localeId),
-            'categories' => $this->queueTableGroup(Category::class, CategoryTranslation::class, 'category_id', $localeId),
-            'category_fields' => $this->queueCategoryFields($localeId),
+        $tracker = JobTracker::openTranslation($type, "missing:{$type}", $userId);
+
+        $queued = match ($type) {
+            'attributes' => $this->queueTableGroup(Attribute::class, AttributeTranslation::class, 'attribute_id', $localeId, $tracker),
+            'attribute_options' => $this->queueTableGroup(AttributeOption::class, AttributeOptionTranslation::class, 'attribute_option_id', $localeId, $tracker),
+            'categories' => $this->queueTableGroup(Category::class, CategoryTranslation::class, 'category_id', $localeId, $tracker),
+            'category_fields' => $this->queueCategoryFields($localeId, $tracker),
             default => 0,
         };
+
+        // Nothing to translate (or an unknown type) — close the tracker now,
+        // otherwise it sits at "processing" with a 0/0 bar forever.
+        if ($queued === 0) {
+            $tracker->update(['status' => 'completed', 'completed_at' => now()]);
+        }
+
+        return $queued;
     }
 
     /**
      * Same as queueMissing(), for a single record — the per-row "Translate"
      * action on the Content tab.
      */
-    public function queueOne(string $type, int $id): bool
+    public function queueOne(string $type, int $id, ?int $userId = null): bool
     {
-        return match ($type) {
-            'attributes' => $this->queueOneTableRecord(Attribute::find($id), AttributeTranslation::class, 'attribute_id'),
-            'attribute_options' => $this->queueOneTableRecord(AttributeOption::find($id), AttributeOptionTranslation::class, 'attribute_option_id'),
-            'categories' => $this->queueOneTableRecord(Category::find($id), CategoryTranslation::class, 'category_id'),
-            'category_fields' => $this->queueOneCategoryField(CategoryField::find($id)),
+        $tracker = JobTracker::openTranslation($type, "{$type}:{$id}", $userId);
+
+        $queued = match ($type) {
+            'attributes' => $this->queueOneTableRecord(Attribute::find($id), AttributeTranslation::class, 'attribute_id', $tracker),
+            'attribute_options' => $this->queueOneTableRecord(AttributeOption::find($id), AttributeOptionTranslation::class, 'attribute_option_id', $tracker),
+            'categories' => $this->queueOneTableRecord(Category::find($id), CategoryTranslation::class, 'category_id', $tracker),
+            'category_fields' => $this->queueOneCategoryField(CategoryField::find($id), $tracker),
             default => false,
         };
+
+        if (! $queued) {
+            $tracker->update(['status' => 'completed', 'completed_at' => now()]);
+        }
+
+        return $queued;
     }
 
     /**
@@ -123,6 +147,9 @@ class ContentTranslationCoverageService
             'missing' => $missing->map(fn (CategoryField $f) => [
                 'id' => $f->id,
                 'code' => $f->code,
+                // labels is a {localeId: label} JSON map — show whichever label
+                // it does have (prefer the app default) as readable context.
+                'name' => (string) ($this->resolveSource((array) $f->labels)[1] ?: $f->code),
                 'editUrl' => "/catalog/categoryFields/{$f->id}/edit",
             ])->values()->all(),
         ];
@@ -132,7 +159,7 @@ class ContentTranslationCoverageService
      * @param  class-string<Model>  $modelClass
      * @param  class-string<Model>  $translationClass
      */
-    private function queueTableGroup(string $modelClass, string $translationClass, string $foreignKey, int $localeId): int
+    private function queueTableGroup(string $modelClass, string $translationClass, string $foreignKey, int $localeId, ?JobTracker $tracker = null): int
     {
         $translatedIds = $translationClass::where('locale_id', $localeId)
             ->whereNotNull('label')
@@ -161,14 +188,15 @@ class ContentTranslationCoverageService
                 continue;
             }
 
-            AutoTranslateLabelsJob::dispatch($translationClass, $foreignKey, $id, $sourceLocaleId, $sourceLabel);
+            $tracker?->noteTranslationQueued();
+            AutoTranslateLabelsJob::dispatch($translationClass, $foreignKey, $id, $sourceLocaleId, $sourceLabel, $tracker?->id);
             $queued++;
         }
 
         return $queued;
     }
 
-    private function queueCategoryFields(int $localeId): int
+    private function queueCategoryFields(int $localeId, ?JobTracker $tracker = null): int
     {
         $fields = CategoryField::all(['id', 'labels']);
         $queued = 0;
@@ -186,7 +214,8 @@ class ContentTranslationCoverageService
                 continue;
             }
 
-            AutoTranslateJsonLabelsJob::dispatch(CategoryField::class, $field->id, 'labels', $sourceLocaleId, $sourceLabel);
+            $tracker?->noteTranslationQueued();
+            AutoTranslateJsonLabelsJob::dispatch(CategoryField::class, $field->id, 'labels', $sourceLocaleId, $sourceLabel, $tracker?->id);
             $queued++;
         }
 
@@ -196,7 +225,7 @@ class ContentTranslationCoverageService
     /**
      * @param  class-string<Model>  $translationClass
      */
-    private function queueOneTableRecord(?Model $record, string $translationClass, string $foreignKey): bool
+    private function queueOneTableRecord(?Model $record, string $translationClass, string $foreignKey, ?JobTracker $tracker = null): bool
     {
         if (!$record) {
             return false;
@@ -209,12 +238,13 @@ class ContentTranslationCoverageService
             return false;
         }
 
-        AutoTranslateLabelsJob::dispatch($translationClass, $foreignKey, $record->id, $sourceLocaleId, $sourceLabel);
+        $tracker?->noteTranslationQueued();
+        AutoTranslateLabelsJob::dispatch($translationClass, $foreignKey, $record->id, $sourceLocaleId, $sourceLabel, $tracker?->id);
 
         return true;
     }
 
-    private function queueOneCategoryField(?CategoryField $field): bool
+    private function queueOneCategoryField(?CategoryField $field, ?JobTracker $tracker = null): bool
     {
         if (!$field) {
             return false;
@@ -227,7 +257,8 @@ class ContentTranslationCoverageService
             return false;
         }
 
-        AutoTranslateJsonLabelsJob::dispatch(CategoryField::class, $field->id, 'labels', $sourceLocaleId, $sourceLabel);
+        $tracker?->noteTranslationQueued();
+        AutoTranslateJsonLabelsJob::dispatch(CategoryField::class, $field->id, 'labels', $sourceLocaleId, $sourceLabel, $tracker?->id);
 
         return true;
     }

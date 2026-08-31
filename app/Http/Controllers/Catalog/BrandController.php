@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\AutoTranslateLabelsJob;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
@@ -25,6 +24,7 @@ use App\Models\WooCommerceBrand;
 use App\Services\CodeGenerator;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\WooCommerce\WooCommerceClient;
+use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -986,12 +986,15 @@ class BrandController extends Controller
             return;
         }
 
-        AutoTranslateLabelsJob::dispatch(
+        TranslationTracking::dispatchLabels(
             AttributeOptionTranslation::class,
             'attribute_option_id',
             $option->id,
             $sourceLocaleId,
             $sourceLabel,
+            'brands',
+            $option->code,
+            auth()->id(),
         );
     }
 

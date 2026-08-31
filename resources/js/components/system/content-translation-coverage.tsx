@@ -22,6 +22,7 @@ import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-
 export interface ContentMissingRow {
     id: number;
     code: string;
+    name: string;
     editUrl: string;
 }
 
@@ -106,11 +107,14 @@ function ContentGroupCard({
     const filteredMissing = useMemo(() => {
         const needle = search.trim().toLowerCase();
         if (!needle) return group.missing;
-        return group.missing.filter((row) => row.code.toLowerCase().includes(needle));
+        return group.missing.filter(
+            (row) => row.code.toLowerCase().includes(needle) || row.name.toLowerCase().includes(needle),
+        );
     }, [group.missing, search]);
 
-    // Only 2 columns (Code, Actions) — both stay always visible, there's
-    // nothing worth deprioritizing into the pop-in area here.
+    // Code identifies the row and Actions are the point of the table, so both
+    // stay always-visible; Name is readable context that can reflow into the
+    // pop-in area first on a narrow screen.
     const columns: FioriResponsiveColumn<ContentMissingRow>[] = [
         {
             key: 'code',
@@ -118,6 +122,14 @@ function ContentGroupCard({
             priority: 'always',
             render: (row) => (
                 <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.code}</Typography>
+            ),
+        },
+        {
+            key: 'name',
+            header: 'Name',
+            priority: 'high',
+            render: (row) => (
+                <Typography sx={{ fontSize: '0.8rem' }}>{row.name || '—'}</Typography>
             ),
         },
         {
@@ -195,7 +207,7 @@ function ContentGroupCard({
                     <TextField
                         value={search}
                         onChange={(e) => onSearchChange(e.target.value)}
-                        placeholder="Search code"
+                        placeholder="Search code or name"
                         size="small"
                         sx={{ mb: 1, minWidth: 240 }}
                         InputProps={{

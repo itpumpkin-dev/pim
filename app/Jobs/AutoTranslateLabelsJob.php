@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Category;
 use App\Models\CategoryTranslation;
+use App\Models\JobTracker;
 use App\Services\AttributeAutoTranslator;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,18 +35,33 @@ class AutoTranslateLabelsJob implements ShouldQueue
         public int $ownerId,
         public int $sourceLocaleId,
         public string $sourceLabel,
+        // Standalone translation tracker row (JobTracker::openTranslation),
+        // when this was dispatched from a save / bulk "translate missing"
+        // action so the Locales page's "Translation Jobs" tab can show live
+        // progress. Null for callers with no tracker (e.g. an import, which
+        // reports onto its own import tracker instead).
+        public ?int $jobTrackerId = null,
     ) {
     }
 
     public function handle(AttributeAutoTranslator $translator): void
     {
-        $translator->fillMissing(
-            $this->translationModel,
-            $this->foreignKey,
-            $this->ownerId,
-            $this->sourceLocaleId,
-            $this->sourceLabel,
-        );
+        $cancelled = $this->jobTrackerId
+            && JobTracker::where('id', $this->jobTrackerId)->whereNotNull('cancel_requested_at')->exists();
+
+        if (! $cancelled) {
+            $translator->fillMissing(
+                $this->translationModel,
+                $this->foreignKey,
+                $this->ownerId,
+                $this->sourceLocaleId,
+                $this->sourceLabel,
+            );
+        }
+
+        if ($this->jobTrackerId) {
+            JobTracker::find($this->jobTrackerId)?->noteTranslationDone();
+        }
 
         // The controller already bumps the cached category tree (see
         // Category::bumpTreeCacheVersion()) when the save happens, but this
@@ -54,6 +70,18 @@ class AutoTranslateLabelsJob implements ShouldQueue
         // tree until the 6h TTL expires.
         if ($this->translationModel === CategoryTranslation::class) {
             Category::bumpTreeCacheVersion();
+        }
+    }
+
+    /**
+     * A job that exhausts every try (provider outage, bad payload, …) still
+     * has to report back, or its tracker's completed counter never catches
+     * up to queued and the "Translation Jobs" tab shows it running forever.
+     */
+    public function failed(\Throwable $e): void
+    {
+        if ($this->jobTrackerId) {
+            JobTracker::find($this->jobTrackerId)?->noteTranslationDone($e->getMessage());
         }
     }
 }
