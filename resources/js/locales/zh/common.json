@@ -6,5 +6,10 @@
     "exportThisProduct": "导出此产品",
     "settings": "设置",
     "logout": "退出登录",
-    "loggingOut": "正在退出登录..."
+    "loggingOut": "正在退出登录...",
+    "search": "搜索",
+    "popularBadge": "热门",
+    "editableLocaleHint": "显示当前所选语言（右上角）的字段。切换语言以编辑其他语言。",
+    "noActiveLocales": "未配置启用的语言。",
+    "unsavedChangesConfirm": "您有未保存的更改。确定要离开此页面吗？更改将会丢失。"
 }

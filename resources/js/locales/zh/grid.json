@@ -17,7 +17,8 @@
         "lastName": "姓",
         "displayName": "显示名称",
         "sku": "斯库",
-        "isGuest": "访客角色"
+        "isGuest": "访客角色",
+        "aiTranslate": "自动翻译"
     },
     "rowActions": {
         "edit": "编辑",

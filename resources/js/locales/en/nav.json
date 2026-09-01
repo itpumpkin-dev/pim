@@ -26,5 +26,21 @@
     "exports": "Exports",
     "jobTracker": "Job Tracker",
     "wooConvert": "WooCommerce Converter",
-    "productGroups": "Product Groups"
+    "productGroups": "Product Groups",
+    "baseUnits": "Base Units",
+    "master": "Master",
+    "subCategories": "Subcategories",
+    "unitsSellBuy": "Units",
+    "points": "Points",
+    "commissionGroups": "Commission Groups",
+    "bom": "BOM",
+    "businessTypes": "Business Types",
+    "productGrades": "Product Grades",
+    "vendors": "Vendors",
+    "marketplace": "Marketplace",
+    "marketplaceConnect": "Connection Settings",
+    "mapBrand": "Map brand",
+    "mapCategory": "Map category",
+    "mapPushData": "Map push data",
+    "currencies": "Currencies"
 }

@@ -11,12 +11,23 @@ import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, fioriCardSx, fioriSwitchSx, fioriTabsSx, fioriToggleButtonGroupSx } from '@/lib/fiori-style';
+import {
+    FIORI,
+    fioriCardSx,
+    fioriDefaultSx,
+    fioriEmphasizedSx,
+    fioriGhostSx,
+    fioriNegativeSx,
+    fioriSwitchSx,
+    fioriTabsSx,
+    fioriToggleButtonGroupSx,
+} from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
-import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
+import { mappedChipSx, UI_BORDER } from '@/lib/ui-style';
 import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import type { FormDataConvertible } from '@inertiajs/core';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -1137,6 +1148,37 @@ export default function ProductEdit({
         });
     };
 
+    // Per-panel Save (Categories / Brand / Sales Channels): each hits its own
+    // endpoint with only that card's fields — no full-form submit. preserveState
+    // keeps the rest of the form as-is; preserveScroll leaves the page put.
+    const [savingSection, setSavingSection] = useState<'categories' | 'brand' | 'channels' | null>(null);
+
+    const saveSection = (section: 'categories' | 'brand' | 'channels', payload: Record<string, FormDataConvertible>) => {
+        setSavingSection(section);
+        skipNavigationGuardRef.current = true;
+        router.put(`/catalog/products/${product.id}/${section}`, payload, {
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => {
+                setSavingSection(null);
+                skipNavigationGuardRef.current = false;
+            },
+        });
+    };
+
+    const sectionSaveButton = (section: 'categories' | 'brand' | 'channels', onClick: () => void) => (
+        <Button
+            size="small"
+            variant="outlined"
+            onClick={onClick}
+            disabled={savingSection !== null || processing}
+            startIcon={savingSection === section ? <CircularProgress size={13} color="inherit" /> : undefined}
+            sx={{ ...fioriDefaultSx, ml: 'auto', minWidth: 0 }}
+        >
+            {savingSection === section ? t('saving') : t('save')}
+        </Button>
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Product | SKU: ${data.sku}`} />
@@ -1205,23 +1247,11 @@ export default function ProductEdit({
                                 </Select>
                             </Box>
                             {isFieldAreaBusy && <CircularProgress size={18} thickness={5} />}
-                            <Button variant="outlined" size="small" sx={{ color: 'text.secondary', borderColor: UI_BORDER, textTransform: 'none' }}>
+                            <Button variant="outlined" size="small" sx={fioriDefaultSx}>
                                 More
                             </Button>
 
-                            <Button
-                                component={Link}
-                                href="/catalog/products"
-                                variant="outlined"
-                                sx={{
-                                    color: 'text.secondary',
-                                    borderColor: UI_BORDER_STRONG,
-                                    textTransform: 'none',
-                                    fontWeight: 700,
-                                    px: 2.5,
-                                    '&:hover': { borderColor: UI_BORDER_STRONG, bgcolor: 'grey.100' },
-                                }}
-                            >
+                            <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
                                 Back
                             </Button>
                             <Button
@@ -1229,7 +1259,7 @@ export default function ProductEdit({
                                 variant="contained"
                                 disabled={processing}
                                 startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700, px: 2.5 }}
+                                sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                             >
                                 {processing ? 'Saving…' : 'Save Product'}
                             </Button>
@@ -1459,6 +1489,7 @@ export default function ProductEdit({
                                                                                 variant="outlined"
                                                                                 startIcon={<AutorenewIcon fontSize="small" />}
                                                                                 onClick={openVariantDialog}
+                                                                                sx={fioriDefaultSx}
                                                                             >
                                                                                 {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
                                                                             </Button>
@@ -1467,6 +1498,7 @@ export default function ProductEdit({
                                                                                 variant="text"
                                                                                 startIcon={<AddIcon fontSize="small" />}
                                                                                 onClick={handleAddBlankVariant}
+                                                                                sx={fioriGhostSx}
                                                                             >
                                                                                 เพิ่มแถวว่าง
                                                                             </Button>
@@ -1635,6 +1667,15 @@ export default function ProductEdit({
                                                 <Tooltip title={t('categoriesSourceInfoTooltip')} arrow>
                                                     <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
                                                 </Tooltip>
+                                                {sectionSaveButton('categories', () =>
+                                                    saveSection('categories', {
+                                                        category_ids: data.category_ids,
+                                                        shopee_category_id: data.shopee_category_id,
+                                                        lazada_category_id: data.lazada_category_id,
+                                                        tiktok_category_id: data.tiktok_category_id,
+                                                        woocommerce_category_id: data.woocommerce_category_id,
+                                                    }),
+                                                )}
                                             </Stack>
 
                                             <ToggleButtonGroup
@@ -1677,7 +1718,7 @@ export default function ProductEdit({
                                                         href="/catalog/categories/marketplace-sync"
                                                         size="small"
                                                         startIcon={<LinkIcon fontSize="small" />}
-                                                        sx={{ textTransform: 'none' }}
+                                                        sx={fioriGhostSx}
                                                     >
                                                         {t('marketplaceMappingButton')}
                                                     </Button>
@@ -1741,6 +1782,20 @@ export default function ProductEdit({
                                                     <Tooltip title={t('brandSourceInfoTooltip')} arrow>
                                                         <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
                                                     </Tooltip>
+                                                    {sectionSaveButton('brand', () => {
+                                                        const { channelKey, localeKey } = getValueKeys(brandAttr);
+                                                        const pbrand =
+                                                            data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
+                                                            data.values[brandAttr.id]?.[channelKey]?.['default'] ??
+                                                            '';
+                                                        saveSection('brand', {
+                                                            pbrand: typeof pbrand === 'string' ? pbrand : '',
+                                                            shopee_brand_id: data.shopee_brand_id,
+                                                            lazada_brand_id: data.lazada_brand_id,
+                                                            tiktok_brand_id: data.tiktok_brand_id,
+                                                            woocommerce_brand_id: data.woocommerce_brand_id,
+                                                        });
+                                                    })}
                                                 </Stack>
 
                                                 <ToggleButtonGroup
@@ -1850,7 +1905,7 @@ export default function ProductEdit({
                                                                             rel="noreferrer"
                                                                             size="small"
                                                                             startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
-                                                                            sx={{ minWidth: 0, py: 0, px: 1, fontSize: 11, textTransform: 'none' }}
+                                                                            sx={{ ...fioriGhostSx, minWidth: 0, py: 0, px: 1, fontSize: 11 }}
                                                                         >
                                                                             {t('mapMarketplaceBrandButton')}
                                                                         </Button>
@@ -1970,9 +2025,14 @@ export default function ProductEdit({
 
                                         {/* แผง Sales Channels */}
                                         <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                Sales Channels
-                                            </Typography>
+                                            <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
+                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                    Sales Channels
+                                                </Typography>
+                                                {sectionSaveButton('channels', () =>
+                                                    saveSection('channels', { published_shop_ids: data.published_shop_ids }),
+                                                )}
+                                            </Stack>
                                             <Stack spacing={0.5}>
                                                 {/* การแก้ไขตรงนี้ (activeChannelId = null) คือการตั้งค่า fallback ของ
                                             ฟิลด์ที่เป็น channel-based — channel ไหนด้านล่างที่ไม่มีค่าของตัวเอง
@@ -2306,6 +2366,7 @@ export default function ProductEdit({
                                             size="small"
                                             disabled={!translationComplete || fillingTranslation}
                                             startIcon={fillingTranslation ? <CircularProgress size={14} /> : <TranslateIcon fontSize="small" />}
+                                            sx={fioriDefaultSx}
                                         >
                                             {fillingTranslation ? t('pushingEllipsis') : t('pushTranslationButton')}
                                         </Button>
@@ -2326,7 +2387,7 @@ export default function ProductEdit({
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={closePushDialog} color="inherit" disabled={pushing}>
+                    <Button onClick={closePushDialog} disabled={pushing} sx={fioriGhostSx}>
                         {t('cancel')}
                     </Button>
                     <Button
@@ -2334,7 +2395,7 @@ export default function ProductEdit({
                         variant="contained"
                         disabled={pushing}
                         startIcon={pushing ? <CircularProgress size={16} /> : <PublishIcon />}
-                        sx={solidActionSx}
+                        sx={fioriEmphasizedSx}
                     >
                         {pushing ? t('pushingEllipsis') : t('push')}
                     </Button>
@@ -2380,13 +2441,13 @@ export default function ProductEdit({
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeactivateConfirmShop(null)} color="inherit" disabled={deactivating}>
+                    <Button onClick={() => setDeactivateConfirmShop(null)} disabled={deactivating} sx={fioriGhostSx}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={confirmDeactivate}
-                        color="error"
-                        variant="contained"
+                        variant="outlined"
+                        sx={fioriNegativeSx}
                         disabled={
                             deactivating ||
                             !deactivateStatusCheck ||
@@ -2454,13 +2515,13 @@ export default function ProductEdit({
                         )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={closeDeleteListingDialog} color="inherit" disabled={deletingListing}>
+                    <Button onClick={closeDeleteListingDialog} disabled={deletingListing} sx={fioriGhostSx}>
                         {t('cancel')}
                     </Button>
                     <Button
                         onClick={confirmDeleteListing}
-                        color="error"
-                        variant="contained"
+                        variant="outlined"
+                        sx={fioriNegativeSx}
                         disabled={
                             deletingListing ||
                             !deleteListingStatusCheck ||
@@ -2484,10 +2545,10 @@ export default function ProductEdit({
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setPendingSimpleConfirm(false)} color="inherit">
+                    <Button onClick={() => setPendingSimpleConfirm(false)} sx={fioriGhostSx}>
                         ยกเลิก
                     </Button>
-                    <Button onClick={confirmSwitchToSimple} color="error" variant="contained">
+                    <Button onClick={confirmSwitchToSimple} variant="outlined" sx={fioriNegativeSx}>
                         ยืนยัน เปลี่ยนเป็น Simple
                     </Button>
                 </DialogActions>
@@ -2535,10 +2596,10 @@ export default function ProductEdit({
                     />
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
-                    <Button onClick={() => setVariantDialogOpen(false)} sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'none' }}>
+                    <Button onClick={() => setVariantDialogOpen(false)} sx={fioriGhostSx}>
                         ยกเลิก
                     </Button>
-                    <Button onClick={applyVariantGeneration} variant="contained" sx={{ ...solidActionSx, textTransform: 'none', fontWeight: 700 }}>
+                    <Button onClick={applyVariantGeneration} variant="contained" sx={fioriEmphasizedSx}>
                         Generate
                     </Button>
                 </DialogActions>

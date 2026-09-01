@@ -50,7 +50,7 @@ function useMainNavItems(): NavItem[] {
                         ],
                     },
                     {
-                        title: t('categories'),
+                        title: t('master'),
                         items: [
                             {
                                 title: t('categories'),
@@ -71,32 +71,81 @@ function useMainNavItems(): NavItem[] {
                                 ],
                             },
                             {
+                                title: t('subCategories'),
+                                url: '/catalog/subcategories',
+                                permission: 'subcategories.list_subcategories',
+                            },
+                            {
                                 title: t('productGroups'),
                                 url: '/catalog/product-groups',
                                 permission: 'product_groups.list_product_groups',
                             },
-                            // {
-                            //     title: t('categoryFields'),
-                            //     url: '/catalog/categoryFields',
-                            //     permission: 'category_fields.list_category_fields',
-                            // },
-                        ],
-                    },
-                    {
-                        title: t('brands'),
-                        items: [
                             {
                                 title: t('brands'),
                                 url: '/catalog/brands',
                                 permission: 'brands.list_brands',
-                                // No /catalog/brands/shopee-mapping or
-                                // /catalog/brands/marketplace-sync entries here
-                                // anymore — both pages are gone; brand mapping
-                                // and sync now live on /catalog/categories/
-                                // shopee-mapping, /catalog/categories/
-                                // lazada-mapping, and /catalog/categories/
-                                // marketplace-sync instead (already covered by
-                                // the Categories excludeUrls above).
+                            },
+                            {
+                                title: t('unitsSellBuy'),
+                                url: '/catalog/base-units',
+                                permission: 'base_units.list_base_units',
+                            },
+                            {
+                                title: t('points'),
+                                url: '/catalog/points',
+                                permission: 'points.list_points',
+                            },
+                            {
+                                title: t('commissionGroups'),
+                                url: '/catalog/commission-groups',
+                                permission: 'commission_groups.list_commission_groups',
+                            },
+                            {
+                                title: t('bom'),
+                                url: '/catalog/bom',
+                                permission: 'products.list_products',
+                            },
+                            {
+                                title: t('businessTypes'),
+                                url: '/catalog/business-types',
+                                permission: 'business_types.list_business_types',
+                            },
+                            {
+                                title: t('productGrades'),
+                                url: '/catalog/product-grades',
+                                permission: 'products.list_products',
+                            },
+                            {
+                                title: t('vendors'),
+                                url: '/catalog/vendors',
+                                permission: 'vendors.list_vendors',
+                            },
+                            {
+                                title: t('currencies'),
+                                url: '/catalog/currencies',
+                                permission: 'currencies.list_currencies',
+                            },
+                            {
+                                title: t('marketplace'),
+                                items: [
+                                    {
+                                        title: t('marketplaceConnect'),
+                                        items: [
+                                            { title: 'Shopee', url: '/catalog/marketplace/connect/shopee', permission: 'products.list_products' },
+                                            { title: 'Lazada', url: '/catalog/marketplace/connect/lazada', permission: 'products.list_products' },
+                                            { title: 'TikTok', url: '/catalog/marketplace/connect/tiktok', permission: 'products.list_products' },
+                                            { title: 'WooCommerce', url: '/catalog/marketplace/connect/woocommerce', permission: 'products.list_products' },
+                                        ],
+                                    },
+                                    ...(['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
+                                        title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
+                                        items: [
+                                            { title: t('mapCategory'), url: `/catalog/marketplace/${platform}/category`, permission: 'products.list_products' },
+                                            { title: t('mapBrand'), url: `/catalog/marketplace/${platform}/brand`, permission: 'products.list_products' },
+                                            { title: t('mapPushData'), url: `/catalog/marketplace/${platform}/push`, permission: 'products.list_products' },
+                                        ],
+                                    })),
+                                ],
                             },
                         ],
                     },

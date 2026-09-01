@@ -2807,6 +2807,123 @@ class ProductController extends Controller
         return to_route('catalog.products.show', $product)->with('success', 'Product updated successfully.');
     }
 
+    /**
+     * Per-panel save from the edit screen: PIM categories + the marketplace
+     * category overrides. Mirrors the category slice of update() so behaviour
+     * (legacy-code derivation, sync) stays identical — it just doesn't touch
+     * anything else on the product.
+     */
+    public function updateCategories(Request $request, Product $product): RedirectResponse
+    {
+        $validated = $request->validate([
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['exists:categories,id'],
+            'shopee_category_id' => ['nullable', 'integer', 'exists:shopee_categories,id'],
+            'lazada_category_id' => ['nullable', 'integer', 'exists:lazada_categories,id'],
+            'tiktok_category_id' => ['nullable', 'integer', 'exists:tiktok_categories,id'],
+            'woocommerce_category_id' => ['nullable', 'integer', 'exists:woocommerce_categories,id'],
+        ]);
+
+        DB::transaction(function () use ($validated, $request, $product) {
+            $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+            $product->update([
+                'shopee_category_id' => $validated['shopee_category_id'] ?? null,
+                'lazada_category_id' => $validated['lazada_category_id'] ?? null,
+                'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
+                'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            $newCategoryIds = collect($validated['category_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $product->categories()->sync($newCategoryIds);
+
+            if ($oldCategoryIds !== $newCategoryIds) {
+                ProductCategoryLinker::deriveLegacyCodesFromCategories($product, $newCategoryIds);
+            }
+        });
+
+        return back()->with('success', 'Categories saved.');
+    }
+
+    /**
+     * Per-panel save: the `pbrand` attribute value (System Brand side) plus
+     * the marketplace brand overrides. `pbrand` is a plain select attribute —
+     * not channel/locale scoped — so it's a single ProductValue row.
+     */
+    public function updateBrand(Request $request, Product $product): RedirectResponse
+    {
+        $pbrandId = Attribute::idForCode('pbrand');
+
+        $validated = $request->validate([
+            'pbrand' => [
+                'nullable', 'string', 'max:255',
+                $pbrandId ? Rule::exists('attribute_options', 'code')->where('attribute_id', $pbrandId) : 'string',
+            ],
+            'shopee_brand_id' => ['nullable', 'integer', 'exists:shopee_brands,id'],
+            'lazada_brand_id' => ['nullable', 'integer', 'exists:lazada_brands,id'],
+            'tiktok_brand_id' => ['nullable', 'integer', 'exists:tiktok_brands,id'],
+            'woocommerce_brand_id' => ['nullable', 'integer', 'exists:woocommerce_brands,id'],
+        ]);
+
+        DB::transaction(function () use ($validated, $request, $product, $pbrandId) {
+            $product->update([
+                'shopee_brand_id' => $validated['shopee_brand_id'] ?? null,
+                'lazada_brand_id' => $validated['lazada_brand_id'] ?? null,
+                'tiktok_brand_id' => $validated['tiktok_brand_id'] ?? null,
+                'woocommerce_brand_id' => $validated['woocommerce_brand_id'] ?? null,
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            if ($pbrandId) {
+                $code = trim((string) ($validated['pbrand'] ?? ''));
+                $row = ProductValue::where('product_id', $product->id)
+                    ->where('attribute_id', $pbrandId)
+                    ->whereNull('channel_id')->whereNull('locale_id');
+
+                if ($code !== '') {
+                    $row->exists()
+                        ? $row->update(['value' => $code])
+                        : ProductValue::create([
+                            'product_id' => $product->id,
+                            'attribute_id' => $pbrandId,
+                            'channel_id' => null,
+                            'locale_id' => null,
+                            'value' => $code,
+                        ]);
+                } else {
+                    $row->delete();
+                }
+            }
+        });
+
+        return back()->with('success', 'Brand saved.');
+    }
+
+    /**
+     * Per-panel save: which shops the product is marked "published" to.
+     * Same sync + audit as update()'s Sales Channels slice.
+     */
+    public function updateChannels(Request $request, Product $product): RedirectResponse
+    {
+        $validated = $request->validate([
+            'published_shop_ids' => ['nullable', 'array'],
+            'published_shop_ids.*' => ['exists:sales_platform_shops,id'],
+        ]);
+
+        DB::transaction(function () use ($validated, $product) {
+            $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $newShopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $product->platformShops()->sync($newShopIds);
+
+            if ($oldShopIds !== $newShopIds) {
+                AuditLog::record('published_shops_updated', $product, ['shop_ids' => $oldShopIds], ['shop_ids' => $newShopIds]);
+            }
+        });
+
+        return back()->with('success', 'Sales channels saved.');
+    }
+
     public function destroy(Product $product): RedirectResponse
     {
         $productId = $product->id;

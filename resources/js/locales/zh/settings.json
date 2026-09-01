@@ -9,5 +9,6 @@
     "saved": "已保存",
     "emailUnverified": "您的电子邮件地址尚未核实 .",
     "resendVerification": "点击这里重新发送校验邮件 .",
-    "verificationSent": "一个新的校验链接已经发送到您的电子邮件地址 ."
+    "verificationSent": "一个新的校验链接已经发送到您的电子邮件地址 .",
+    "saving": "保存中..."
 }

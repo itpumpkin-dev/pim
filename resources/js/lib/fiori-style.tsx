@@ -64,36 +64,69 @@ export const FIORI_RAW = {
     neutral: '#6A6D70',
 } as const;
 
-/** Fiori "Emphasized" button — the page's single primary/confirm action. */
-export const fioriEmphasizedSx: SxProps<Theme> = {
-    bgcolor: FIORI.brand,
-    color: '#fff',
+/**
+ * SAP Fiori (Horizon) "Button" design types for a MUI `<Button>`. One shared
+ * shape — non-uppercase label, 8px radius, no elevation, a muted disabled
+ * state — with a per-design colour set. Spread onto `<Button sx={fioriEmphasizedSx}>`.
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Button
+ *   Emphasized → the page's single primary/confirm action (solid brand fill)
+ *   Default    → neutral secondary actions (bordered, surface fill)
+ *   Transparent/Ghost → lowest-emphasis action, e.g. Export (no fill, no border)
+ *   Positive / Negative / Attention → semantic actions (accept / reject-delete /
+ *     proceed-with-caution): a bordered button tinted with the semantic colour.
+ */
+const fioriButtonBaseSx = {
     fontWeight: 600,
     textTransform: 'none',
     borderRadius: '8px',
     boxShadow: 'none',
+} as const;
+
+/** Bordered semantic button (Positive / Negative / Attention share this shape). */
+const fioriSemanticSx = (color: string, hoverBg: string): SxProps<Theme> => ({
+    ...fioriButtonBaseSx,
+    bgcolor: FIORI.surface,
+    color,
+    border: `1px solid ${color}`,
+    '&:hover': { bgcolor: hoverBg, borderColor: color, boxShadow: 'none' },
+    '&.Mui-disabled': { color: FIORI.textSecondary, borderColor: FIORI.border, opacity: 0.6 },
+});
+
+/** Fiori "Emphasized" button — the page's single primary/confirm action. */
+export const fioriEmphasizedSx: SxProps<Theme> = {
+    ...fioriButtonBaseSx,
+    bgcolor: FIORI.brand,
+    color: '#fff',
     '&:hover': { bgcolor: FIORI.brandDark, boxShadow: 'none' },
+    '&.Mui-disabled': { bgcolor: FIORI.neutralBg, color: FIORI.textSecondary },
 };
 
 /** Fiori "Default" button — bordered, neutral secondary actions. */
 export const fioriDefaultSx: SxProps<Theme> = {
+    ...fioriButtonBaseSx,
     bgcolor: FIORI.surface,
     color: FIORI.textPrimary,
     border: `1px solid ${FIORI.borderStrong}`,
-    fontWeight: 600,
-    textTransform: 'none',
-    borderRadius: '8px',
     '&:hover': { bgcolor: FIORI.headerBg, borderColor: FIORI.borderStrong },
+    '&.Mui-disabled': { color: FIORI.textSecondary, borderColor: FIORI.border, opacity: 0.6 },
 };
 
 /** Fiori "Ghost"/transparent button — lowest-emphasis action (e.g. Export). */
 export const fioriGhostSx: SxProps<Theme> = {
+    ...fioriButtonBaseSx,
     color: FIORI.textPrimary,
-    fontWeight: 600,
-    textTransform: 'none',
-    borderRadius: '8px',
     '&:hover': { bgcolor: FIORI.headerBg },
+    '&.Mui-disabled': { color: FIORI.textSecondary, opacity: 0.6 },
 };
+
+/** Fiori "Positive" button — a confirming/accepting action (semantic green). */
+export const fioriPositiveSx: SxProps<Theme> = fioriSemanticSx(FIORI.success, FIORI.successBg);
+
+/** Fiori "Negative" button — a destructive/rejecting action (semantic red). */
+export const fioriNegativeSx: SxProps<Theme> = fioriSemanticSx(FIORI.error, FIORI.errorBg);
+
+/** Fiori "Attention" button — an action to proceed with caution (semantic orange). */
+export const fioriAttentionSx: SxProps<Theme> = fioriSemanticSx(FIORI.warning, FIORI.warningBg);
 
 /** Toolbar icon button (filter, columns, row actions, pagination arrows). */
 export const fioriIconButtonSx: SxProps<Theme> = {

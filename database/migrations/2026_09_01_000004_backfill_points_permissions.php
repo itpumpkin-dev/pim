@@ -1,0 +1,59 @@
+<?php
+
+use App\Services\SessionInvalidator;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration
+{
+    /**
+     * `/catalog/points/*` (Points master) is gated by its own `points.*`
+     * permissions. Backfill onto every role that already holds the
+     * equivalent `categories.*` grant — same move as
+     * backfill_subcategories_permissions — so catalog master-data
+     * maintainers keep working without a manual role edit. Run
+     * `php artisan permissions:sync` afterwards to register the resource for
+     * the Roles UI / Administrator.
+     */
+    public function up(): void
+    {
+        $this->copyGrant('categories', 'list_categories', 'points', 'list_points');
+        $this->copyGrant('categories', 'edit_categories', 'points', 'edit_points');
+
+        $roleIds = DB::table('role_permissions')->where('resource', 'points')->pluck('role_id')->unique();
+
+        $userIds = DB::table('user_role')->whereIn('role_id', $roleIds)->pluck('user_id')
+            ->merge(
+                DB::table('role_user_group')
+                    ->join('user_group_user', 'role_user_group.group_id', '=', 'user_group_user.group_id')
+                    ->whereIn('role_user_group.role_id', $roleIds)
+                    ->pluck('user_group_user.user_id')
+            )
+            ->unique()
+            ->values();
+
+        SessionInvalidator::users($userIds);
+    }
+
+    public function down(): void
+    {
+        DB::table('role_permissions')->where('resource', 'points')->delete();
+    }
+
+    private function copyGrant(string $fromResource, string $fromAction, string $toResource, string $toAction): void
+    {
+        $roleIds = DB::table('role_permissions')
+            ->where('resource', $fromResource)
+            ->where('action', $fromAction)
+            ->where('granted', true)
+            ->pluck('role_id')
+            ->unique();
+
+        foreach ($roleIds as $roleId) {
+            DB::table('role_permissions')->updateOrInsert(
+                ['role_id' => $roleId, 'resource' => $toResource, 'action' => $toAction],
+                ['granted' => true],
+            );
+        }
+    }
+};

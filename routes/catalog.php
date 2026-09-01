@@ -4,18 +4,25 @@ use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\AttributeOptionController;
+use App\Http\Controllers\Catalog\BaseUnitController;
 use App\Http\Controllers\Catalog\BrandController;
+use App\Http\Controllers\Catalog\BusinessTypeController;
 use App\Http\Controllers\Catalog\CategoryController;
 use App\Http\Controllers\Catalog\CategoryFieldController;
 use App\Http\Controllers\Catalog\ChannelController;
+use App\Http\Controllers\Catalog\CommissionGroupController;
+use App\Http\Controllers\Catalog\CurrencyController;
+use App\Http\Controllers\Catalog\PointController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\ProductGroupController;
+use App\Http\Controllers\Catalog\SubcategoryController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
 use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
 use App\Http\Controllers\Catalog\TikTokAttributeMappingController;
 use App\Http\Controllers\Catalog\ShopeeAttributeMappingController;
 use App\Http\Controllers\Catalog\WooCommerceAttributeMappingController;
+use App\Http\Controllers\Catalog\VendorController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -41,6 +48,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');
     Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show')->middleware('permission:products,list_products');
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:products,edit_products');
+    // Per-panel saves on the edit screen — each persists just its own slice so
+    // the user doesn't have to submit the whole product form to save one card.
+    Route::put('products/{product}/categories', [ProductController::class, 'updateCategories'])->name('products.updateCategories')->middleware('permission:products,edit_products');
+    Route::put('products/{product}/brand', [ProductController::class, 'updateBrand'])->name('products.updateBrand')->middleware('permission:products,edit_products');
+    Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:products,edit_products');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
@@ -89,6 +101,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::delete('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'destroy'])->name('attributes.options.destroy')->middleware('permission:attributes,edit_attributes');
 
     Route::get('brands', [BrandController::class, 'index'])->name('brands.index')->middleware('permission:brands,list_brands');
+    Route::get('brands/create', [BrandController::class, 'create'])->name('brands.create')->middleware('permission:brands,edit_brands');
     Route::post('brands', [BrandController::class, 'store'])->name('brands.store')->middleware('permission:brands,edit_brands');
     Route::get('brands/{brand}/edit', [BrandController::class, 'edit'])->name('brands.edit')->middleware('permission:brands,edit_brands');
     Route::put('brands/{brand}', [BrandController::class, 'update'])->name('brands.update')->middleware('permission:brands,edit_brands');
@@ -133,6 +146,18 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('brands/sync-jobs/{jobTracker}/status', [BrandController::class, 'brandSyncStatus'])->name('brands.syncStatus')->middleware('permission:brands,edit_brands');
     Route::post('brands/sync-jobs/{jobTracker}/cancel', [BrandController::class, 'cancelBrandSync'])->name('brands.syncCancel')->middleware('permission:brands,edit_brands');
 
+    // "หน่วยนับพื้นฐาน" (Base Units) — หน้าจัดการ master สไตล์เดียวกับ Brands
+    // ที่แก้แถว AttributeOption ของ attribute `pbaseunit` โดยตรง (ดู docblock
+    // ของ BaseUnitController) จึงมีสิทธิ์ resource ของตัวเอง `base_units` แยก
+    // จาก `attributes` — backfill ให้ role เดิมผ่าน migration
+    // backfill_base_units_permission เหมือนที่ Brands ทำ
+    Route::get('base-units', [BaseUnitController::class, 'index'])->name('baseUnits.index')->middleware('permission:base_units,list_base_units');
+    Route::get('base-units/create', [BaseUnitController::class, 'create'])->name('baseUnits.create')->middleware('permission:base_units,edit_base_units');
+    Route::post('base-units', [BaseUnitController::class, 'store'])->name('baseUnits.store')->middleware('permission:base_units,edit_base_units');
+    Route::get('base-units/{baseUnit}/edit', [BaseUnitController::class, 'edit'])->name('baseUnits.edit')->middleware('permission:base_units,edit_base_units');
+    Route::put('base-units/{baseUnit}', [BaseUnitController::class, 'update'])->name('baseUnits.update')->middleware('permission:base_units,edit_base_units');
+    Route::delete('base-units/{baseUnit}', [BaseUnitController::class, 'destroy'])->name('baseUnits.destroy')->middleware('permission:base_units,edit_base_units');
+
     Route::get('attributeGroups', [AttributeGroupController::class, 'index'])->name('attributeGroups.index')->middleware('permission:attribute_groups,list_attribute_groups');
     Route::get('attributeGroups/create', [AttributeGroupController::class, 'create'])->name('attributeGroups.create')->middleware('permission:attribute_groups,create_attribute_groups');
     Route::post('attributeGroups', [AttributeGroupController::class, 'store'])->name('attributeGroups.store')->middleware('permission:attribute_groups,create_attribute_groups');
@@ -173,6 +198,72 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('product-groups/{category}', [ProductGroupController::class, 'update'])->name('productGroups.update')->middleware('permission:product_groups,edit_product_groups');
     Route::delete('product-groups/{category}', [ProductGroupController::class, 'destroy'])->name('productGroups.destroy')->middleware('permission:product_groups,delete_product_groups');
     Route::get('product-groups/{category}/history', [ProductGroupController::class, 'history'])->name('productGroups.history')->middleware('permission:product_groups,view_history');
+
+    // Subcategories (หมวดหมู่ย่อย) — depth-2 of the `categories` tree, its own
+    // admin surface (see SubcategoryController). `{subcategory}` route-model-
+    // binds to Category; the controller 404s any row that isn't exactly one
+    // level below a real root. Own `subcategories.*` permissions, backfilled
+    // from `categories.*` by backfill_subcategories_permissions.
+    Route::get('subcategories', [SubcategoryController::class, 'index'])->name('subcategories.index')->middleware('permission:subcategories,list_subcategories');
+    Route::get('subcategories/create', [SubcategoryController::class, 'create'])->name('subcategories.create')->middleware('permission:subcategories,create_subcategories');
+    Route::post('subcategories', [SubcategoryController::class, 'store'])->name('subcategories.store')->middleware('permission:subcategories,create_subcategories');
+    Route::get('subcategories/{subcategory}/edit', [SubcategoryController::class, 'edit'])->name('subcategories.edit')->middleware('permission:subcategories,edit_subcategories');
+    Route::put('subcategories/{subcategory}', [SubcategoryController::class, 'update'])->name('subcategories.update')->middleware('permission:subcategories,edit_subcategories');
+    Route::delete('subcategories/{subcategory}', [SubcategoryController::class, 'destroy'])->name('subcategories.destroy')->middleware('permission:subcategories,delete_subcategories');
+    Route::get('subcategories/{subcategory}/history', [SubcategoryController::class, 'history'])->name('subcategories.history')->middleware('permission:subcategories,view_history');
+
+    // "คะแนน" (Points) master — own `points` table (point_type + point_ratio),
+    // own `points.*` permissions backfilled from `categories.*` by
+    // backfill_points_permissions. `edit_points` covers every write.
+    Route::get('points', [PointController::class, 'index'])->name('points.index')->middleware('permission:points,list_points');
+    Route::get('points/create', [PointController::class, 'create'])->name('points.create')->middleware('permission:points,edit_points');
+    Route::post('points', [PointController::class, 'store'])->name('points.store')->middleware('permission:points,edit_points');
+    Route::get('points/{point}/edit', [PointController::class, 'edit'])->name('points.edit')->middleware('permission:points,edit_points');
+    Route::put('points/{point}', [PointController::class, 'update'])->name('points.update')->middleware('permission:points,edit_points');
+    Route::delete('points/{point}', [PointController::class, 'destroy'])->name('points.destroy')->middleware('permission:points,edit_points');
+
+    // "กลุ่มคอมมิชชั่น" (Commission Groups) master — own `commission_groups`
+    // table (code + group_id_1 + divisor_start/divisor_secondary + is_active
+    // + remark), own `commission_groups.*` permissions backfilled from
+    // `categories.*`. `edit_commission_groups` covers every write.
+    Route::get('commission-groups', [CommissionGroupController::class, 'index'])->name('commissionGroups.index')->middleware('permission:commission_groups,list_commission_groups');
+    Route::get('commission-groups/create', [CommissionGroupController::class, 'create'])->name('commissionGroups.create')->middleware('permission:commission_groups,edit_commission_groups');
+    Route::post('commission-groups', [CommissionGroupController::class, 'store'])->name('commissionGroups.store')->middleware('permission:commission_groups,edit_commission_groups');
+    Route::get('commission-groups/{commissionGroup}/edit', [CommissionGroupController::class, 'edit'])->name('commissionGroups.edit')->middleware('permission:commission_groups,edit_commission_groups');
+    Route::put('commission-groups/{commissionGroup}', [CommissionGroupController::class, 'update'])->name('commissionGroups.update')->middleware('permission:commission_groups,edit_commission_groups');
+    Route::delete('commission-groups/{commissionGroup}', [CommissionGroupController::class, 'destroy'])->name('commissionGroups.destroy')->middleware('permission:commission_groups,edit_commission_groups');
+
+    // "ประเภทธุรกิจ" (Business Types) master — own `business_types` table
+    // (name + description + status), own `business_types.*` permissions
+    // backfilled from `categories.*`. `edit_business_types` covers every
+    // write.
+    Route::get('business-types', [BusinessTypeController::class, 'index'])->name('businessTypes.index')->middleware('permission:business_types,list_business_types');
+    Route::get('business-types/create', [BusinessTypeController::class, 'create'])->name('businessTypes.create')->middleware('permission:business_types,edit_business_types');
+    Route::post('business-types', [BusinessTypeController::class, 'store'])->name('businessTypes.store')->middleware('permission:business_types,edit_business_types');
+    Route::get('business-types/{businessType}/edit', [BusinessTypeController::class, 'edit'])->name('businessTypes.edit')->middleware('permission:business_types,edit_business_types');
+    Route::put('business-types/{businessType}', [BusinessTypeController::class, 'update'])->name('businessTypes.update')->middleware('permission:business_types,edit_business_types');
+    Route::delete('business-types/{businessType}', [BusinessTypeController::class, 'destroy'])->name('businessTypes.destroy')->middleware('permission:business_types,edit_business_types');
+
+    // "เวนเดอร์" (Vendors) master — own `vendors` table, own `vendors.*`
+    // permissions backfilled from `categories.*`. `edit_vendors` covers
+    // every write.
+    Route::get('vendors', [VendorController::class, 'index'])->name('vendors.index')->middleware('permission:vendors,list_vendors');
+    Route::get('vendors/create', [VendorController::class, 'create'])->name('vendors.create')->middleware('permission:vendors,edit_vendors');
+    Route::post('vendors', [VendorController::class, 'store'])->name('vendors.store')->middleware('permission:vendors,edit_vendors');
+    Route::get('vendors/{vendor}/edit', [VendorController::class, 'edit'])->name('vendors.edit')->middleware('permission:vendors,edit_vendors');
+    Route::put('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update')->middleware('permission:vendors,edit_vendors');
+    Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->name('vendors.destroy')->middleware('permission:vendors,edit_vendors');
+
+    // "สกุลเงิน" (Currencies) master — the existing `currencies` table
+    // (already used by Channels' currency picker and Vendor's main-currency
+    // field), own `currencies.*` permissions backfilled from `categories.*`.
+    // `edit_currencies` covers every write.
+    Route::get('currencies', [CurrencyController::class, 'index'])->name('currencies.index')->middleware('permission:currencies,list_currencies');
+    Route::get('currencies/create', [CurrencyController::class, 'create'])->name('currencies.create')->middleware('permission:currencies,edit_currencies');
+    Route::post('currencies', [CurrencyController::class, 'store'])->name('currencies.store')->middleware('permission:currencies,edit_currencies');
+    Route::get('currencies/{currency}/edit', [CurrencyController::class, 'edit'])->name('currencies.edit')->middleware('permission:currencies,edit_currencies');
+    Route::put('currencies/{currency}', [CurrencyController::class, 'update'])->name('currencies.update')->middleware('permission:currencies,edit_currencies');
+    Route::delete('currencies/{currency}', [CurrencyController::class, 'destroy'])->name('currencies.destroy')->middleware('permission:currencies,edit_currencies');
     Route::get('categories/marketplace-sync', [CategoryController::class, 'marketplaceSync'])->name('categories.marketplaceSync')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
     Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:categories,edit_categories');
@@ -260,4 +351,31 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('sales-platforms/{salesPlatform}/shops', [SalesPlatformController::class, 'storeShop'])->name('salesPlatforms.shops.store')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::put('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'updateShop'])->name('salesPlatforms.shops.update')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::delete('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'destroyShop'])->name('salesPlatforms.shops.destroy')->middleware('permission:sales_platforms,edit_sales_platforms');
+
+    // ── Master-data screens reserved but not yet built ────────────────────
+    // Each renders the shared catalog/placeholder page with its own nav
+    // title key. They have a sidebar entry now so the intended IA is
+    // visible; when a feature ships for real, repoint its route at a real
+    // controller/page. Gated on products,list_products (an existing
+    // resource) — same rationale as the `management` hub route above: keep
+    // them visible to the Catalog audience without minting a permission
+    // resource per stub.
+    $stub = fn (string $titleKey) => fn () => Inertia::render('catalog/placeholder', ['titleKey' => $titleKey]);
+
+    Route::middleware('permission:products,list_products')->group(function () use ($stub) {
+        Route::get('bom', $stub('bom'))->name('bom.index');
+        Route::get('product-grades', $stub('productGrades'))->name('productGrades.index');
+
+        Route::get('marketplace/connect/{platform}', fn (string $platform) => Inertia::render('catalog/placeholder', [
+            'titleKey' => 'marketplaceConnect',
+            'subtitle' => ucfirst($platform),
+        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.connect');
+
+        Route::get('marketplace/{platform}/{view}', fn (string $platform, string $view) => Inertia::render('catalog/placeholder', [
+            'titleKey' => 'marketplace',
+            'subtitle' => ucfirst($platform).' — '.$view,
+        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])
+            ->whereIn('view', ['brand', 'category', 'push'])
+            ->name('marketplace.map');
+    });
 });

@@ -237,6 +237,15 @@ class BrandController extends Controller
         ]);
     }
 
+    public function create(): Response
+    {
+        $attribute = $this->brandAttribute();
+
+        return Inertia::render('catalog/brands/create', [
+            'parentOptions' => $this->parentOptionsList($attribute),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $attribute = $this->brandAttribute();
@@ -274,7 +283,7 @@ class BrandController extends Controller
 
         AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
 
-        return back()->with('success', 'Brand added successfully.');
+        return to_route('catalog.brands.index')->with('success', 'Brand added successfully.');
     }
 
     public function edit(AttributeOption $brand): Response

@@ -25,5 +25,22 @@
     "missingTranslations": "缺失的译文",
     "brands": "品牌",
     "management": "管理",
-    "wooConvert": "WooCommerce 转换器"
+    "wooConvert": "WooCommerce 转换器",
+    "master": "主数据",
+    "productGroups": "产品组",
+    "subCategories": "子类别",
+    "baseUnits": "基本单位",
+    "unitsSellBuy": "单位",
+    "points": "积分",
+    "commissionGroups": "佣金组",
+    "bom": "物料清单",
+    "businessTypes": "业务类型",
+    "productGrades": "产品等级",
+    "vendors": "供应商",
+    "currencies": "货币",
+    "marketplace": "电商平台",
+    "marketplaceConnect": "连接设置",
+    "mapBrand": "映射品牌",
+    "mapCategory": "映射类别",
+    "mapPushData": "映射推送数据"
 }
