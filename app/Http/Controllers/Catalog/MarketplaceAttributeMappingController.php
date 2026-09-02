@@ -22,15 +22,16 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
- * จุดเข้าเดียว ("จับคู่เนื้อหา Marketplace") ที่รวมข้อมูล attribute-mapping ของ
- * ทั้ง 4 แพลตฟอร์มไว้ใน Inertia response เดียว แสดงผลเป็นแท็บผ่าน
- * resources/js/pages/catalog/attributes/marketplace-mapping.tsx
- * — แทนที่หน้า hub tile/page/controller ที่แยกกัน 4 อันเดิม ซึ่งต่างก็มี
- * index() action ของตัวเอง (WooCommerceAttributeMappingController,
- * ShopeeAttributeMappingController, LazadaAttributeMappingController,
- * TikTokAttributeMappingController — แต่ละตัวยังคง update()/syncXAttributes()
- * ที่เป็น action เขียนข้อมูลไว้เหมือนเดิม เรียกใช้จากในแผงแท็บของตัวเอง
- * มีแค่ index() ที่เป็น read-only ของทั้ง 4 ตัวเท่านั้นที่ถูกรวมมาไว้ที่นี่)
+ * รวม read-only action ของ attribute-mapping ทั้ง 4 แพลตฟอร์มไว้ที่เดียว (แต่ละ
+ * แพลตฟอร์มมี action ของตัวเองแยกกันด้านล่าง — woocommerce()/shopee()/lazada()/
+ * tiktok() — คนละหน้า คนละ URL กันจริงๆ ไม่ใช่แท็บร่วมแล้ว) เข้าถึงผ่านเมนู
+ * "แมปฟิวส่งข้อมูล" ใต้มาสเตอร์ > มาร์เก็ตเพลส > แต่ละแพลตฟอร์ม (ดู app-sidebar.tsx)
+ * แต่ละหน้าปลายทาง (resources/js/pages/catalog/marketplace/
+ * {platform}-attribute-mapping.tsx) render panel component ของแพลตฟอร์มนั้น
+ * ตัวเดียว (components/catalog/*-attribute-mapping-panel.tsx) — เคยรวมเป็นหน้า
+ * เดียวมี Tabs สลับ 4 แพลตฟอร์ม แต่ user ให้แยกจริงเป็นคนละหน้า/URL ไปเลย —
+ * update()/syncXAttributes() ที่เป็น action เขียนข้อมูลยังคงอยู่ที่เดิมของแต่ละ
+ * แพลตฟอร์ม (WooCommerceAttributeMappingController ฯลฯ) ไม่ได้ย้ายมาที่นี่ด้วย
  */
 class MarketplaceAttributeMappingController extends Controller
 {
@@ -59,71 +60,85 @@ class MarketplaceAttributeMappingController extends Controller
         'package_weight', 'package_length', 'package_width', 'package_height',
     ];
 
-    public function index(): Response
+    public function woocommerce(): Response
     {
         $pimAttributes = Attribute::cachedList();
-
         $wooMappings = WooCommerceAttributeMapping::cachedList();
-        $shopeeMappings = ShopeeAttributeMapping::cachedList();
-        $lazadaMappings = LazadaAttributeMapping::cachedList();
-        $tiktokMappings = TikTokAttributeMapping::cachedList();
-
         $wooCommerceAttributes = WooCommerceAttribute::cachedList();
+
+        return Inertia::render('catalog/marketplace/woocommerce-attribute-mapping', [
+            'attributes' => $this->woocommerceAttributeRows($pimAttributes, $wooMappings),
+            'wooCommerceAttributes' => $wooCommerceAttributes,
+            'coverage' => [
+                'payloadFields' => $this->payloadFieldCoverage($wooMappings, self::PAYLOAD_FIELDS['woocommerce']),
+                // wc_attribute ไม่มีการจำกัด input_type (ดูที่
+                // WooCommerceAttributeMappingController) — WooCommerce
+                // attribute ที่ sync มาแล้วทุกตัวใช้เป็นเป้าหมาย mapping ได้หมด
+                'platformAttributes' => $this->platformAttributeCoverage(
+                    $wooCommerceAttributes,
+                    $wooMappings->where('target_field', 'wc_attribute')->pluck('woocommerce_attribute_id')->all(),
+                ),
+            ],
+        ]);
+    }
+
+    public function shopee(): Response
+    {
+        $pimAttributes = Attribute::cachedList();
+        $shopeeMappings = ShopeeAttributeMapping::cachedList();
         $shopeeAttributes = ShopeeAttribute::cachedList();
+
+        return Inertia::render('catalog/marketplace/shopee-attribute-mapping', [
+            'attributes' => $this->shopeeAttributeRows($pimAttributes, $shopeeMappings),
+            'shopeeAttributes' => $shopeeAttributes,
+            'coverage' => [
+                'payloadFields' => $this->payloadFieldCoverage($shopeeMappings, self::PAYLOAD_FIELDS['shopee']),
+                'platformAttributes' => $this->platformAttributeCoverage(
+                    $shopeeAttributes->where('input_type', 3), // FREE_TEXT_FILED — ชนิดเดียวที่ map ได้
+                    $shopeeMappings->where('target_field', 'shopee_attribute')->pluck('shopee_attribute_id')->all(),
+                ),
+            ],
+        ]);
+    }
+
+    public function lazada(): Response
+    {
+        $pimAttributes = Attribute::cachedList();
+        $lazadaMappings = LazadaAttributeMapping::cachedList();
         $lazadaAttributes = LazadaAttribute::cachedList();
+
+        return Inertia::render('catalog/marketplace/lazada-attribute-mapping', [
+            'attributes' => $this->lazadaAttributeRows($pimAttributes, $lazadaMappings),
+            'lazadaAttributes' => $lazadaAttributes,
+            'coverage' => [
+                'payloadFields' => $this->payloadFieldCoverage($lazadaMappings, self::PAYLOAD_FIELDS['lazada']),
+                'platformAttributes' => $this->platformAttributeCoverage(
+                    $lazadaAttributes
+                        ->whereIn('input_type', ['text', 'numeric', 'richText'])
+                        ->reject(fn ($a) => in_array($a->name, self::LAZADA_RESERVED_ATTRIBUTE_NAMES, true)),
+                    $lazadaMappings->where('target_field', 'lazada_attribute')->pluck('lazada_attribute_name')->all(),
+                    idKey: 'name',
+                    labelKey: 'label',
+                ),
+            ],
+        ]);
+    }
+
+    public function tiktok(): Response
+    {
+        $pimAttributes = Attribute::cachedList();
+        $tiktokMappings = TikTokAttributeMapping::cachedList();
         $tiktokAttributes = TikTokAttribute::cachedList();
 
-        return Inertia::render('catalog/attributes/marketplace-mapping', [
-            'woocommerce' => [
-                'attributes' => $this->woocommerceAttributeRows($pimAttributes, $wooMappings),
-                'wooCommerceAttributes' => $wooCommerceAttributes,
-                'coverage' => [
-                    'payloadFields' => $this->payloadFieldCoverage($wooMappings, self::PAYLOAD_FIELDS['woocommerce']),
-                    // wc_attribute ไม่มีการจำกัด input_type (ดูที่
-                    // WooCommerceAttributeMappingController) — WooCommerce
-                    // attribute ที่ sync มาแล้วทุกตัวใช้เป็นเป้าหมาย mapping ได้หมด
-                    'platformAttributes' => $this->platformAttributeCoverage(
-                        $wooCommerceAttributes,
-                        $wooMappings->where('target_field', 'wc_attribute')->pluck('woocommerce_attribute_id')->all(),
-                    ),
-                ],
-            ],
-            'shopee' => [
-                'attributes' => $this->shopeeAttributeRows($pimAttributes, $shopeeMappings),
-                'shopeeAttributes' => $shopeeAttributes,
-                'coverage' => [
-                    'payloadFields' => $this->payloadFieldCoverage($shopeeMappings, self::PAYLOAD_FIELDS['shopee']),
-                    'platformAttributes' => $this->platformAttributeCoverage(
-                        $shopeeAttributes->where('input_type', 3), // FREE_TEXT_FILED — ชนิดเดียวที่ map ได้
-                        $shopeeMappings->where('target_field', 'shopee_attribute')->pluck('shopee_attribute_id')->all(),
-                    ),
-                ],
-            ],
-            'lazada' => [
-                'attributes' => $this->lazadaAttributeRows($pimAttributes, $lazadaMappings),
-                'lazadaAttributes' => $lazadaAttributes,
-                'coverage' => [
-                    'payloadFields' => $this->payloadFieldCoverage($lazadaMappings, self::PAYLOAD_FIELDS['lazada']),
-                    'platformAttributes' => $this->platformAttributeCoverage(
-                        $lazadaAttributes
-                            ->whereIn('input_type', ['text', 'numeric', 'richText'])
-                            ->reject(fn ($a) => in_array($a->name, self::LAZADA_RESERVED_ATTRIBUTE_NAMES, true)),
-                        $lazadaMappings->where('target_field', 'lazada_attribute')->pluck('lazada_attribute_name')->all(),
-                        idKey: 'name',
-                        labelKey: 'label',
-                    ),
-                ],
-            ],
-            'tiktok' => [
-                'attributes' => $this->tiktokAttributeRows($pimAttributes, $tiktokMappings),
-                'tiktokAttributes' => $tiktokAttributes,
-                'coverage' => [
-                    'payloadFields' => $this->payloadFieldCoverage($tiktokMappings, self::PAYLOAD_FIELDS['tiktok']),
-                    'platformAttributes' => $this->platformAttributeCoverage(
-                        $tiktokAttributes->where('is_customizable', true),
-                        $tiktokMappings->where('target_field', 'tiktok_attribute')->pluck('tiktok_attribute_id')->all(),
-                    ),
-                ],
+        return Inertia::render('catalog/marketplace/tiktok-attribute-mapping', [
+            'attributes' => $this->tiktokAttributeRows($pimAttributes, $tiktokMappings),
+            'tiktokAttributes' => $tiktokAttributes,
+            'coverage' => [
+                'payloadFields' => $this->payloadFieldCoverage($tiktokMappings, self::PAYLOAD_FIELDS['tiktok']),
+                'platformAttributes' => $this->platformAttributeCoverage(
+                    $tiktokAttributes->where('is_customizable', true),
+                    $tiktokMappings->where('target_field', 'tiktok_attribute')->pluck('tiktok_attribute_id')->all(),
+                ),
             ],
         ]);
     }

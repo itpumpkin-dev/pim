@@ -140,9 +140,22 @@ function useMainNavItems(): NavItem[] {
                                     ...(['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
                                         title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
                                         items: [
-                                            { title: t('mapCategory'), url: `/catalog/marketplace/${platform}/category`, permission: 'products.list_products' },
-                                            { title: t('mapBrand'), url: `/catalog/marketplace/${platform}/brand`, permission: 'products.list_products' },
-                                            { title: t('mapPushData'), url: `/catalog/marketplace/${platform}/push`, permission: 'products.list_products' },
+                                            // หน้าเดียวรวมทั้งแมปหมวดหมู่และแมปแบรนด์ (ลองแยกเป็นหน้าเดี่ยวๆ
+                                            // ไปแล้วแต่ user ให้รวมกลับมาเหมือนเดิม) — เลยไม่มีเมนู "แมปฟิว
+                                            // brand" แยกต่างหากอีกแล้ว
+                                            { title: t('mapCategory'), url: `/catalog/categories/${platform}-mapping`, permission: 'categories.edit_categories' },
+                                            // "แมปฟิวส่งข้อมูล" — พาไปหน้าจับคู่แอตทริบิวต์ PIM ↔ แอตทริบิวต์
+                                            // marketplace ของแพลตฟอร์มนั้นๆ โดยตรง คนละหน้า/URL กันจริงๆ ต่อ
+                                            // แพลตฟอร์ม (เคยรวมเป็นหน้าเดียวมี Tabs สลับ ก่อนแยกจริงตามที่
+                                            // user ขอ — ดู docblock ของ MarketplaceAttributeMappingController)
+                                            // อยู่ใต้ /catalog/marketplace/ ไม่ใช่ /catalog/attributes/ — ไม่งั้น
+                                            // เมนู "แอตทริบิวต์" จะโดน highlight ผิดไปด้วย (ดูคอมเมนต์ที่
+                                            // routes/catalog.php ตรง route กลุ่มนี้)
+                                            {
+                                                title: t('mapPushData'),
+                                                url: `/catalog/marketplace/${platform}/attribute-mapping`,
+                                                permission: 'attributes.edit_attributes',
+                                            },
                                         ],
                                     })),
                                 ],
@@ -186,21 +199,18 @@ function useMainNavItems(): NavItem[] {
                                 title: t('management'),
                                 url: '/catalog/management',
                                 permission: 'products.list_products',
-                                // These pages are only reachable via a card on
-                                // the Management hub now (their own sidebar/tab
-                                // entries were removed) — without this, visiting
-                                // one directly leaves no sidebar item matching
-                                // its URL, so findActiveGroup falls back to
-                                // Dashboard and the whole secondary sidebar
+                                // Neither of these has its own sidebar/tab entry
+                                // (product-translations is a Management-hub card;
+                                // marketplace-sync is only reachable via the
+                                // back-link on each platform's มาสเตอร์ > มาร์เก็ตเพลส
+                                // > {platform} mapping page now) — without this,
+                                // visiting one directly leaves no sidebar item
+                                // matching its URL, so findActiveGroup falls back
+                                // to Dashboard and the whole secondary sidebar
                                 // collapses instead of staying on "จัดการ".
                                 matchUrls: [
                                     '/catalog/product-translations',
-                                    '/catalog/management/marketplace',
                                     '/catalog/categories/marketplace-sync',
-                                    '/catalog/categories/lazada-mapping',
-                                    '/catalog/categories/shopee-mapping',
-                                    '/catalog/categories/tiktok-mapping',
-                                    '/catalog/categories/woocommerce-mapping',
                                 ],
                             },
                         ],

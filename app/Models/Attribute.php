@@ -39,6 +39,7 @@ class Attribute extends Model
         'name',
         'type',
         'swatch_type',
+        'master_source',
         'is_required',
         'is_unique',
         'is_locale_based',

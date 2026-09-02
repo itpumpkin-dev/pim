@@ -159,7 +159,7 @@ export function AttributeMappingTable({
         // ส่วน locale ก็ด้วยเหตุผลเดียวกับ AttributeController::export() —
         // ดูคอมเมนต์ที่นั่น
         const params = encodeQueryParams({ platform, format, search, status, locale });
-        window.location.href = `/catalog/attributes/marketplace-mapping/export?${params.join('&')}`;
+        window.location.href = `/catalog/marketplace/attribute-mapping/export?${params.join('&')}`;
         setExportAnchor(null);
     };
 

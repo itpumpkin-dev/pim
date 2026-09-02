@@ -1,41 +1,31 @@
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, FioriStatus, fioriDefaultSx, type FioriTone } from '@/lib/fiori-style';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import DownloadIcon from '@mui/icons-material/Download';
-import LinkIcon from '@mui/icons-material/Link';
-import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
-import { Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
-import { useState } from 'react';
+import { FIORI, FioriStatus, type FioriTone } from '@/lib/fiori-style';
+import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/react';
+import { Box, Stack, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 
 // ทำเป็นตารางแถวละแพลตฟอร์ม แทนที่จะเป็น picker-tile + panel รายละเอียดอันเดียว
-// (ดีไซน์เดิมโชว์ action ได้ทีละแพลตฟอร์มเท่านั้น) — ตอนนี้เห็น action ของทุก
+// (ดีไซน์เดิมโชว์ action ได้ทีละแพลตฟอร์มเท่านั้น) — ตอนนี้เห็นสถานะ sync ของทุก
 // แพลตฟอร์มพร้อมกันเลย จะเพิ่มแพลตฟอร์มใหม่ก็แค่เพิ่ม entry ตรงนี้กับ route ฝั่ง
 // backend เพิ่มอีกอันเดียวจบ
 //
-// ตอนนี้การ sync/mapping ทั้งหมวดหมู่และแบรนด์ ย้ายไปอยู่ที่หน้า
-// categories/{platform}-mapping.tsx ของแต่ละแพลตฟอร์มแล้ว (Shopee กับ Lazada
-// ทำก่อน ส่วน TikTok กับ WooCommerce ตามมาทีหลังด้วยแนวทางเดียวกัน — ดู docblock
-// ของแต่ละหน้า) — เพราะดูต้นไม้หมวดหมู่คู่กับ brand catalog ที่ผูกกันในหน้าเดียว
-// มันดีกว่าทำเป็น hub กลางแยกทุก action ออกมา ไม่ใช่แค่เคสที่ brand catalog
-// ผูกกับหมวดหมู่เท่านั้น หน้านี้เลยเหลือแค่ปุ่ม "Map" (ทางลัดไปหน้านั้น) กับ
-// export/import ของ WooCommerce เอง ที่ยังไม่มีที่เฉพาะให้ไปอยู่
-const CATEGORY_SYNC_PLATFORMS = [
-    { value: 'lazada', label: 'Lazada', mappingRoute: '/catalog/categories/lazada-mapping', exportRoute: null, importRoute: null },
-    { value: 'shopee', label: 'Shopee', mappingRoute: '/catalog/categories/shopee-mapping', exportRoute: null, importRoute: null },
-    { value: 'tiktok', label: 'TikTok', mappingRoute: '/catalog/categories/tiktok-mapping', exportRoute: null, importRoute: null },
-    {
-        value: 'woocommerce',
-        label: 'WooCommerce',
-        mappingRoute: '/catalog/categories/woocommerce-mapping',
-        exportRoute: '/catalog/categories/export-woocommerce',
-        importRoute: '/catalog/categories/import-woocommerce',
-    },
+// การ sync/mapping ทั้งหมวดหมู่และแบรนด์ของแต่ละแพลตฟอร์ม รวมถึงปุ่ม export/
+// import CSV ของ WooCommerce เอง ตอนนี้ย้ายไปอยู่ที่มาสเตอร์ > มาร์เก็ตเพลส >
+// {แพลตฟอร์ม} หมดแล้ว (category-mapping ยังอยู่ที่หน้า categories/
+// {platform}-mapping.tsx เดิม — ดู docblock ของไฟล์นั้นๆ) หน้านี้เลยเหลือแค่
+// ตารางแสดงสถานะ sync ล่าสุดของแต่ละแพลตฟอร์มอย่างเดียว ไม่มี action ให้กดแล้ว
+// — ยังคงไว้เพราะยังมี back-link/breadcrumb จากหน้า {platform}-mapping.tsx
+// ทั้ง 4 ชี้กลับมาที่นี่อยู่
+const PLATFORMS = [
+    { value: 'lazada', label: 'Lazada' },
+    { value: 'shopee', label: 'Shopee' },
+    { value: 'tiktok', label: 'TikTok' },
+    { value: 'woocommerce', label: 'WooCommerce' },
 ] as const;
 
-type Platform = (typeof CATEGORY_SYNC_PLATFORMS)[number];
+type Platform = (typeof PLATFORMS)[number];
 
 function formatLocalDateTime(value: string | null): string {
     if (!value) return '-';
@@ -63,27 +53,11 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
-    const { auth } = usePage<SharedData>().props;
-    const permissions = auth.permissions || [];
-    const canEdit = permissions.includes('categories.edit_categories');
-
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('management'), href: '/catalog/management' },
-        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
         { title: t('marketplaceSyncTitle'), href: '#' },
     ];
-
-    // ใช้ key เป็นค่าของแพลตฟอร์ม ไม่ใช่ boolean ตัวเดียวใช้ร่วมกัน — เพราะปุ่ม
-    // import ของแต่ละแถวต้องกดแยกอิสระจากกันได้ (ดีไซน์เดิมมีแพลตฟอร์มที่ "เลือกอยู่"
-    // แค่ตัวเดียว เลยใช้ boolean ตัวเดียวพอ)
-    const [importingPlatform, setImportingPlatform] = useState<string | null>(null);
-
-    const runImport = (platform: Platform) => {
-        if (!platform.importRoute) return;
-        setImportingPlatform(platform.value);
-        router.post(platform.importRoute, {}, { onFinish: () => setImportingPlatform(null) });
-    };
 
     const columns: FioriResponsiveColumn<Platform>[] = [
         {
@@ -103,63 +77,6 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                 </Stack>
             ),
         },
-        {
-            key: 'manage',
-            header: t('manageColumn'),
-            priority: 'always',
-            minWidth: 320,
-            render: (platform) => {
-                if (!canEdit) {
-                    return (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontStyle: 'italic' }}>
-                            —
-                        </Typography>
-                    );
-                }
-
-                const isImporting = importingPlatform === platform.value;
-
-                return (
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<LinkIcon fontSize="small" />}
-                            onClick={() => router.visit(platform.mappingRoute)}
-                            sx={fioriDefaultSx}
-                        >
-                            {t('mapToPlatformCategories', { platform: platform.label })}
-                        </Button>
-
-                        {platform.exportRoute && (
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<DownloadIcon fontSize="small" />}
-                                component="a"
-                                href={platform.exportRoute}
-                                sx={fioriDefaultSx}
-                            >
-                                {t('exportCategoriesCsv')}
-                            </Button>
-                        )}
-
-                        {platform.importRoute && (
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                disabled={isImporting}
-                                startIcon={isImporting ? <CircularProgress size={14} /> : <SystemUpdateAltIcon fontSize="small" />}
-                                onClick={() => runImport(platform)}
-                                sx={fioriDefaultSx}
-                            >
-                                {isImporting ? t('importingCategories') : t('importAsPimCategories')}
-                            </Button>
-                        )}
-                    </Stack>
-                );
-            },
-        },
     ];
 
     return (
@@ -173,7 +90,7 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
                     <Typography sx={{ color: FIORI.textSecondary, mt: 0.5 }}>{t('marketplaceSyncSubtitle')}</Typography>
                 </Box>
 
-                <FioriResponsiveTable columns={columns} rows={[...CATEGORY_SYNC_PLATFORMS]} getRowKey={(platform) => platform.value} />
+                <FioriResponsiveTable columns={columns} rows={[...PLATFORMS]} getRowKey={(platform) => platform.value} />
             </Box>
         </AppLayout>
     );

@@ -116,7 +116,6 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('management'), href: '/catalog/management' },
-        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
         { title: t('marketplaceSyncTitle'), href: '/catalog/categories/marketplace-sync' },
         { title: t('shopeeMappingTitle'), href: '#' },
     ];

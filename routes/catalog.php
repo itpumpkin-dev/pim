@@ -32,7 +32,6 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ของตัวเองอยู่แล้ว หน้ารวมนี้เลยไม่ต้องมี middleware อะไรเพิ่มนอกจาก auth
     // ฝั่ง frontend จะซ่อน tile ที่ user คนนั้นเข้าไม่ได้เองอยู่แล้ว
     Route::get('management', fn () => Inertia::render('catalog/management/index'))->name('management');
-    Route::get('management/marketplace', fn () => Inertia::render('catalog/management/marketplace'))->name('management.marketplace');
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
@@ -78,8 +77,18 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/export', [AttributeController::class, 'export'])->name('attributes.export')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
-    Route::get('attributes/marketplace-mapping', [MarketplaceAttributeMappingController::class, 'index'])->name('attributes.marketplaceMapping')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/marketplace-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('attributes.marketplaceMapping.export')->middleware('permission:attributes,edit_attributes');
+    // แยกเป็นคนละ action/URL/หน้ากันจริงๆ ต่อแพลตฟอร์มแล้ว (เคยรวมเป็นหน้าเดียว
+    // มี Tabs สลับ ก่อนแยกจริงตามที่ user ขอ) — ดู docblock ของ
+    // MarketplaceAttributeMappingController อยู่ใต้ path prefix "marketplace/"
+    // ไม่ใช่ "attributes/" (ต่างจากตอนแรกที่ทำ) เพราะ nav-secondary.tsx ไฮไลต์
+    // เมนู active ด้วยการเทียบ prefix ของ pathname — ถ้าอยู่ใต้ "attributes/"
+    // จะโดนเมนู "แอตทริบิวต์" (url: /catalog/attributes) highlight ผิดไปด้วย
+    // เพราะ /catalog/attributes/... ก็ขึ้นต้นด้วย /catalog/attributes เหมือนกัน
+    Route::get('marketplace/attribute-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('marketplace.attributeMapping.export')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/woocommerce/attribute-mapping', [MarketplaceAttributeMappingController::class, 'woocommerce'])->name('marketplace.woocommerce.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
@@ -371,11 +380,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
             'subtitle' => ucfirst($platform),
         ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.connect');
 
-        Route::get('marketplace/{platform}/{view}', fn (string $platform, string $view) => Inertia::render('catalog/placeholder', [
-            'titleKey' => 'marketplace',
-            'subtitle' => ucfirst($platform).' — '.$view,
-        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])
-            ->whereIn('view', ['brand', 'category', 'push'])
-            ->name('marketplace.map');
+        // "category" (รวม brand-mapping กลับเข้าไปแล้วเหมือนเดิม) reached straight
+        // from the sidebar at its real URL (/catalog/categories/{platform}-mapping),
+        // and "push" (แมปฟิวส่งข้อมูล) now reaches its own real attribute-mapping
+        // page at /catalog/marketplace/{platform}/attribute-mapping — no more
+        // placeholder stub for either of them.
     });
 });

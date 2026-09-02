@@ -131,6 +131,24 @@ class AttributeCatalogSeeder extends Seeder
         'power_type' => ['select', false, false],
     ];
 
+    /**
+     * Which catalog master feeds each dropdown attribute's option list —
+     * previously hard-coded in code, now stored on `attributes.master_source`
+     * and editable on the attribute's edit page (see MasterAttributeOptionSync).
+     * attribute code => source key
+     */
+    private const MASTER_SOURCES = [
+        'pcatid' => 'categories',
+        'pcatname' => 'categories',
+        'psubcatname' => 'subcategories',
+        'productgroupname' => 'product_groups',
+        'pointtype' => 'points',
+        'commission_group' => 'commission_groups',
+        'business_type' => 'business_types',
+        'vendor' => 'vendors',
+        'purchase_currency' => 'currencies',
+    ];
+
     public function run(): void
     {
         foreach (self::ATTRIBUTES as $code => $config) {
@@ -146,8 +164,13 @@ class AttributeCatalogSeeder extends Seeder
                     'is_channel_based' => $isChannelBased,
                     'is_required' => $isRequired,
                     'swatch_type' => in_array($type, ['select', 'multiselect'], true) ? 'text' : null,
+                    'master_source' => self::MASTER_SOURCES[$code] ?? null,
                 ]
             );
+        }
+
+        foreach (self::MASTER_SOURCES as $code => $sourceKey) {
+            Attribute::where('code', $code)->update(['master_source' => $sourceKey]);
         }
     }
 }

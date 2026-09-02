@@ -11,10 +11,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
+import DownloadIcon from '@mui/icons-material/Download';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
+import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
 import {
     Box,
     Button,
@@ -37,12 +39,16 @@ import { useTranslation } from 'react-i18next';
 
 // ใช้ตารางแบบ marketplace-tree-row-centric เหมือนกับ categories/shopee-mapping.tsx/
 // categories/lazada-mapping.tsx/categories/tiktok-mapping.tsx (ดู docblock ของ
-// CategoryController::woocommerceMapping()) รวมถึงส่วน detail "Brands" แบบเดียวกัน
-// (global — เพราะ taxonomy "Product Brands" ของ WooCommerce เองไม่มีมิติหมวดหมู่
-// เหมือนกับของ Lazada/TikTok) แต่ไม่มีส่วน "Attributes" ในหน้านี้ — ต่างจาก
-// Shopee/Lazada/TikTok ตรงที่ custom attributes ของ WooCommerce ไม่ได้ผูกกับ
+// CategoryController::woocommerceMapping()) — ไม่มีส่วน "Attributes" ในหน้านี้
+// เหมือน Shopee/Lazada/TikTok เพราะ custom attributes ของ WooCommerce ไม่ได้ผูกกับ
 // schema หมวดหมู่เลย (ดู WooCommerceAttributeMappingController —
 // syncWoocommerceAttributes() ทำงานแบบ global ไม่มีแนวคิดแยกตามหมวดหมู่ให้เลียนแบบ)
+//
+// ปุ่ม "ดาวน์โหลด CSV"/"นำเข้าเป็นหมวดหมู่ PIM" ย้ายมาจาก
+// categories/marketplace-sync.tsx แล้ว (ดู docblock ของหน้านั้น) — ใช้ endpoint
+// เดิมทุกอย่าง (categories/export-woocommerce, categories/import-woocommerce)
+// ไม่มีการแก้ backend เลย แค่ย้าย UI มาไว้ที่มาสเตอร์ > มาร์เก็ตเพลส > WooCommerce
+// ตรงๆ แทน
 type WoocommerceFilter = 'all' | 'leaf' | 'parent' | 'flagged';
 
 interface MappedCategory {
@@ -97,7 +103,6 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('management'), href: '/catalog/management' },
-        { title: t('manageEcommerceMarketplaceTab'), href: '/catalog/management/marketplace' },
         { title: t('marketplaceSyncTitle'), href: '/catalog/categories/marketplace-sync' },
         { title: t('woocommerceMappingTitle'), href: '#' },
     ];
@@ -109,6 +114,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     const [assigningFor, setAssigningFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [syncingCategories, setSyncingCategories] = useState(false);
+    const [importingCategories, setImportingCategories] = useState(false);
     const firstRender = useRef(true);
 
     const runCategorySync = () => {
@@ -116,7 +122,17 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
         router.post('/catalog/categories/sync-woocommerce', {}, { preserveScroll: true, onFinish: () => setSyncingCategories(false) });
     };
 
-    // ---- WooCommerce Brands (global — ดู docblock ของ WoocommerceBrandRow ประกอบ) ----
+    // ดาวน์โหลด/นำเข้า CSV หมวดหมู่ PIM — คนละกลไกกับ "sync categories" ด้านบน
+    // ("sync categories" ดึงต้นไม้หมวดหมู่จาก WooCommerce API มาเก็บไว้ที่ตาราง
+    // staging woocommerce_categories สำหรับ map เข้ากับหมวดหมู่ PIM ที่มีอยู่แล้ว
+    // ส่วนตัวนี้ export/import หมวดหมู่ PIM เองเป็นไฟล์ CSV ตรงๆ — ใช้เวลาต้องการ
+    // แก้ไข/สร้างหมวดหมู่ PIM จำนวนมากนอก UI แล้วนำเข้ากลับมา)
+    const runCategoryImport = () => {
+        setImportingCategories(true);
+        router.post('/catalog/categories/import-woocommerce', {}, { onFinish: () => setImportingCategories(false) });
+    };
+
+    // ---- WooCommerce Brands ----
     const [woocommerceBrands, setWoocommerceBrands] = useState<PaginatedData<WoocommerceBrandRow> | null>(null);
     const [loadingWoocommerceBrands, setLoadingWoocommerceBrands] = useState(false);
     const [woocommerceBrandSearch, setWoocommerceBrandSearch] = useState('');
@@ -140,8 +156,6 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
             .finally(() => setLoadingWoocommerceBrands(false));
     };
 
-    // โหลดครั้งเดียวตอน mount — brand catalog ของ WooCommerce ไม่มีมิติหมวดหมู่เลย
-    // เหมือนกับของ Lazada/TikTok
     useEffect(() => {
         if (canEditBrands) loadWoocommerceBrands({ page: 1 });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,10 +182,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     };
 
     // การ sync แบรนด์ของ WooCommerce เองทำงานแบบ synchronous (mode: 'sync' —
-    // endpoint Product Brands ของมัน return ข้อมูลทั้งหมดมาแค่ไม่กี่หน้า เจอจริง
-    // มาแล้ว: มีแบรนด์รวม 4 อัน) — แค่ POST ธรรมดา + onFinish สไตล์ Inertia ก็พอ
-    // ไม่ต้องมี JobTracker/polling แบบที่ queued brand sync ของ Shopee/Lazada/
-    // TikTok ใช้
+    // endpoint Product Brands ของมัน return ข้อมูลทั้งหมดมาแค่ไม่กี่หน้า) — แค่ POST
+    // ธรรมดา + onFinish สไตล์ Inertia ก็พอ ไม่ต้องมี JobTracker/polling แบบที่
+    // queued brand sync ของ Shopee/Lazada/TikTok ใช้
     const triggerWoocommerceBrandSync = () => {
         setWoocommerceBrandSyncing(true);
         setWoocommerceBrandSyncMessage('');
@@ -192,7 +205,7 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
     // (attribute_options.woocommerce_brand_id) — ถ้าเป็นการจับคู่ใหม่ ก็คือ id ของ
     // แบรนด์ PIM ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping
     // เดิมนั้น ไม่ใช่อะไรที่คำนวณมาจาก `woocommerceBrandId` ส่วน `display` คือสิ่งที่จะ
-    // โชว์ในแถวหลังจากนั้น รูปแบบเดียวกับ persistBrand() ของอีก 3 แพลตฟอร์ม
+    // โชว์ในแถวหลังจากนั้น
     const persistWoocommerceBrand = (
         woocommerceBrandId: number,
         optionId: number,
@@ -523,7 +536,25 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         </Typography>
                     </Box>
 
-                    <Stack direction="row" spacing={1.5}>
+                    <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap justifyContent="flex-end">
+                        <Button
+                            variant="outlined"
+                            startIcon={<DownloadIcon fontSize="small" />}
+                            component="a"
+                            href="/catalog/categories/export-woocommerce"
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {t('exportCategoriesCsv')}
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            disabled={importingCategories}
+                            startIcon={importingCategories ? <CircularProgress size={16} /> : <SystemUpdateAltIcon fontSize="small" />}
+                            onClick={runCategoryImport}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {importingCategories ? t('importingCategories') : t('importAsPimCategories')}
+                        </Button>
                         <Button
                             variant="outlined"
                             disabled={syncingCategories}

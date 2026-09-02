@@ -26,6 +26,7 @@ interface Attribute {
     name: string;
     type: string;
     swatch_type: string | null;
+    master_source: string | null;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -34,10 +35,16 @@ interface Attribute {
     is_filterable: boolean;
 }
 
+interface MasterSourceOption {
+    value: string;
+    labelKey: string;
+}
+
 interface AttributeForm {
     code: string;
     type: string;
     swatch_type: string;
+    master_source: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -52,10 +59,11 @@ interface Props {
     attribute: Attribute;
     translations: Record<string, string>;
     options?: AttributeOptionItem[];
+    masterSources?: MasterSourceOption[];
     canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations, options = [], canViewHistory = false }: Props) {
+export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -92,6 +100,7 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         code: attribute.code || '',
         type: attribute.type || 'text',
         swatch_type: attribute.swatch_type || '',
+        master_source: attribute.master_source || '',
         is_required: Boolean(attribute.is_required),
         is_unique: Boolean(attribute.is_unique),
         is_locale_based: Boolean(attribute.is_locale_based),
@@ -108,8 +117,11 @@ export default function AttributeEdit({ attribute, translations, options = [], c
         setData('type', value);
         if (value !== 'select' && value !== 'multiselect') {
             setData('swatch_type', '');
+            setData('master_source', '');
         }
     };
+
+    const masterBound = data.master_source !== '';
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -186,6 +198,32 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                                 </FormControl>
                             </FioriField>
                         )}
+
+                        {showSwatchType && (
+                            <FioriField
+                                label={t('masterSourceLabel')}
+                                htmlFor="attribute-master-source"
+                                valueState={valueStateOf(errors.master_source)}
+                                message={errors.master_source}
+                                hint={t('masterSourceHint')}
+                            >
+                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.master_source))}>
+                                    <Select
+                                        id="attribute-master-source"
+                                        displayEmpty
+                                        value={data.master_source}
+                                        onChange={(event) => setData('master_source', event.target.value)}
+                                    >
+                                        <MenuItem value="">{t('masterSourceNone')}</MenuItem>
+                                        {masterSources.map((source) => (
+                                            <MenuItem key={source.value} value={source.value}>
+                                                {t(source.labelKey)}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </FioriField>
+                        )}
                     </FioriFormGroup>
 
                     <FioriFormGroup title={t('validationsTitle')}>
@@ -211,7 +249,17 @@ export default function AttributeEdit({ attribute, translations, options = [], c
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    {showSwatchType && (
+                    {showSwatchType && masterBound && (
+                        <FioriFormGroup title={t('optionsTitle')}>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('masterSourceOptionsLocked', {
+                                    source: t(masterSources.find((s) => s.value === data.master_source)?.labelKey ?? data.master_source),
+                                })}
+                            </Typography>
+                        </FioriFormGroup>
+                    )}
+
+                    {showSwatchType && !masterBound && (
                         <AttributeOptionsPanel attributeId={attribute.id} swatchType={data.swatch_type} options={options} />
                     )}
                 </Stack>

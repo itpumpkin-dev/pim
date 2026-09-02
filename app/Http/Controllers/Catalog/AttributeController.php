@@ -10,6 +10,7 @@ use App\Models\AttributeGroup;
 use App\Models\AttributeTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
+use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\SpreadsheetWriter;
@@ -209,16 +210,19 @@ class AttributeController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('catalog/attributes/create');
+        return Inertia::render('catalog/attributes/create', [
+            'masterSources' => MasterAttributeOptionSync::pickerOptions(),
+        ]);
     }
 
     public function edit(Attribute $attribute): Response
     {
         return Inertia::render('catalog/attributes/edit', [
             'attribute' => $attribute->only([
-                'id', 'code', 'name', 'type', 'swatch_type', 'is_required', 'is_unique',
+                'id', 'code', 'name', 'type', 'swatch_type', 'master_source', 'is_required', 'is_unique',
                 'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable',
             ]),
+            'masterSources' => MasterAttributeOptionSync::pickerOptions(),
             'translations' => $attribute->translations()->get()
                 ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
             'options' => $attribute->options()->orderBy('sort_order')->orderBy('id')->get([
@@ -248,6 +252,7 @@ class AttributeController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,number,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
+            'master_source' => ['nullable', 'in:' . implode(',', MasterAttributeOptionSync::keys())],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],
@@ -261,10 +266,16 @@ class AttributeController extends Controller
         $translations = $validated['translations'] ?? [];
         $name = $this->resolveName($translations, $validated['name'] ?? null);
 
+        // A master_source only makes sense for a dropdown attribute.
+        $masterSource = in_array($validated['type'], ['select', 'multiselect'], true)
+            ? ($validated['master_source'] ?? null)
+            : null;
+
         $attribute = CodeGenerator::createWithRetry('attributes', 'attribute', fn ($code) => Attribute::create([
             ...$validated,
             'code' => $code,
             'name' => $name,
+            'master_source' => $masterSource,
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -283,6 +294,10 @@ class AttributeController extends Controller
             AuditLog::record('labels_set', $attribute, null, $newTranslations);
         }
 
+        if ($attribute->master_source !== null) {
+            app(MasterAttributeOptionSync::class)->rebuildAttribute($attribute);
+        }
+
         Attribute::bumpCodeMapVersion();
         Attribute::bumpListVersion();
 
@@ -295,6 +310,7 @@ class AttributeController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,number,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
+            'master_source' => ['nullable', 'in:' . implode(',', MasterAttributeOptionSync::keys())],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],
@@ -307,10 +323,16 @@ class AttributeController extends Controller
 
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($attribute);
+        $oldMasterSource = $attribute->master_source;
+
+        $masterSource = in_array($validated['type'], ['select', 'multiselect'], true)
+            ? ($validated['master_source'] ?? null)
+            : null;
 
         $attribute->update([
             ...$validated,
             'name' => $this->resolveName($translations, $validated['name'] ?? null),
+            'master_source' => $masterSource,
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -326,6 +348,12 @@ class AttributeController extends Controller
         $newTranslations = $this->currentTranslations($attribute);
         if ($oldTranslations !== $newTranslations) {
             AuditLog::record('labels_updated', $attribute, $oldTranslations, $newTranslations);
+        }
+
+        // Rebound (or unbound) the master — regenerate the whole option list
+        // from the new source. A no-op source keeps whatever options exist.
+        if ($attribute->master_source !== $oldMasterSource && $attribute->master_source !== null) {
+            app(MasterAttributeOptionSync::class)->rebuildAttribute($attribute);
         }
 
         Attribute::bumpListVersion();

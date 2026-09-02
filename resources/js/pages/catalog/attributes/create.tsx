@@ -34,9 +34,19 @@ const swatchTypeKeys: Record<string, string> = {
     image: 'swatchTypeImage',
 };
 
+interface MasterSourceOption {
+    value: string;
+    labelKey: string;
+}
+
+interface Props {
+    masterSources?: MasterSourceOption[];
+}
+
 interface AttributeForm {
     type: string;
     swatch_type: string;
+    master_source: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -47,7 +57,7 @@ interface AttributeForm {
     [key: string]: string | boolean | Record<string, string>;
 }
 
-export default function AttributeCreate() {
+export default function AttributeCreate({ masterSources = [] }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -70,6 +80,7 @@ export default function AttributeCreate() {
     const { data, setData, post, processing, errors, isDirty } = useForm<AttributeForm>({
         type: 'text',
         swatch_type: '',
+        master_source: '',
         is_required: false,
         is_unique: false,
         // ตั้งค่าเริ่มต้นให้ติ๊ก "ค่าต่อภาษา" ไว้ — แอตทริบิวต์ส่วนใหญ่ที่สร้างใหม่
@@ -88,6 +99,7 @@ export default function AttributeCreate() {
         setData('type', value);
         if (value !== 'select' && value !== 'multiselect') {
             setData('swatch_type', '');
+            setData('master_source', '');
         }
     };
 
@@ -143,6 +155,32 @@ export default function AttributeCreate() {
                                 <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.swatch_type))}>
                                     <Select id="attribute-swatch-type" value={data.swatch_type} onChange={(event) => setData('swatch_type', event.target.value)}>
                                         {swatchTypes.map((type) => <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>)}
+                                    </Select>
+                                </FormControl>
+                            </FioriField>
+                        )}
+
+                        {showSwatchType && (
+                            <FioriField
+                                label={t('masterSourceLabel')}
+                                htmlFor="attribute-master-source"
+                                valueState={valueStateOf(errors.master_source)}
+                                message={errors.master_source}
+                                hint={t('masterSourceHint')}
+                            >
+                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.master_source))}>
+                                    <Select
+                                        id="attribute-master-source"
+                                        displayEmpty
+                                        value={data.master_source}
+                                        onChange={(event) => setData('master_source', event.target.value)}
+                                    >
+                                        <MenuItem value="">{t('masterSourceNone')}</MenuItem>
+                                        {masterSources.map((source) => (
+                                            <MenuItem key={source.value} value={source.value}>
+                                                {t(source.labelKey)}
+                                            </MenuItem>
+                                        ))}
                                     </Select>
                                 </FormControl>
                             </FioriField>

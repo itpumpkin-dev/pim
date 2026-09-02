@@ -1,7 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import TranslateIcon from '@mui/icons-material/Translate';
 import { Box, Grid, Typography } from '@mui/material';
 import { type ComponentType } from 'react';
@@ -9,13 +8,17 @@ import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
- * หน้า hub "จัดการ" — เป็นเมนู sidebar จุดเดียวที่รวมหน้าย่อย 3 หน้าเข้าไว้ด้วยกัน
- * ซึ่งแต่ก่อนหน้าพวกนี้จะซ่อนอยู่ลึกในแต่ละ entity ของตัวเอง
- * (list คำแปลที่ขาดของ Products, และแท็บ marketplace-sync ของ Categories/Brands)
- * เลยย้ายมาไว้ตรงนี้ให้กดคลิกเดียวถึงจาก sidebar ของ Catalog เลย
- * แต่ละการ์ดแค่พาไปหน้าจริงเท่านั้น — การเช็ค permission และ action ต่างๆ
- * ยังอยู่ที่หน้าปลายทางเหมือนเดิม หน้านี้เป็นแค่ตัวพาไป (launcher)
- * เลยไม่ต้องมี props จาก server เลย
+ * หน้า hub "จัดการ" — เป็นเมนู sidebar จุดเดียวที่รวมหน้าย่อยที่แต่ก่อนจะซ่อนอยู่ลึก
+ * ในแต่ละ entity ของตัวเอง (list คำแปลที่ขาดของ Products) เลยย้ายมาไว้ตรงนี้ให้กด
+ * คลิกเดียวถึงจาก sidebar ของ Catalog เลย แต่ละการ์ดแค่พาไปหน้าจริงเท่านั้น —
+ * การเช็ค permission และ action ต่างๆ ยังอยู่ที่หน้าปลายทางเหมือนเดิม หน้านี้เป็น
+ * แค่ตัวพาไป (launcher) เลยไม่ต้องมี props จาก server เลย
+ *
+ * ไม่มีการ์ด "จัดการ Ecommerce/Marketplace" แล้ว — ทุก action ของ Marketplace
+ * (sync/mapping หมวดหมู่+แบรนด์, จับคู่แอตทริบิวต์, export/import CSV ของ
+ * WooCommerce) ย้ายไปอยู่ใต้มาสเตอร์ > มาร์เก็ตเพลส > แต่ละแพลตฟอร์มหมดแล้ว —
+ * หน้า management/marketplace.tsx ที่การ์ดนี้เคยพาไป (แค่ launcher มีการ์ดเดียว
+ * เหลืออยู่) เลยไม่มีที่ให้ลิงก์เข้าถึงอีกต่อไป เลยลบทั้งไฟล์/route ทิ้งไปด้วยกัน
  */
 export default function CatalogManagement() {
     const { t } = useTranslation('catalog');
@@ -37,18 +40,6 @@ export default function CatalogManagement() {
             description: t('manageMissingTranslationsDesc'),
             url: '/catalog/product-translations',
             permission: 'product_translations.list_product_translations',
-        },
-        {
-            // รวมสองการ์ดเดิมเข้าด้วยกัน ("ซิงค์ Marketplace" ของ Categories
-            // กับ "จัดการ Ecommerce" ของ Brands) ให้เหลือทางเข้าจุดเดียว —
-            // ใครที่มีสิทธิ์เข้าถึงอย่างใดอย่างหนึ่งก็จะเห็นการ์ดนี้ เพราะหน้าที่ลิงก์ไป
-            // (management/marketplace) จะโชว์เฉพาะการ์ดที่คนดูมีสิทธิ์จริงๆ เท่านั้น
-            key: 'ecommerce-marketplace',
-            icon: StorefrontOutlinedIcon,
-            title: t('manageEcommerceMarketplaceTab'),
-            description: t('manageEcommerceMarketplaceSubtitle'),
-            url: '/catalog/management/marketplace',
-            permission: ['categories.list_categories', 'brands.list_brands'],
         },
     ];
 
