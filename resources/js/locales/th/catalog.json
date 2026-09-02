@@ -96,6 +96,7 @@
     "masterSourceVendors": "เวนเดอร์",
     "masterSourceCurrencies": "สกุลเงิน",
     "masterSourceProductTypes": "ประเภทสินค้า",
+    "masterSourceBaseUnits": "หน่วยนับพื้นฐาน",
     "createAttribute": "สร้างแอตทริบิวต์",
     "searchAttributes": "ค้นหาแอตทริบิวต์",
     "noAttributesFound": "ไม่พบแอตทริบิวต์",

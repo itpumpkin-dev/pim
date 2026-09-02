@@ -96,6 +96,7 @@
     "masterSourceVendors": "Vendors",
     "masterSourceCurrencies": "Currencies",
     "masterSourceProductTypes": "Product Types",
+    "masterSourceBaseUnits": "Base Units",
     "createAttribute": "Create Attribute",
     "searchAttributes": "Search attributes",
     "noAttributesFound": "No attributes found.",

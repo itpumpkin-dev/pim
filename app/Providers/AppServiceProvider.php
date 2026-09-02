@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Listeners\AuditAuthEventSubscriber;
+use App\Models\BaseUnit;
+use App\Models\BaseUnitTranslation;
 use App\Models\BusinessType;
 use App\Models\Category;
 use App\Models\CategoryTranslation;
@@ -22,7 +24,7 @@ use Illuminate\Support\ServiceProvider;
 class AppServiceProvider extends ServiceProvider
 {
     /** Master models whose rows mirror into a bound `select` attribute's options. */
-    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class];
+    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class, BaseUnit::class];
 
     /**
      * Register any application services.
@@ -58,6 +60,17 @@ class AppServiceProvider extends ServiceProvider
         };
         CategoryTranslation::saved($syncTranslationParent);
         CategoryTranslation::deleted($syncTranslationParent);
+
+        // เหตุผลเดียวกับ CategoryTranslation ด้านบน — ชื่อของ BaseUnit ก็มีหลาย
+        // locale อยู่บนโมเดลลูกแยกต่างหาก (base_unit_translations) ไม่ใช่คอลัมน์
+        // เดียวบน base_units เอง
+        $syncBaseUnitTranslationParent = function (BaseUnitTranslation $translation) use ($sync): void {
+            if ($baseUnit = $translation->baseUnit) {
+                $sync()->syncModel($baseUnit);
+            }
+        };
+        BaseUnitTranslation::saved($syncBaseUnitTranslationParent);
+        BaseUnitTranslation::deleted($syncBaseUnitTranslationParent);
 
         // routes/api.php had no throttling at all — enabled via
         // ->throttleApi() in bootstrap/app.php, which applies this 'api'

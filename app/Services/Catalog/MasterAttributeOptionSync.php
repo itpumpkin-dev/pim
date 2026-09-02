@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
+use App\Models\BaseUnit;
 use App\Models\BusinessType;
 use App\Models\Category;
 use App\Models\CommissionGroup;
@@ -28,6 +29,9 @@ use Illuminate\Database\Eloquent\Model;
  *   points / commission_groups / business_types / vendors / currencies /
  *   product_types → their own flat tables; plain admin_label only, no
  *       per-locale row
+ *   base_units → its own flat table (base_units), but WITH per-locale rows
+ *       (base_unit_translations) — mirrors CategoryTranslation's shape, not
+ *       the single-admin_label flat masters above
  *
  * Master edits flow in through model events (categories) or the
  * SyncsAttributeOptionMirror trait (the flat masters); changing an
@@ -47,6 +51,7 @@ class MasterAttributeOptionSync
         'vendors' => ['label' => 'masterSourceVendors', 'model' => Vendor::class],
         'currencies' => ['label' => 'masterSourceCurrencies', 'model' => Currency::class],
         'product_types' => ['label' => 'masterSourceProductTypes', 'model' => ProductType::class],
+        'base_units' => ['label' => 'masterSourceBaseUnits', 'model' => BaseUnit::class],
     ];
 
     private const CATEGORY_DEPTH_KEYS = ['categories', 'subcategories', 'product_groups'];
@@ -222,6 +227,7 @@ class MasterAttributeOptionSync
             'product_types' => ProductType::all()->map(fn (ProductType $p) => [
                 'code' => (string) $p->code, 'label' => $p->name, 'is_active' => (bool) $p->is_active,
             ])->all(),
+            'base_units' => BaseUnit::with('translations')->get()->map(fn (BaseUnit $u) => $this->baseUnitRow($u))->all(),
             default => [],
         };
     }
@@ -255,8 +261,30 @@ class MasterAttributeOptionSync
         if ($model instanceof ProductType) {
             return ['code' => (string) $model->code, 'label' => $model->name, 'is_active' => (bool) $model->is_active];
         }
+        if ($model instanceof BaseUnit) {
+            return $this->baseUnitRow($model);
+        }
 
         return null;
+    }
+
+    /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
+    private function baseUnitRow(BaseUnit $unit): array
+    {
+        $translations = [];
+        $rows = $unit->relationLoaded('translations') ? $unit->translations : $unit->translations()->get();
+        foreach ($rows as $t) {
+            if (trim((string) $t->label) !== '') {
+                $translations[$t->locale_id] = $t->label;
+            }
+        }
+
+        return [
+            'code' => (string) $unit->code,
+            'label' => $unit->name,
+            'is_active' => (bool) $unit->is_active,
+            'translations' => $translations,
+        ];
     }
 
     /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
@@ -320,7 +348,7 @@ class MasterAttributeOptionSync
         if ($model instanceof Currency) {
             return $model->wasChanged('code') ? strtolower((string) $model->getOriginal('code')) : null;
         }
-        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType) {
+        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType || $model instanceof BaseUnit) {
             return $model->wasChanged('code') ? (string) $model->getOriginal('code') : null;
         }
 

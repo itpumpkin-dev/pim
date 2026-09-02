@@ -4,34 +4,33 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
-use App\Models\AttributeOption;
-use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
+use App\Models\BaseUnit;
+use App\Models\BaseUnitTranslation;
 use App\Models\Locale;
 use App\Models\ProductValue;
 use App\Services\CodeGenerator;
 use App\Support\TranslationTracking;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * "หน่วยนับพื้นฐาน" (Base Units) เป็นหน้าจอจัดการ master แบบเดียวกับ Brands —
- * สร้างบนแถว AttributeOption ที่มีอยู่แล้วของ Attribute ชื่อ `pbaseunit` ไม่ใช่
- * ตารางใหม่ หน่วยนับของสินค้าถูกเก็บในรูป `ProductValue.value = AttributeOption.code`
- * (ดู ProductPresenter::SELECT_CODES_TO_RESOLVE ที่มี 'pbaseunit' อยู่ และคอลัมน์
- * "Count" ด้านล่างที่ query จากตรงนั้น) เพราะแก้ตรงแถว option โดยตรง ตัวเลือกใน
- * dropdown ของ attribute `pbaseunit` (หน้า Edit Product, import ฯลฯ) จึงอัปเดต
- * ตามทันทีโดยไม่ต้อง sync อะไรเพิ่ม
+ * "หน่วยนับพื้นฐาน" (Base Units) — เดิมเป็นหน้าจอ CRUD ตรงบนแถว AttributeOption
+ * ของ attribute `pbaseunit` (แบบเดียวกับ Brands) ตอนนี้เปลี่ยนมาเป็น master
+ * table ของตัวเอง (`base_units` + `base_unit_translations` — ดู BaseUnit
+ * model) ผูก master_source = 'base_units' เข้ากับ attribute `pbaseunit`
+ * (ดู MasterAttributeOptionSync) เพื่อให้เลือกเป็นแหล่งข้อมูล Master ของ
+ * attribute อื่นได้ด้วย — หน่วยนับของสินค้ายังเก็บเป็น
+ * `ProductValue.value = BaseUnit.code` เหมือนเดิมทุกประการ (ไม่กระทบ) เพราะ
+ * รหัส (code) เดิมทุกตัวถูกย้ายมาแบบคงเดิม (ดู migration create_base_units_table)
  *
- * แยก controller นี้ออกจาก AttributeOptionController ด้วยเหตุผลเดียวกับ
- * BrandController — รูปแบบ list/search/sort/count ของหน้านี้ไม่เข้ากับ panel
- * inline ทั่วไปของ attribute แต่ helper เรื่อง translation/audit/code-generation
- * ด้านล่างเลียนแบบพฤติกรรมของ controller นั้นมาทั้งหมด
+ * Helper เรื่อง translation/audit/code-generation ด้านล่างเลียนแบบ
+ * BusinessTypeController/BrandController มาเกือบทั้งหมด ต่างกันตรงที่ BaseUnit
+ * มีชื่อแปลได้หลายภาษาจริง (เหมือน Category) เลยต้อง sync ผ่าน
+ * BaseUnitTranslation แยกออกมาแทนที่จะเป็นคอลัมน์ name เดียว
  */
 class BaseUnitController extends Controller
 {
@@ -41,11 +40,10 @@ class BaseUnitController extends Controller
     }
 
     /**
-     * value (code ของ option) => จำนวนสินค้าที่ไม่ซ้ำกัน สำหรับ badge
-     * "products_count" บน index() — คัดลอกแนวคิดมาจาก
-     * BrandController::brandProductCounts() รวมถึงเหตุผลที่แคชด้วย TTL สั้นๆ
-     * แทนการ invalidate ตาม event (แถว ProductValue ของ pbaseunit ถูกเขียนจาก
-     * หลายจุด: สร้าง/แก้ไขสินค้า, import จำนวนมาก)
+     * code ของ BaseUnit => จำนวนสินค้าที่ไม่ซ้ำกัน สำหรับ badge "products_count"
+     * บน index() — เหมือนเดิมทุกอย่าง (ProductValue ยังอ้างอิงด้วย code ตรงๆ)
+     * แคชด้วย TTL สั้นๆ แทนการ invalidate ตาม event เพราะแถว ProductValue ของ
+     * pbaseunit ถูกเขียนจากหลายจุด: สร้าง/แก้ไขสินค้า, import จำนวนมาก
      */
     private function baseUnitProductCounts(int $attributeId): \Illuminate\Support\Collection
     {
@@ -55,7 +53,7 @@ class BaseUnitController extends Controller
             fn () => ProductValue::where('attribute_id', $attributeId)
                 ->whereNull('channel_id')
                 ->whereNull('locale_id')
-                ->select('value', DB::raw('count(distinct product_id) as cnt'))
+                ->select('value', \Illuminate\Support\Facades\DB::raw('count(distinct product_id) as cnt'))
                 ->groupBy('value')
                 ->pluck('cnt', 'value')
         );
@@ -71,10 +69,15 @@ class BaseUnitController extends Controller
             $perPage = 15;
         }
 
-        $options = AttributeOption::where('attribute_id', $attribute->id)
-            ->when($search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('admin_label', 'like', "%{$search}%")
+        // โหลดทั้งหมดมาเรียงเอง (เหมือนเวอร์ชันเดิมที่ทำงานบน AttributeOption
+        // ตรงๆ) แทนที่จะ paginate ระดับ query builder — เพราะ products_count
+        // เป็นค่าที่คำนวณเอง ไม่ใช่คอลัมน์จริงของ base_units จะ sort ตามคอลัมน์นี้
+        // ให้ถูกต้องข้ามหน้าได้ ต้องมีข้อมูลครบทุกแถวก่อนค่อยตัดหน้า จำนวน
+        // base unit ทั้งระบบมีไม่มาก (หลักสิบ) โหลดทั้งหมดไม่กระทบ performance
+        $units = BaseUnit::query()
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($q2) use ($search) {
+                    $q2->where('name', 'like', "%{$search}%")
                         ->orWhere('slug', 'like', "%{$search}%")
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
                 });
@@ -82,11 +85,16 @@ class BaseUnitController extends Controller
             ->get();
 
         $counts = $this->baseUnitProductCounts($attribute->id);
-
-        $options = $options->map(function (AttributeOption $option) use ($counts) {
-            $option->products_count = (int) ($counts[$option->code] ?? 0);
-
-            return $option;
+        $rows = $units->map(function (BaseUnit $unit) use ($counts) {
+            return [
+                'id' => $unit->id,
+                'code' => $unit->code,
+                'admin_label' => $unit->name,
+                'slug' => $unit->slug,
+                'description' => $unit->description,
+                'products_count' => (int) ($counts[$unit->code] ?? 0),
+                'is_active' => $unit->is_active,
+            ];
         });
 
         $sortableColumns = ['admin_label', 'slug', 'description', 'products_count', 'is_active'];
@@ -94,16 +102,16 @@ class BaseUnitController extends Controller
         $sortDir = strtolower((string) $request->input('dir')) === 'desc' ? 'desc' : 'asc';
 
         if ($sortField && in_array($sortField, $sortableColumns, true)) {
-            $options = $sortDir === 'desc' ? $options->sortByDesc($sortField) : $options->sortBy($sortField);
+            $rows = $sortDir === 'desc' ? $rows->sortByDesc($sortField) : $rows->sortBy($sortField);
         } else {
-            $options = $options->sortBy('admin_label', SORT_NATURAL | SORT_FLAG_CASE);
+            $rows = $rows->sortBy('admin_label', SORT_NATURAL | SORT_FLAG_CASE);
         }
-        $options = $options->values();
+        $rows = $rows->values();
 
         $page = (int) $request->input('page', 1);
-        $paginated = new LengthAwarePaginator(
-            $options->forPage($page, $perPage)->values(),
-            $options->count(),
+        $paginated = new \Illuminate\Pagination\LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
             $perPage,
             $page,
             ['path' => $request->url(), 'query' => $request->query()],
@@ -127,8 +135,6 @@ class BaseUnitController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $attribute = $this->baseUnitAttribute();
-
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -139,57 +145,42 @@ class BaseUnitController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
-        $adminLabel = $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null);
+        $name = $this->resolveName($translations, $validated['admin_label'] ?? null);
 
-        $nextSort = (int) AttributeOption::where('attribute_id', $attribute->id)->max('sort_order') + 1;
+        $nextSort = (int) BaseUnit::max('sort_order') + 1;
 
-        $option = CodeGenerator::createWithRetry(
-            'attribute_options',
-            'option',
-            fn ($code) => $attribute->options()->create([
+        $unit = CodeGenerator::createWithRetry(
+            'base_units',
+            'unit',
+            fn ($code) => BaseUnit::create([
                 'code' => $code,
-                'admin_label' => $adminLabel,
+                'name' => $name ?? $code,
                 'slug' => $validated['slug'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'sort_order' => $nextSort,
                 'is_active' => $request->boolean('is_active', true),
             ]),
-            scope: ['attribute_id' => $attribute->id],
         );
 
-        $this->syncTranslations($option, $translations);
-        $this->autoTranslate($attribute, $option, $translations);
+        $this->syncTranslations($unit, $translations);
+        $this->autoTranslate($unit, $translations);
 
-        AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
+        AuditLog::record('base_unit_created', $this->baseUnitAttribute(), null, $this->auditFields($unit));
 
         return to_route('catalog.baseUnits.index')->with('success', 'Base unit added successfully.');
     }
 
-    public function edit(AttributeOption $baseUnit): Response
+    public function edit(BaseUnit $baseUnit): Response
     {
-        $attribute = $this->baseUnitAttribute();
-        abort_unless($baseUnit->attribute_id === $attribute->id, 404);
-
-        // option ที่ไม่มีแถว AttributeOptionTranslation เลย (เช่นที่ seed มาแค่
-        // คอลัมน์ `admin_label` ดิบๆ) จะโชว์ช่อง Name ว่างสำหรับ locale ปัจจุบัน
-        // ทั้งที่มีชื่ออยู่จริง — ใช้ fallback แบบเดียวกับ BrandController::edit()
         $translations = $baseUnit->translations
-            ->mapWithKeys(fn (AttributeOptionTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->mapWithKeys(fn (BaseUnitTranslation $t) => [(string) $t->locale_id => $t->label])
             ->all();
-
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-        if ($activeLocaleId && trim((string) ($translations[$activeLocaleId] ?? '')) === '') {
-            $rawLabel = trim((string) $baseUnit->getRawOriginal('admin_label'));
-            if ($rawLabel !== '') {
-                $translations[(string) $activeLocaleId] = $rawLabel;
-            }
-        }
 
         return Inertia::render('catalog/base-units/edit', [
             'baseUnit' => [
                 'id' => $baseUnit->id,
                 'code' => $baseUnit->code,
-                'admin_label' => $baseUnit->getRawOriginal('admin_label'),
+                'admin_label' => $baseUnit->name,
                 'slug' => $baseUnit->slug,
                 'description' => $baseUnit->description,
                 'is_active' => $baseUnit->is_active,
@@ -198,11 +189,8 @@ class BaseUnitController extends Controller
         ]);
     }
 
-    public function update(Request $request, AttributeOption $baseUnit): RedirectResponse
+    public function update(Request $request, BaseUnit $baseUnit): RedirectResponse
     {
-        $attribute = $this->baseUnitAttribute();
-        abort_unless($baseUnit->attribute_id === $attribute->id, 404);
-
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -213,58 +201,56 @@ class BaseUnitController extends Controller
         ]);
 
         $translations = $validated['translations'] ?? [];
-        $oldFields = $this->optionAuditFields($baseUnit);
+        $oldFields = $this->auditFields($baseUnit);
 
         $baseUnit->update([
-            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
+            'name' => $this->resolveName($translations, $validated['admin_label'] ?? null) ?? $baseUnit->name,
             'slug' => $validated['slug'] ?? null,
             'description' => $validated['description'] ?? null,
             'is_active' => $request->boolean('is_active', true),
         ]);
 
         $this->syncTranslations($baseUnit, $translations);
-        $this->autoTranslate($attribute, $baseUnit, $translations);
+        $this->autoTranslate($baseUnit, $translations);
 
-        $newFields = $this->optionAuditFields($baseUnit);
+        $newFields = $this->auditFields($baseUnit->fresh());
         if ($oldFields !== $newFields) {
-            AuditLog::record('option_updated', $attribute, $oldFields, $newFields);
+            AuditLog::record('base_unit_updated', $this->baseUnitAttribute(), $oldFields, $newFields);
         }
 
         return back()->with('success', 'Base unit updated successfully.');
     }
 
-    public function destroy(AttributeOption $baseUnit): RedirectResponse
+    public function destroy(BaseUnit $baseUnit): RedirectResponse
     {
-        $attribute = $this->baseUnitAttribute();
-        abort_unless($baseUnit->attribute_id === $attribute->id, 404);
-
-        $oldFields = $this->optionAuditFields($baseUnit);
+        $oldFields = $this->auditFields($baseUnit);
         $baseUnit->delete();
 
-        AuditLog::record('option_deleted', $attribute, $oldFields, null);
+        AuditLog::record('base_unit_deleted', $this->baseUnitAttribute(), $oldFields, null);
 
         return back()->with('success', 'Base unit deleted successfully.');
     }
 
     /**
-     * ทำงานเหมือน AttributeOptionController::optionAuditFields() /
-     * BrandController::optionAuditFields() — prefix option#{id}.* เดียวกัน
-     * เพื่อให้ไปโชว์ในแท็บ History ของ Attribute แม่ (pbaseunit)
+     * เหมือน BusinessTypeController::optionAuditFields() ทำนองเดียวกัน — prefix
+     * base_unit#{id}.* เพื่อให้ไปโชว์ในแท็บ History ของ Attribute แม่ (pbaseunit)
+     * แยกจาก option#{id}.* เดิมของยุค AttributeOption (ก่อน migration ย้ายมาที่นี่)
+     * ชัดเจน ไม่ปนกัน
      */
-    private function optionAuditFields(AttributeOption $option): array
+    private function auditFields(BaseUnit $unit): array
     {
-        $prefix = "option#{$option->id}";
+        $prefix = "base_unit#{$unit->id}";
 
-        return collect($option->only(['code', 'admin_label', 'slug', 'description', 'sort_order', 'is_active']))
+        return collect($unit->only(['code', 'name', 'slug', 'description', 'sort_order', 'is_active']))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
             ->all();
     }
 
     /**
-     * คัดลอกมาจาก BrandController::resolveAdminLabel() — ทำให้คอลัมน์
-     * `admin_label` ดิบๆ ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ
+     * คัดลอกมาจาก BrandController::resolveAdminLabel() — ทำให้คอลัมน์ `name`
+     * ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ
      */
-    private function resolveAdminLabel(array $translations, ?string $adminLabel): ?string
+    private function resolveName(array $translations, ?string $adminLabel): ?string
     {
         $defaultLocaleId = Locale::idForCode(config('app.locale'));
 
@@ -284,8 +270,9 @@ class BaseUnitController extends Controller
      * คัดลอกมาจาก BrandController::autoTranslate() — ยึดตามแฟล็ก "AI translate"
      * ของ attribute แม่ (pbaseunit) เหมือน option อื่นๆ ทุกตัวที่อยู่ข้างใต้มัน
      */
-    private function autoTranslate(Attribute $attribute, AttributeOption $option, array $translations): void
+    private function autoTranslate(BaseUnit $unit, array $translations): void
     {
+        $attribute = $this->baseUnitAttribute();
         if (! $attribute->is_ai_translate) {
             return;
         }
@@ -297,13 +284,13 @@ class BaseUnitController extends Controller
         }
 
         TranslationTracking::dispatchLabels(
-            AttributeOptionTranslation::class,
-            'attribute_option_id',
-            $option->id,
+            BaseUnitTranslation::class,
+            'base_unit_id',
+            $unit->id,
             $sourceLocaleId,
             $sourceLabel,
             'base-units',
-            $option->code,
+            $unit->code,
             auth()->id(),
         );
     }
@@ -336,21 +323,21 @@ class BaseUnitController extends Controller
     /**
      * คัดลอกมาจาก BrandController::syncTranslations()
      */
-    private function syncTranslations(AttributeOption $option, array $translations): void
+    private function syncTranslations(BaseUnit $unit, array $translations): void
     {
         foreach ($translations as $localeId => $label) {
             $label = is_string($label) ? trim($label) : '';
 
             if ($label === '') {
-                AttributeOptionTranslation::where('attribute_option_id', $option->id)
+                BaseUnitTranslation::where('base_unit_id', $unit->id)
                     ->where('locale_id', $localeId)
                     ->delete();
 
                 continue;
             }
 
-            AttributeOptionTranslation::updateOrCreate(
-                ['attribute_option_id' => $option->id, 'locale_id' => $localeId],
+            BaseUnitTranslation::updateOrCreate(
+                ['base_unit_id' => $unit->id, 'locale_id' => $localeId],
                 ['label' => $label]
             );
         }
