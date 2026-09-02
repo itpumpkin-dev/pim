@@ -28,11 +28,18 @@ import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 interface Props {
     categories: { id: number; name: string }[];
     subcategories: { id: number; name: string; parent_id: number }[];
+    businessTypes: { id: number; name: string }[];
     defaultCategoryId: number | null;
     defaultSubcategoryId: number | null;
 }
 
-export default function ProductGroupCreate({ categories = [], subcategories = [], defaultCategoryId = null, defaultSubcategoryId = null }: Props) {
+export default function ProductGroupCreate({
+    categories = [],
+    subcategories = [],
+    businessTypes = [],
+    defaultCategoryId = null,
+    defaultSubcategoryId = null,
+}: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -49,6 +56,7 @@ export default function ProductGroupCreate({ categories = [], subcategories = []
         description: '',
         category_id: (defaultCategoryId ?? '') as number | '',
         subcategory_id: (defaultSubcategoryId ?? '') as number | '',
+        business_type_id: '' as number | '',
         thumbnail: null as File | null,
         is_active: true as boolean,
     });
@@ -160,6 +168,28 @@ export default function ProductGroupCreate({ categories = [], subcategories = []
                                     {subcategoryOptions.map((s) => (
                                         <MenuItem key={s.id} value={String(s.id)}>
                                             {s.name}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </FioriField>
+
+                        <FioriField
+                            label={t('businessTypeName')}
+                            valueState={valueStateOf(errors.business_type_id)}
+                            message={errors.business_type_id}
+                        >
+                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.business_type_id))}>
+                                <Select
+                                    id="pg-business-type"
+                                    displayEmpty
+                                    value={data.business_type_id === '' ? '' : String(data.business_type_id)}
+                                    onChange={(e) => setData('business_type_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                >
+                                    <MenuItem value="">{t('selectBusinessType')}</MenuItem>
+                                    {businessTypes.map((b) => (
+                                        <MenuItem key={b.id} value={String(b.id)}>
+                                            {b.name}
                                         </MenuItem>
                                     ))}
                                 </Select>

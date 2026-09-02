@@ -27,6 +27,7 @@ class Category extends Model
         'additional_data',
         'is_ai_translate',
         'parent_id',
+        'business_type_id',
         'lazada_category_id',
         'shopee_category_id',
         'tiktok_category_id',
@@ -115,6 +116,31 @@ class Category extends Model
     public function woocommerceCategory(): BelongsTo
     {
         return $this->belongsTo(WooCommerceCategory::class, 'woocommerce_category_id');
+    }
+
+    /**
+     * ผูกกับ "ประเภทธุรกิจ" — ใช้จริงเฉพาะที่ระดับกลุ่มสินค้า (depth 3) เท่านั้น
+     * (ดู ProductGroupController) แต่ไม่ได้จำกัดไว้ที่ระดับนั้นด้วยโค้ด เผื่ออนาคต
+     * อยากผูกที่ระดับอื่นด้วย
+     */
+    public function businessType(): BelongsTo
+    {
+        return $this->belongsTo(BusinessType::class);
+    }
+
+    /**
+     * ตระกูลแอตทริบิวต์ที่ผูกกับกลุ่มสินค้านี้ (ใช้จริงเฉพาะระดับกลุ่มสินค้า/depth 3
+     * เหมือน businessType() ด้านบน) เรียงตาม sort_order — ตัวแรก (sort_order
+     * ต่ำสุด) คือตระกูล "เริ่มต้น" ใช้ตอนสร้างสินค้าใหม่แล้วเลือกกลุ่มสินค้านี้เพื่อ
+     * เดา family_id เริ่มต้นให้ (ProductController::attributeFamiliesForCategory())
+     * ส่วนตอนแก้ไขสินค้าที่มีอยู่แล้ว attribute ที่แก้ได้จะมาจาก "ทุก" ตระกูลที่ผูก
+     * ไว้ตรงนี้ (union) ไม่ใช่แค่ตัวแรก — ดู ProductController::effectiveFamilyIds()
+     */
+    public function attributeFamilies(): BelongsToMany
+    {
+        return $this->belongsToMany(AttributeFamily::class, 'category_attribute_family', 'category_id', 'family_id')
+            ->withPivot('sort_order')
+            ->orderByPivot('sort_order');
     }
 
     /**

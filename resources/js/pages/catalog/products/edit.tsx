@@ -1,11 +1,8 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
-import { CategoryCascadeSelect } from '@/components/category-cascade-select';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
 import { FioriFormGroup, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
-import { MarketplaceBrandPicker } from '@/components/marketplace-brand-picker';
-import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
 import { useLocale } from '@/hooks/use-locale';
@@ -24,7 +21,6 @@ import {
 } from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { mappedChipSx, UI_BORDER } from '@/lib/ui-style';
-import { PALETTE } from '@/theme';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -38,7 +34,6 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import LinkIcon from '@mui/icons-material/Link';
 import PublishIcon from '@mui/icons-material/Publish';
 import TranslateIcon from '@mui/icons-material/Translate';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
@@ -83,16 +78,6 @@ import { useTranslation } from 'react-i18next';
 // เมื่อคลิกแท็บ (scrollMarginTop ของ Paper) — ใช้ร่วมกับ scroll-spy ที่คำนวณว่า
 // แท็บไหนควรไฮไลต์ ค่าต้องตรงกันสองที่ ไม่งั้นแท็บกับเนื้อหาจะไม่ sync
 const GROUP_SECTION_SCROLL_MARGIN = 80;
-
-// ใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับ MAPPED_PLATFORMS ใน category-cascade-select.tsx /
-// MAPPED_PLATFORMS ใน categories/index.tsx (Lazada, Shopee, TikTok,
-// WooCommerce) — ที่นี่แยกก็อปปี้เก็บไว้เอง ตามแนวทางเดิมที่ "เล็กพอจะก็อปปี้ซ้ำได้"
-const BRAND_MAPPED_PLATFORMS: { value: string; label: string; color: string }[] = [
-    { value: 'lazada', label: 'Lazada', color: PALETTE.accent },
-    { value: 'shopee', label: 'Shopee', color: PALETTE.highlight },
-    { value: 'tiktok', label: 'TikTok', color: PALETTE.primary },
-    { value: 'woocommerce', label: 'WooCommerce', color: PALETTE.secondary },
-];
 
 interface AttributeOption {
     id: number;
@@ -184,6 +169,15 @@ interface Props {
     product: Product;
     families: AttributeFamily[];
     assignedGroups: GroupWithAttributes[];
+    /** หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า — เรียงมาแล้ว (ดู
+     * ProductController::MASTER_CATEGORY_ATTRIBUTE_CODES) ไม่ได้ผูก family ไหน
+     * เลย เลยไม่ปนอยู่ใน assignedGroups แสดงเป็น panel ของตัวเองแทน */
+    masterCategoryAttributes: AttributeItem[];
+    /** แอตทริบิวต์ "Product Type" (producttype) — options mirror มาจาก master
+     * product_types (ดู ProductController::productTypeAttributeFor()) ไม่ผูก
+     * family ตายตัวเหมือนกัน เลยแยก panel field ของตัวเองเหมือน
+     * masterCategoryAttributes แทนที่จะปนใน assignedGroups */
+    productTypeAttribute?: AttributeItem | null;
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
     configurableAttributes?: AttributeItem[];
@@ -253,6 +247,8 @@ export default function ProductEdit({
     product,
     families,
     assignedGroups,
+    masterCategoryAttributes = [],
+    productTypeAttribute = null,
     productValues,
     variants = [],
     configurableAttributes = [],
@@ -267,17 +263,6 @@ export default function ProductEdit({
     const { t } = useTranslation('catalog');
     const { auth } = usePage<SharedData>().props;
     const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
-    // pbrand จะอยู่ใน family group ไหนก็ได้ที่มันถูกผูกไว้ เหมือน attribute ทั่วไป —
-    // ที่ดึงออกมาตรงนี้เพื่อให้ render เป็น panel ของตัวเอง (ต่อจาก Categories)
-    // แทนที่จะวนแสดงในลูปของ attribute-groups ทั่วไป ดูเงื่อนไข
-    // `attr.code === 'pbrand'` ที่กันมันออกในลูปด้านล่างประกอบด้วย
-    const brandAttr = useMemo(() => {
-        for (const group of assignedGroups) {
-            const found = group.attributes.find((attr) => attr.code === 'pbrand');
-            if (found) return found;
-        }
-        return null;
-    }, [assignedGroups]);
     const [tabIndex, setTabIndex] = useState(0);
     // แท็บย่อยภายในแท็บหลัก "General" ใช้จัดกลุ่มเนื้อหาฟอร์มฝั่งคอลัมน์ซ้าย —
     // ลำดับอ้างอิงตาม layout ต้นแบบ: General info -> Attributes -> Details ->
@@ -422,6 +407,12 @@ export default function ProductEdit({
             initialValues[attr.id] = (productValues[attr.id] as any) || {};
         });
     });
+    masterCategoryAttributes.forEach((attr) => {
+        initialValues[attr.id] = (productValues[attr.id] as any) || {};
+    });
+    if (productTypeAttribute) {
+        initialValues[productTypeAttribute.id] = (productValues[productTypeAttribute.id] as any) || {};
+    }
 
     const { data, setData, post, transform, processing, errors, isDirty } = useForm<ProductForm>({
         sku: product.sku || '',
@@ -448,32 +439,6 @@ export default function ProductEdit({
         },
     });
 
-    // สลับได้แค่ทางเดียวว่าจะให้ "System Categories" (PIM category tree ด้านล่าง
-    // ที่ผูก mapping ระดับ category กับทุก platform ไว้เป็นค่า default) หรือ
-    // "Marketplace Categories" (override เฉพาะรายสินค้าต่อแพลตฟอร์ม) เป็นตัวที่
-    // ใช้งานจริงสำหรับสินค้านี้ — อีกฝั่งจะแค่ถูก disable (ไม่ถูกล้างค่า) ไม่ใช่ซ่อนไป
-    // ค่าเริ่มต้นเป็น "system" (หมวดหมู่ของระบบ) เว้นแต่สินค้านี้เคยตั้ง override
-    // ระดับ platform ไว้แล้ว — กรณีนั้นเปิดมาที่ "marketplace" เพื่อไม่ให้ override
-    // เดิมถูกส่งไป push ต่อทั้งที่ UI โชว์ว่าใช้ System (resolve*CategoryId() ฝั่ง
-    // backend เลือก override ก่อนเสมอถ้ายังมีค่าอยู่)
-    const hasCategoryOverride = Boolean(
-        product.shopee_category_id || product.lazada_category_id || product.tiktok_category_id || product.woocommerce_category_id,
-    );
-    const [categorySource, setCategorySource] = useState<'system' | 'marketplace'>(
-        hasCategoryOverride ? 'marketplace' : 'system',
-    );
-
-    // เหตุผลเดียวกับ categorySource ด้านบน แต่สำหรับ Brand แยกต่างหาก — สินค้าอาจ
-    // ใช้ System Categories สำหรับหมวดหมู่ แต่ยังอยาก override เฉพาะ Brand ต่อ
-    // แพลตฟอร์มก็ได้ (หรือกลับกัน) เลยไม่ผูกโหมดทั้งสองไว้ด้วยกัน — ค่าเริ่มต้นเป็น
-    // "system" เว้นแต่มี override ระดับ platform อยู่แล้ว เหมือนกัน
-    const hasBrandOverride = Boolean(
-        product.shopee_brand_id || product.lazada_brand_id || product.tiktok_brand_id || product.woocommerce_brand_id,
-    );
-    const [brandSource, setBrandSource] = useState<'system' | 'marketplace'>(
-        hasBrandOverride ? 'marketplace' : 'system',
-    );
-
     const toggleShopPublished = (shopId: number) => {
         const current = data.published_shop_ids;
         setData('published_shop_ids', current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId]);
@@ -484,6 +449,102 @@ export default function ProductEdit({
     const familyScopedVariantAttributes = configurableAttributes.filter(
         (attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id)),
     );
+
+    // บังคับเลือกตาม step: หมวดหมู่ก่อน หมวดหมู่ย่อยถึงจะ "ขึ้น" มาให้เลือก แล้ว
+    // ค่อยกลุ่มสินค้า — ไม่ใช่แค่กรองตัวเลือกเฉยๆ แต่ไม่โชว์ฟิลด์ถัดไปเลยจนกว่าตัว
+    // ก่อนหน้าจะมีค่า (ตามที่ user ขอ) ตัวเลือกที่โชว์ก็ยังกรองด้วย code prefix
+    // เหมือนเดิม (categories.code ของแต่ละ level ต่อกันเป็นสาย เช่น 'a025' ->
+    // 'a025001' -> 'a025001001' ดู ProductCategoryLinker) ไม่งั้น productgroupname
+    // จะมีตัวเลือกเกือบ 900 ตัวให้เลือกแบบไม่กรองเลย — masterCategoryAttributes
+    // เรียงมาจาก backend แล้วเป็น [หมวดหมู่, หมวดหมู่ย่อย, กลุ่มสินค้า] เป๊ะๆ (ดู
+    // ProductController::MASTER_CATEGORY_ATTRIBUTE_CODES)
+    // หาว่า value ของ attribute ตัวนี้อยู่ใต้ key ไหนบ้าง ตาม channel/locale ที่เลือก
+    // อยู่ตอนนี้ โดยดูจาก flag การ scope ของ attribute นั้นเอง — ย้ายมาไว้ตรงนี้
+    // (แทนที่จะอยู่ท้ายไฟล์เหมือนเดิม) เพราะ selectedMasterCategoryCode() ด้านล่าง
+    // ต้องเรียกใช้ตัวนี้ด้วย ไม่งั้นจะกลายเป็น temporal-dead-zone (เรียก const ที่
+    // ยังไม่ถูก declare ในลำดับการ render เดียวกัน) — ทั้ง activeChannelId/
+    // activeLocaleId ที่ใช้ก็ประกาศไว้ก่อนจุดนี้อยู่แล้ว เลยย้ายขึ้นมาได้อย่างปลอดภัย
+    const getValueKeys = (attr: AttributeItem) => ({
+        channelKey: attr.is_channel_based && activeChannelId ? String(activeChannelId) : 'global',
+        localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
+    });
+
+    // pcatname/psubcatname/productgroupname เป็น system attribute ที่ปกติไม่ใช่
+    // channel/locale-based (ค่าอยู่ใต้ 'global'/'default' เสมอ) แต่เผื่อมีใครไปติ๊ก
+    // เปิด is_channel_based/is_locale_based ให้ตัวใดตัวหนึ่งทีหลังผ่านหน้าแก้ไข
+    // attribute (ไม่มีอะไรกันไว้) เลยอ่านค่าผ่าน getValueKeys() แบบเดียวกับทุก field
+    // อื่นในหน้านี้ แทนที่จะ hardcode 'global'/'default' ตรงๆ — ไม่งั้นถ้า flag ถูก
+    // เปิดขึ้นมาจริงๆ ฟิลด์นี้จะอ่าน/เขียนคนละ key กับที่ RenderAttributeInput ใช้จริง
+    // (ซึ่งอ่าน/เขียนผ่าน getValueKeys() เช่นกัน) ทำให้ cascade และปุ่ม Save ของแผงนี้
+    // อ่านค่าว่างเปล่าไปเงียบๆ ทั้งที่ผู้ใช้เลือกไว้แล้วจริงๆ
+    const selectedMasterCategoryCode = (attr?: AttributeItem): string => {
+        if (!attr) return '';
+        const { channelKey, localeKey } = getValueKeys(attr);
+        const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? '';
+        return typeof val === 'string' ? val : '';
+    };
+
+    // ตัวเลือกของ 3 ฟิลด์นี้ (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) ให้โชว์เป็น
+    // "code:name" แทนที่จะเป็นแค่ชื่ออย่างเดียว (ตามที่ user ขอ) — ใส่รหัสนำหน้าไว้ใน
+    // admin_label ตรงนี้แค่สำหรับ 3 ฟิลด์นี้เท่านั้น ไม่ไปแตะ SelectControl/
+    // RenderAttributeInput ที่ใช้ร่วมกับ attribute แบบ select ตัวอื่นทั้งระบบ
+    // เพราะมันอ่าน label จาก opt.admin_label ตรงๆ อยู่แล้ว (ดู getOptionLabel ใน
+    // SelectControl) — ตัวเลือกที่ค้นหา/บันทึกยังอ้างอิงจาก opt.code เหมือนเดิม
+    // ไม่กระทบ
+    const withCodePrefixedLabels = (attr: AttributeItem): AttributeItem => ({
+        ...attr,
+        options: (attr.options || []).map((opt) => ({
+            ...opt,
+            admin_label: opt.code ? `${opt.code}:${opt.admin_label || opt.code}` : opt.admin_label,
+        })),
+    });
+
+    const cascadedMasterCategoryAttributes = useMemo(() => {
+        const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
+        const categoryCode = selectedMasterCategoryCode(categoryAttr);
+        const subcatCode = selectedMasterCategoryCode(subcatAttr);
+
+        const visible: AttributeItem[] = [];
+        if (categoryAttr) visible.push(withCodePrefixedLabels(categoryAttr));
+        if (subcatAttr && categoryCode) {
+            visible.push(
+                withCodePrefixedLabels({
+                    ...subcatAttr,
+                    options: (subcatAttr.options || []).filter((opt) => (opt.code || '').startsWith(categoryCode)),
+                }),
+            );
+        }
+        if (groupAttr && subcatCode) {
+            visible.push(
+                withCodePrefixedLabels({
+                    ...groupAttr,
+                    options: (groupAttr.options || []).filter((opt) => (opt.code || '').startsWith(subcatCode)),
+                }),
+            );
+        }
+        return visible;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [masterCategoryAttributes, data.values, activeChannelId, activeLocaleId]);
+
+    // เปลี่ยนหมวดหมู่/หมวดหมู่ย่อยแล้ว ต้องล้างค่าของฟิลด์ถัดไปทิ้งด้วย เพราะอาจไม่
+    // ตรงกับสายใหม่แล้ว (เช่น เปลี่ยนหมวดหมู่ แต่หมวดหมู่ย่อยเดิมที่เลือกไว้เป็นของ
+    // หมวดหมู่เก่า) ไม่งั้นจะมีค่าตกค้างที่ไม่สัมพันธ์กันเป็นสายอยู่
+    const handleMasterCategoryChange = (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
+        setAttributeValue(attributeId, channelKey, localeKey, val);
+
+        const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
+        const clear = (attr?: AttributeItem) => {
+            if (!attr) return;
+            const keys = getValueKeys(attr);
+            setAttributeValue(attr.id, keys.channelKey, keys.localeKey, '');
+        };
+        if (attributeId === categoryAttr?.id) {
+            clear(subcatAttr);
+            clear(groupAttr);
+        } else if (attributeId === subcatAttr?.id) {
+            clear(groupAttr);
+        }
+    };
 
     const optionLabelFor = (attributeId: number, code: string): string => {
         const attr = configurableAttributes.find((a) => a.id === attributeId);
@@ -1029,13 +1090,6 @@ export default function ProductEdit({
     const deleteListingStatusCheck =
         statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
 
-    // หาว่า value ของ attribute ตัวนี้อยู่ใต้ key ไหนบ้าง ตาม channel/locale ที่เลือก
-    // อยู่ตอนนี้ โดยดูจาก flag การ scope ของ attribute นั้นเอง
-    const getValueKeys = (attr: AttributeItem) => ({
-        channelKey: attr.is_channel_based && activeChannelId ? String(activeChannelId) : 'global',
-        localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
-    });
-
     // useForm() ไม่ได้การันตีว่า setData จะมี identity คงที่ทุก render เลยเก็บมันไว้
     // ใน ref แทนที่จะเป็น dep ของ useCallback — วิธีนี้ทำให้ identity ของ
     // setAttributeValue เองคงที่ตลอด (deps ว่างเปล่า) ไม่ว่า identity ของ setData
@@ -1148,12 +1202,16 @@ export default function ProductEdit({
         });
     };
 
-    // Per-panel Save (Categories / Brand / Sales Channels): each hits its own
+    // Per-panel Save (Sales Channels / Master Categories): each hits its own
     // endpoint with only that card's fields — no full-form submit. preserveState
     // keeps the rest of the form as-is; preserveScroll leaves the page put.
-    const [savingSection, setSavingSection] = useState<'categories' | 'brand' | 'channels' | null>(null);
+    // Categories/Brand (the old ones) used to have their own panels+save here
+    // too — removed (see docblock near the "Master Categories" panel below
+    // and the pbrand exclusion that used to live in the attribute-groups
+    // loop) in favor of the Master pages + this new right-column panel.
+    const [savingSection, setSavingSection] = useState<'channels' | 'master-categories' | null>(null);
 
-    const saveSection = (section: 'categories' | 'brand' | 'channels', payload: Record<string, FormDataConvertible>) => {
+    const saveSection = (section: 'channels' | 'master-categories', payload: Record<string, FormDataConvertible>) => {
         setSavingSection(section);
         skipNavigationGuardRef.current = true;
         router.put(`/catalog/products/${product.id}/${section}`, payload, {
@@ -1166,7 +1224,7 @@ export default function ProductEdit({
         });
     };
 
-    const sectionSaveButton = (section: 'categories' | 'brand' | 'channels', onClick: () => void) => (
+    const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
         <Button
             size="small"
             variant="outlined"
@@ -1254,10 +1312,14 @@ export default function ProductEdit({
                             <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
                                 Back
                             </Button>
+                            {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
+                                เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
+                                ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
+                                เลย disabled โดยอัตโนมัติจนกว่าจะมีการแก้ไขจริงสักฟิลด์ */}
                             <Button
                                 type="submit"
                                 variant="contained"
-                                disabled={processing}
+                                disabled={processing || !isDirty}
                                 startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                                 sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                             >
@@ -1359,11 +1421,6 @@ export default function ProductEdit({
                                             const isGeneral = group.code.toLowerCase() === 'general';
                                             const isSales = group.code.toLowerCase() === 'pricing_packaging';
                                             const visibleAttrs = group.attributes.filter((attr) => {
-                                                // pbrand มี panel แยกของตัวเองต่อจาก Categories เลย (ดูด้านล่าง)
-                                                // แทนที่จะไปอยู่ตรงไหนก็ได้ที่ลำดับ group ของ family นี้บังเอิญวางไว้
-                                                if (attr.code === 'pbrand') {
-                                                    return false;
-                                                }
                                                 if (data.type.toLowerCase() === 'configurable') {
                                                     return attr.code !== 'price' && attr.code !== 'qty';
                                                 }
@@ -1422,6 +1479,14 @@ export default function ProductEdit({
                                                                     />
                                                                 </Box>
                                                             )}
+
+                                                            {visibleAttrs.length === 0 &&
+                                                                isGeneral &&
+                                                                assignedGroups.length === 1 && (
+                                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                        {t('noAttributeFamilyBoundYet')}
+                                                                    </Typography>
+                                                                )}
 
                                                             {visibleAttrs.length === 0 &&
                                                                 !isGeneral &&
@@ -1558,62 +1623,55 @@ export default function ProductEdit({
                                                 />
                                             </Box>
 
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                    Family
-                                                </Typography>
-                                                <Autocomplete
-                                                    fullWidth
-                                                    size="small"
-                                                    disableClearable
-                                                    autoHighlight
-                                                    options={families}
-                                                    popupIcon={<KeyboardArrowDownIcon />}
-                                                    getOptionLabel={(fam) => localizedLabel(fam, activeLocaleId)}
-                                                    isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                                                    value={families.find((f) => f.id === Number(data.family_id)) ?? families[0]}
-                                                    onChange={(_, fam) => fam && setData('family_id', fam.id)}
-                                                    sx={fioriComboBoxSx(valueStateOf(errors.family_id))}
-                                                    slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-                                                    renderInput={(params) => (
-                                                        <TextField
-                                                            {...params}
-                                                            error={Boolean(errors.family_id)}
-                                                            helperText={
-                                                                errors.family_id ||
-                                                                'Attribute groups below update the next time you open this product after saving.'
-                                                            }
-                                                        />
-                                                    )}
-                                                />
-                                            </Box>
+                                            {/* เดิมมีช่อง "Product Type" (Simple/Configurable) เป็น dropdown ให้แก้
+                                                ตรงนี้ — ซ่อนออกตามที่ user ขอ เพราะชื่อชนกับฟิลด์ "ประเภทสินค้า"
+                                                (แอตทริบิวต์ producttype) ด้านล่าง ทั้งที่เป็นคนละเรื่องกันในระบบ
+                                                (ตัวนี้กำหนดว่ามี variant ย่อยหรือไม่ ไม่เกี่ยวกับหมวดหมู่สินค้าเลย)
+                                                และ Configurable ก็ปิดใช้งานสำหรับสินค้าใหม่มาตั้งแต่ต้นอยู่แล้ว —
+                                                data.type ยังคงอยู่ใน form เดิม (ส่งไปกับ Save Product ตามปกติ ไม่ได้
+                                                ถูกบังคับเปลี่ยนค่า) สินค้าที่เคยเป็น configurable อยู่แล้วจะยังทำงาน
+                                                เหมือนเดิมทุกอย่าง (ตาราง variants ด้านล่างซ้ายยังโชว์/แก้ไขได้) แค่
+                                                ไม่มีช่องให้สลับ Simple ⇄ Configurable จากหน้านี้อีกต่อไปเฉยๆ ถ้าจำเป็น
+                                                ต้องสลับจริงๆ ทำผ่าน tinker ได้ */}
 
-                                            <Box>
-                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                    Product Type
-                                                </Typography>
-                                                <TextField
-                                                    select
-                                                    value={data.type}
-                                                    onChange={(e) => handleTypeChange(e.target.value)}
-                                                    size="small"
-                                                    fullWidth
-                                                    error={Boolean(errors.type)}
-                                                    helperText={
-                                                        errors.type || (!isAlreadyConfigurable ? t('configurableTemporarilyDisabled') : undefined)
-                                                    }
-                                                    sx={fioriFieldStateSx(valueStateOf(errors.type))}
-                                                    SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
-                                                >
-                                                    <MenuItem value="simple">Simple</MenuItem>
-                                                    {/* Turned off for now (see create.tsx). A product that's
-                                                        already configurable keeps the option so it can still
-                                                        be saved or switched back to simple. */}
-                                                    <MenuItem value="configurable" disabled={!isAlreadyConfigurable}>
-                                                        Configurable
-                                                    </MenuItem>
-                                                </TextField>
-                                            </Box>
+                                            {/* ประเภทสินค้า — แอตทริบิวต์ producttype ที่ options mirror
+                                                มาจาก catalog/product-types (ดู ProductController::productTypeAttributeFor())
+                                                คนละตัวกับ Product Type (Simple/Configurable) ด้านบน — ใช้ label
+                                                แยกกันชัดเจนกันสับสน ค่าที่เลือกไปรวมอยู่ใน data.values เหมือน
+                                                attribute อื่นๆ ทั่วไป บันทึกพร้อมปุ่ม Save Product หลักไปเลย
+                                                ไม่ต้องมีปุ่ม Save แยกของตัวเอง */}
+                                            {productTypeAttribute && (
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.secondary"
+                                                        display="block"
+                                                        sx={{ mb: 0.5 }}
+                                                    >
+                                                        {t('masterProductTypeFieldLabel')}
+                                                    </Typography>
+                                                    <TextField
+                                                        select
+                                                        value={(data.values[productTypeAttribute.id]?.['global']?.['default'] as string) || ''}
+                                                        onChange={(e) => setAttributeValue(productTypeAttribute.id, 'global', 'default', e.target.value)}
+                                                        size="small"
+                                                        fullWidth
+                                                        disabled={productTypeAttribute.editable === false}
+                                                        error={Boolean(errors[`values.${productTypeAttribute.id}`])}
+                                                        helperText={errors[`values.${productTypeAttribute.id}`]}
+                                                        sx={fioriFieldStateSx(valueStateOf(errors[`values.${productTypeAttribute.id}`]))}
+                                                        SelectProps={{ IconComponent: KeyboardArrowDownIcon, displayEmpty: true }}
+                                                    >
+                                                        <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
+                                                        {(productTypeAttribute.options || []).map((opt) => (
+                                                            <MenuItem key={opt.id} value={opt.code || ''}>
+                                                                {opt.admin_label || opt.code}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                </Box>
+                                            )}
 
                                             <Box>
                                                 <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
@@ -1648,314 +1706,59 @@ export default function ProductEdit({
                                             </Box>
                                         </FioriFormGroup>
 
-                                        {/* แผง Categories — สลับได้ว่าจะให้ System Categories (PIM category tree
-                                        ที่ mapping ระดับ category เป็นค่า default ให้ทุก platform) หรือ
-                                        Marketplace Categories (override เฉพาะรายสินค้าต่อแพลตฟอร์ม) เป็นตัวที่
-                                        ใช้งานจริง — ฝั่ง System Categories แค่ disable ไว้เฉยๆ ไม่ล้างค่า
-                                        (category_ids มีประโยชน์อื่นนอกเหนือจาก push เช่น storefront/grid filter
-                                        เลยต้องคงอยู่เสมอ) แต่สลับกลับไป "System Categories" จะล้างค่า override
-                                        ทั้ง 4 platform ทิ้งจริงๆ (ไม่ใช่แค่ disable เฉยๆ) เพราะ field พวกนั้นมีไว้
-                                        ทำหน้าที่ override การ push อย่างเดียว ไม่งั้นค่าเก่าจะยังถูกใช้จริงตอน push
-                                        อยู่ดี (resolve*CategoryId() ฝั่ง backend เลือก override ก่อนเสมอ) ทั้งที่
-                                        UI บอกว่าเปลี่ยนไปใช้ System Categories แล้ว ดู categorySource ด้านบนของ
-                                        component นี้ */}
-                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 2 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                    {t('categoriesBlockTitle')}
-                                                </Typography>
-                                                <Tooltip title={t('categoriesSourceInfoTooltip')} arrow>
-                                                    <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
-                                                </Tooltip>
-                                                {sectionSaveButton('categories', () =>
-                                                    saveSection('categories', {
-                                                        category_ids: data.category_ids,
-                                                        shopee_category_id: data.shopee_category_id,
-                                                        lazada_category_id: data.lazada_category_id,
-                                                        tiktok_category_id: data.tiktok_category_id,
-                                                        woocommerce_category_id: data.woocommerce_category_id,
-                                                    }),
-                                                )}
-                                            </Stack>
-
-                                            <ToggleButtonGroup
-                                                exclusive
-                                                fullWidth
-                                                size="small"
-                                                value={categorySource}
-                                                onChange={(_, next) => {
-                                                    if (!next) return;
-                                                    setCategorySource(next);
-                                                    // เคลียร์ override ทั้ง 4 platform ทิ้งจริงๆ ตอนสลับกลับไปใช้
-                                                    // System Categories — field พวกนี้มีหน้าที่ override การ push
-                                                    // อย่างเดียว ไม่งั้นค่าเก่าจะยังถูกใช้จริงอยู่ (resolve*CategoryId()
-                                                    // ฝั่ง backend เลือก override ก่อนเสมอถ้ายังมีค่าอยู่) ทั้งที่ UI
-                                                    // บอกว่าเปลี่ยนมาใช้ System Categories แล้ว — category_ids (PIM)
-                                                    // ไม่ต้องเคลียร์แบบเดียวกัน เพราะมีประโยชน์อื่นอยู่ (storefront/
-                                                    // grid filter) นอกเหนือจาก push
-                                                    if (next === 'system') {
-                                                        setData('shopee_category_id', null);
-                                                        setData('lazada_category_id', null);
-                                                        setData('tiktok_category_id', null);
-                                                        setData('woocommerce_category_id', null);
-                                                    }
-                                                }}
-                                                sx={{ ...fioriToggleButtonGroupSx, mb: 2.5 }}
-                                            >
-                                                <ToggleButton value="system">{t('systemCategoriesLabel')}</ToggleButton>
-                                                <ToggleButton value="marketplace">{t('marketplaceCategoriesLabel')}</ToggleButton>
-                                            </ToggleButtonGroup>
-
-                                            <Divider sx={{ my: 1 }} />
-
-                                            <Stack spacing={1}>
-                                                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                        {t('systemCategoriesLabel')}
-                                                    </Typography>
-                                                    <Button
-                                                        component={Link}
-                                                        href="/catalog/categories/marketplace-sync"
-                                                        size="small"
-                                                        startIcon={<LinkIcon fontSize="small" />}
-                                                        sx={fioriGhostSx}
-                                                    >
-                                                        {t('marketplaceMappingButton')}
-                                                    </Button>
-                                                </Stack>
-                                                <CategoryCascadeSelect
-                                                    value={data.category_ids}
-                                                    onChange={(ids) => setData('category_ids', ids)}
-                                                    disabled={categorySource !== 'system'}
-                                                />
-                                            </Stack>
-                                            <Divider sx={{ mt: 3 }} />
-                                            <Stack spacing={1} sx={{ mt: 3 }}>
-                                                <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                    {t('marketplaceCategoriesLabel')}
-                                                </Typography>
-                                                <MarketplaceCategoryPicker
-                                                    platform="shopee"
-                                                    label="Shopee"
-                                                    value={data.shopee_category_id}
-                                                    onChange={(id) => setData('shopee_category_id', id)}
-                                                    disabled={categorySource !== 'marketplace'}
-                                                />
-                                                <MarketplaceCategoryPicker
-                                                    platform="lazada"
-                                                    label="Lazada"
-                                                    value={data.lazada_category_id}
-                                                    onChange={(id) => setData('lazada_category_id', id)}
-                                                    disabled={categorySource !== 'marketplace'}
-                                                />
-                                                <MarketplaceCategoryPicker
-                                                    platform="tiktok"
-                                                    label="TikTok"
-                                                    value={data.tiktok_category_id}
-                                                    onChange={(id) => setData('tiktok_category_id', id)}
-                                                    disabled={categorySource !== 'marketplace'}
-                                                />
-                                                <MarketplaceCategoryPicker
-                                                    platform="woocommerce"
-                                                    label="WooCommerce"
-                                                    value={data.woocommerce_category_id}
-                                                    onChange={(id) => setData('woocommerce_category_id', id)}
-                                                    disabled={categorySource !== 'marketplace'}
-                                                />
-                                            </Stack>
-                                        </Paper>
-
-                                        {/* แผง Brand — ใช้หลักการเดียวกับ Categories ทุกประการ: สลับได้ว่าจะให้
-                                        System Brand (pbrand ที่แยกออกมาจากลูปของ attribute ทั่วไป — ดูเงื่อนไข
-                                        `attr.code === 'pbrand'` ที่กันออกด้านบน — mapping ระดับ brand option
-                                        เป็นค่า default ให้ทุก platform) หรือ Marketplace Brand (override เฉพาะ
-                                        รายสินค้าต่อแพลตฟอร์ม จากชุดแบรนด์จริงที่ sync มา) เป็นตัวที่ใช้งานจริง
-                                        ฝั่งที่ไม่ได้เลือกจะถูก dim ไว้เฉยๆ (ไม่ล้างค่า) ยกเว้นสลับกลับไป System
-                                        Brand จะล้างค่า override ทั้ง 4 platform ทิ้งจริงๆ เหตุผลเดียวกับ
-                                        categorySource: field พวกนี้มีหน้าที่ override การ push อย่างเดียว */}
-                                        {brandAttr && (
+                                        {/* แผง "Master Categories" — หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ย้ายมา
+                                        แทนที่บล็อค Categories/Brand เดิม (จัดการทางหน้า Master แทนแล้ว — ดู
+                                        catalog/categories/*, catalog/product-groups/*) เหลือแค่ 3 attribute
+                                        ธรรมดา (pcatname/psubcatname/productgroupname) ที่ options mirror ต้นไม้
+                                        categories มาเป๊ะๆ ผ่าน categories.code (ดู ProductCategoryLinker) ไม่ได้
+                                        ผูก attribute_family ไหนเลย เลยแยก panel ของตัวเองแทนที่จะปนใน groupsData
+                                        ทั่วไป (ดู ProductController::buildProductFormProps()) — บังคับเลือกตาม
+                                        step (หมวดหมู่ -> หมวดหมู่ย่อย -> กลุ่มสินค้า เห็นทีละขั้นเท่านั้น ดู
+                                        cascadedMasterCategoryAttributes/handleMasterCategoryChange ด้านบน) มีปุ่ม
+                                        Save แยกของตัวเอง (เหมือน Sales Channels) ไม่ต้อง submit ทั้งฟอร์มใหญ่ —
+                                        ฝั่ง backend (ProductController::updateMasterCategories()) จะ sync เข้า
+                                        ต้นไม้ categories จริงให้เอง (เรียก ProductCategoryLinker::linkFromCodes())
+                                        ซึ่งเป็นตัวที่ effectiveFamilyIds() ใช้อยู่แล้ว — ถ้ากลุ่มสินค้าที่เลือกมี
+                                        ตระกูลแอตทริบิวต์ผูกไว้ (ดู Category::attributeFamilies()) แอตทริบิวต์ของ
+                                        ตระกูลนั้นจะโผล่มาให้กรอกทันทีตอนเปิดแก้ไขสินค้านี้รอบถัดไป — เหมือนกับที่
+                                        field Family เคยมีผลแบบเดียวกันตอน save+reload มาก่อน ไม่ต้อง fetch สดๆ
+                                        ก่อน save แต่อย่างใด */}
+                                        {cascadedMasterCategoryAttributes.length > 0 && (
                                             <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 2 }}>
-                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                        {t('brandBlockTitle')}
+                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
+                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
+                                                        {t('masterCategoriesBlockTitle')}
                                                     </Typography>
-                                                    <Tooltip title={t('brandSourceInfoTooltip')} arrow>
-                                                        <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
-                                                    </Tooltip>
-                                                    {sectionSaveButton('brand', () => {
-                                                        const { channelKey, localeKey } = getValueKeys(brandAttr);
-                                                        const pbrand =
-                                                            data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
-                                                            data.values[brandAttr.id]?.[channelKey]?.['default'] ??
-                                                            '';
-                                                        saveSection('brand', {
-                                                            pbrand: typeof pbrand === 'string' ? pbrand : '',
-                                                            shopee_brand_id: data.shopee_brand_id,
-                                                            lazada_brand_id: data.lazada_brand_id,
-                                                            tiktok_brand_id: data.tiktok_brand_id,
-                                                            woocommerce_brand_id: data.woocommerce_brand_id,
+                                                    {sectionSaveButton('master-categories', () => {
+                                                        const payload: Record<string, FormDataConvertible> = {};
+                                                        masterCategoryAttributes.forEach((attr) => {
+                                                            payload[attr.code] = selectedMasterCategoryCode(attr);
                                                         });
+                                                        saveSection('master-categories', payload);
                                                     })}
                                                 </Stack>
-
-                                                <ToggleButtonGroup
-                                                    exclusive
-                                                    fullWidth
-                                                    size="small"
-                                                    value={brandSource}
-                                                    onChange={(_, next) => {
-                                                        if (!next) return;
-                                                        setBrandSource(next);
-                                                        if (next === 'system') {
-                                                            setData('shopee_brand_id', null);
-                                                            setData('lazada_brand_id', null);
-                                                            setData('tiktok_brand_id', null);
-                                                            setData('woocommerce_brand_id', null);
-                                                        }
-                                                    }}
-                                                    sx={{ ...fioriToggleButtonGroupSx, mb: 2.5 }}
-                                                >
-                                                    <ToggleButton value="system">{t('systemBrandLabel')}</ToggleButton>
-                                                    <ToggleButton value="marketplace">{t('marketplaceBrandLabel')}</ToggleButton>
-                                                </ToggleButtonGroup>
-
-                                                <Box
-                                                    sx={{
-                                                        opacity: brandSource === 'system' ? 1 : 0.5,
-                                                        pointerEvents: brandSource === 'system' ? 'auto' : 'none',
-                                                    }}
-                                                >
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={800}
-                                                        fontSize="large"
-                                                        color="text.secondary"
-                                                        sx={{ display: 'block', mb: 1 }}
-                                                    >
-                                                        {t('systemBrandLabel')}
-                                                    </Typography>
-                                                    {(() => {
-                                                        const { channelKey, localeKey } = getValueKeys(brandAttr);
+                                                <Stack spacing={2}>
+                                                    {cascadedMasterCategoryAttributes.map((attr) => {
+                                                        const { channelKey, localeKey } = getValueKeys(attr);
                                                         const val =
-                                                            data.values[brandAttr.id]?.[channelKey]?.[localeKey] ??
-                                                            data.values[brandAttr.id]?.[channelKey]?.['default'] ??
+                                                            data.values[attr.id]?.[channelKey]?.[localeKey] ??
+                                                            data.values[attr.id]?.[channelKey]?.['default'] ??
                                                             '';
-                                                        const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                        const activeChannelName =
-                                                            activeChannelId === null
-                                                                ? 'Default (All Channels)'
-                                                                : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
-                                                        const stringValue = typeof val === 'string' ? val : '';
-                                                        const selectedOption =
-                                                            brandAttr.options?.find((opt) => optionValue(opt) === stringValue) ?? null;
-                                                        const mapped = selectedOption?.mapped_platforms ?? [];
-
                                                         return (
-                                                            <Stack spacing={1.5}>
-                                                                <RenderAttributeInput
-                                                                    attr={brandAttr}
-                                                                    value={val}
-                                                                    channelKey={channelKey}
-                                                                    localeKey={localeKey}
-                                                                    onValueChange={setAttributeValue}
-                                                                    label={localizedLabel(brandAttr, activeLocaleId)}
-                                                                    activeLocaleCode={activeLocaleCode}
-                                                                    activeChannelName={activeChannelName}
-                                                                    canAddOptions={canAddAttributeOptions}
-                                                                    sku={data.sku}
-                                                                    productId={product.id}
-                                                                />
-                                                                {selectedOption && (
-                                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                                                                        <Typography variant="caption" color="text.secondary">
-                                                                            {t('marketplaceMappingLabel')}
-                                                                        </Typography>
-                                                                        {mapped.length > 0 ? (
-                                                                            <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                                                                {BRAND_MAPPED_PLATFORMS.filter((p) => mapped.includes(p.value)).map(
-                                                                                    (p) => (
-                                                                                        <Chip
-                                                                                            key={p.value}
-                                                                                            label={p.label}
-                                                                                            size="small"
-                                                                                            sx={{
-                                                                                                bgcolor: p.color,
-                                                                                                color: '#fff',
-                                                                                                fontWeight: 600,
-                                                                                                height: 20,
-                                                                                                fontSize: 11,
-                                                                                            }}
-                                                                                        />
-                                                                                    ),
-                                                                                )}
-                                                                            </Stack>
-                                                                        ) : (
-                                                                            <Typography
-                                                                                variant="caption"
-                                                                                color="text.disabled"
-                                                                                sx={{ fontStyle: 'italic' }}
-                                                                            >
-                                                                                {t('notMappedToAnyMarketplace')}
-                                                                            </Typography>
-                                                                        )}
-                                                                        <Button
-                                                                            component="a"
-                                                                            href={`/catalog/brands/${selectedOption.id}/edit`}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            size="small"
-                                                                            startIcon={<LinkIcon sx={{ fontSize: 14 }} />}
-                                                                            sx={{ ...fioriGhostSx, minWidth: 0, py: 0, px: 1, fontSize: 11 }}
-                                                                        >
-                                                                            {t('mapMarketplaceBrandButton')}
-                                                                        </Button>
-                                                                    </Stack>
-                                                                )}
-                                                            </Stack>
+                                                            <RenderAttributeInput
+                                                                key={attr.id}
+                                                                attr={attr}
+                                                                value={val}
+                                                                channelKey={channelKey}
+                                                                localeKey={localeKey}
+                                                                onValueChange={handleMasterCategoryChange}
+                                                                label={localizedLabel(attr, activeLocaleId)}
+                                                                canAddOptions={canAddAttributeOptions}
+                                                                sku={data.sku}
+                                                                productId={product.id}
+                                                            />
                                                         );
-                                                    })()}
-                                                </Box>
-                                                <Divider sx={{ mt: 3, mb: 2 }} />
-                                                <Stack
-                                                    spacing={1}
-                                                    sx={{
-                                                        mt: 3,
-                                                        opacity: brandSource === 'marketplace' ? 1 : 0.5,
-                                                        pointerEvents: brandSource === 'marketplace' ? 'auto' : 'none',
-                                                    }}
-                                                >
-                                                    <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                        {t('marketplaceBrandLabel')}
-                                                    </Typography>
-                                                    <MarketplaceBrandPicker
-                                                        platform="shopee"
-                                                        label="Shopee"
-                                                        value={data.shopee_brand_id}
-                                                        onChange={(id) => setData('shopee_brand_id', id)}
-                                                        disabled={brandSource !== 'marketplace'}
-                                                        shopeeCategoryId={data.shopee_category_id}
-                                                    />
-                                                    <MarketplaceBrandPicker
-                                                        platform="lazada"
-                                                        label="Lazada"
-                                                        value={data.lazada_brand_id}
-                                                        onChange={(id) => setData('lazada_brand_id', id)}
-                                                        disabled={brandSource !== 'marketplace'}
-                                                    />
-                                                    <MarketplaceBrandPicker
-                                                        platform="tiktok"
-                                                        label="TikTok"
-                                                        value={data.tiktok_brand_id}
-                                                        onChange={(id) => setData('tiktok_brand_id', id)}
-                                                        disabled={brandSource !== 'marketplace'}
-                                                    />
-                                                    <MarketplaceBrandPicker
-                                                        platform="woocommerce"
-                                                        label="WooCommerce"
-                                                        value={data.woocommerce_brand_id}
-                                                        onChange={(id) => setData('woocommerce_brand_id', id)}
-                                                        disabled={brandSource !== 'marketplace'}
-                                                    />
+                                                    })}
                                                 </Stack>
                                             </Paper>
                                         )}

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Models\AttributeFamily;
 use App\Models\AuditLog;
+use App\Models\BusinessType;
 use App\Models\Category;
 use App\Models\CategoryTranslation;
 use App\Models\Locale;
@@ -123,6 +125,7 @@ class ProductGroupController extends Controller
         return Inertia::render('catalog/product-groups/create', [
             'categories' => Category::whereNull('parent_id')->orderBy('name')->get(['id', 'name']),
             'subcategories' => $this->subcategoryOptions(),
+            'businessTypes' => BusinessType::orderBy('name')->get(['id', 'name']),
             'defaultCategoryId' => $request->integer('category') ?: null,
             'defaultSubcategoryId' => $request->integer('subcategory') ?: null,
         ]);
@@ -143,6 +146,7 @@ class ProductGroupController extends Controller
             'code' => $code,
             'name' => $this->resolveName($translations, $validated['name'] ?? null, $code),
             'parent_id' => $validated['subcategory_id'],
+            'business_type_id' => $validated['business_type_id'] ?? null,
             'thumbnail' => $thumbnailPath,
             'description' => $validated['description'] ?? null,
             'is_active' => $request->boolean('is_active', true),
@@ -178,6 +182,7 @@ class ProductGroupController extends Controller
             'shopeeCategory:id,name,name_th,parent_id',
             'tiktokCategory:id,name,name_th,parent_id',
             'woocommerceCategory:id,name,parent_id',
+            'attributeFamilies',
         ]);
 
         $translations = $this->currentTranslations($category);
@@ -198,6 +203,7 @@ class ProductGroupController extends Controller
                 'is_ai_translate' => (bool) $category->is_ai_translate,
                 'subcategory_id' => $category->parent_id,
                 'category_id' => $category->parent?->parent_id,
+                'business_type_id' => $category->business_type_id,
                 'lazada_category_id' => $category->lazada_category_id,
                 'lazada_category' => $category->lazadaCategory,
                 'shopee_category_id' => $category->shopee_category_id,
@@ -206,11 +212,19 @@ class ProductGroupController extends Controller
                 'tiktok_category' => $category->tiktokCategory,
                 'woocommerce_category_id' => $category->woocommerce_category_id,
                 'woocommerce_category' => $category->woocommerceCategory,
+                // เรียงตาม sort_order มาแล้วจาก Category::attributeFamilies() —
+                // ตัวแรกในลิสต์นี้คือตระกูล "เริ่มต้น" ของกลุ่มสินค้านี้
+                'attribute_families' => $category->attributeFamilies->map(fn (AttributeFamily $f) => [
+                    'id' => $f->id,
+                    'name' => $f->name,
+                ])->values(),
             ],
             'thumbnailUrl' => AttributeValueFormatter::resolveStorageUrl($category->thumbnail),
             'translations' => $translations,
             'categories' => Category::whereNull('parent_id')->orderBy('name')->get(['id', 'name']),
             'subcategories' => $this->subcategoryOptions(),
+            'businessTypes' => BusinessType::orderBy('name')->get(['id', 'name']),
+            'availableFamilies' => AttributeFamily::orderBy('name')->get(['id', 'code', 'name']),
             'canViewHistory' => auth()->user()?->hasPermission('product_groups', 'view_history') ?? false,
         ]);
     }
@@ -232,6 +246,7 @@ class ProductGroupController extends Controller
             // `code` is fixed after creation — never updated here.
             'name' => $this->resolveName($translations, $validated['name'] ?? null, $category->code),
             'parent_id' => $validated['subcategory_id'],
+            'business_type_id' => $validated['business_type_id'] ?? null,
             'thumbnail' => $thumbnailPath,
             'description' => $validated['description'] ?? null,
             'is_active' => $request->boolean('is_active', true),
@@ -242,6 +257,7 @@ class ProductGroupController extends Controller
 
         $this->syncTranslations($category, $translations);
         $this->autoTranslate($category, $translations);
+        $this->syncAttributeFamilies($category, $validated['family_ids'] ?? []);
 
         $newTranslations = $this->currentTranslations($category);
         if ($oldTranslations !== $newTranslations) {
@@ -251,6 +267,25 @@ class ProductGroupController extends Controller
         Category::bumpTreeCacheVersion();
 
         return to_route('catalog.productGroups.index')->with('success', 'Product group updated successfully.');
+    }
+
+    /**
+     * เก็บลำดับที่ user จัดไว้ในหน้าแก้ไข (ลาก/กดปุ่มเลื่อนบน-ล่าง) ลง sort_order
+     * ตรงๆ — ตัวแรกในลิสต์ (sort_order = 0) คือตระกูล "เริ่มต้น" ของกลุ่มสินค้านี้
+     * ที่ ProductController::attributeFamiliesForCategory() จะหยิบไปเดา family_id
+     * เริ่มต้นให้ตอนสร้างสินค้าใหม่ ส่วนตอนแก้ไขสินค้าที่มีอยู่แล้ว
+     * effectiveFamilyIds() จะเอา "ทุก" ตัวในลิสต์นี้ไปรวมกัน ไม่ใช่แค่ตัวแรก
+     *
+     * @param  array<int, int>  $familyIds
+     */
+    private function syncAttributeFamilies(Category $category, array $familyIds): void
+    {
+        $pivotData = [];
+        foreach (array_values($familyIds) as $index => $familyId) {
+            $pivotData[$familyId] = ['sort_order' => $index];
+        }
+
+        $category->attributeFamilies()->sync($pivotData);
     }
 
     public function destroy(Category $category): RedirectResponse
@@ -285,6 +320,9 @@ class ProductGroupController extends Controller
             'is_active' => ['boolean'],
             'category_id' => ['required', Rule::exists('categories', 'id')->whereNull('parent_id')],
             'subcategory_id' => ['required', Rule::exists('categories', 'id')->whereNotNull('parent_id')],
+            'business_type_id' => ['nullable', 'exists:business_types,id'],
+            'family_ids' => ['nullable', 'array'],
+            'family_ids.*' => ['integer', 'distinct', 'exists:attribute_families,id'],
             'lazada_category_id' => ['nullable', 'exists:lazada_categories,id'],
             'shopee_category_id' => ['nullable', 'exists:shopee_categories,id'],
             'tiktok_category_id' => ['nullable', 'exists:tiktok_categories,id'],

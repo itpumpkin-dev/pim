@@ -126,6 +126,11 @@ function useMainNavItems(): NavItem[] {
                                 permission: 'currencies.list_currencies',
                             },
                             {
+                                title: t('productTypes'),
+                                url: '/catalog/product-types',
+                                permission: 'product_types.list_product_types',
+                            },
+                            {
                                 title: t('marketplace'),
                                 items: [
                                     {

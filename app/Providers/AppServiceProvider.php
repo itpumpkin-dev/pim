@@ -9,6 +9,7 @@ use App\Models\CategoryTranslation;
 use App\Models\CommissionGroup;
 use App\Models\Currency;
 use App\Models\Point;
+use App\Models\ProductType;
 use App\Models\Vendor;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -21,7 +22,7 @@ use Illuminate\Support\ServiceProvider;
 class AppServiceProvider extends ServiceProvider
 {
     /** Master models whose rows mirror into a bound `select` attribute's options. */
-    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class];
+    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class];
 
     /**
      * Register any application services.

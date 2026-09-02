@@ -62,6 +62,19 @@ class AttributeFamily extends Model
         return $this->hasMany(Product::class, 'family_id');
     }
 
+    /**
+     * กลุ่มสินค้า (categories ที่ depth 3) ที่ผูกตระกูลนี้ไว้ — ดู
+     * Category::attributeFamilies() ประกอบ (ฝั่งนั้นเป็นฝั่งหลักที่ถูกใช้จริง
+     * จาก ProductGroupController; ฝั่งนี้ไว้เผื่อใครอยากไล่กลับจากตระกูลไปหา
+     * กลุ่มสินค้าที่ผูกอยู่)
+     */
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(Category::class, 'category_attribute_family', 'family_id', 'category_id')
+            ->withPivot('sort_order')
+            ->orderByPivot('sort_order');
+    }
+
     public function translations(): HasMany
     {
         return $this->hasMany(AttributeFamilyTranslation::class);

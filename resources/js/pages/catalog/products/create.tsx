@@ -3,8 +3,6 @@ import {
     FioriField,
     FioriFormErrorSummary,
     FioriFormGroup,
-    fioriComboBoxPaperSx,
-    fioriComboBoxSx,
     fioriFieldStateSx,
     fioriMultiInputSx,
     valueStateOf,
@@ -45,12 +43,6 @@ import {
 import { FormEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-interface AttributeFamily {
-    id: number;
-    code: string;
-    name: string;
-}
-
 interface AttributeOption {
     id: number;
     code?: string;
@@ -66,17 +58,27 @@ interface AttributeItem {
     family_ids?: number[];
 }
 
+/** แอตทริบิวต์ "Product Type" (producttype) — options mirror มาจาก master
+ * product_types (ดู ProductController::productTypeAttributeFor()) คนละตัวกับ
+ * data.type ด้านล่าง (Simple/Configurable) ที่ชื่อชนกันโดยบังเอิญ */
+interface ProductTypeAttribute {
+    id: number;
+    code: string;
+    name: string;
+    options?: AttributeOption[];
+}
+
 interface Props {
-    families: AttributeFamily[];
     attributes: AttributeItem[];
+    productTypeAttribute?: ProductTypeAttribute | null;
 }
 
 interface ProductForm {
     [key: string]: FormDataConvertible;
     enabled: boolean;
-    family_id: string | number;
     type: string;
     sku: string;
+    product_type_code: string;
     configurable_attributes: number[];
     variants: {
         sku: string;
@@ -104,7 +106,7 @@ function comboCount(sets: unknown[][]): number {
     return sets.reduce((n, set) => n * Math.max(set.length, 1), 1);
 }
 
-export default function ProductCreate({ families, attributes }: Props) {
+export default function ProductCreate({ attributes, productTypeAttribute }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -116,9 +118,9 @@ export default function ProductCreate({ families, attributes }: Props) {
 
     const { data, setData, post, processing, errors, isDirty } = useForm<ProductForm>({
         enabled: true,
-        family_id: families.length > 0 ? families[0].id : '',
         type: 'simple',
         sku: '',
+        product_type_code: '',
         configurable_attributes: [],
         variants: [],
     });
@@ -134,14 +136,14 @@ export default function ProductCreate({ families, attributes }: Props) {
         [attributes, data.configurable_attributes],
     );
 
-    // จำกัดตัวเลือกใน variant-attribute picker ให้เหลือแค่ attribute ที่ผูกกับ
-    // family ที่เลือกไว้จริงๆ — แต่ก่อนเลือก attribute ระบบไหนก็ได้ที่มี options
-    // มาใช้ตรงนี้ได้หมด ถึงจะไม่เกี่ยวกับ family ที่เลือกเลยก็ตาม สุดท้าย value
-    // ของ variant ที่ได้ก็จะไม่โผล่ในกลุ่ม attribute ของ family นั้นตอนไปหน้า Edit
-    const familyScopedAttributeOptions = useMemo(
-        () => attributes.filter((attr) => (attr.options || []).length > 0 && (attr.family_ids || []).includes(Number(data.family_id))),
-        [attributes, data.family_id],
-    );
+    // ตัวเลือกใน variant-attribute picker — เมื่อก่อนจำกัดตาม family ที่เลือกไว้
+    // ในหน้านี้ แต่หน้า Create ไม่มีให้เลือก family/กลุ่มสินค้าอีกต่อไปแล้ว (เลือก
+    // ทีหลังตอนแก้ไขสินค้าแทน ผ่านกลุ่มสินค้า — ดู catalog/product-groups/edit.tsx)
+    // เลยเหลือแค่กรองว่ามี options ให้เลือกจริงๆ (เช่น สี, ไซส์) เท่านั้น — ไม่ได้
+    // กระทบอะไรในทางปฏิบัติอยู่แล้ว เพราะ Product Type ที่นี่ล็อกไว้ที่ "Simple"
+    // เสมอ (ดู MenuItem value="configurable" disabled ด้านล่าง) จุดนี้เลยไม่มีวัน
+    // ถูกใช้งานจริงตอนสร้างสินค้าใหม่
+    const familyScopedAttributeOptions = useMemo(() => attributes.filter((attr) => (attr.options || []).length > 0), [attributes]);
 
     const handleGenerateVariants = (selectedAttrIds: number[]) => {
         const selectedAttrs = attributes.filter((attr) => selectedAttrIds.includes(attr.id));
@@ -324,80 +326,13 @@ export default function ProductCreate({ families, attributes }: Props) {
                             </Stack>
                         </FioriField>
 
-                        {/* Family (กลุ่มสินค้า) */}
-                        <FioriField
-                            label={t('fieldFamily')}
-                            htmlFor="product-family"
-                            required
-                            valueState={valueStateOf(errors.family_id)}
-                            message={errors.family_id}
-                        >
-                            <Autocomplete
-                                id="product-family"
-                                fullWidth
-                                size="small"
-                                options={families}
-                                autoHighlight
-                                popupIcon={<KeyboardArrowDownIcon />}
-                                getOptionLabel={(fam) => fam.name || fam.code}
-                                isOptionEqualToValue={(opt, val) => opt.id === val.id}
-                                value={families.find((fam) => fam.id === Number(data.family_id)) ?? null}
-                                onChange={(_, fam) =>
-                                    setData((prev) => ({
-                                        ...prev,
-                                        family_id: fam ? fam.id : '',
-                                        // แกน variant ที่เลือกไว้จาก family เดิม อาจใช้ไม่ได้กับ
-                                        // family ใหม่ เลยต้องล้าง matrix ที่ generate ไว้ทิ้งไปด้วย
-                                        configurable_attributes: [],
-                                        variants: [],
-                                    }))
-                                }
-                                sx={fioriComboBoxSx(valueStateOf(errors.family_id))}
-                                slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        placeholder={t('selectOption')}
-                                        error={Boolean(errors.family_id)}
-                                    />
-                                )}
-                            />
-                        </FioriField>
-
-                        {/* ประเภทสินค้า */}
-                        <FioriField
-                            label={t('fieldProductType')}
-                            htmlFor="product-type"
-                            required
-                            valueState={valueStateOf(errors.type)}
-                            message={errors.type}
-                            hint={t('configurableTemporarilyDisabled')}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.type))}>
-                                <Select
-                                    id="product-type"
-                                    IconComponent={KeyboardArrowDownIcon}
-                                    value={data.type}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setData('type', val);
-                                        if (val === 'configurable') {
-                                            setConfigModalOpen(true);
-                                        } else {
-                                            setData('variants', []);
-                                        }
-                                    }}
-                                >
-                                    <MenuItem value="simple">{t('simple')}</MenuItem>
-                                    {/* Configurable products are turned off for now — the variant
-                                        matrix can blow up on the option-heavy attributes in this
-                                        catalog. Re-enable once the picker is restricted. */}
-                                    <MenuItem value="configurable" disabled>
-                                        {t('configurable')}
-                                    </MenuItem>
-                                </Select>
-                            </FormControl>
-                        </FioriField>
+                        {/* เดิมมีช่อง "ประเภทสินค้า" (Simple/Configurable) อยู่ตรงนี้ — เอาออก
+                            ตามที่ user ขอ เพราะชนชื่อกับฟิลด์ "ประเภทสินค้า" (แอตทริบิวต์
+                            producttype) ด้านล่าง ทั้งที่เป็นคนละเรื่องกันในระบบ: ตัวนี้กำหนดว่ามี
+                            variant ย่อยหรือไม่ ส่วนฟิลด์ด้านล่างคือหมวดหมู่สินค้า และ Configurable
+                            ก็ถูกปิดใช้งานถาวรอยู่แล้วด้วย (MenuItem disabled ด้านบนเดิม ไม่เคย
+                            เลือกได้จริงตั้งแต่ต้น) data.type จึงยังคงเป็น 'simple' เสมอสำหรับ
+                            สินค้าที่สร้างใหม่ทุกตัว — ไม่ต้องมี field ให้ผู้ใช้เลือกอีกต่อไป */}
 
                         {/* SKU หลัก */}
                         <FioriField
@@ -417,6 +352,36 @@ export default function ProductCreate({ families, attributes }: Props) {
                                 sx={fioriFieldStateSx(valueStateOf(errors.sku))}
                             />
                         </FioriField>
+
+                        {/* ประเภทสินค้า — แอตทริบิวต์ producttype ที่ options mirror มาจาก
+                            catalog/product-types (คนละเรื่องกับ Simple/Configurable ที่เอาออก
+                            ไปด้านบนแล้ว) เลือกได้ทันทีตอนสร้าง ไม่บังคับ — ถ้าไม่เลือก ไปเลือก
+                            ทีหลังที่หน้าแก้ไขได้ */}
+                        {productTypeAttribute && (
+                            <FioriField
+                                label={t('masterProductTypeFieldLabel')}
+                                htmlFor="product-type-master"
+                                valueState={valueStateOf(errors.product_type_code)}
+                                message={errors.product_type_code}
+                            >
+                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.product_type_code))}>
+                                    <Select
+                                        id="product-type-master"
+                                        IconComponent={KeyboardArrowDownIcon}
+                                        displayEmpty
+                                        value={data.product_type_code}
+                                        onChange={(e) => setData('product_type_code', e.target.value)}
+                                    >
+                                        <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
+                                        {(productTypeAttribute.options || []).map((opt) => (
+                                            <MenuItem key={opt.id} value={opt.code || ''}>
+                                                {opt.admin_label || opt.code}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </FioriField>
+                        )}
                     </FioriFormGroup>
 
                     {/* ตาราง Variants ที่ generate แบบ cartesian */}

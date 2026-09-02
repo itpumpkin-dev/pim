@@ -11,6 +11,7 @@ use App\Models\CommissionGroup;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Models\Point;
+use App\Models\ProductType;
 use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,8 +25,9 @@ use Illuminate\Database\Eloquent\Model;
  *   categories / subcategories / product_groups → depth 0 / 1 / 2 of the
  *       shared `categories` tree; option translations mirror CategoryTranslation
  *       plus the English name kept in additional_data.name_eng
- *   points / commission_groups / business_types / vendors / currencies →
- *       their own flat tables; plain admin_label only, no per-locale row
+ *   points / commission_groups / business_types / vendors / currencies /
+ *   product_types → their own flat tables; plain admin_label only, no
+ *       per-locale row
  *
  * Master edits flow in through model events (categories) or the
  * SyncsAttributeOptionMirror trait (the flat masters); changing an
@@ -44,6 +46,7 @@ class MasterAttributeOptionSync
         'business_types' => ['label' => 'masterSourceBusinessTypes', 'model' => BusinessType::class],
         'vendors' => ['label' => 'masterSourceVendors', 'model' => Vendor::class],
         'currencies' => ['label' => 'masterSourceCurrencies', 'model' => Currency::class],
+        'product_types' => ['label' => 'masterSourceProductTypes', 'model' => ProductType::class],
     ];
 
     private const CATEGORY_DEPTH_KEYS = ['categories', 'subcategories', 'product_groups'];
@@ -216,6 +219,9 @@ class MasterAttributeOptionSync
             'currencies' => Currency::all()->map(fn (Currency $c) => [
                 'code' => strtolower((string) $c->code), 'label' => $c->name, 'is_active' => true,
             ])->all(),
+            'product_types' => ProductType::all()->map(fn (ProductType $p) => [
+                'code' => (string) $p->code, 'label' => $p->name, 'is_active' => (bool) $p->is_active,
+            ])->all(),
             default => [],
         };
     }
@@ -245,6 +251,9 @@ class MasterAttributeOptionSync
         }
         if ($model instanceof Currency) {
             return ['code' => strtolower((string) $model->code), 'label' => $model->name, 'is_active' => true];
+        }
+        if ($model instanceof ProductType) {
+            return ['code' => (string) $model->code, 'label' => $model->name, 'is_active' => (bool) $model->is_active];
         }
 
         return null;
@@ -311,7 +320,7 @@ class MasterAttributeOptionSync
         if ($model instanceof Currency) {
             return $model->wasChanged('code') ? strtolower((string) $model->getOriginal('code')) : null;
         }
-        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor) {
+        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType) {
             return $model->wasChanged('code') ? (string) $model->getOriginal('code') : null;
         }
 

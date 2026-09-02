@@ -169,6 +169,10 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                     disableRipple
                     sx={rowSx(depth, active, false)}
                 >
+                    {/* Empty twistie gutter so leaf labels line up with the
+                        labels of sibling groups (VSCode aligns text past the
+                        chevron column). */}
+                    <Box sx={{ width: 18, flexShrink: 0 }} />
                     <ListItemText primary={item.title} sx={labelSx(depth, active)} />
                 </ListItemButton>
             );
@@ -180,18 +184,46 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
         return (
             <Fragment key={key}>
                 <ListItemButton disableRipple onClick={() => toggle(key)} sx={rowSx(depth, hasActiveDescendant, true)}>
-                    <ListItemText primary={item.title} sx={labelSx(depth, hasActiveDescendant)} />
                     <ExpandMoreIcon
                         fontSize="small"
                         sx={{
+                            width: 18,
+                            flexShrink: 0,
                             color: FIORI.textSecondary,
                             transition: 'transform 0.15s ease',
                             transform: isOpen ? 'none' : 'rotate(-90deg)',
                         }}
                     />
+                    <ListItemText primary={item.title} sx={labelSx(depth, hasActiveDescendant)} />
                 </ListItemButton>
                 <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                    <List dense disablePadding>
+                    <List
+                        dense
+                        disablePadding
+                        sx={{
+                            position: 'relative',
+                            // VSCode-style indent guide: a thin vertical line down
+                            // the whole expanded branch, one per nesting level,
+                            // aligned to the parent row's chevron. It brightens
+                            // while the pointer is anywhere in the branch (VSCode's
+                            // "active indent guide").
+                            '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: `${(1.5 + depth * 1.25) * 8 + 7}px`,
+                                width: '1px',
+                                bgcolor: FIORI.border,
+                                opacity: 0.7,
+                                transition: 'background-color 0.12s ease, opacity 0.12s ease',
+                            },
+                            '&:hover::before': {
+                                bgcolor: FIORI.textSecondary,
+                                opacity: 1,
+                            },
+                        }}
+                    >
                         {children.map((child) => renderNode(child, depth + 1, key))}
                     </List>
                 </Collapse>

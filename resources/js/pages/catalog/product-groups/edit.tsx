@@ -4,15 +4,21 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import UploadIcon from '@mui/icons-material/CloudUpload';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import SaveIcon from '@mui/icons-material/Save';
 import {
+    Autocomplete,
     Box,
     Button,
     Checkbox,
     CircularProgress,
     FormControl,
     FormControlLabel,
+    IconButton,
     MenuItem,
+    Paper,
     Select,
     Stack,
     Tab,
@@ -40,6 +46,7 @@ interface GroupData {
     is_ai_translate: boolean;
     subcategory_id: number | null;
     category_id: number | null;
+    business_type_id: number | null;
     lazada_category_id: number | null;
     lazada_category: LazadaCategoryOption | null;
     shopee_category_id: number | null;
@@ -48,6 +55,7 @@ interface GroupData {
     tiktok_category: TikTokCategoryOption | null;
     woocommerce_category_id: number | null;
     woocommerce_category: WooCommerceCategoryOption | null;
+    attribute_families: { id: number; name: string }[];
 }
 
 interface Props {
@@ -56,10 +64,21 @@ interface Props {
     translations: Record<string, string>;
     categories: { id: number; name: string }[];
     subcategories: { id: number; name: string; parent_id: number }[];
+    businessTypes: { id: number; name: string }[];
+    availableFamilies: { id: number; code: string; name: string }[];
     canViewHistory?: boolean;
 }
 
-export default function ProductGroupEdit({ group, thumbnailUrl, translations, categories = [], subcategories = [], canViewHistory = false }: Props) {
+export default function ProductGroupEdit({
+    group,
+    thumbnailUrl,
+    translations,
+    categories = [],
+    subcategories = [],
+    businessTypes = [],
+    availableFamilies = [],
+    canViewHistory = false,
+}: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -82,6 +101,8 @@ export default function ProductGroupEdit({ group, thumbnailUrl, translations, ca
         description: group.description || '',
         category_id: (group.category_id ?? '') as number | '',
         subcategory_id: (group.subcategory_id ?? '') as number | '',
+        business_type_id: (group.business_type_id ?? '') as number | '',
+        family_ids: group.attribute_families.map((f) => f.id) as number[],
         lazada_category_id: group.lazada_category_id,
         shopee_category_id: group.shopee_category_id,
         tiktok_category_id: group.tiktok_category_id,
@@ -95,6 +116,37 @@ export default function ProductGroupEdit({ group, thumbnailUrl, translations, ca
         () => (data.category_id === '' ? [] : subcategories.filter((s) => s.parent_id === data.category_id)),
         [subcategories, data.category_id],
     );
+
+    // ตระกูลแอตทริบิวต์ที่ผูกไว้ — เก็บแค่ id เรียงตามลำดับใน data.family_ids
+    // (ลำดับ = sort_order ที่จะถูกบันทึก) ตัวนี้ map กลับไปหาชื่อ/โค้ดจาก
+    // availableFamilies เพื่อ render แถวในลิสต์ด้านล่าง
+    const boundFamilies = useMemo(
+        () => data.family_ids.map((id) => availableFamilies.find((f) => f.id === id)).filter((f): f is (typeof availableFamilies)[number] => !!f),
+        [data.family_ids, availableFamilies],
+    );
+    const unboundFamilies = useMemo(
+        () => availableFamilies.filter((f) => !data.family_ids.includes(f.id)),
+        [availableFamilies, data.family_ids],
+    );
+
+    const addFamily = (familyId: number) => {
+        setData('family_ids', [...data.family_ids, familyId]);
+    };
+
+    const removeFamily = (familyId: number) => {
+        setData(
+            'family_ids',
+            data.family_ids.filter((id) => id !== familyId),
+        );
+    };
+
+    const moveFamily = (index: number, direction: -1 | 1) => {
+        const next = [...data.family_ids];
+        const target = index + direction;
+        if (target < 0 || target >= next.length) return;
+        [next[index], next[target]] = [next[target], next[index]];
+        setData('family_ids', next);
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -211,6 +263,28 @@ export default function ProductGroupEdit({ group, thumbnailUrl, translations, ca
                                 </FioriField>
 
                                 <FioriField
+                                    label={t('businessTypeName')}
+                                    valueState={valueStateOf(errors.business_type_id)}
+                                    message={errors.business_type_id}
+                                >
+                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.business_type_id))}>
+                                        <Select
+                                            id="pg-business-type"
+                                            displayEmpty
+                                            value={data.business_type_id === '' ? '' : String(data.business_type_id)}
+                                            onChange={(e) => setData('business_type_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                        >
+                                            <MenuItem value="">{t('selectBusinessType')}</MenuItem>
+                                            {businessTypes.map((b) => (
+                                                <MenuItem key={b.id} value={String(b.id)}>
+                                                    {b.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </FioriField>
+
+                                <FioriField
                                     label={t('description')}
                                     htmlFor="pg-description"
                                     valueState={valueStateOf(errors.description)}
@@ -270,6 +344,86 @@ export default function ProductGroupEdit({ group, thumbnailUrl, translations, ca
                                             control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
                                             label={t('active')}
                                         />
+                                    </Stack>
+                                </FioriField>
+                            </FioriFormGroup>
+
+                            <FioriFormGroup title={t('attributeFamily')} description={t('boundAttributeFamiliesHelperText')}>
+                                <FioriField label="" valueState={valueStateOf(errors.family_ids)} message={errors.family_ids} fullWidth>
+                                    <Stack spacing={1.5}>
+                                        <Autocomplete
+                                            size="small"
+                                            options={unboundFamilies}
+                                            getOptionLabel={(f) => f.name}
+                                            value={null}
+                                            onChange={(_, next) => next && addFamily(next.id)}
+                                            renderInput={(params) => <TextField {...params} placeholder={t('addAttributeFamilyPlaceholder')} />}
+                                        />
+
+                                        {boundFamilies.length === 0 ? (
+                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontStyle: 'italic' }}>
+                                                {t('noAttributeFamiliesBound')}
+                                            </Typography>
+                                        ) : (
+                                            <Stack spacing={1}>
+                                                {boundFamilies.map((family, index) => (
+                                                    <Paper
+                                                        key={family.id}
+                                                        variant="outlined"
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            px: 1.5,
+                                                            py: 1,
+                                                            gap: 1,
+                                                            borderColor: FIORI.border,
+                                                        }}
+                                                    >
+                                                        <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                                                            {family.name}
+                                                        </Typography>
+                                                        {index === 0 && (
+                                                            <Typography
+                                                                variant="caption"
+                                                                sx={{
+                                                                    color: FIORI.brand,
+                                                                    fontWeight: 600,
+                                                                    border: `1px solid ${FIORI.brand}`,
+                                                                    borderRadius: '4px',
+                                                                    px: 0.75,
+                                                                    py: 0.125,
+                                                                }}
+                                                            >
+                                                                {t('defaultFamilyBadge')}
+                                                            </Typography>
+                                                        )}
+                                                        <IconButton
+                                                            size="small"
+                                                            disabled={index === 0}
+                                                            title={t('moveFamilyUp')}
+                                                            onClick={() => moveFamily(index, -1)}
+                                                        >
+                                                            <KeyboardArrowUpIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            size="small"
+                                                            disabled={index === boundFamilies.length - 1}
+                                                            title={t('moveFamilyDown')}
+                                                            onClick={() => moveFamily(index, 1)}
+                                                        >
+                                                            <KeyboardArrowDownIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            size="small"
+                                                            title={t('removeFamily')}
+                                                            onClick={() => removeFamily(family.id)}
+                                                        >
+                                                            <DeleteOutlineIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Paper>
+                                                ))}
+                                            </Stack>
+                                        )}
                                     </Stack>
                                 </FioriField>
                             </FioriFormGroup>

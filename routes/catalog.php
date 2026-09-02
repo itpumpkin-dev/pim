@@ -15,6 +15,7 @@ use App\Http\Controllers\Catalog\CurrencyController;
 use App\Http\Controllers\Catalog\PointController;
 use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\ProductGroupController;
+use App\Http\Controllers\Catalog\ProductTypeController;
 use App\Http\Controllers\Catalog\SubcategoryController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
@@ -49,9 +50,12 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:products,edit_products');
     // Per-panel saves on the edit screen — each persists just its own slice so
     // the user doesn't have to submit the whole product form to save one card.
-    Route::put('products/{product}/categories', [ProductController::class, 'updateCategories'])->name('products.updateCategories')->middleware('permission:products,edit_products');
-    Route::put('products/{product}/brand', [ProductController::class, 'updateBrand'])->name('products.updateBrand')->middleware('permission:products,edit_products');
+    // The old Categories/Brand panels here were removed in favor of the
+    // Master pages + the pcatname/psubcatname/productgroupname "Master
+    // Categories" panel below, which gained its own save route back (see its
+    // docblock in products/edit.tsx).
     Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:products,edit_products');
+    Route::put('products/{product}/master-categories', [ProductController::class, 'updateMasterCategories'])->name('products.updateMasterCategories')->middleware('permission:products,edit_products');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
@@ -252,6 +256,18 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('business-types/{businessType}/edit', [BusinessTypeController::class, 'edit'])->name('businessTypes.edit')->middleware('permission:business_types,edit_business_types');
     Route::put('business-types/{businessType}', [BusinessTypeController::class, 'update'])->name('businessTypes.update')->middleware('permission:business_types,edit_business_types');
     Route::delete('business-types/{businessType}', [BusinessTypeController::class, 'destroy'])->name('businessTypes.destroy')->middleware('permission:business_types,edit_business_types');
+
+    // "ประเภทสินค้า" (Product Types) master — own `product_types` table
+    // (name + description + status), mirrors into the `producttype`
+    // attribute's options via `master_source`. Own `product_types.*`
+    // permissions backfilled from `categories.*`. `edit_product_types`
+    // covers every write.
+    Route::get('product-types', [ProductTypeController::class, 'index'])->name('productTypes.index')->middleware('permission:product_types,list_product_types');
+    Route::get('product-types/create', [ProductTypeController::class, 'create'])->name('productTypes.create')->middleware('permission:product_types,edit_product_types');
+    Route::post('product-types', [ProductTypeController::class, 'store'])->name('productTypes.store')->middleware('permission:product_types,edit_product_types');
+    Route::get('product-types/{productType}/edit', [ProductTypeController::class, 'edit'])->name('productTypes.edit')->middleware('permission:product_types,edit_product_types');
+    Route::put('product-types/{productType}', [ProductTypeController::class, 'update'])->name('productTypes.update')->middleware('permission:product_types,edit_product_types');
+    Route::delete('product-types/{productType}', [ProductTypeController::class, 'destroy'])->name('productTypes.destroy')->middleware('permission:product_types,edit_product_types');
 
     // "เวนเดอร์" (Vendors) master — own `vendors` table, own `vendors.*`
     // permissions backfilled from `categories.*`. `edit_vendors` covers

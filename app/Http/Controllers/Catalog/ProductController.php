@@ -66,6 +66,26 @@ class ProductController extends Controller
     // ด้านบน
     private const MIN_IMAGE_DIMENSION = 300;
 
+    // Attribute ที่ผูกกับ Master หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้าโดยตรง (options
+    // mirror ต้นไม้ categories มาเป๊ะๆ ผ่าน categories.code — ดู
+    // ProductCategoryLinker) ไม่ได้ผูกกับ attribute_family ไหนเลย (ดู
+    // buildProductFormProps()) เลยต้องแยกเป็น panel ของตัวเองที่มุมขวาแทนที่จะ
+    // ปนไปกับ groupsData ทั่วไป — ไม่มี 'pcatid' เพราะมันซ้ำกับ 'pcatname' ที่
+    // ระดับเดียวกัน (ดู ProductCategoryLinker::LEGACY_CODE_LEVELS) และ 'pcatname'
+    // คือตัวที่ระบบอื่น (WooCommerceConverter ฯลฯ) ใช้จริง
+    private const MASTER_CATEGORY_ATTRIBUTE_CODES = ['pcatname', 'psubcatname', 'productgroupname'];
+
+    // Attribute code ของแอตทริบิวต์ "Product Type" (Customer Brand / Hand
+    // Tools / ... — ดู ProductTypeController) ที่ผูก master_source =
+    // 'product_types' ไว้แล้ว (ดู migration bind_product_type_to_attribute)
+    // คนละตัวกับ $validated['type'] (Simple/Configurable) ของสินค้าเอง — ชื่อ
+    // ชนกันโดยบังเอิญเพราะเป็น attribute เดิมของระบบ ไม่ได้ผูก attribute_family
+    // ไหนแบบตายตัว (family "General Chemical Products" ผูกไว้เป็นตัวอย่างเดิม
+    // สำหรับสินค้าเคมีเท่านั้น) เลยแยกเป็น panel/field ของตัวเอง เหมือนกับ
+    // MASTER_CATEGORY_ATTRIBUTE_CODES ด้านบน แทนที่จะปนไปกับ groupsData ทั่วไป —
+    // ดู buildProductFormProps()
+    private const PRODUCT_TYPE_ATTRIBUTE_CODE = 'producttype';
+
     public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
 
     public function index(Request $request): Response
@@ -1230,6 +1250,11 @@ class ProductController extends Controller
     {
         return Attribute::with(['options', 'families:id'])
             ->has('options')
+            // Product Type (producttype) มีปุ่มเลือกเป็นของตัวเองแล้ว (ดู
+            // $productTypeAttribute ใน create()/buildProductFormProps())
+            // ไม่ควรโผล่ในตัวเลือกของ variant-attribute picker ด้วย — ไม่มีใคร
+            // อยากได้ variant สินค้าแยกตาม "Hand Tools vs Power Tools"
+            ->where('code', '!=', self::PRODUCT_TYPE_ATTRIBUTE_CODE)
             ->select('id', 'code', 'name', 'type')
             ->get()
             ->map(function (Attribute $attribute) {
@@ -1239,31 +1264,57 @@ class ProductController extends Controller
             });
     }
 
+    /**
+     * แอตทริบิวต์ "Product Type" (producttype) แบบเดี่ยว พร้อม options ที่ mirror
+     * มาจาก master `product_types` (ดู MasterAttributeOptionSync) — ใช้ทั้งหน้า
+     * Create (เลือกตอนสร้างสินค้าใหม่ได้เลย) และหน้า Edit (แผง Product Info)
+     */
+    private function productTypeAttributeFor(?\App\Models\User $user = null): ?Attribute
+    {
+        $attr = Attribute::with('options')->where('code', self::PRODUCT_TYPE_ATTRIBUTE_CODE)->first();
+        if (! $attr) {
+            return null;
+        }
+        if ($user && ! $this->canUserViewAttribute($user, $attr)) {
+            return null;
+        }
+        $attr->editable = $user ? $this->canUserEditAttribute($user, $attr) : true;
+        $this->decorateOptionsWithMappedPlatforms($attr);
+
+        return $attr;
+    }
+
     public function create(): Response
     {
-        // เรียง family ที่ถูกใช้บ่อยที่สุดไว้อันดับแรก เพื่อให้ค่าเริ่มต้นของฟอร์ม
-        // create (families[0]) เป็น family ที่สินค้าถูก assign ไปมากที่สุดจริงๆ
-        // แทนที่จะเป็นลำดับสุ่มๆ ตามที่ถูก insert ลง DB ก่อนหลัง
-        $families = AttributeFamily::withCount('products')
-            ->orderByDesc('products_count')
-            ->orderBy('name')
-            ->get(['id', 'code', 'name']);
-
         $attributes = $this->configurableAttributeOptions();
 
         return Inertia::render('catalog/products/create', [
-            'families' => $families,
             'attributes' => $attributes,
+            'productTypeAttribute' => $this->productTypeAttributeFor(auth()->user()),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
+        $productTypeAttributeId = Attribute::where('code', self::PRODUCT_TYPE_ATTRIBUTE_CODE)->value('id');
+
         $validator = Validator::make($request->all(), [
             'sku' => ['required', 'string', 'max:100', 'unique:products,sku'],
-            'family_id' => ['required', 'exists:attribute_families,id'],
+            // ไม่มี family_id/category_id ให้เลือกตอนสร้างสินค้าแล้ว (เอาออกตาม
+            // ที่ user ขอ) — สินค้าใหม่จะยังไม่มีตระกูล/กลุ่มสินค้าจนกว่าจะไปเลือก
+            // กลุ่มสินค้าที่หน้าแก้ไข (ผ่านแอตทริบิวต์ productgroupname ในแผง
+            // "Master Categories" — ดู products/edit.tsx) effectiveFamilyIds()
+            // จะ fallback ไปโชว์ system attribute ทั้งหมดใต้กลุ่ม "General" เอง
+            // ถ้ายังไม่มีทั้ง family_id และกลุ่มสินค้า (ดู buildProductFormProps())
             'type' => ['required', 'in:simple,configurable'],
             'enabled' => ['required', 'boolean'],
+            // ประเภทสินค้า (producttype attribute — mirror จาก master
+            // product_types) เลือกได้เลยตอนสร้าง แต่ไม่บังคับ — ยังไม่ผูก
+            // ProductValue ตัวนี้จนกว่าจะบันทึกสำเร็จ (ดูด้านล่าง)
+            'product_type_code' => [
+                'nullable', 'string', 'max:255',
+                $productTypeAttributeId ? Rule::exists('attribute_options', 'code')->where('attribute_id', $productTypeAttributeId) : 'string',
+            ],
             'configurable_attributes' => ['nullable', 'array'],
             'configurable_attributes.*' => ['integer', 'exists:attributes,id'],
             'variants' => ['nullable', 'array'],
@@ -1316,7 +1367,6 @@ class ProductController extends Controller
         DB::transaction(function () use ($validated, $request, &$parentProduct) {
             $parentProduct = Product::create([
                 'sku' => $validated['sku'],
-                'family_id' => $validated['family_id'],
                 'type' => $validated['type'],
                 'enabled' => $validated['enabled'],
                 'configurable_attributes' => $validated['configurable_attributes'] ?? null,
@@ -1325,6 +1375,20 @@ class ProductController extends Controller
             ]);
 
             $parentProduct->applySmartDefaults();
+
+            $productTypeCode = trim((string) ($validated['product_type_code'] ?? ''));
+            if ($productTypeCode !== '') {
+                $productTypeAttributeId = Attribute::where('code', self::PRODUCT_TYPE_ATTRIBUTE_CODE)->value('id');
+                if ($productTypeAttributeId) {
+                    ProductValue::create([
+                        'product_id' => $parentProduct->id,
+                        'attribute_id' => $productTypeAttributeId,
+                        'channel_id' => null,
+                        'locale_id' => null,
+                        'value' => $productTypeCode,
+                    ]);
+                }
+            }
 
             if ($validated['type'] === 'configurable' && ! empty($validated['variants'])) {
                 $priceAttr = Attribute::where('code', 'price')->first();
@@ -1532,6 +1596,45 @@ class ProductController extends Controller
     }
 
     /**
+     * ตระกูลแอตทริบิวต์ที่ "มีผลจริง" กับสินค้าตัวนี้ตอนนี้ — แทนที่การอ่านจาก
+     * product.family_id เดิมตรงๆ (ตามที่ user เลือกตอนถูกถาม): มาจากตระกูลที่
+     * ผูกกับกลุ่มสินค้า (categories) ที่สินค้านี้อยู่ทุกตัว (ดู
+     * Category::attributeFamilies() — เรียงตาม sort_order ที่ตั้งไว้ในหน้าแก้ไข
+     * กลุ่มสินค้า) เป็นหลัก เพราะงั้นถ้ามีคนไปเพิ่มตระกูลที่ 2 ให้กลุ่มสินค้าทีหลัง
+     * สินค้าเดิมที่อยู่ในกลุ่มนั้นจะเห็นแอตทริบิวต์ของตระกูลใหม่ทันทีตอนเปิดแก้ไข
+     * โดยไม่ต้องแก้อะไรที่ตัวสินค้าเองเลย
+     *
+     * Fallback กลับไปที่ product.family_id เดิมก็ต่อเมื่อไม่มีกลุ่มสินค้าไหนของ
+     * สินค้าตัวนี้ผูกตระกูลไว้เลยสักตัว — กันไม่ให้สินค้าที่มีอยู่เดิมทุกตัวเจอฟอร์ม
+     * แอตทริบิวต์ว่างเปล่าทันทีตั้งแต่วันที่ deploy ฟีเจอร์นี้ ก่อนที่แอดมินจะไปผูก
+     * ตระกูลให้กลุ่มสินค้าจริงๆ ทีละกลุ่ม
+     *
+     * @return array<int, int>  ลำดับความสำคัญจากมากไปน้อย — ถ้า attribute
+     *                            ตัวเดียวกันถูกผูกซ้ำในหลายตระกูล ตัวจากตระกูล
+     *                            ที่มาก่อนในลิสต์นี้จะชนะ
+     */
+    private function effectiveFamilyIds(Product $product): array
+    {
+        $categoryIds = $product->relationLoaded('categories')
+            ? $product->categories->pluck('id')
+            : $product->categories()->pluck('categories.id');
+
+        $groupFamilyIds = DB::table('category_attribute_family')
+            ->whereIn('category_id', $categoryIds)
+            ->orderBy('sort_order')
+            ->pluck('family_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        if (! empty($groupFamilyIds)) {
+            return $groupFamilyIds;
+        }
+
+        return $product->family_id ? [$product->family_id] : [];
+    }
+
+    /**
      * Everything the Edit/Read product pages need — split out from edit()
      * (which used to build this inline) purely so show() can render the
      * exact same data read-only instead of maintaining a second, parallel
@@ -1543,12 +1646,22 @@ class ProductController extends Controller
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
-        // ดึง pivot family_attributes ของ family ของสินค้านี้ ตามลำดับที่ตั้งไว้
-        // ในหน้าแก้ไข Attribute Family
-        $familyAttributes = FamilyAttribute::with(['attribute.options', 'attributeGroup'])
-            ->where('family_id', $product->family_id)
-            ->orderBy('sort_order')
-            ->get();
+        // ดึง pivot family_attributes ของ "ทุก" ตระกูลที่มีผลกับสินค้านี้ตอนนี้
+        // (ดู effectiveFamilyIds()) เรียงตามลำดับความสำคัญของตระกูล แล้วค่อย
+        // sort_order ภายในตระกูลนั้น — ถ้า attribute ตัวเดียวกันถูกผูกซ้ำใน
+        // มากกว่าหนึ่งตระกูล ให้ตัวจากตระกูลที่มาก่อนชนะ (unique('attribute_id')
+        // เก็บตัวที่เจอก่อนไว้)
+        $effectiveFamilyIds = $this->effectiveFamilyIds($product);
+        $familyAttributes = collect();
+        foreach ($effectiveFamilyIds as $familyId) {
+            $familyAttributes = $familyAttributes->merge(
+                FamilyAttribute::with(['attribute.options', 'attributeGroup'])
+                    ->where('family_id', $familyId)
+                    ->orderBy('sort_order')
+                    ->get()
+            );
+        }
+        $familyAttributes = $familyAttributes->unique('attribute_id')->values();
 
         $user = auth()->user();
 
@@ -1558,6 +1671,14 @@ class ProductController extends Controller
             $group = $fa->attributeGroup;
             $attr = $fa->attribute;
             if (! $group || ! $attr) {
+                continue;
+            }
+
+            // producttype มีแผงของตัวเองแล้ว (ดู $productTypeAttribute ด้านล่าง) —
+            // ข้ามแม้จะถูกผูกไว้กับ family จริงๆ ก็ตาม (family "General Chemical
+            // Products" ผูกไว้เป็นตัวอย่างเดิม) ไม่งั้นสินค้าในตระกูลนั้นจะเห็นฟิลด์
+            // เดียวกันซ้ำสองที่
+            if ($attr->code === self::PRODUCT_TYPE_ATTRIBUTE_CODE) {
                 continue;
             }
 
@@ -1596,8 +1717,20 @@ class ProductController extends Controller
         // หมายเหตุ: ตรงนี้ต้องเช็คจาก attribute assignments ดิบๆ ของ family เอง ไม่ใช่เช็คจาก $groupsData
         // เพราะไม่งั้น family ที่มี attribute ผูกไว้จริง แต่ user ดันไม่มีสิทธิ์ดู จะเผลอไหลไปโชว์
         // system attribute ทั้งหมดแทน ทั้งที่ควรจะโชว์เป็นกลุ่มว่างเปล่าตามความถูกต้อง
-        if ($familyAttributes->isEmpty()) {
-            $allAttributes = Attribute::with('options')->get();
+        //
+        // เงื่อนไข !empty($effectiveFamilyIds) กันไว้ด้วย — fallback นี้มีไว้เฉพาะ
+        // กรณี "มีตระกูลที่ resolve ได้จริง แต่ตระกูลนั้นดันยังไม่มี attribute ผูกไว้
+        // เลยสักตัว" เท่านั้น ถ้าสินค้ายังไม่มีทั้งกลุ่มสินค้าที่ผูกตระกูลไว้ และไม่มี
+        // family_id เดิมเลย (effectiveFamilyIds() คืน [] ว่างเปล่า) ต้องปล่อยให้
+        // $groupsData ว่างจริงๆ ไม่ใช่โชว์ system attribute ทั้งหมดแทน — ไม่งั้นสินค้า
+        // ทุกตัวที่ยังไม่ได้ผูกกลุ่มสินค้ากับตระกูลอะไรเลย (ค่าเริ่มต้นของสินค้าใหม่
+        // ทุกตัวตอนนี้ ตั้งแต่เอา family ออกจากหน้า Create ไปแล้ว) จะเห็น attribute
+        // ทั้งระบบให้กรอกอยู่ดี ทั้งที่ user ตั้งใจให้ "ไม่มีตระกูลผูก = ไม่มีฟิลด์โชว์"
+        if ($familyAttributes->isEmpty() && ! empty($effectiveFamilyIds)) {
+            $allAttributes = Attribute::with('options')
+                ->whereNotIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
+                ->where('code', '!=', self::PRODUCT_TYPE_ATTRIBUTE_CODE)
+                ->get();
 
             // ถ้ามีการเช็คสิทธิ์ user ก็กรองตามนั้นด้วย
             if ($user) {
@@ -1637,6 +1770,18 @@ class ProductController extends Controller
             // the hardcoded list was strictly a second, conflicting source of
             // truth for the same thing.
             $groupsData = array_values($groupsData);
+        }
+
+        // สินค้าที่ไม่มีทั้งกลุ่มสินค้าที่ผูกตระกูล และไม่มี family_id เดิมเลย
+        // (effectiveFamilyIds() ว่างเปล่า — ค่าเริ่มต้นของสินค้าใหม่ทุกตัวตอนนี้)
+        // จะไม่มี group ไหนเลยตรงนี้ตามที่ตั้งใจ (ดูเงื่อนไข !empty($effectiveFamilyIds)
+        // ด้านบน) — แต่ฟิลด์ SKU ฝั่ง frontend (products/edit.tsx) ถูกปักไว้ใน
+        // panel ของ group ที่ code = 'general' โดยเฉพาะ ไม่ใช่ element แยกต่างหาก
+        // ถ้าไม่มี group 'general' เลย ฟิลด์ SKU จะหายไปจากหน้าด้วย ทั้งที่ควรแก้ไข
+        // ได้เสมอไม่ว่าจะผูกตระกูลไว้หรือไม่ก็ตาม เลยต้องยัด group 'general' เปล่าๆ
+        // (ไม่มี attribute เลย) เข้าไปเสมอเป็นตัวสุดท้าย เพื่อให้ SKU ยังโชว์อยู่
+        if (empty($groupsData)) {
+            $groupsData[] = ['id' => 0, 'code' => 'general', 'name' => 'General', 'attributes' => []];
         }
 
         // โหลดค่าล่วงหน้าเฉพาะที่ไม่ผูก channel (global attribute) บวกกับ channel
@@ -1748,6 +1893,21 @@ class ProductController extends Controller
 
         $categoryIds = $product->categories()->pluck('categories.id')->all();
 
+        // เรียงตามลำดับ self::MASTER_CATEGORY_ATTRIBUTE_CODES เป๊ะๆ (หมวดหมู่ >
+        // หมวดหมู่ย่อย > กลุ่มสินค้า) — whereIn() ของ Eloquent ไม่การันตีลำดับผลลัพธ์
+        // ตาม array ที่ส่งเข้าไป ต้อง sortBy เอาเอง
+        $masterCategoryAttributes = Attribute::with('options')
+            ->whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
+            ->get()
+            ->sortBy(fn (Attribute $attr) => array_search($attr->code, self::MASTER_CATEGORY_ATTRIBUTE_CODES))
+            ->values();
+        if ($user) {
+            $masterCategoryAttributes = $masterCategoryAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr))->values();
+        }
+        $masterCategoryAttributes->each(function ($attr) use ($user) {
+            $attr->editable = $this->canUserEditAttribute($user, $attr);
+        });
+
         return [
             'product' => [
                 'id' => $product->id,
@@ -1773,6 +1933,8 @@ class ProductController extends Controller
             ],
             'families' => $families,
             'assignedGroups' => $groupsData,
+            'masterCategoryAttributes' => $masterCategoryAttributes->values(),
+            'productTypeAttribute' => $this->productTypeAttributeFor($user),
             'productValues' => $values,
             'variants' => $variantsData,
             'configurableAttributes' => $this->configurableAttributeOptions(),
@@ -2289,7 +2451,11 @@ class ProductController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'sku' => ['required', 'string', 'max:100', 'unique:products,sku,'.$product->id],
-            'family_id' => ['required', 'exists:attribute_families,id'],
+            // ไม่บังคับแล้ว (เอาช่อง Family ออกจากหน้าแก้ไขไปแล้ว — เลือกกลุ่มสินค้า
+            // ที่แผง "Master Categories" แทน) สินค้าที่สร้างใหม่ทุกตัวตอนนี้ไม่มี
+            // family_id ติดมาตั้งแต่ต้นด้วยซ้ำ (ดู store()) ถ้ายังบังคับ required
+            // อยู่ ปุ่ม Save Product หลักจะ error ทุกครั้งสำหรับสินค้าพวกนี้
+            'family_id' => ['nullable', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
             'category_ids' => ['nullable', 'array'],
@@ -2350,7 +2516,7 @@ class ProductController extends Controller
 
             $product->update([
                 'sku' => $validated['sku'],
-                'family_id' => $validated['family_id'],
+                'family_id' => $validated['family_id'] ?? null,
                 'type' => strtolower($validated['type']),
                 'enabled' => $validated['enabled'],
                 'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
@@ -2387,6 +2553,23 @@ class ProductController extends Controller
             // is_channel_based/is_locale_based ให้แล้ว ดังนั้น loop นี้แค่ต้องแปลง
             // sentinel key กลับเป็น null สำหรับ scope แบบ global/default เท่านั้น
             $values = $request->input('values', []);
+
+            // pcatname/psubcatname/productgroupname (แผง "Master Categories" มุมขวา
+            // ของหน้าแก้ไข — ดู buildProductFormProps()) ไม่มีการ sync
+            // product_category ของตัวเองเหมือน category_ids ด้านบน เพราะมันคือ
+            // attribute value ธรรมดาที่ผ่าน $values ตรงนี้ — ใช้กลไกเดิมที่มีอยู่แล้ว
+            // สำหรับ import จาก ERP (ProductCategoryLinker::linkFromCodes()) เพิ่ม
+            // การเชื่อมโยงเข้าต้นไม้ categories จริงๆ ให้ ซึ่งเป็นสิ่งที่
+            // effectiveFamilyIds()/storefront/ตัวกรอง grid ใช้กันอยู่ — แค่เพิ่ม
+            // อย่างเดียว ไม่ล้างของเดิมทิ้ง (เหตุผลเดียวกับ linkFromCodes() เอง)
+            $masterCategoryAttributeIds = Attribute::whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)->pluck('id');
+            $masterCategoryCodes = $masterCategoryAttributeIds
+                ->map(fn ($attributeId) => $values[$attributeId]['global']['default'] ?? null)
+                ->filter(fn ($code) => is_string($code) && $code !== '')
+                ->all();
+            if (! empty($masterCategoryCodes)) {
+                ProductCategoryLinker::linkFromCodes($product, $masterCategoryCodes);
+            }
 
             // เก็บ error แบบ "values.{attributeId}" => message ไว้ตรงนี้ ทั้งจาก
             // รอบอัปโหลดไฟล์และรอบเช็ค required/unique ด้านล่าง แล้วค่อยโยน
@@ -2519,8 +2702,12 @@ class ProductController extends Controller
             // canUserEditAttributeGroup()) ถ้าไม่มีตัวเช็คนี้ คำขอที่ยิงตรงมาที่
             // endpoint นี้เลย (ข้าม UI ที่บังคับกฎนี้อยู่) จะยังเขียนค่าลง attribute
             // ที่ group แม่เป็น read-only ได้อยู่ดี
+            // ใช้ effectiveFamilyIds() ตัวเดียวกับที่ buildProductFormProps() ใช้
+            // ตอน render หน้าแก้ไข — ไม่งั้น attribute ที่มาจากตระกูลที่ 2 (ผูก
+            // เพิ่มทีหลังที่กลุ่มสินค้า) จะหา group ไม่เจอตรงนี้ แล้วเผลอข้ามการเช็ค
+            // สิทธิ์ระดับ group ไปแบบเงียบๆ
             $attributeGroupsById = FamilyAttribute::with('attributeGroup')
-                ->where('family_id', $product->family_id)
+                ->whereIn('family_id', $this->effectiveFamilyIds($product))
                 ->whereIn('attribute_id', $touchedAttributeIds)
                 ->get()
                 ->keyBy('attribute_id')
@@ -2808,99 +2995,6 @@ class ProductController extends Controller
     }
 
     /**
-     * Per-panel save from the edit screen: PIM categories + the marketplace
-     * category overrides. Mirrors the category slice of update() so behaviour
-     * (legacy-code derivation, sync) stays identical — it just doesn't touch
-     * anything else on the product.
-     */
-    public function updateCategories(Request $request, Product $product): RedirectResponse
-    {
-        $validated = $request->validate([
-            'category_ids' => ['nullable', 'array'],
-            'category_ids.*' => ['exists:categories,id'],
-            'shopee_category_id' => ['nullable', 'integer', 'exists:shopee_categories,id'],
-            'lazada_category_id' => ['nullable', 'integer', 'exists:lazada_categories,id'],
-            'tiktok_category_id' => ['nullable', 'integer', 'exists:tiktok_categories,id'],
-            'woocommerce_category_id' => ['nullable', 'integer', 'exists:woocommerce_categories,id'],
-        ]);
-
-        DB::transaction(function () use ($validated, $request, $product) {
-            $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-
-            $product->update([
-                'shopee_category_id' => $validated['shopee_category_id'] ?? null,
-                'lazada_category_id' => $validated['lazada_category_id'] ?? null,
-                'tiktok_category_id' => $validated['tiktok_category_id'] ?? null,
-                'woocommerce_category_id' => $validated['woocommerce_category_id'] ?? null,
-                'updated_by' => $request->user()?->id,
-            ]);
-
-            $newCategoryIds = collect($validated['category_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
-            $product->categories()->sync($newCategoryIds);
-
-            if ($oldCategoryIds !== $newCategoryIds) {
-                ProductCategoryLinker::deriveLegacyCodesFromCategories($product, $newCategoryIds);
-            }
-        });
-
-        return back()->with('success', 'Categories saved.');
-    }
-
-    /**
-     * Per-panel save: the `pbrand` attribute value (System Brand side) plus
-     * the marketplace brand overrides. `pbrand` is a plain select attribute —
-     * not channel/locale scoped — so it's a single ProductValue row.
-     */
-    public function updateBrand(Request $request, Product $product): RedirectResponse
-    {
-        $pbrandId = Attribute::idForCode('pbrand');
-
-        $validated = $request->validate([
-            'pbrand' => [
-                'nullable', 'string', 'max:255',
-                $pbrandId ? Rule::exists('attribute_options', 'code')->where('attribute_id', $pbrandId) : 'string',
-            ],
-            'shopee_brand_id' => ['nullable', 'integer', 'exists:shopee_brands,id'],
-            'lazada_brand_id' => ['nullable', 'integer', 'exists:lazada_brands,id'],
-            'tiktok_brand_id' => ['nullable', 'integer', 'exists:tiktok_brands,id'],
-            'woocommerce_brand_id' => ['nullable', 'integer', 'exists:woocommerce_brands,id'],
-        ]);
-
-        DB::transaction(function () use ($validated, $request, $product, $pbrandId) {
-            $product->update([
-                'shopee_brand_id' => $validated['shopee_brand_id'] ?? null,
-                'lazada_brand_id' => $validated['lazada_brand_id'] ?? null,
-                'tiktok_brand_id' => $validated['tiktok_brand_id'] ?? null,
-                'woocommerce_brand_id' => $validated['woocommerce_brand_id'] ?? null,
-                'updated_by' => $request->user()?->id,
-            ]);
-
-            if ($pbrandId) {
-                $code = trim((string) ($validated['pbrand'] ?? ''));
-                $row = ProductValue::where('product_id', $product->id)
-                    ->where('attribute_id', $pbrandId)
-                    ->whereNull('channel_id')->whereNull('locale_id');
-
-                if ($code !== '') {
-                    $row->exists()
-                        ? $row->update(['value' => $code])
-                        : ProductValue::create([
-                            'product_id' => $product->id,
-                            'attribute_id' => $pbrandId,
-                            'channel_id' => null,
-                            'locale_id' => null,
-                            'value' => $code,
-                        ]);
-                } else {
-                    $row->delete();
-                }
-            }
-        });
-
-        return back()->with('success', 'Brand saved.');
-    }
-
-    /**
      * Per-panel save: which shops the product is marked "published" to.
      * Same sync + audit as update()'s Sales Channels slice.
      */
@@ -2922,6 +3016,66 @@ class ProductController extends Controller
         });
 
         return back()->with('success', 'Sales channels saved.');
+    }
+
+    /**
+     * Per-panel save: หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า (pcatname/psubcatname/
+     * productgroupname — self::MASTER_CATEGORY_ATTRIBUTE_CODES) มีปุ่ม Save
+     * แยกของตัวเอง (ตามที่ user ขอ) เหมือน updateChannels() ด้านบน — ทำงาน
+     * เหมือนตอนบันทึกผ่านฟอร์มใหญ่ทุกอย่าง (เขียน ProductValue ของ 3 attribute
+     * นี้ + เรียก ProductCategoryLinker::linkFromCodes() sync เข้าต้นไม้
+     * categories จริง) แค่ scope เฉพาะ 3 ฟิลด์นี้เท่านั้น ไม่แตะ attribute อื่น
+     */
+    public function updateMasterCategories(Request $request, Product $product): RedirectResponse
+    {
+        $attributeIdsByCode = Attribute::whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)->pluck('id', 'code');
+
+        $rules = [];
+        foreach (self::MASTER_CATEGORY_ATTRIBUTE_CODES as $code) {
+            $attributeId = $attributeIdsByCode->get($code);
+            $rules[$code] = [
+                'nullable', 'string', 'max:255',
+                $attributeId ? Rule::exists('attribute_options', 'code')->where('attribute_id', $attributeId) : 'string',
+            ];
+        }
+        $validated = $request->validate($rules);
+
+        DB::transaction(function () use ($validated, $attributeIdsByCode, $product) {
+            $codes = [];
+
+            foreach (self::MASTER_CATEGORY_ATTRIBUTE_CODES as $code) {
+                $attributeId = $attributeIdsByCode->get($code);
+                if (! $attributeId) {
+                    continue;
+                }
+
+                $value = trim((string) ($validated[$code] ?? ''));
+                $row = ProductValue::where('product_id', $product->id)
+                    ->where('attribute_id', $attributeId)
+                    ->whereNull('channel_id')->whereNull('locale_id');
+
+                if ($value !== '') {
+                    $row->exists()
+                        ? $row->update(['value' => $value])
+                        : ProductValue::create([
+                            'product_id' => $product->id,
+                            'attribute_id' => $attributeId,
+                            'channel_id' => null,
+                            'locale_id' => null,
+                            'value' => $value,
+                        ]);
+                    $codes[] = $value;
+                } else {
+                    $row->delete();
+                }
+            }
+
+            if (! empty($codes)) {
+                ProductCategoryLinker::linkFromCodes($product, $codes);
+            }
+        });
+
+        return back()->with('success', 'Categories saved.');
     }
 
     public function destroy(Product $product): RedirectResponse
@@ -3151,9 +3305,14 @@ class ProductController extends Controller
      */
     private function scopableAttributesFor(Product $product, $user = null)
     {
+        // effectiveFamilyIds() ตัวเดียวกับ buildProductFormProps() — ต้อง sync
+        // กันเสมอ ไม่งั้นการสลับ channel/locale จะดึงค่าของ attribute จากตระกูล
+        // ที่หน้าแก้ไข (ซึ่งใช้ตัวนี้ตอน render) ไม่ได้แสดงไว้ด้วยซ้ำ
+        $effectiveFamilyIds = $this->effectiveFamilyIds($product);
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
-            ->where('family_id', $product->family_id)
-            ->get();
+            ->whereIn('family_id', $effectiveFamilyIds)
+            ->get()
+            ->unique('attribute_id');
 
         if ($familyAttributes->isNotEmpty()) {
             $attributes = $familyAttributes
@@ -3164,6 +3323,12 @@ class ProductController extends Controller
                         return false;
                     }
 
+                    // producttype มีแผงของตัวเองแล้ว (ดู buildProductFormProps()) —
+                    // ข้ามให้ตรงกับที่ edit() ไม่โชว์มันใน assignedGroups เช่นกัน
+                    if ($attr->code === self::PRODUCT_TYPE_ATTRIBUTE_CODE) {
+                        return false;
+                    }
+
                     if ($user && ! $this->canUserViewAttributeGroup($user, $group)) {
                         return false;
                     }
@@ -3171,14 +3336,21 @@ class ProductController extends Controller
                     return ! $user || $this->canUserViewAttribute($user, $attr);
                 })
                 ->map(fn ($fa) => $fa->attribute);
-        } else {
-            // ยังไม่มี family attribute ให้ใช้เลย — edit() จะ fallback ไปโชว์
-            // system attribute ทั้งหมดใต้หมวด "General" เลยทำแบบเดียวกันตรงนี้ด้วย
-            $attributes = Attribute::all();
+        } elseif (! empty($effectiveFamilyIds)) {
+            // ยังไม่มี family attribute ให้ใช้เลย (แต่ resolve family ได้จริง) —
+            // edit() จะ fallback ไปโชว์ system attribute ทั้งหมดใต้หมวด "General"
+            // เลยทำแบบเดียวกันตรงนี้ด้วย (เงื่อนไข !empty($effectiveFamilyIds) กัน
+            // เหมือนกับ buildProductFormProps() — สินค้าที่ไม่มีทั้งกลุ่มสินค้าที่
+            // ผูกตระกูลและไม่มี family_id เดิมเลย ไม่ควรได้ attribute ทั้งระบบมาด้วย)
+            $attributes = Attribute::whereNotIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
+                ->where('code', '!=', self::PRODUCT_TYPE_ATTRIBUTE_CODE)
+                ->get();
 
             if ($user) {
                 $attributes = $attributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
+        } else {
+            $attributes = collect();
         }
 
         return $attributes
