@@ -102,11 +102,11 @@ function useMainNavItems(): NavItem[] {
                                 url: '/catalog/commission-groups',
                                 permission: 'commission_groups.list_commission_groups',
                             },
-                            {
-                                title: t('rawMaterials'),
-                                url: '/catalog/raw-materials',
-                                permission: 'raw_materials.list_raw_materials',
-                            },
+                            // {
+                            //     title: t('rawMaterials'),
+                            //     url: '/catalog/raw-materials',
+                            //     permission: 'raw_materials.list_raw_materials',
+                            // },
                             {
                                 title: t('bom'),
                                 url: '/catalog/bom',

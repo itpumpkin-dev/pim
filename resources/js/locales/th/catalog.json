@@ -99,7 +99,7 @@
     "masterSourceBaseUnits": "หน่วยนับพื้นฐาน",
     "masterSourceBrands": "แบรนด์",
     "masterSourceProductGrades": "เกรดสินค้า",
-    "masterSourceChipTooltip": "ตัวเลือกของฟิลด์นี้ mirror มาจากหน้าจัดการ Master — ไปแก้ที่หน้านั้น ไม่ใช่แก้ทีละตัวเลือกตรงนี้",
+    "masterSourceChipTooltip": "ตัวเลือกของฟิลด์นี้ถูกดึงมาจากหน้าจัดการมาสเตอร์",
     "createAttribute": "สร้างแอตทริบิวต์",
     "searchAttributes": "ค้นหาแอตทริบิวต์",
     "noAttributesFound": "ไม่พบแอตทริบิวต์",
