@@ -409,8 +409,20 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
         Route::get('marketplace/connect/{platform}', fn (string $platform) => Inertia::render('catalog/placeholder', [
             'titleKey' => 'marketplaceConnect',
-            'subtitle' => ucfirst($platform),
+            // ucfirst() เดิมให้ 'Tiktok'/'Woocommerce' ผิดหลักตัวพิมพ์ที่ใช้กันทั่ว
+            // ทั้งแอป (เทียบ PLATFORM_LABEL ใน platform-hub.tsx) — map ตรงๆ แทน
+            'subtitle' => ['shopee' => 'Shopee', 'lazada' => 'Lazada', 'tiktok' => 'TikTok', 'woocommerce' => 'WooCommerce'][$platform],
         ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.connect');
+
+        // Hub page ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม]) —
+        // grid การ์ด 3 ใบพาไปหน้าจับคู่หมวดหมู่/จับคู่ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ
+        // ของแพลตฟอร์มนั้น (ดู resources/js/pages/catalog/marketplace/
+        // platform-hub.tsx) แทนที่เมนู sidebar แบบซ้อนหลายชั้นเดิม เป็นแค่หน้า
+        // launcher ไม่มี business logic ของตัวเอง เลย render ตรงนี้แบบเดียวกับ
+        // marketplace/connect/{platform} ด้านบน ไม่ต้องมี controller แยก
+        Route::get('marketplace/{platform}', fn (string $platform) => Inertia::render('catalog/marketplace/platform-hub', [
+            'platform' => $platform,
+        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.hub');
 
         // "category" (รวม brand-mapping กลับเข้าไปแล้วเหมือนเดิม) reached straight
         // from the sidebar at its real URL (/catalog/categories/{platform}-mapping),

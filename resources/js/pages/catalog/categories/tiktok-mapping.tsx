@@ -113,8 +113,9 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('management'), href: '/catalog/management' },
-        { title: t('marketplaceSyncTitle'), href: '/catalog/categories/marketplace-sync' },
+        { title: tNav('master'), href: '#' },
+        { title: tNav('marketplace'), href: '#' },
+        { title: 'TikTok', href: '/catalog/marketplace/tiktok' },
         { title: t('tiktokMappingTitle'), href: '#' },
     ];
 
@@ -745,10 +746,10 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
                         <Button
                             size="small"
                             startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/categories/marketplace-sync')}
+                            onClick={() => router.visit('/catalog/marketplace/tiktok')}
                             sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
                         >
-                            {t('marketplaceSyncTitle')}
+                            TikTok
                         </Button>
                         <Typography variant="h4" fontWeight={700}>
                             {t('tiktokMappingTitle')}

@@ -21,7 +21,7 @@ export default function TikTokAttributeMapping({ attributes, tiktokAttributes, c
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
         { title: tNav('marketplace'), href: '#' },
-        { title: 'TikTok', href: '#' },
+        { title: 'TikTok', href: '/catalog/marketplace/tiktok' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

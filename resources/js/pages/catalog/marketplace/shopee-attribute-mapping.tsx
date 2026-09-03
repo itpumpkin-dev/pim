@@ -21,7 +21,7 @@ export default function ShopeeAttributeMapping({ attributes, shopeeAttributes, c
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
         { title: tNav('marketplace'), href: '#' },
-        { title: 'Shopee', href: '#' },
+        { title: 'Shopee', href: '/catalog/marketplace/shopee' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

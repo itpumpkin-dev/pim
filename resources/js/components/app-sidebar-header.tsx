@@ -109,12 +109,20 @@ export function AppSidebarHeader({ breadcrumbs = [], actions, onSearch, searchPl
                         textOverflow: 'ellipsis',
                     },
                     '& .MuiBreadcrumbs-separator': { color: shell.secondaryTextColor, mx: 0.5, flexShrink: 0 },
-                    '& a, & p': { color: shell.textColor },
+                    // เส้นทางลิงก์จริงใช้สี interactive ของ shell (คลิกได้ต่างจาก
+                    // ข้อความปกติชัดเจน) หน้าปัจจุบัน (ตัวสุดท้าย) ใช้สีเข้มสุด
+                    // ส่วน placeholder ("#" — segment ที่ยังไม่มีหน้าให้ไปจริงๆ)
+                    // ใช้สีรองแบบเดียวกับ separator เพราะไม่ใช่ทั้งลิงก์และไม่ใช่
+                    // หน้าปัจจุบัน (ดู Breadcrumbs component ที่ตัดสินใจว่าอันไหน
+                    // render เป็น <a> vs <p>)
+                    '& .MuiBreadcrumbs-li a': { color: shell.interactiveColor },
+                    '& .MuiBreadcrumbs-li p': { color: shell.secondaryTextColor },
+                    '& .MuiBreadcrumbs-li:last-of-type p': { color: shell.textColor },
+                    // ปุ่ม "…" ตอน collapse (ดู maxItems ใน Breadcrumbs component)
+                    '& .MuiBreadcrumbs-li button': { color: shell.secondaryTextColor, minWidth: 'auto' },
                 }}
             >
-                {/* on mobile the full trail can't fit and clips from the wrong
-                    end — show just the current page instead */}
-                <Breadcrumbs breadcrumbs={isCompact ? breadcrumbs.slice(-1) : breadcrumbs} />
+                <Breadcrumbs breadcrumbs={breadcrumbs} compact={isCompact} />
             </Box>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>

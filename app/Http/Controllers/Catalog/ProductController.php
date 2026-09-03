@@ -24,6 +24,7 @@ use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
@@ -1992,6 +1993,13 @@ class ProductController extends Controller
             'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
+            // ให้ frontend แปล attribute.master_source (โค้ดดิบ เช่น 'brands')
+            // เป็นชื่อที่อ่านง่ายสำหรับ chip "Master: ..." บน field ของ attribute
+            // นั้นๆ — รูปแบบเดียวกับที่ AttributeController ส่งให้หน้าแก้ไข
+            // attribute ใช้เลือก master_source อยู่แล้ว (labelKey ค่อยไป t()
+            // ที่ frontend แทนที่จะแปลที่นี่ เพื่อให้สลับภาษาได้ทันทีโดยไม่ต้อง
+            // round-trip)
+            'masterSources' => MasterAttributeOptionSync::pickerOptions(),
         ];
     }
 

@@ -58,10 +58,12 @@ function useMainNavItems(): NavItem[] {
                                 permission: 'categories.list_categories',
                                 // Otherwise these prefix-match this item too
                                 // (they're routed under the Categories CRUD
-                                // prefix) and both this item and "จัดการ" would
-                                // highlight as active at once — the whole
-                                // marketplace-sync + per-platform mapping flow
-                                // belongs to the Management hub now.
+                                // prefix) and both this item and the relevant
+                                // มาร์เก็ตเพลส/จัดการ item would highlight as
+                                // active at once — the per-platform mapping
+                                // pages belong to มาสเตอร์ > มาร์เก็ตเพลส >
+                                // {platform} now (its matchUrls claims them),
+                                // marketplace-sync still belongs to จัดการ.
                                 excludeUrls: [
                                     '/catalog/categories/marketplace-sync',
                                     '/catalog/categories/lazada-mapping',
@@ -131,39 +133,32 @@ function useMainNavItems(): NavItem[] {
                                 permission: 'product_types.list_product_types',
                             },
                             {
+                                // แต่ก่อนซ้อน 2 ชั้น (มาร์เก็ตเพลส > การเชื่อมต่อ [4 แพลตฟอร์ม] +
+                                // มาร์เก็ตเพลส > {แพลตฟอร์ม} > [จับคู่หมวดหมู่, จับคู่ข้อมูลส่ง])
+                                // ตอนนี้แบนราบเหลือแค่ มาร์เก็ตเพลส > {แพลตฟอร์ม} ตรงๆ แต่ละอันพาไป
+                                // หน้า hub ของแพลตฟอร์มนั้น (resources/js/pages/catalog/marketplace/
+                                // platform-hub.tsx) ที่โชว์การ์ดทั้ง 3 อัน (จับคู่หมวดหมู่/จับคู่
+                                // ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ) พร้อมกันในที่เดียว แทนที่จะต้องไล่
+                                // เปิดเมนูย่อยทีละชั้น — สิทธิ์เข้าถึงแต่ละการ์ดยังเช็คที่หน้า
+                                // ปลายทางเหมือนเดิม (การ์ดจะซ่อนเองถ้าไม่มีสิทธิ์) เข้าหน้า hub เองได้
+                                // เสมอ (ไม่มีสิทธิ์เฉพาะของหน้า hub — เหมือนกับที่ marketplace/
+                                // connect/{platform} เดิมก็ไม่มีสิทธิ์เฉพาะของตัวเองเช่นกัน)
                                 title: t('marketplace'),
-                                items: [
-                                    {
-                                        title: t('marketplaceConnect'),
-                                        items: [
-                                            { title: 'Shopee', url: '/catalog/marketplace/connect/shopee', permission: 'products.list_products' },
-                                            { title: 'Lazada', url: '/catalog/marketplace/connect/lazada', permission: 'products.list_products' },
-                                            { title: 'TikTok', url: '/catalog/marketplace/connect/tiktok', permission: 'products.list_products' },
-                                            { title: 'WooCommerce', url: '/catalog/marketplace/connect/woocommerce', permission: 'products.list_products' },
-                                        ],
-                                    },
-                                    ...(['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
-                                        title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
-                                        items: [
-                                            // หน้าเดียวรวมทั้งแมปหมวดหมู่และแมปแบรนด์ (ลองแยกเป็นหน้าเดี่ยวๆ
-                                            // ไปแล้วแต่ user ให้รวมกลับมาเหมือนเดิม) — เลยไม่มีเมนู "แมปฟิว
-                                            // brand" แยกต่างหากอีกแล้ว
-                                            { title: t('mapCategory'), url: `/catalog/categories/${platform}-mapping`, permission: 'categories.edit_categories' },
-                                            // "แมปฟิวส่งข้อมูล" — พาไปหน้าจับคู่แอตทริบิวต์ PIM ↔ แอตทริบิวต์
-                                            // marketplace ของแพลตฟอร์มนั้นๆ โดยตรง คนละหน้า/URL กันจริงๆ ต่อ
-                                            // แพลตฟอร์ม (เคยรวมเป็นหน้าเดียวมี Tabs สลับ ก่อนแยกจริงตามที่
-                                            // user ขอ — ดู docblock ของ MarketplaceAttributeMappingController)
-                                            // อยู่ใต้ /catalog/marketplace/ ไม่ใช่ /catalog/attributes/ — ไม่งั้น
-                                            // เมนู "แอตทริบิวต์" จะโดน highlight ผิดไปด้วย (ดูคอมเมนต์ที่
-                                            // routes/catalog.php ตรง route กลุ่มนี้)
-                                            {
-                                                title: t('mapPushData'),
-                                                url: `/catalog/marketplace/${platform}/attribute-mapping`,
-                                                permission: 'attributes.edit_attributes',
-                                            },
-                                        ],
-                                    })),
-                                ],
+                                items: (['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
+                                    title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
+                                    url: `/catalog/marketplace/${platform}`,
+                                    permission: 'products.list_products',
+                                    // การ์ดบนหน้า hub พาไปหน้าจริงที่ไม่ได้อยู่ใต้
+                                    // /catalog/marketplace/{platform}/ ทุกอัน (เช่น หน้าจับคู่
+                                    // หมวดหมู่อยู่คนละ path เลย) — ต้องระบุ matchUrls ตรงๆ ไม่งั้น
+                                    // เปิดจากการ์ดแล้วเมนู "มาร์เก็ตเพลส" นี้จะไม่ไฮไลต์ (เหมือน
+                                    // ปัญหาเดียวกับที่หน้า "จัดการ" เจอมาก่อน — ดูคอมเมนต์ที่นั่น)
+                                    matchUrls: [
+                                        `/catalog/categories/${platform}-mapping`,
+                                        `/catalog/marketplace/${platform}/attribute-mapping`,
+                                        `/catalog/marketplace/connect/${platform}`,
+                                    ],
+                                })),
                             },
                         ],
                     },

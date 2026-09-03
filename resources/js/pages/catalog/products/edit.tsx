@@ -106,6 +106,14 @@ interface AttributeItem {
     family_ids?: number[];
     /** label ของทุก locale — ทำให้ชื่อที่แสดงเปลี่ยนได้ทันทีตอนสลับ locale โดยไม่ต้องรอ round-trip ไปเซิร์ฟเวอร์เพื่อ resolve `name` ใหม่ */
     translations?: Translation[];
+    /** โค้ดของ master ที่ตัวเลือกของ attribute นี้ mirror มา (เช่น 'brands', 'currencies') — null/ไม่มีค่า แปลว่าตัวเลือกกรอกเองตรงๆ ไม่ได้มาจาก master ไหน ดู MasterAttributeOptionSync */
+    master_source?: string | null;
+}
+
+/** ตัวเลือก master_source หนึ่งตัว — จับคู่กับ MasterAttributeOptionSync::pickerOptions() ฝั่ง backend */
+interface MasterSourceOption {
+    value: string;
+    labelKey: string;
 }
 
 interface GroupWithAttributes {
@@ -189,6 +197,8 @@ interface Props {
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
+    /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
+    masterSources?: MasterSourceOption[];
 }
 
 type AttributeValue = string | File | (string | File)[];
@@ -260,6 +270,7 @@ export default function ProductEdit({
     publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
+    masterSources = [],
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
     const { t } = useTranslation('catalog');
@@ -1556,6 +1567,7 @@ export default function ProductEdit({
                                                                         canAddOptions={canAddAttributeOptions}
                                                                         sku={data.sku}
                                                                         productId={product.id}
+                                                                        masterSources={masterSources}
                                                                     />
                                                                 );
                                                             })}
@@ -1666,15 +1678,31 @@ export default function ProductEdit({
                                                 ไม่ต้องมีปุ่ม Save แยกของตัวเอง */}
                                             {productTypeAttribute && (
                                                 <Box>
-                                                    <Typography
-                                                        variant="caption"
-                                                        fontWeight={600}
-                                                        color="text.secondary"
-                                                        display="block"
-                                                        sx={{ mb: 0.5 }}
-                                                    >
-                                                        {t('masterProductTypeFieldLabel')}
-                                                    </Typography>
+                                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                                        <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                                            {t('masterProductTypeFieldLabel')}
+                                                        </Typography>
+                                                        {productTypeAttribute.master_source && (
+                                                            <Tooltip title={t('masterSourceChipTooltip')} arrow>
+                                                                <Chip
+                                                                    icon={<InfoOutlinedIcon sx={{ fontSize: 13, color: `${FIORI.brand} !important` }} />}
+                                                                    label={t(
+                                                                        masterSources.find((s) => s.value === productTypeAttribute.master_source)
+                                                                            ?.labelKey ?? productTypeAttribute.master_source,
+                                                                    )}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        height: 18,
+                                                                        fontSize: '0.65rem',
+                                                                        bgcolor: FIORI.brandBg,
+                                                                        color: FIORI.brand,
+                                                                        fontWeight: 600,
+                                                                        '& .MuiChip-icon': { ml: '4px' },
+                                                                    }}
+                                                                />
+                                                            </Tooltip>
+                                                        )}
+                                                    </Stack>
                                                     <TextField
                                                         select
                                                         value={(data.values[productTypeAttribute.id]?.['global']?.['default'] as string) || ''}
@@ -1780,6 +1808,7 @@ export default function ProductEdit({
                                                                 canAddOptions={canAddAttributeOptions}
                                                                 sku={data.sku}
                                                                 productId={product.id}
+                                                                masterSources={masterSources}
                                                             />
                                                         );
                                                     })}
@@ -2634,6 +2663,7 @@ function RenderAttributeInput({
     canAddOptions,
     sku,
     productId,
+    masterSources = [],
 }: {
     attr: AttributeItem;
     value: AttributeValue;
@@ -2646,7 +2676,9 @@ function RenderAttributeInput({
     canAddOptions?: boolean;
     sku: string;
     productId: number;
+    masterSources?: MasterSourceOption[];
 }) {
+    const { t } = useTranslation('catalog');
     // ใช้กับทุกประเภทฟิลด์ด้านล่าง ยกเว้น SelectControl / RichTextControl ที่
     // memoize ไว้ (สองตัวนี้เรียก onValueChange ตรงๆ พร้อม
     // attributeId/channelKey/localeKey ที่ resolve แล้วแทน) — เพราะสองฟิลด์นี้
@@ -2715,6 +2747,25 @@ function RenderAttributeInput({
                         sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.900', color: '#fff', fontWeight: 700 }}
                     />
                 )}
+                {attr.master_source && (
+                    <Tooltip title={t('masterSourceChipTooltip')} arrow>
+                        <Chip
+                            icon={<InfoOutlinedIcon sx={{ fontSize: 13, color: `${FIORI.brand} !important` }} />}
+                            label={t(
+                                masterSources.find((s) => s.value === attr.master_source)?.labelKey ?? attr.master_source,
+                            )}
+                            size="small"
+                            sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                bgcolor: FIORI.brandBg,
+                                color: FIORI.brand,
+                                fontWeight: 600,
+                                '& .MuiChip-icon': { ml: '4px' },
+                            }}
+                        />
+                    </Tooltip>
+                )}
             </>
         );
     };
@@ -2759,6 +2810,11 @@ function RenderAttributeInput({
                         activeLocaleCode={activeLocaleCode}
                         swatchType={attr.swatch_type}
                         existingOptions={options}
+                        masterSourceLabel={
+                            attr.master_source
+                                ? t(masterSources.find((s) => s.value === attr.master_source)?.labelKey ?? attr.master_source)
+                                : undefined
+                        }
                         onClose={() => setAddOptionOpen(false)}
                         onCreated={(code) => onChange(code)}
                     />

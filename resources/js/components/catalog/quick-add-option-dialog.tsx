@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import { KeyboardEvent, useState } from 'react';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { type SharedData } from '@/types';
 
@@ -38,6 +39,15 @@ export interface ExistingOption {
  * ส่วน `code` ไม่ได้เก็บเลย เพราะ backend จะ generate ให้เองเสมอ (ดูที่
  * CodeGenerator) ไม่สนใจค่าที่ส่งมาจาก client อยู่แล้ว ดังนั้นถ้าจะให้กรอกตรงนี้
  * ก็ไม่มีประโยชน์อะไร
+ *
+ * ถ้า `masterSourceLabel` ถูกส่งมา (attribute นี้ผูก master_source ไว้ — ดู
+ * chip "Master: ..." ข้าง field) แสดงว่า option ที่กำลังจะสร้างจะไปเป็น
+ * record ใหม่ในตาราง master นั้นจริงๆ ไม่ใช่ AttributeOption ตรงๆ (ดู
+ * AttributeOptionController::storeMasterBackedOption()) — ซ่อนช่อง
+ * swatch ไปเลยเพราะ master ที่รองรับ quick-add ไม่มีแนวคิด swatch ต่อตัวเลือก
+ * (backend เพิกเฉยค่านี้อยู่แล้วถ้าส่งไป) และโชว์ข้อความเตือนสั้นๆ ให้รู้ว่า
+ * กำลังจะสร้างที่ไหน ป้องกันความสับสนว่าทำไมกด "+" ตรงนี้แล้ว option ไปโผล่ที่
+ * หน้า master แทนที่จะอยู่ใต้ attribute เฉยๆ
  */
 export function QuickAddOptionDialog({
     open,
@@ -46,6 +56,7 @@ export function QuickAddOptionDialog({
     activeLocaleCode,
     swatchType,
     existingOptions = [],
+    masterSourceLabel,
     onClose,
     onCreated,
 }: {
@@ -55,6 +66,7 @@ export function QuickAddOptionDialog({
     activeLocaleCode?: string;
     swatchType?: string | null;
     existingOptions?: ExistingOption[];
+    masterSourceLabel?: string;
     onClose: () => void;
     onCreated: (code: string) => void;
 }) {
@@ -142,6 +154,12 @@ export function QuickAddOptionDialog({
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
             <DialogTitle>Add option — {attributeLabel}</DialogTitle>
             <DialogContent>
+                {masterSourceLabel && (
+                    <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
+                        This will add a new record to the <strong>{masterSourceLabel}</strong> master data screen, not just this attribute.
+                    </FioriMessageStrip>
+                )}
+
                 {existingOptions.length > 0 && (
                     <>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
@@ -172,7 +190,7 @@ export function QuickAddOptionDialog({
                         autoFocus
                         sx={{ minWidth: 220, flex: 1 }}
                     />
-                    {swatchType === 'color' && (
+                    {!masterSourceLabel && swatchType === 'color' && (
                         <TextField
                             label="Color (hex)"
                             size="small"
@@ -182,7 +200,7 @@ export function QuickAddOptionDialog({
                             sx={{ width: 140 }}
                         />
                     )}
-                    {swatchType === 'image' && (
+                    {!masterSourceLabel && swatchType === 'image' && (
                         <TextField
                             type="file"
                             size="small"

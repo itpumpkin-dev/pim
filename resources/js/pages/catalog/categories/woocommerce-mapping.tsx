@@ -102,8 +102,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('management'), href: '/catalog/management' },
-        { title: t('marketplaceSyncTitle'), href: '/catalog/categories/marketplace-sync' },
+        { title: tNav('master'), href: '#' },
+        { title: tNav('marketplace'), href: '#' },
+        { title: 'WooCommerce', href: '/catalog/marketplace/woocommerce' },
         { title: t('woocommerceMappingTitle'), href: '#' },
     ];
 
@@ -521,10 +522,10 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
                         <Button
                             size="small"
                             startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/categories/marketplace-sync')}
+                            onClick={() => router.visit('/catalog/marketplace/woocommerce')}
                             sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
                         >
-                            {t('marketplaceSyncTitle')}
+                            WooCommerce
                         </Button>
                         <Typography variant="h4" fontWeight={700}>
                             {t('woocommerceMappingTitle')}

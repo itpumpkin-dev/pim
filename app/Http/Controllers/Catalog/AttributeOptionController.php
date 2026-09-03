@@ -7,13 +7,25 @@ use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
+use App\Models\BaseUnit;
+use App\Models\BaseUnitTranslation;
+use App\Models\Brand;
+use App\Models\BrandTranslation;
+use App\Models\BusinessType;
+use App\Models\BusinessTypeTranslation;
 use App\Models\Locale;
+use App\Models\ProductType;
+use App\Models\ProductTypeTranslation;
 use App\Services\CodeGenerator;
 use App\Support\TranslationTracking;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * จัดการ CRUD ของตัวเลือก (option) แบบ select/multiselect ของ attribute
@@ -23,11 +35,51 @@ use Illuminate\Validation\Rule;
  * บริบทของ attribute เท่านั้น พอทำเสร็จจะ redirect กลับไปหน้าแก้ไข attribute
  * เหมือน controller อื่นๆ ใน catalog แทนที่จะ return JSON เพื่อให้ flow
  * การ submit ฟอร์มปกติของ Inertia (CSRF, validation error bag ฯลฯ) ทำงานได้เลย
+ *
+ * ถ้า attribute ผูก master_source ไว้ (ดู MasterAttributeOptionSync) ตัวเลือก
+ * ของมัน "ต้อง" มาจาก master table เท่านั้น — สร้าง AttributeOption ตรงๆ
+ * ตรงนี้จะโดนลบทิ้งเงียบๆ ทันทีที่มีการ rebuildAttribute() ครั้งถัดไป (เช่น
+ * ตอนแก้ master record อื่น หรือรัน `catalog:sync-master-options`) เพราะฉะนั้น
+ * store() จะเช็คก่อนเสมอว่า attribute นี้ผูก master ไว้หรือเปล่า ถ้าใช่ก็สร้าง
+ * record ใน master table แทน (ดู storeMasterBackedOption()) ไม่ใช่สร้าง
+ * AttributeOption ตรงๆ — ใช้ได้เฉพาะ master ที่ auto-generate code เอง
+ * (business_types/product_types/base_units/brands) เท่านั้น เพราะ dialog
+ * quick-add บนหน้าแก้ไขสินค้าไม่ได้เก็บ field code มาด้วย ส่วน master ที่ต้อง
+ * พิมพ์ code เอง (currencies/product_grades/vendors) หรือมีโครงสร้างซับซ้อน
+ * กว่านั้น (points/commission_groups/categories/subcategories/product_groups)
+ * จะแจ้ง error กลับไปให้ไปเพิ่มที่หน้าจัดการ master นั้นโดยตรงแทน
  */
 class AttributeOptionController extends Controller
 {
+    /**
+     * master_source => การตั้งค่าสำหรับสร้าง record ใหม่แบบเร็วๆ (แค่ชื่อ +
+     * code auto-generate) — เฉพาะ master ที่ครบ 3 เงื่อนไขนี้: (1) ไม่มีคอลัมน์
+     * required อื่นนอกจาก code/name (2) code auto-generate ได้ ไม่ต้องพิมพ์เอง
+     * (3) มีโมเดลคำแปลแยกต่างหากรูปแบบเดียวกันหมด (parent_id + locale_id +
+     * label) — Points/CommissionGroups (โครงสร้างคอลัมน์ไม่ตรงแบบนี้เลย) และ
+     * Currencies/ProductGrades/Vendors (code ต้องพิมพ์เอง) จึงไม่อยู่ในนี้
+     */
+    private const QUICK_ADD_MASTER_CONFIG = [
+        // `unique_name` mirrors that master's OWN controller exactly: Business
+        // Type/Product Type both validate `Rule::unique($table, 'name')`
+        // before creating (their tables carry a real DB unique constraint on
+        // `name`) — Base Unit/Brand don't (no such constraint, and their own
+        // controllers never check it either). Getting this wrong isn't
+        // cosmetic: skipping it where the DB *does* enforce it turns a
+        // duplicate-name quick-add into an uncaught QueryException instead
+        // of a normal validation error.
+        'business_types' => ['model' => BusinessType::class, 'translation' => BusinessTypeTranslation::class, 'fk' => 'business_type_id', 'table' => 'business_types', 'prefix' => 'biztype', 'unique_name' => true],
+        'product_types' => ['model' => ProductType::class, 'translation' => ProductTypeTranslation::class, 'fk' => 'product_type_id', 'table' => 'product_types', 'prefix' => 'ptype', 'unique_name' => true],
+        'base_units' => ['model' => BaseUnit::class, 'translation' => BaseUnitTranslation::class, 'fk' => 'base_unit_id', 'table' => 'base_units', 'prefix' => 'unit', 'unique_name' => false],
+        'brands' => ['model' => Brand::class, 'translation' => BrandTranslation::class, 'fk' => 'brand_id', 'table' => 'brands', 'prefix' => 'brand', 'unique_name' => false],
+    ];
+
     public function store(Request $request, Attribute $attribute): RedirectResponse
     {
+        if ($attribute->master_source !== null) {
+            return $this->storeMasterBackedOption($request, $attribute);
+        }
+
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -66,6 +118,86 @@ class AttributeOptionController extends Controller
         // เพื่อให้ dialog quick-add ในหน้าแก้ไขสินค้าเลือก option นี้ได้ทันที
         // โดยไม่ต้องให้ฝั่งเรียกเดาหรือใส่โค้ดเอง
         return back()->with('success', 'Option added successfully.')->with('created_option_code', $option->code);
+    }
+
+    /**
+     * เวอร์ชัน "สร้างตัวเลือกใหม่" สำหรับ attribute ที่ผูก master ไว้ — สร้าง
+     * record ในตาราง master จริงๆ (ไม่ใช่ AttributeOption ตรงๆ) แล้วปล่อยให้
+     * model 'saved' event ที่ผูกไว้แล้วใน AppServiceProvider::MASTER_MODELS
+     * เป็นคน mirror เข้า AttributeOption ให้เองอัตโนมัติ — ไม่ต้องเรียก
+     * MasterAttributeOptionSync ตรงๆ ในนี้เลย เหมือนกับที่ทุก master
+     * controller (BrandController, BusinessTypeController, ...) ทำอยู่แล้ว
+     */
+    private function storeMasterBackedOption(Request $request, Attribute $attribute): RedirectResponse
+    {
+        $config = self::QUICK_ADD_MASTER_CONFIG[$attribute->master_source] ?? null;
+
+        if ($config === null) {
+            throw ValidationException::withMessages([
+                'translations' => "This attribute's options come from a Master data screen that needs more information than a quick add can provide (e.g. a code you type yourself) — add it from that Master's own page instead.",
+            ]);
+        }
+
+        $validated = $request->validate([
+            'admin_label' => ['nullable', 'string', 'max:255'],
+            'translations' => ['nullable', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $translations = $validated['translations'] ?? [];
+        $name = $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null);
+
+        // ต้องเช็คก่อนสร้างจริง ไม่ใช่ปล่อยให้ DB unique constraint (ถ้ามี)
+        // เป็นคนจับแทน — business_types/product_types มี unique('name') จริง
+        // ที่ระดับ DB (ดู QUICK_ADD_MASTER_CONFIG ด้านบน) ถ้าไม่เช็คตรงนี้ก่อน
+        // ชื่อซ้ำจะกลายเป็น QueryException ดิบๆ (500) แทนที่จะเป็น validation
+        // error ปกติที่ dialog แสดงให้ผู้ใช้เห็นได้
+        if ($config['unique_name'] && $name !== null) {
+            Validator::make(
+                ['translations' => $name],
+                ['translations' => [Rule::unique($config['table'], 'name')]],
+            )->validate();
+        }
+
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $config['model'];
+        $hasSortOrder = Schema::hasColumn($config['table'], 'sort_order');
+        $nextSort = $hasSortOrder ? (int) $modelClass::max('sort_order') + 1 : null;
+
+        $model = CodeGenerator::createWithRetry(
+            $config['table'],
+            $config['prefix'],
+            function ($code) use ($modelClass, $name, $hasSortOrder, $nextSort) {
+                $data = ['code' => $code, 'name' => $name ?? $code];
+                if ($hasSortOrder) {
+                    $data['sort_order'] = $nextSort;
+                }
+
+                return $modelClass::create($data);
+            },
+        );
+
+        /** @var class-string<Model> $translationClass */
+        $translationClass = $config['translation'];
+        $fk = $config['fk'];
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label === '') {
+                continue;
+            }
+
+            $translationClass::updateOrCreate([$fk => $model->id, 'locale_id' => $localeId], ['label' => $label]);
+        }
+
+        // model->save() ข้างบน (ผ่าน CodeGenerator::createWithRetry()) และการ
+        // สร้างแถวคำแปลข้างต้น ทั้งคู่ยิง 'saved' event ที่ mirror เข้า
+        // AttributeOption ให้เองแล้ว (ดู AppServiceProvider) — ไม่ต้องเรียก
+        // MasterAttributeOptionSync ตรงๆ ในนี้เลย ต่างจาก AuditLog ที่ยังต้อง
+        // เขียนเองตรงนี้ เพราะแต่ละ master controller ปกติเป็นคนเขียนเอง
+        // (event เดียวกันไม่ได้ทำ audit log ให้)
+        AuditLog::record('option_created', $attribute, null, ["master_option#{$model->id}.code" => $model->code, "master_option#{$model->id}.name" => $model->name]);
+
+        return back()->with('success', 'Option added successfully.')->with('created_option_code', $model->code);
     }
 
     public function update(Request $request, Attribute $attribute, AttributeOption $option): RedirectResponse

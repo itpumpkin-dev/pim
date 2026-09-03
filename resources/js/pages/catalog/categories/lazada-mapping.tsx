@@ -110,8 +110,9 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
-        { title: tNav('management'), href: '/catalog/management' },
-        { title: t('marketplaceSyncTitle'), href: '/catalog/categories/marketplace-sync' },
+        { title: tNav('master'), href: '#' },
+        { title: tNav('marketplace'), href: '#' },
+        { title: 'Lazada', href: '/catalog/marketplace/lazada' },
         { title: t('lazadaMappingTitle'), href: '#' },
     ];
 
@@ -731,10 +732,10 @@ export default function LazadaCategoryMapping({ categories, stats, lastSyncedAt,
                         <Button
                             size="small"
                             startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/categories/marketplace-sync')}
+                            onClick={() => router.visit('/catalog/marketplace/lazada')}
                             sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
                         >
-                            {t('marketplaceSyncTitle')}
+                            Lazada
                         </Button>
                         <Typography variant="h4" fontWeight={700}>
                             {t('lazadaMappingTitle')}

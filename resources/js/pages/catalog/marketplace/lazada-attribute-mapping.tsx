@@ -21,7 +21,7 @@ export default function LazadaAttributeMapping({ attributes, lazadaAttributes, c
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
         { title: tNav('marketplace'), href: '#' },
-        { title: 'Lazada', href: '#' },
+        { title: 'Lazada', href: '/catalog/marketplace/lazada' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 

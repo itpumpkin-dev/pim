@@ -25,7 +25,7 @@ export default function WoocommerceAttributeMapping({ attributes, wooCommerceAtt
         { title: tNav('catalog'), href: '#' },
         { title: tNav('master'), href: '#' },
         { title: tNav('marketplace'), href: '#' },
-        { title: 'WooCommerce', href: '#' },
+        { title: 'WooCommerce', href: '/catalog/marketplace/woocommerce' },
         { title: tNav('mapPushData'), href: '#' },
     ];
 
