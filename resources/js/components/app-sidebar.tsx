@@ -103,9 +103,14 @@ function useMainNavItems(): NavItem[] {
                                 permission: 'commission_groups.list_commission_groups',
                             },
                             {
+                                title: t('rawMaterials'),
+                                url: '/catalog/raw-materials',
+                                permission: 'raw_materials.list_raw_materials',
+                            },
+                            {
                                 title: t('bom'),
                                 url: '/catalog/bom',
-                                permission: 'products.list_products',
+                                permission: 'bom.list_bom',
                             },
                             {
                                 title: t('businessTypes'),

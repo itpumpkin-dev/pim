@@ -10,10 +10,24 @@ export interface ProductOption {
 
 /**
  * Search-by-SKU-or-name picker for the product edit page's Associations
- * panel (Related/Up-sell/Cross-sell). Debounced server search against
+ * panel (Related/Up-sell/Cross-sell), also reused for BOM's "raw materials"
+ * component picker (catalog/bom/edit.tsx, via `extraParams={{
+ * raw_material_only: '1' }}`) and the "add to raw materials" picker
+ * (catalog/raw-materials/index.tsx). Debounced server search against
  * catalog.products.search, excluding whatever's already picked.
  */
-export function ProductPicker({ value, onChange }: { value: ProductOption[]; onChange: (next: ProductOption[]) => void }) {
+export function ProductPicker({
+    value,
+    onChange,
+    extraParams,
+    placeholder,
+}: {
+    value: ProductOption[];
+    onChange: (next: ProductOption[]) => void;
+    /** extra query params appended to every search request, e.g. `{ raw_material_only: '1' }` */
+    extraParams?: Record<string, string>;
+    placeholder?: string;
+}) {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<ProductOption[]>([]);
     const [loading, setLoading] = useState(false);
@@ -26,7 +40,7 @@ export function ProductPicker({ value, onChange }: { value: ProductOption[]; onC
 
         setLoading(true);
         const timer = setTimeout(() => {
-            const params = new URLSearchParams({ q: query });
+            const params = new URLSearchParams({ q: query, ...extraParams });
             value.forEach((p) => params.append('exclude[]', String(p.id)));
 
             fetch(`/catalog/products/search?${params.toString()}`, { headers: { Accept: 'application/json' } })
@@ -61,7 +75,7 @@ export function ProductPicker({ value, onChange }: { value: ProductOption[]; onC
                 onInputChange={(_, val) => setQuery(val)}
                 onChange={(_, val) => val && addProduct(val)}
                 value={null}
-                renderInput={(params) => <TextField {...params} placeholder="ค้นหาด้วย SKU หรือชื่อสินค้า" />}
+                renderInput={(params) => <TextField {...params} placeholder={placeholder ?? 'ค้นหาด้วย SKU หรือชื่อสินค้า'} />}
             />
             <Stack spacing={0.5}>
                 {value.map((product) => (

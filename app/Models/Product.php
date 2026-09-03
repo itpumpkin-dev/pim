@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Cache;
 
 class Product extends Model
@@ -28,6 +29,7 @@ class Product extends Model
         'lazada_brand_id',
         'tiktok_brand_id',
         'woocommerce_brand_id',
+        'is_raw_material',
     ];
 
     protected function casts(): array
@@ -36,6 +38,7 @@ class Product extends Model
             'enabled' => 'boolean',
             'parent_id' => 'integer',
             'configurable_attributes' => 'array',
+            'is_raw_material' => 'boolean',
         ];
     }
 
@@ -136,6 +139,18 @@ class Product extends Model
     public function associatedWith(): HasMany
     {
         return $this->hasMany(ProductAssociation::class, 'associated_product_id');
+    }
+
+    /** BOM ที่สินค้านี้เป็น "หัว" (finished good) — มีได้แค่ชุดเดียว ดู ProductBom */
+    public function bom(): HasOne
+    {
+        return $this->hasOne(ProductBom::class);
+    }
+
+    /** BOM ทุกชุดที่สินค้านี้ถูกใช้เป็นวัตถุดิบ (component) อยู่ข้างใน */
+    public function bomComponentOf(): HasMany
+    {
+        return $this->hasMany(ProductBomComponent::class, 'component_product_id');
     }
 
     /**

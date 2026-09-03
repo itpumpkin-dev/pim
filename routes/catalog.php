@@ -5,6 +5,7 @@ use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
 use App\Http\Controllers\Catalog\AttributeOptionController;
 use App\Http\Controllers\Catalog\BaseUnitController;
+use App\Http\Controllers\Catalog\BomController;
 use App\Http\Controllers\Catalog\BrandController;
 use App\Http\Controllers\Catalog\BusinessTypeController;
 use App\Http\Controllers\Catalog\CategoryController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Catalog\ProductController;
 use App\Http\Controllers\Catalog\ProductGradeController;
 use App\Http\Controllers\Catalog\ProductGroupController;
 use App\Http\Controllers\Catalog\ProductTypeController;
+use App\Http\Controllers\Catalog\RawMaterialController;
 use App\Http\Controllers\Catalog\SubcategoryController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
@@ -286,6 +288,25 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('product-grades/{productGrade}', [ProductGradeController::class, 'update'])->name('productGrades.update')->middleware('permission:product_grades,edit_product_grades');
     Route::delete('product-grades/{productGrade}', [ProductGradeController::class, 'destroy'])->name('productGrades.destroy')->middleware('permission:product_grades,edit_product_grades');
 
+    // "วัตถุดิบ" (Raw Materials / RM) master — ไม่ใช่สินค้าแบบใหม่ แค่หน้าจอ
+    // ติ๊ก/เลือกว่าสินค้าที่มีอยู่แล้วตัวไหนใช้เป็นวัตถุดิบได้บ้าง
+    // (products.is_raw_material) ไม่มี edit เพราะไม่มีอะไรให้แก้ นอกจาก
+    // เพิ่ม (store) / เอาออก (destroy) ดู RawMaterialController
+    Route::get('raw-materials', [RawMaterialController::class, 'index'])->name('rawMaterials.index')->middleware('permission:raw_materials,list_raw_materials');
+    Route::post('raw-materials', [RawMaterialController::class, 'store'])->name('rawMaterials.store')->middleware('permission:raw_materials,edit_raw_materials');
+    Route::delete('raw-materials/{product}', [RawMaterialController::class, 'destroy'])->name('rawMaterials.destroy')->middleware('permission:raw_materials,edit_raw_materials');
+
+    // "BOM" (Bill of Materials) master — แทนที่ placeholder stub เดิม (เอาบรรทัด
+    // 'bom' ออกจากกลุ่ม $stub ด้านล่างแล้ว) สร้างโดยเลือก SKU สินค้าที่มีอยู่แล้ว
+    // แล้วค่อยเพิ่มรายการวัตถุดิบ (จำกัดแค่สินค้าที่อยู่ในลิสต์ราวัตถุดิบด้านบน)
+    // จากหน้าแก้ไข ดู BomController
+    Route::get('bom', [BomController::class, 'index'])->name('bom.index')->middleware('permission:bom,list_bom');
+    Route::get('bom/create', [BomController::class, 'create'])->name('bom.create')->middleware('permission:bom,edit_bom');
+    Route::post('bom', [BomController::class, 'store'])->name('bom.store')->middleware('permission:bom,edit_bom');
+    Route::get('bom/{bom}/edit', [BomController::class, 'edit'])->name('bom.edit')->middleware('permission:bom,edit_bom');
+    Route::put('bom/{bom}', [BomController::class, 'update'])->name('bom.update')->middleware('permission:bom,edit_bom');
+    Route::delete('bom/{bom}', [BomController::class, 'destroy'])->name('bom.destroy')->middleware('permission:bom,edit_bom');
+
     // "เวนเดอร์" (Vendors) master — own `vendors` table, own `vendors.*`
     // permissions backfilled from `categories.*`. `edit_vendors` covers
     // every write.
@@ -405,7 +426,6 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     $stub = fn (string $titleKey) => fn () => Inertia::render('catalog/placeholder', ['titleKey' => $titleKey]);
 
     Route::middleware('permission:products,list_products')->group(function () use ($stub) {
-        Route::get('bom', $stub('bom'))->name('bom.index');
 
         Route::get('marketplace/connect/{platform}', fn (string $platform) => Inertia::render('catalog/placeholder', [
             'titleKey' => 'marketplaceConnect',

@@ -378,11 +378,17 @@ class ProductController extends Controller
      * locale เลย ตั้งใจให้ครอบคลุมกว้างกว่าชื่อที่แสดงผลด้านล่าง เผื่อกรณีมีเลขคล้าย
      * SKU ฝังอยู่ในชื่อของ locale ไหนก็ตามให้ยัง match ได้) และตัดตัวที่เลือกไว้
      * แล้วออก
+     *
+     * ใช้ endpoint เดียวกันนี้ซ้ำสำหรับตัวเลือกวัตถุดิบ (RM) ของ BOM ด้วย (ดู
+     * BomController/catalog/bom/edit.tsx) ผ่าน `raw_material_only=1` — จำกัด
+     * ผลลัพธ์ให้เหลือแค่สินค้าที่ถูกจัดเป็นวัตถุดิบไว้แล้ว
+     * (Product.is_raw_material) เท่านั้น ไม่ต้องแยก endpoint ใหม่
      */
     public function search(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
         $excludeIds = array_filter(array_map('intval', (array) $request->query('exclude', [])));
+        $rawMaterialOnly = $request->boolean('raw_material_only');
 
         if ($query === '') {
             return response()->json([]);
@@ -400,6 +406,7 @@ class ProductController extends Controller
                 $q->orWhereIn('id', $matchingProductIds);
             }
         })
+            ->when($rawMaterialOnly, fn ($q) => $q->where('is_raw_material', true))
             ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->limit(20)
             ->get(['id', 'sku']);
