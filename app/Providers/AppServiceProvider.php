@@ -5,14 +5,20 @@ namespace App\Providers;
 use App\Listeners\AuditAuthEventSubscriber;
 use App\Models\BaseUnit;
 use App\Models\BaseUnitTranslation;
+use App\Models\Brand;
+use App\Models\BrandTranslation;
 use App\Models\BusinessType;
+use App\Models\BusinessTypeTranslation;
 use App\Models\Category;
 use App\Models\CategoryTranslation;
 use App\Models\CommissionGroup;
 use App\Models\Currency;
+use App\Models\CurrencyTranslation;
 use App\Models\Point;
 use App\Models\ProductType;
+use App\Models\ProductTypeTranslation;
 use App\Models\Vendor;
+use App\Models\VendorTranslation;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -24,7 +30,7 @@ use Illuminate\Support\ServiceProvider;
 class AppServiceProvider extends ServiceProvider
 {
     /** Master models whose rows mirror into a bound `select` attribute's options. */
-    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class, BaseUnit::class];
+    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class, BaseUnit::class, Brand::class];
 
     /**
      * Register any application services.
@@ -71,6 +77,54 @@ class AppServiceProvider extends ServiceProvider
         };
         BaseUnitTranslation::saved($syncBaseUnitTranslationParent);
         BaseUnitTranslation::deleted($syncBaseUnitTranslationParent);
+
+        // เหตุผลเดียวกัน — ชื่อของ Brand ก็มีหลาย locale อยู่บนโมเดลลูกแยก
+        // ต่างหาก (brand_translations) เช่นกัน
+        $syncBrandTranslationParent = function (BrandTranslation $translation) use ($sync): void {
+            if ($brand = $translation->brand) {
+                $sync()->syncModel($brand);
+            }
+        };
+        BrandTranslation::saved($syncBrandTranslationParent);
+        BrandTranslation::deleted($syncBrandTranslationParent);
+
+        // เหตุผลเดียวกัน — BusinessType/Currency/ProductType เพิ่งได้คำแปลหลาย
+        // ภาษาจริงแบบเดียวกัน (ดู migration create_business_type_translations_table/
+        // create_currency_translations_table/create_product_type_translations_table)
+        $syncBusinessTypeTranslationParent = function (BusinessTypeTranslation $translation) use ($sync): void {
+            if ($businessType = $translation->businessType) {
+                $sync()->syncModel($businessType);
+            }
+        };
+        BusinessTypeTranslation::saved($syncBusinessTypeTranslationParent);
+        BusinessTypeTranslation::deleted($syncBusinessTypeTranslationParent);
+
+        $syncCurrencyTranslationParent = function (CurrencyTranslation $translation) use ($sync): void {
+            if ($currency = $translation->currency) {
+                $sync()->syncModel($currency);
+            }
+        };
+        CurrencyTranslation::saved($syncCurrencyTranslationParent);
+        CurrencyTranslation::deleted($syncCurrencyTranslationParent);
+
+        $syncProductTypeTranslationParent = function (ProductTypeTranslation $translation) use ($sync): void {
+            if ($productType = $translation->productType) {
+                $sync()->syncModel($productType);
+            }
+        };
+        ProductTypeTranslation::saved($syncProductTypeTranslationParent);
+        ProductTypeTranslation::deleted($syncProductTypeTranslationParent);
+
+        // เหตุผลเดียวกัน — ชื่อของ Vendor ก็มีหลาย locale อยู่บนโมเดลลูกแยกต่างหาก
+        // (vendor_translations) ยุบมาจากคอลัมน์ name_en เดิม (ดู migration
+        // create_vendor_translations_table)
+        $syncVendorTranslationParent = function (VendorTranslation $translation) use ($sync): void {
+            if ($vendor = $translation->vendor) {
+                $sync()->syncModel($vendor);
+            }
+        };
+        VendorTranslation::saved($syncVendorTranslationParent);
+        VendorTranslation::deleted($syncVendorTranslationParent);
 
         // routes/api.php had no throttling at all — enabled via
         // ->throttleApi() in bootstrap/app.php, which applies this 'api'

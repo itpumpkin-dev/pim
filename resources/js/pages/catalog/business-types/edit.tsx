@@ -8,6 +8,7 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
@@ -20,9 +21,10 @@ interface BusinessTypeData {
 
 interface Props {
     businessType: BusinessTypeData;
+    translations: Record<string, string>;
 }
 
-export default function BusinessTypeEdit({ businessType }: Props) {
+export default function BusinessTypeEdit({ businessType, translations }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -33,7 +35,7 @@ export default function BusinessTypeEdit({ businessType }: Props) {
     ];
 
     const { data, setData, put, processing, errors, isDirty } = useForm({
-        name: businessType.name ?? '',
+        translations: translations || ({} as Record<string, string>),
         description: businessType.description ?? '',
         is_active: Boolean(businessType.is_active),
     });
@@ -66,11 +68,16 @@ export default function BusinessTypeEdit({ businessType }: Props) {
                     </Stack>
                 </Stack>
 
-                <FioriFormGroup title={t('generalTitle')}>
-                    <FioriField label={t('businessTypeName')} htmlFor="bt-name" valueState={valueStateOf(errors.name)} message={errors.name}>
-                        <TextField id="bt-name" fullWidth size="small" value={data.name} onChange={(e) => setData('name', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.name))} />
-                    </FioriField>
+                <Stack spacing={2} sx={{ mb: 2 }}>
+                    <LocaleLabelFields
+                        title={t('businessTypeName')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+                </Stack>
 
+                <FioriFormGroup title={t('generalTitle')}>
                     <FioriField label={t('description')} htmlFor="bt-description" valueState={valueStateOf(errors.description)} message={errors.description} fullWidth>
                         <TextField
                             id="bt-description"

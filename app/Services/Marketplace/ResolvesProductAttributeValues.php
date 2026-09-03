@@ -3,7 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Models\Attribute;
-use App\Models\AttributeOption;
+use App\Models\Brand;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -133,12 +133,19 @@ trait ResolvesProductAttributeValues
     /**
      * Marketplace brand id (e.g. shopee_brand_id/lazada_brand_id/
      * tiktok_brand_id/woocommerce_brand_id) mapped to this product's
-     * `pbrand` attribute value's AttributeOption row — null if the product
-     * has no `pbrand` value set, or that option has no mapping for this
-     * platform's $column yet. Shared by every {Platform}ProductSyncService's
+     * `pbrand` attribute value's Brand row — null if the product has no
+     * `pbrand` value set, or that brand has no mapping for this platform's
+     * $column yet. Shared by every {Platform}ProductSyncService's
      * resolve*BrandId(), each of which prefers a per-product override
-     * (products.{platform}_brand_id) over this shared, brand-option-level
-     * default when the product has one of its own.
+     * (products.{platform}_brand_id) over this shared, brand-level default
+     * when the product has one of its own.
+     *
+     * Looks up by Brand.code (not id) — matches how `pbrand`'s ProductValue
+     * is stored (ProductValue.value = Brand.code, mirrored from this same
+     * code into the attribute's AttributeOption rows — see
+     * MasterAttributeOptionSync). Used to read straight from `brands`
+     * instead of `attribute_options` (brands table is the master since
+     * migration create_brands_table).
      */
     private function mappedBrandOptionId(Product $product, string $column): ?int
     {
@@ -147,14 +154,7 @@ trait ResolvesProductAttributeValues
             return null;
         }
 
-        $pbrandAttributeId = Attribute::where('code', 'pbrand')->value('id');
-        if (!$pbrandAttributeId) {
-            return null;
-        }
-
-        $mapped = AttributeOption::where('attribute_id', $pbrandAttributeId)
-            ->where('code', $brandCode)
-            ->value($column);
+        $mapped = Brand::where('code', $brandCode)->value($column);
 
         return $mapped !== null ? (int) $mapped : null;
     }

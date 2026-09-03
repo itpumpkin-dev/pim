@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
-use App\Models\AttributeOption;
-use App\Models\AttributeOptionTranslation;
 use App\Models\AuditLog;
 use App\Jobs\SyncLazadaBrandsJob;
 use App\Jobs\SyncShopeeBrandsJob;
 use App\Jobs\SyncTikTokBrandsJob;
+use App\Models\Brand;
+use App\Models\BrandTranslation;
 use App\Models\Category;
 use App\Models\JobTracker;
 use App\Models\LazadaBrand;
@@ -36,17 +36,23 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * "Brands" เป็นหน้าจอเฉพาะทางสไตล์ WooCommerce ที่สร้างขึ้นมาบนแถว AttributeOption
- * ที่มีอยู่แล้วของ Attribute ชื่อ `pbrand` — ไม่ใช่ taxonomy ใหม่ แบรนด์ของสินค้าจะถูก
- * เก็บในรูป `ProductValue.value = AttributeOption.code` (ดู
- * ProductPresenter::resolveSelectOptionLabels() และ view master_products ที่ join
- * แบบเดียวกันนี้) ซึ่งเป็นสิ่งที่คอลัมน์ "Count" ด้านล่างใช้ query หาข้อมูล
+ * "Brands" เป็นหน้าจอเฉพาะทางสไตล์ WooCommerce — เดิมสร้างขึ้นมาบนแถว
+ * AttributeOption ที่มีอยู่แล้วของ Attribute ชื่อ `pbrand` ตอนนี้เปลี่ยนมาเป็น
+ * master table ของตัวเอง (`brands` + `brand_translations` — ดู Brand model)
+ * ผูก master_source = 'brands' เข้ากับ attribute `pbrand` (ดู
+ * MasterAttributeOptionSync) เพื่อให้เลือกเป็นแหล่งข้อมูล Master ของ attribute
+ * อื่นได้ด้วย — แบรนด์ของสินค้ายังเก็บเป็น `ProductValue.value = Brand.code`
+ * เหมือนเดิมทุกประการ (ไม่กระทบ) เพราะรหัส (code) เดิมทุกตัวถูกย้ายมาแบบคงเดิม
+ * (ดู migration create_brands_table) thumbnail/parent_id/marketplace brand id
+ * (Shopee/Lazada/TikTok/WooCommerce) ก็ย้ายมาที่นี่ทั้งหมดเช่นกัน — ไม่ใช่แค่
+ * "ตัวเลือกของ select field" อีกต่อไป แต่เป็นข้อมูลที่
+ * ResolvesProductAttributeValues::mappedBrandOptionId() (ใช้โดยทุก
+ * marketplace ProductSyncService ตอน push สินค้าจริง) อ่านตรงจากตารางนี้แล้ว
  *
- * ตั้งใจแยก controller นี้ออกจาก AttributeOptionController แทนที่จะใช้ route
- * `/attributes/{attribute}/options` ที่ซ้อนอยู่ในนั้น เพราะรูปแบบ list/search/sort/count
- * ของหน้าจอนี้ไม่เข้ากับ panel แบบ inline ทั่วไปนั้น แต่ helper ทุกตัวเรื่อง
- * translation/audit/code-generation ด้านล่างนี้ก็เลียนแบบพฤติกรรมที่พิสูจน์แล้วว่าใช้ได้
- * ของ controller นั้นมาทั้งหมด
+ * Helper เรื่อง translation/audit/code-generation ด้านล่างเลียนแบบ
+ * BusinessTypeController/BaseUnitController มาเกือบทั้งหมด ต่างกันตรงที่ Brand
+ * มีชื่อแปลได้หลายภาษาจริง (เหมือน Category/BaseUnit) เลยต้อง sync ผ่าน
+ * BrandTranslation แยกออกมาแทนที่จะเป็นคอลัมน์ name เดียว
  */
 class BrandController extends Controller
 {
@@ -116,7 +122,7 @@ class BrandController extends Controller
     }
 
     /**
-     * value (code ของ brand option) => จำนวนสินค้าที่ไม่ซ้ำกัน สำหรับ badge
+     * value (code ของแบรนด์) => จำนวนสินค้าที่ไม่ซ้ำกัน สำหรับ badge
      * "products_count" บน index() เพราะต้อง scan product_values ทุกครั้งที่โหลด
      * เลยแคชไว้ด้วย TTL สั้นๆ แทนที่จะไม่แคชเลย — เลือกใช้ TTL ธรรมดาแทนการ
      * invalidate ตาม event เพราะแถว ProductValue ของ pbrand ถูกเขียนจากหลายจุด
@@ -157,10 +163,10 @@ class BrandController extends Controller
             'tiktok' => 'tiktok_brand_id',
         ];
 
-        $options = AttributeOption::where('attribute_id', $attribute->id)
+        $brands = Brand::query()
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('admin_label', 'like', "%{$search}%")
+                    $q->where('name', 'like', "%{$search}%")
                         ->orWhere('slug', 'like', "%{$search}%")
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
                 });
@@ -185,23 +191,29 @@ class BrandController extends Controller
         // ลิสต์แบรนด์มีขนาดเล็ก (หลักสิบ ไม่ใช่หลักพัน) — นับ/เรียงลำดับใน PHP หลังจาก
         // fetch มาครั้งเดียวง่ายกว่าและเร็วพอ แถมยังเลี่ยง SQL subquery สำหรับนับที่
         // ต้อง join กับสิ่งที่ไม่ใช่ Eloquent relation จริงๆ ได้ด้วย
-        // (ProductValue.value = AttributeOption.code ไม่ใช่ FK)
+        // (ProductValue.value = Brand.code ไม่ใช่ FK)
         $counts = $this->brandProductCounts($attribute->id);
 
-        $labelById = $options->pluck('admin_label', 'id');
+        $nameById = $brands->pluck('name', 'id');
 
-        $options = $options->map(function (AttributeOption $option) use ($counts, $labelById) {
-            $option->products_count = (int) ($counts[$option->code] ?? 0);
-            $option->thumbnail_url = AttributeValueFormatter::resolveStorageUrl($option->thumbnail);
-            $option->parent_name = $option->parent_id ? ($labelById[$option->parent_id] ?? null) : null;
-            $option->mapped_platforms = collect([
-                'shopee' => $option->shopee_brand_id,
-                'woocommerce' => $option->woocommerce_brand_id,
-                'lazada' => $option->lazada_brand_id,
-                'tiktok' => $option->tiktok_brand_id,
-            ])->filter()->keys()->values()->all();
-
-            return $option;
+        $rows = $brands->map(function (Brand $brand) use ($counts, $nameById) {
+            return [
+                'id' => $brand->id,
+                'code' => $brand->code,
+                'admin_label' => $brand->name,
+                'slug' => $brand->slug,
+                'description' => $brand->description,
+                'products_count' => (int) ($counts[$brand->code] ?? 0),
+                'thumbnail_url' => AttributeValueFormatter::resolveStorageUrl($brand->thumbnail),
+                'parent_id' => $brand->parent_id,
+                'parent_name' => $brand->parent_id ? ($nameById[$brand->parent_id] ?? null) : null,
+                'mapped_platforms' => collect([
+                    'shopee' => $brand->shopee_brand_id,
+                    'woocommerce' => $brand->woocommerce_brand_id,
+                    'lazada' => $brand->lazada_brand_id,
+                    'tiktok' => $brand->tiktok_brand_id,
+                ])->filter()->keys()->values()->all(),
+            ];
         });
 
         $sortableColumns = ['admin_label', 'description', 'slug', 'products_count'];
@@ -209,16 +221,16 @@ class BrandController extends Controller
         $sortDir = strtolower((string) $request->input('dir')) === 'desc' ? 'desc' : 'asc';
 
         if ($sortField && in_array($sortField, $sortableColumns, true)) {
-            $options = $sortDir === 'desc' ? $options->sortByDesc($sortField) : $options->sortBy($sortField);
+            $rows = $sortDir === 'desc' ? $rows->sortByDesc($sortField) : $rows->sortBy($sortField);
         } else {
-            $options = $options->sortBy('admin_label');
+            $rows = $rows->sortBy('admin_label');
         }
-        $options = $options->values();
+        $rows = $rows->values();
 
         $page = (int) $request->input('page', 1);
         $paginated = new LengthAwarePaginator(
-            $options->forPage($page, $perPage)->values(),
-            $options->count(),
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
             $perPage,
             $page,
             ['path' => $request->url(), 'query' => $request->query()],
@@ -226,7 +238,7 @@ class BrandController extends Controller
 
         return Inertia::render('catalog/brands/index', [
             'brands' => $paginated,
-            'parentOptions' => $this->parentOptionsList($attribute),
+            'parentOptions' => $this->parentOptionsList(),
             'attributeId' => $attribute->id,
             'filters' => [
                 'search' => $search ?? '',
@@ -239,17 +251,13 @@ class BrandController extends Controller
 
     public function create(): Response
     {
-        $attribute = $this->brandAttribute();
-
         return Inertia::render('catalog/brands/create', [
-            'parentOptions' => $this->parentOptionsList($attribute),
+            'parentOptions' => $this->parentOptionsList(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $attribute = $this->brandAttribute();
-
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -257,62 +265,45 @@ class BrandController extends Controller
             'slug' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'thumbnail' => ['nullable', 'image', 'max:4096'],
-            'parent_id' => ['nullable', Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id)],
+            'parent_id' => ['nullable', Rule::exists('brands', 'id')],
         ]);
 
         $translations = $validated['translations'] ?? [];
-        $adminLabel = $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null);
+        $name = $this->resolveName($translations, $validated['admin_label'] ?? null);
         $thumbnailPath = $request->hasFile('thumbnail') ? $request->file('thumbnail')->store('brand-thumbnails', 'public') : null;
 
-        $option = CodeGenerator::createWithRetry(
-            'attribute_options',
-            'option',
-            fn ($code) => $attribute->options()->create([
+        $brand = CodeGenerator::createWithRetry(
+            'brands',
+            'brand',
+            fn ($code) => Brand::create([
                 'code' => $code,
                 'parent_id' => $validated['parent_id'] ?? null,
-                'admin_label' => $adminLabel,
+                'name' => $name ?? $code,
                 'slug' => $validated['slug'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'thumbnail' => $thumbnailPath,
             ]),
-            scope: ['attribute_id' => $attribute->id],
         );
 
-        $this->syncTranslations($option, $translations);
-        $this->autoTranslate($attribute, $option, $translations);
+        $this->syncTranslations($brand, $translations);
+        $this->autoTranslate($brand, $translations);
 
-        AuditLog::record('option_created', $attribute, null, $this->optionAuditFields($option));
+        AuditLog::record('brand_created', $this->brandAttribute(), null, $this->auditFields($brand));
 
         return to_route('catalog.brands.index')->with('success', 'Brand added successfully.');
     }
 
-    public function edit(AttributeOption $brand): Response
+    public function edit(Brand $brand): Response
     {
-        $attribute = $this->brandAttribute();
-        abort_unless($brand->attribute_id === $attribute->id, 404);
-
-        // แบรนด์ที่ไม่มีแถว AttributeOptionTranslation เลย (เช่นที่สร้างผ่าน import
-        // / เขียนแค่คอลัมน์ `admin_label` ดิบๆ) จะโชว์ช่อง Name ว่างสำหรับ locale
-        // ปัจจุบันของแอดมิน ทั้งที่มีชื่ออยู่จริง — เลียนแบบ fallback เดียวกับ
-        // CategoryController::edit() คือถ้า locale ปัจจุบันยังไม่มีคำแปล ให้ดึง
-        // ค่า raw `admin_label` มาเป็นค่าเริ่มต้นของฟอร์มหน้านี้ (เฉพาะหน้านี้)
         $translations = $brand->translations
-            ->mapWithKeys(fn (AttributeOptionTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->mapWithKeys(fn (BrandTranslation $t) => [(string) $t->locale_id => $t->label])
             ->all();
-
-        $activeLocaleId = Locale::idForCode(app()->getLocale());
-        if ($activeLocaleId && trim((string) ($translations[$activeLocaleId] ?? '')) === '') {
-            $rawLabel = trim((string) $brand->getRawOriginal('admin_label'));
-            if ($rawLabel !== '') {
-                $translations[(string) $activeLocaleId] = $rawLabel;
-            }
-        }
 
         return Inertia::render('catalog/brands/edit', [
             'brand' => [
                 'id' => $brand->id,
                 'code' => $brand->code,
-                'admin_label' => $brand->getRawOriginal('admin_label'),
+                'admin_label' => $brand->name,
                 'slug' => $brand->slug,
                 'description' => $brand->description,
                 'parent_id' => $brand->parent_id,
@@ -325,15 +316,12 @@ class BrandController extends Controller
                 'woocommerce_brand_id' => $brand->woocommerce_brand_id,
             ],
             'translations' => $translations,
-            'parentOptions' => $this->parentOptionsList($attribute, excludeId: $brand->id),
+            'parentOptions' => $this->parentOptionsList(excludeId: $brand->id),
         ]);
     }
 
-    public function update(Request $request, AttributeOption $brand): RedirectResponse
+    public function update(Request $request, Brand $brand): RedirectResponse
     {
-        $attribute = $this->brandAttribute();
-        abort_unless($brand->attribute_id === $attribute->id, 404);
-
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -343,7 +331,7 @@ class BrandController extends Controller
             'thumbnail' => ['nullable', 'image', 'max:4096'],
             'parent_id' => [
                 'nullable',
-                Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
+                Rule::exists('brands', 'id'),
                 Rule::notIn([$brand->id]),
             ],
             'shopee_brand_id' => ['nullable', 'integer', Rule::exists('shopee_brands', 'id')],
@@ -358,11 +346,11 @@ class BrandController extends Controller
             ? $request->file('thumbnail')->store('brand-thumbnails', 'public')
             : $brand->thumbnail;
 
-        $oldFields = $this->optionAuditFields($brand);
+        $oldFields = $this->auditFields($brand);
 
         $brand->update([
             'parent_id' => $validated['parent_id'] ?? null,
-            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
+            'name' => $this->resolveName($translations, $validated['admin_label'] ?? null) ?? $brand->name,
             'slug' => $validated['slug'] ?? null,
             'description' => $validated['description'] ?? null,
             'thumbnail' => $thumbnailPath,
@@ -373,25 +361,22 @@ class BrandController extends Controller
         ]);
 
         $this->syncTranslations($brand, $translations);
-        $this->autoTranslate($attribute, $brand, $translations);
+        $this->autoTranslate($brand, $translations);
 
-        $newFields = $this->optionAuditFields($brand);
+        $newFields = $this->auditFields($brand->fresh());
         if ($oldFields !== $newFields) {
-            AuditLog::record('option_updated', $attribute, $oldFields, $newFields);
+            AuditLog::record('brand_updated', $this->brandAttribute(), $oldFields, $newFields);
         }
 
         return back()->with('success', 'Brand updated successfully.');
     }
 
-    public function destroy(AttributeOption $brand): RedirectResponse
+    public function destroy(Brand $brand): RedirectResponse
     {
-        $attribute = $this->brandAttribute();
-        abort_unless($brand->attribute_id === $attribute->id, 404);
-
-        $oldFields = $this->optionAuditFields($brand);
+        $oldFields = $this->auditFields($brand);
         $brand->delete();
 
-        AuditLog::record('option_deleted', $attribute, $oldFields, null);
+        AuditLog::record('brand_deleted', $this->brandAttribute(), $oldFields, null);
 
         return back()->with('success', 'Brand deleted successfully.');
     }
@@ -638,8 +623,6 @@ class BrandController extends Controller
      */
     public function shopeeBrandsForCategory(Request $request, int $shopeeCategoryId): JsonResponse
     {
-        $attribute = $this->brandAttribute();
-
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 25);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
@@ -659,16 +642,15 @@ class BrandController extends Controller
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
 
-        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
-            ->whereIn('shopee_brand_id', $paginated->getCollection()->pluck('id'))
-            ->get(['id', 'admin_label', 'shopee_brand_id'])
+        $mappedByBrandId = Brand::whereIn('shopee_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'name', 'shopee_brand_id'])
             ->keyBy('shopee_brand_id');
 
         $rows = $paginated->getCollection()->map(fn (ShopeeBrand $brand) => [
             'id' => $brand->id,
             'name' => $brand->name,
             'mapped' => $mappedByBrandId->has($brand->id)
-                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->name]
                 : null,
         ]);
 
@@ -686,28 +668,27 @@ class BrandController extends Controller
      * ของ Shopee และ Lazada (categories/shopee-mapping.tsx,
      * categories/lazada-mapping.tsx) — เป็นภาพสะท้อนกลับด้านของ
      * searchTiktokBrands()/searchWoocommerceBrands() ด้านล่าง: ตัวเหล่านั้นค้นหา
-     * แคชแบรนด์ของ marketplace ตามชื่อ ส่วนตัวนี้ค้นหา attribute option `pbrand`
-     * ของเราเองตามชื่อ เพราะสองตารางนั้นแมปกลับด้าน (เลือก PIM brand ให้กับแถว
+     * แคชแบรนด์ของ marketplace ตามชื่อ ส่วนตัวนี้ค้นหาแบรนด์ของเราเอง (`brands`)
+     * ตามชื่อ เพราะสองตารางนั้นแมปกลับด้าน (เลือก PIM brand ให้กับแถว
      * แบรนด์ของ marketplace ไม่ใช่กลับด้านกัน — ส่วนหน้าแมปแบรนด์ของ
      * TikTok/WooCommerce เองยังทำแบบเดิมอยู่)
      */
     public function searchPimBrands(Request $request): JsonResponse
     {
-        $attribute = $this->brandAttribute();
         $query = trim((string) $request->query('q', ''));
 
-        $options = AttributeOption::where('attribute_id', $attribute->id)
+        $brands = Brand::query()
             ->when($query !== '', function ($q) use ($query) {
                 $q->where(function ($q2) use ($query) {
-                    $q2->where('admin_label', 'like', "%{$query}%")
+                    $q2->where('name', 'like', "%{$query}%")
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
                 });
             })
-            ->orderBy('admin_label')
+            ->orderBy('name')
             ->limit(50)
-            ->get(['id', 'admin_label']);
+            ->get(['id', 'name']);
 
-        return response()->json(['data' => $options->map(fn (AttributeOption $o) => ['id' => $o->id, 'name' => $o->admin_label])]);
+        return response()->json(['data' => $brands->map(fn (Brand $b) => ['id' => $b->id, 'name' => $b->name])]);
     }
 
     /**
@@ -720,8 +701,6 @@ class BrandController extends Controller
      */
     public function woocommerceBrandsList(Request $request): JsonResponse
     {
-        $attribute = $this->brandAttribute();
-
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 25);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
@@ -736,16 +715,15 @@ class BrandController extends Controller
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
 
-        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
-            ->whereIn('woocommerce_brand_id', $paginated->getCollection()->pluck('id'))
-            ->get(['id', 'admin_label', 'woocommerce_brand_id'])
+        $mappedByBrandId = Brand::whereIn('woocommerce_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'name', 'woocommerce_brand_id'])
             ->keyBy('woocommerce_brand_id');
 
         $rows = $paginated->getCollection()->map(fn (WooCommerceBrand $brand) => [
             'id' => $brand->id,
             'name' => $brand->name,
             'mapped' => $mappedByBrandId->has($brand->id)
-                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->name]
                 : null,
         ]);
 
@@ -782,8 +760,6 @@ class BrandController extends Controller
      */
     public function lazadaBrandsList(Request $request): JsonResponse
     {
-        $attribute = $this->brandAttribute();
-
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 25);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
@@ -798,16 +774,15 @@ class BrandController extends Controller
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
 
-        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
-            ->whereIn('lazada_brand_id', $paginated->getCollection()->pluck('id'))
-            ->get(['id', 'admin_label', 'lazada_brand_id'])
+        $mappedByBrandId = Brand::whereIn('lazada_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'name', 'lazada_brand_id'])
             ->keyBy('lazada_brand_id');
 
         $rows = $paginated->getCollection()->map(fn (LazadaBrand $brand) => [
             'id' => $brand->id,
             'name' => $brand->name,
             'mapped' => $mappedByBrandId->has($brand->id)
-                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->name]
                 : null,
         ]);
 
@@ -834,8 +809,6 @@ class BrandController extends Controller
      */
     public function tiktokBrandsList(Request $request): JsonResponse
     {
-        $attribute = $this->brandAttribute();
-
         $search = trim((string) $request->query('search', ''));
         $perPage = (int) $request->query('per_page', 25);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
@@ -854,16 +827,15 @@ class BrandController extends Controller
         // ระวัง — PHP native int ยังเก็บ/คืนค่าได้ครบถ้วนไม่มีปัดเศษ แต่ JSON.parse
         // ของ JS ทำไม่ได้ (เช็คจากของจริงแล้ว 7417026736480880390 จะกลายเป็น
         // 7417026736480881000 หลัง parse) เลยส่งเป็น string ตรงนี้เพื่อเลี่ยงปัญหานั้น
-        $mappedByBrandId = AttributeOption::where('attribute_id', $attribute->id)
-            ->whereIn('tiktok_brand_id', $paginated->getCollection()->pluck('id'))
-            ->get(['id', 'admin_label', 'tiktok_brand_id'])
+        $mappedByBrandId = Brand::whereIn('tiktok_brand_id', $paginated->getCollection()->pluck('id'))
+            ->get(['id', 'name', 'tiktok_brand_id'])
             ->keyBy('tiktok_brand_id');
 
         $rows = $paginated->getCollection()->map(fn (TikTokBrand $brand) => [
             'id' => (string) $brand->id,
             'name' => $brand->name,
             'mapped' => $mappedByBrandId->has($brand->id)
-                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->admin_label]
+                ? ['id' => $mappedByBrandId[$brand->id]->id, 'name' => $mappedByBrandId[$brand->id]->name]
                 : null,
         ]);
 
@@ -891,18 +863,15 @@ class BrandController extends Controller
 
         $validated = $request->validate([
             'mappings' => ['required', 'array'],
-            'mappings.*.option_id' => [
-                'required', 'integer',
-                Rule::exists('attribute_options', 'id')->where('attribute_id', $attribute->id),
-            ],
+            'mappings.*.option_id' => ['required', 'integer', Rule::exists('brands', 'id')],
             'mappings.*.marketplace_brand_id' => ['nullable', 'integer', Rule::exists($table, 'id')],
         ]);
 
         $updated = 0;
 
         foreach ($validated['mappings'] as $mapping) {
-            $option = AttributeOption::where('attribute_id', $attribute->id)->find($mapping['option_id']);
-            if (! $option) {
+            $brand = Brand::find($mapping['option_id']);
+            if (! $brand) {
                 continue;
             }
 
@@ -915,18 +884,18 @@ class BrandController extends Controller
             // normalize แบบนี้ปลอดภัยสำหรับทุกแพลตฟอร์ม ไม่ใช่แค่ TikTok — ส่วนอีก
             // 3 แพลตฟอร์มที่เหลือก็ส่ง/รับเป็น int ธรรมดาอยู่แล้วทุกวันนี้
             $newId = isset($mapping['marketplace_brand_id']) ? (int) $mapping['marketplace_brand_id'] : null;
-            if ($option->{$fkColumn} === $newId) {
+            if ($brand->{$fkColumn} === $newId) {
                 continue;
             }
 
-            $oldId = $option->{$fkColumn};
-            $option->update([$fkColumn => $newId]);
+            $oldId = $brand->{$fkColumn};
+            $brand->update([$fkColumn => $newId]);
 
             AuditLog::record(
                 $auditEvent,
                 $attribute,
-                ["option#{$option->id}.{$fkColumn}" => $oldId],
-                ["option#{$option->id}.{$fkColumn}" => $newId],
+                ["brand#{$brand->id}.{$fkColumn}" => $oldId],
+                ["brand#{$brand->id}.{$fkColumn}" => $newId],
             );
             $updated++;
         }
@@ -947,27 +916,27 @@ class BrandController extends Controller
     /**
      * @return array<int, array{id: int, name: string}>
      */
-    private function parentOptionsList(Attribute $attribute, ?int $excludeId = null): array
+    private function parentOptionsList(?int $excludeId = null): array
     {
-        return AttributeOption::where('attribute_id', $attribute->id)
+        return Brand::query()
             ->when($excludeId, fn ($q, $excludeId) => $q->where('id', '!=', $excludeId))
-            ->get(['id', 'admin_label'])
-            ->map(fn (AttributeOption $option) => ['id' => $option->id, 'name' => $option->admin_label])
+            ->get(['id', 'name'])
+            ->map(fn (Brand $brand) => ['id' => $brand->id, 'name' => $brand->name])
             ->values()
             ->all();
     }
 
     /**
-     * ทำงานเหมือนกับ AttributeOptionController::optionAuditFields() — ใช้
-     * รูปแบบ prefix option#{id}.* แบบเดียวกัน ขยายเพิ่มด้วยคอลัมน์แบรนด์ใหม่ๆ
-     * เพื่อให้ไปโชว์ในแท็บ History ของ Attribute แม่ด้วย
+     * ทำงานเหมือนกับ BaseUnitController::auditFields() — ใช้ prefix
+     * brand#{id}.* ขยายเพิ่มด้วยคอลัมน์แบรนด์เฉพาะทาง เพื่อให้ไปโชว์ในแท็บ
+     * History ของ Attribute แม่ด้วย
      */
-    private function optionAuditFields(AttributeOption $option): array
+    private function auditFields(Brand $brand): array
     {
-        $prefix = "option#{$option->id}";
+        $prefix = "brand#{$brand->id}";
 
-        return collect($option->only([
-            'code', 'admin_label', 'slug', 'description', 'thumbnail', 'parent_id',
+        return collect($brand->only([
+            'code', 'name', 'slug', 'description', 'thumbnail', 'parent_id',
             'shopee_brand_id', 'lazada_brand_id', 'tiktok_brand_id', 'woocommerce_brand_id',
         ]))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
@@ -975,11 +944,10 @@ class BrandController extends Controller
     }
 
     /**
-     * คัดลอกมาจาก AttributeOptionController::resolveAdminLabel() — ทำให้คอลัมน์
-     * `admin_label` ดิบๆ ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ ใช้ลำดับความ
-     * สำคัญแบบ fallback ผ่าน translations แบบเดียวกัน
+     * คัดลอกมาจาก BaseUnitController::resolveName() — ทำให้คอลัมน์ `name`
+     * ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ
      */
-    private function resolveAdminLabel(array $translations, ?string $adminLabel): ?string
+    private function resolveName(array $translations, ?string $adminLabel): ?string
     {
         $defaultLocaleId = Locale::idForCode(config('app.locale'));
 
@@ -996,12 +964,13 @@ class BrandController extends Controller
     }
 
     /**
-     * คัดลอกมาจาก AttributeOptionController::autoTranslate() — ยึดตามแฟล็ก
+     * คัดลอกมาจาก BaseUnitController::autoTranslate() — ยึดตามแฟล็ก
      * "AI translate" ของ attribute แม่ (pbrand) เหมือนกับ option อื่นๆ ทุกตัวที่
      * อยู่ข้างใต้มัน
      */
-    private function autoTranslate(Attribute $attribute, AttributeOption $option, array $translations): void
+    private function autoTranslate(Brand $brand, array $translations): void
     {
+        $attribute = $this->brandAttribute();
         if (! $attribute->is_ai_translate) {
             return;
         }
@@ -1013,19 +982,19 @@ class BrandController extends Controller
         }
 
         TranslationTracking::dispatchLabels(
-            AttributeOptionTranslation::class,
-            'attribute_option_id',
-            $option->id,
+            BrandTranslation::class,
+            'brand_id',
+            $brand->id,
             $sourceLocaleId,
             $sourceLabel,
             'brands',
-            $option->code,
+            $brand->code,
             auth()->id(),
         );
     }
 
     /**
-     * คัดลอกมาจาก AttributeOptionController::resolveAutoTranslateSource()
+     * คัดลอกมาจาก BaseUnitController::resolveAutoTranslateSource()
      *
      * @param  array<int|string, mixed>  $translations
      * @return array{0: int|null, 1: string}
@@ -1050,23 +1019,23 @@ class BrandController extends Controller
     }
 
     /**
-     * คัดลอกมาจาก AttributeOptionController::syncTranslations()
+     * คัดลอกมาจาก BaseUnitController::syncTranslations()
      */
-    private function syncTranslations(AttributeOption $option, array $translations): void
+    private function syncTranslations(Brand $brand, array $translations): void
     {
         foreach ($translations as $localeId => $label) {
             $label = is_string($label) ? trim($label) : '';
 
             if ($label === '') {
-                AttributeOptionTranslation::where('attribute_option_id', $option->id)
+                BrandTranslation::where('brand_id', $brand->id)
                     ->where('locale_id', $localeId)
                     ->delete();
 
                 continue;
             }
 
-            AttributeOptionTranslation::updateOrCreate(
-                ['attribute_option_id' => $option->id, 'locale_id' => $localeId],
+            BrandTranslation::updateOrCreate(
+                ['brand_id' => $brand->id, 'locale_id' => $localeId],
                 ['label' => $label]
             );
         }

@@ -590,6 +590,7 @@
     "confirmDeleteBusinessType": "确定要删除此业务类型吗？",
     "masterSourceProductTypes": "产品类型",
     "masterSourceBaseUnits": "基本单位",
+    "masterSourceBrands": "品牌",
     "productTypeName": "产品类型",
     "createProductType": "添加产品类型",
     "editProductType": "编辑产品类型",

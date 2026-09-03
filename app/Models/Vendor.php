@@ -4,10 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * "เวนเดอร์" (Vendor) master row.
  * Maintained on /catalog/vendors (see VendorController).
+ * `name` เก็บชื่อของ locale เริ่มต้นของแอปไว้เป็น fallback ง่ายๆ — คำแปลจริง
+ * ของแต่ละภาษาอยู่ใน translations() (ดู VendorTranslation) รวมถึงชื่ออังกฤษ
+ * ที่เคยอยู่ในคอลัมน์ `name_en` แยกต่างหาก (ยุบเข้ามาที่นี่แล้ว — ดู migration
+ * create_vendor_translations_table/drop_vendor_name_en_column)
  */
 class Vendor extends Model
 {
@@ -17,10 +22,11 @@ class Vendor extends Model
     /** กลุ่มเวนเดอร์ options shown on the create/edit form. */
     public const VENDOR_GROUPS = ['domestic', 'foreign'];
 
+    protected $with = ['translations'];
+
     protected $fillable = [
         'code',
         'name',
-        'name_en',
         'short_name',
         'vendor_group',
         'tax_id',
@@ -58,5 +64,10 @@ class Vendor extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class);
+    }
+
+    public function translations(): HasMany
+    {
+        return $this->hasMany(VendorTranslation::class);
     }
 }

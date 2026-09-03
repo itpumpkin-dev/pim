@@ -97,6 +97,7 @@
     "masterSourceCurrencies": "สกุลเงิน",
     "masterSourceProductTypes": "ประเภทสินค้า",
     "masterSourceBaseUnits": "หน่วยนับพื้นฐาน",
+    "masterSourceBrands": "แบรนด์",
     "createAttribute": "สร้างแอตทริบิวต์",
     "searchAttributes": "ค้นหาแอตทริบิวต์",
     "noAttributesFound": "ไม่พบแอตทริบิวต์",

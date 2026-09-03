@@ -13,6 +13,8 @@ class Currency extends Model
 
     public $timestamps = false;
 
+    protected $with = ['translations'];
+
     protected $fillable = [
         'code',
         'name',
@@ -26,5 +28,14 @@ class Currency extends Model
     public function vendors(): HasMany
     {
         return $this->hasMany(Vendor::class);
+    }
+
+    /**
+     * ชื่อของ locale เริ่มต้นของแอปเก็บไว้ในคอลัมน์ `name` เป็น fallback ง่ายๆ —
+     * คำแปลจริงของแต่ละภาษาอยู่ที่นี่ (ดู CurrencyTranslation)
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(CurrencyTranslation::class);
     }
 }

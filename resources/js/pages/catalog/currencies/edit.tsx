@@ -8,6 +8,7 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
@@ -19,9 +20,10 @@ interface CurrencyData {
 
 interface Props {
     currency: CurrencyData;
+    translations: Record<string, string>;
 }
 
-export default function CurrencyEdit({ currency }: Props) {
+export default function CurrencyEdit({ currency, translations }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -33,7 +35,7 @@ export default function CurrencyEdit({ currency }: Props) {
 
     const { data, setData, put, processing, errors, isDirty } = useForm({
         code: currency.code ?? '',
-        name: currency.name ?? '',
+        translations: translations || ({} as Record<string, string>),
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -75,11 +77,16 @@ export default function CurrencyEdit({ currency }: Props) {
                             sx={fioriFieldStateSx(valueStateOf(errors.code))}
                         />
                     </FioriField>
-
-                    <FioriField label={t('currencyName')} htmlFor="cur-name" valueState={valueStateOf(errors.name)} message={errors.name}>
-                        <TextField id="cur-name" fullWidth size="small" value={data.name} onChange={(e) => setData('name', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.name))} />
-                    </FioriField>
                 </FioriFormGroup>
+
+                <Stack sx={{ mt: 2 }}>
+                    <LocaleLabelFields
+                        title={t('currencyName')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+                </Stack>
 
                 <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 560 }} />
             </Box>

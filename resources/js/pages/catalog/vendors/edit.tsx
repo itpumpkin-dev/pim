@@ -8,6 +8,7 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
@@ -23,7 +24,6 @@ interface VendorData {
     id: number;
     code: string;
     name: string;
-    name_en: string | null;
     short_name: string | null;
     vendor_group: 'domestic' | 'foreign' | null;
     tax_id: string | null;
@@ -51,10 +51,11 @@ interface VendorData {
 
 interface Props {
     vendor: VendorData;
+    translations: Record<string, string>;
     currencies: CurrencyOption[];
 }
 
-export default function VendorEdit({ vendor, currencies }: Props) {
+export default function VendorEdit({ vendor, translations, currencies }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -66,8 +67,7 @@ export default function VendorEdit({ vendor, currencies }: Props) {
 
     const { data, setData, put, processing, errors, isDirty } = useForm({
         code: vendor.code ?? '',
-        name: vendor.name ?? '',
-        name_en: vendor.name_en ?? '',
+        translations: translations || ({} as Record<string, string>),
         short_name: vendor.short_name ?? '',
         vendor_group: (vendor.vendor_group ?? '') as '' | 'domestic' | 'foreign',
         tax_id: vendor.tax_id ?? '',
@@ -122,17 +122,16 @@ export default function VendorEdit({ vendor, currencies }: Props) {
                 </Stack>
 
                 <Stack spacing={2}>
+                    <LocaleLabelFields
+                        title={t('vendorName')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+
                     <FioriFormGroup title={t('vendorDetailsTitle')}>
                         <FioriField label={t('vendorCode')} htmlFor="v-code" valueState={valueStateOf(errors.code)} message={errors.code}>
                             <TextField id="v-code" fullWidth size="small" value={data.code} onChange={(e) => setData('code', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.code))} />
-                        </FioriField>
-
-                        <FioriField label={t('vendorName')} htmlFor="v-name" valueState={valueStateOf(errors.name)} message={errors.name}>
-                            <TextField id="v-name" fullWidth size="small" value={data.name} onChange={(e) => setData('name', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.name))} />
-                        </FioriField>
-
-                        <FioriField label={t('vendorNameEn')} htmlFor="v-name-en" valueState={valueStateOf(errors.name_en)} message={errors.name_en}>
-                            <TextField id="v-name-en" fullWidth size="small" value={data.name_en} onChange={(e) => setData('name_en', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.name_en))} />
                         </FioriField>
 
                         <FioriField label={t('vendorShortName')} htmlFor="v-short-name" valueState={valueStateOf(errors.short_name)} message={errors.short_name}>

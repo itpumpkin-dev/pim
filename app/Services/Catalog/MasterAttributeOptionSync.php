@@ -6,6 +6,7 @@ use App\Models\Attribute;
 use App\Models\AttributeOption;
 use App\Models\AttributeOptionTranslation;
 use App\Models\BaseUnit;
+use App\Models\Brand;
 use App\Models\BusinessType;
 use App\Models\Category;
 use App\Models\CommissionGroup;
@@ -52,6 +53,7 @@ class MasterAttributeOptionSync
         'currencies' => ['label' => 'masterSourceCurrencies', 'model' => Currency::class],
         'product_types' => ['label' => 'masterSourceProductTypes', 'model' => ProductType::class],
         'base_units' => ['label' => 'masterSourceBaseUnits', 'model' => BaseUnit::class],
+        'brands' => ['label' => 'masterSourceBrands', 'model' => Brand::class],
     ];
 
     private const CATEGORY_DEPTH_KEYS = ['categories', 'subcategories', 'product_groups'];
@@ -215,19 +217,12 @@ class MasterAttributeOptionSync
             'commission_groups' => CommissionGroup::all()->map(fn (CommissionGroup $g) => [
                 'code' => (string) $g->code, 'label' => $g->p_group_name ?? $g->code, 'is_active' => (bool) $g->is_active,
             ])->all(),
-            'business_types' => BusinessType::all()->map(fn (BusinessType $b) => [
-                'code' => (string) $b->code, 'label' => $b->name, 'is_active' => (bool) $b->is_active,
-            ])->all(),
-            'vendors' => Vendor::all()->map(fn (Vendor $v) => [
-                'code' => (string) $v->code, 'label' => $v->name, 'is_active' => (bool) $v->is_active,
-            ])->all(),
-            'currencies' => Currency::all()->map(fn (Currency $c) => [
-                'code' => strtolower((string) $c->code), 'label' => $c->name, 'is_active' => true,
-            ])->all(),
-            'product_types' => ProductType::all()->map(fn (ProductType $p) => [
-                'code' => (string) $p->code, 'label' => $p->name, 'is_active' => (bool) $p->is_active,
-            ])->all(),
+            'business_types' => BusinessType::with('translations')->get()->map(fn (BusinessType $b) => $this->businessTypeRow($b))->all(),
+            'vendors' => Vendor::with('translations')->get()->map(fn (Vendor $v) => $this->vendorRow($v))->all(),
+            'currencies' => Currency::with('translations')->get()->map(fn (Currency $c) => $this->currencyRow($c))->all(),
+            'product_types' => ProductType::with('translations')->get()->map(fn (ProductType $p) => $this->productTypeRow($p))->all(),
             'base_units' => BaseUnit::with('translations')->get()->map(fn (BaseUnit $u) => $this->baseUnitRow($u))->all(),
+            'brands' => Brand::with('translations')->get()->map(fn (Brand $b) => $this->brandRow($b))->all(),
             default => [],
         };
     }
@@ -250,19 +245,22 @@ class MasterAttributeOptionSync
             return ['code' => (string) $model->code, 'label' => $model->p_group_name ?? $model->code, 'is_active' => (bool) $model->is_active];
         }
         if ($model instanceof BusinessType) {
-            return ['code' => (string) $model->code, 'label' => $model->name, 'is_active' => (bool) $model->is_active];
+            return $this->businessTypeRow($model);
         }
         if ($model instanceof Vendor) {
-            return ['code' => (string) $model->code, 'label' => $model->name, 'is_active' => (bool) $model->is_active];
+            return $this->vendorRow($model);
         }
         if ($model instanceof Currency) {
-            return ['code' => strtolower((string) $model->code), 'label' => $model->name, 'is_active' => true];
+            return $this->currencyRow($model);
         }
         if ($model instanceof ProductType) {
-            return ['code' => (string) $model->code, 'label' => $model->name, 'is_active' => (bool) $model->is_active];
+            return $this->productTypeRow($model);
         }
         if ($model instanceof BaseUnit) {
             return $this->baseUnitRow($model);
+        }
+        if ($model instanceof Brand) {
+            return $this->brandRow($model);
         }
 
         return null;
@@ -271,20 +269,97 @@ class MasterAttributeOptionSync
     /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
     private function baseUnitRow(BaseUnit $unit): array
     {
+        return [
+            'code' => (string) $unit->code,
+            'label' => $unit->name,
+            'is_active' => (bool) $unit->is_active,
+            'translations' => $this->translationsMap($unit),
+        ];
+    }
+
+    /**
+     * @return array{code: string, label: string, is_active: bool, translations: array<int, string>}
+     *
+     * เอาเฉพาะ code/name/is_active/translations มา mirror เป็นตัวเลือกของ
+     * pbrand attribute เท่านั้น — thumbnail/parent_id/marketplace brand id ไม่
+     * เกี่ยวกับ "ตัวเลือกใน select field" เลย (เป็นข้อมูลเฉพาะทางของแบรนด์เอง ที่
+     * BrandController/ResolvesProductAttributeValues อ่านตรงจากตาราง brands
+     * โดยไม่ผ่าน AttributeOption อีกต่อไป) เลยไม่ต้องขยาย row shape ให้ซับซ้อน
+     * เกินจำเป็น
+     */
+    private function brandRow(Brand $brand): array
+    {
+        return [
+            'code' => (string) $brand->code,
+            'label' => $brand->name,
+            'is_active' => (bool) $brand->is_active,
+            'translations' => $this->translationsMap($brand),
+        ];
+    }
+
+    /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
+    private function businessTypeRow(BusinessType $businessType): array
+    {
+        return [
+            'code' => (string) $businessType->code,
+            'label' => $businessType->name,
+            'is_active' => (bool) $businessType->is_active,
+            'translations' => $this->translationsMap($businessType),
+        ];
+    }
+
+    /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
+    private function currencyRow(Currency $currency): array
+    {
+        return [
+            'code' => strtolower((string) $currency->code),
+            'label' => $currency->name,
+            'is_active' => true,
+            'translations' => $this->translationsMap($currency),
+        ];
+    }
+
+    /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
+    private function productTypeRow(ProductType $productType): array
+    {
+        return [
+            'code' => (string) $productType->code,
+            'label' => $productType->name,
+            'is_active' => (bool) $productType->is_active,
+            'translations' => $this->translationsMap($productType),
+        ];
+    }
+
+    /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
+    private function vendorRow(Vendor $vendor): array
+    {
+        return [
+            'code' => (string) $vendor->code,
+            'label' => $vendor->name,
+            'is_active' => (bool) $vendor->is_active,
+            'translations' => $this->translationsMap($vendor),
+        ];
+    }
+
+    /**
+     * ดึง translations relation ของโมเดลใดก็ได้ที่มี HasMany ชื่อ `translations`
+     * (BusinessType/Currency/ProductType/BaseUnit/Brand ทุกตัวมี) ออกมาเป็น
+     * map ธรรมดา locale_id => label ใช้ร่วมกันแทนที่จะเขียนซ้ำในแต่ละ *Row()
+     *
+     * @param  Model&object{translations: \Illuminate\Database\Eloquent\Collection}  $model
+     * @return array<int, string>
+     */
+    private function translationsMap(Model $model): array
+    {
         $translations = [];
-        $rows = $unit->relationLoaded('translations') ? $unit->translations : $unit->translations()->get();
+        $rows = $model->relationLoaded('translations') ? $model->translations : $model->translations()->get();
         foreach ($rows as $t) {
             if (trim((string) $t->label) !== '') {
                 $translations[$t->locale_id] = $t->label;
             }
         }
 
-        return [
-            'code' => (string) $unit->code,
-            'label' => $unit->name,
-            'is_active' => (bool) $unit->is_active,
-            'translations' => $translations,
-        ];
+        return $translations;
     }
 
     /** @return array{code: string, label: string, is_active: bool, translations: array<int, string>} */
@@ -348,7 +423,7 @@ class MasterAttributeOptionSync
         if ($model instanceof Currency) {
             return $model->wasChanged('code') ? strtolower((string) $model->getOriginal('code')) : null;
         }
-        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType || $model instanceof BaseUnit) {
+        if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType || $model instanceof BaseUnit || $model instanceof Brand) {
             return $model->wasChanged('code') ? (string) $model->getOriginal('code') : null;
         }
 

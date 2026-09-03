@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
 use App\Models\BusinessType;
+use App\Models\BusinessTypeTranslation;
+use App\Models\Locale;
 use App\Services\CodeGenerator;
+use App\Support\TranslationTracking;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,6 +25,12 @@ use Inertia\Response;
  * Brands/Product Groups). Every write also mirrors into the `business_type`
  * attribute's options (see SyncsAttributeOptionMirror), so it drives that
  * dropdown in Edit Product.
+ *
+ * `name` มีคำแปลหลายภาษาจริงแล้ว (ดู BusinessTypeTranslation / migration
+ * create_business_type_translations_table) — ฟอร์มรับ `translations` (array
+ * locale_id => label) แบบเดียวกับ BaseUnitController/BrandController แทนที่
+ * จะเป็นช่อง `name` เดี่ยวๆ เหมือนเดิม คอลัมน์ `name` ยังคงเก็บชื่อของ locale
+ * เริ่มต้นของแอปไว้เป็น fallback (ที่อื่นในระบบยังอ้างอิงคอลัมน์นี้ตรงๆ อยู่)
  */
 class BusinessTypeController extends Controller
 {
@@ -65,12 +76,21 @@ class BusinessTypeController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validatePayload($request);
+        $translations = $validated['translations'];
 
         $businessType = CodeGenerator::createWithRetry(
             'business_types',
             'biztype',
-            fn ($code) => BusinessType::create([...$validated, 'code' => $code]),
+            fn ($code) => BusinessType::create([
+                'code' => $code,
+                'name' => $validated['name'],
+                'description' => $validated['description'],
+                'is_active' => $validated['is_active'],
+            ]),
         );
+
+        $this->syncTranslations($businessType, $translations);
+        $this->autoTranslate($businessType, $translations);
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $businessType->code, $businessType->name, $businessType->is_active);
 
@@ -79,6 +99,10 @@ class BusinessTypeController extends Controller
 
     public function edit(BusinessType $businessType): Response
     {
+        $translations = $businessType->translations
+            ->mapWithKeys(fn (BusinessTypeTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
         return Inertia::render('catalog/business-types/edit', [
             'businessType' => [
                 'id' => $businessType->id,
@@ -86,12 +110,23 @@ class BusinessTypeController extends Controller
                 'description' => $businessType->description,
                 'is_active' => $businessType->is_active,
             ],
+            'translations' => $translations,
         ]);
     }
 
     public function update(Request $request, BusinessType $businessType): RedirectResponse
     {
-        $businessType->update($this->validatePayload($request, $businessType));
+        $validated = $this->validatePayload($request, $businessType);
+        $translations = $validated['translations'];
+
+        $businessType->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'is_active' => $validated['is_active'],
+        ]);
+
+        $this->syncTranslations($businessType, $translations);
+        $this->autoTranslate($businessType, $translations);
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $businessType->code, $businessType->code, $businessType->name, $businessType->is_active);
 
@@ -108,24 +143,130 @@ class BusinessTypeController extends Controller
     }
 
     /**
+     * ตรวจ translations ก่อน (ต้องมีอย่างน้อยหนึ่งภาษาไม่ว่างเปล่า) แล้วค่อย
+     * resolve เป็น `name` เดี่ยวๆ (ของ locale เริ่มต้นของแอป) เพื่อเช็ค unique
+     * กับ business_types.name ต่อ — ต้องทำเป็น 2 ขั้นแบบนี้เพราะฟอร์มไม่ได้ส่ง
+     * `name` มาตรงๆ อีกต่อไป (ส่งเป็น translations array แทน)
+     *
      * @return array<string, mixed>
      */
     private function validatePayload(Request $request, ?BusinessType $businessType = null): array
     {
         $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-                Rule::unique('business_types', 'name')->ignore($businessType?->id),
-            ],
+            'translations' => ['required', 'array'],
+            'translations.*' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:4000'],
             'is_active' => ['boolean'],
         ]);
 
-        $validated['description'] = $request->input('description');
-        $validated['is_active'] = $request->boolean('is_active', true);
+        $translations = $validated['translations'];
+        $name = $this->resolveName($translations);
 
-        return $validated;
+        Validator::make(
+            ['translations' => $name],
+            ['translations' => ['required', 'string', 'max:255', Rule::unique('business_types', 'name')->ignore($businessType?->id)]],
+        )->validate();
+
+        return [
+            'name' => $name,
+            'translations' => $translations,
+            'description' => $request->input('description'),
+            'is_active' => $request->boolean('is_active', true),
+        ];
+    }
+
+    /**
+     * คัดลอกมาจาก BaseUnitController::resolveName() — ทำให้คอลัมน์ `name`
+     * ตรงกับคำแปลของ locale เริ่มต้นของแอปเสมอ
+     */
+    private function resolveName(array $translations): ?string
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+
+        if ($defaultLocaleId !== null && ! empty(trim((string) ($translations[$defaultLocaleId] ?? '')))) {
+            return trim($translations[$defaultLocaleId]);
+        }
+
+        $firstNonEmpty = collect($translations)->first(fn ($label) => is_string($label) && trim($label) !== '');
+
+        return $firstNonEmpty !== null ? trim($firstNonEmpty) : null;
+    }
+
+    /**
+     * คัดลอกมาจาก BaseUnitController::autoTranslate() — ยึดตามแฟล็ก
+     * "AI translate" ของ attribute แม่ (business_type) เหมือนกับ master อื่นๆ
+     * ที่มีคำแปลหลายภาษา
+     */
+    private function autoTranslate(BusinessType $businessType, array $translations): void
+    {
+        $attribute = Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+        if (! $attribute || ! $attribute->is_ai_translate) {
+            return;
+        }
+
+        [$sourceLocaleId, $sourceLabel] = $this->resolveAutoTranslateSource($translations);
+
+        if ($sourceLocaleId === null || $sourceLabel === '') {
+            return;
+        }
+
+        TranslationTracking::dispatchLabels(
+            BusinessTypeTranslation::class,
+            'business_type_id',
+            $businessType->id,
+            $sourceLocaleId,
+            $sourceLabel,
+            'business-types',
+            $businessType->code,
+            auth()->id(),
+        );
+    }
+
+    /**
+     * คัดลอกมาจาก BaseUnitController::resolveAutoTranslateSource()
+     *
+     * @param  array<int|string, mixed>  $translations
+     * @return array{0: int|null, 1: string}
+     */
+    private function resolveAutoTranslateSource(array $translations): array
+    {
+        $defaultLocaleId = Locale::idForCode(config('app.locale'));
+        $defaultLabel = trim((string) ($translations[$defaultLocaleId] ?? ''));
+
+        if ($defaultLocaleId !== null && $defaultLabel !== '') {
+            return [$defaultLocaleId, $defaultLabel];
+        }
+
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+            if ($label !== '') {
+                return [(int) $localeId, $label];
+            }
+        }
+
+        return [null, ''];
+    }
+
+    /**
+     * คัดลอกมาจาก BaseUnitController::syncTranslations()
+     */
+    private function syncTranslations(BusinessType $businessType, array $translations): void
+    {
+        foreach ($translations as $localeId => $label) {
+            $label = is_string($label) ? trim($label) : '';
+
+            if ($label === '') {
+                BusinessTypeTranslation::where('business_type_id', $businessType->id)
+                    ->where('locale_id', $localeId)
+                    ->delete();
+
+                continue;
+            }
+
+            BusinessTypeTranslation::updateOrCreate(
+                ['business_type_id' => $businessType->id, 'locale_id' => $localeId],
+                ['label' => $label]
+            );
+        }
     }
 }

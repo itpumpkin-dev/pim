@@ -8,6 +8,7 @@ import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
@@ -23,7 +24,7 @@ export default function CurrencyCreate() {
 
     const { data, setData, post, processing, errors, isDirty } = useForm({
         code: '',
-        name: '',
+        translations: {} as Record<string, string>,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -66,10 +67,16 @@ export default function CurrencyCreate() {
                         />
                     </FioriField>
 
-                    <FioriField label={t('currencyName')} htmlFor="cur-name" valueState={valueStateOf(errors.name)} message={errors.name}>
-                        <TextField id="cur-name" fullWidth size="small" value={data.name} onChange={(e) => setData('name', e.target.value)} sx={fioriFieldStateSx(valueStateOf(errors.name))} />
-                    </FioriField>
                 </FioriFormGroup>
+
+                <Stack sx={{ mt: 2 }}>
+                    <LocaleLabelFields
+                        title={t('currencyName')}
+                        description={t('nameHelperText')}
+                        values={data.translations}
+                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                    />
+                </Stack>
 
                 <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 560 }} />
             </Box>

@@ -97,6 +97,7 @@
     "masterSourceCurrencies": "Currencies",
     "masterSourceProductTypes": "Product Types",
     "masterSourceBaseUnits": "Base Units",
+    "masterSourceBrands": "Brands",
     "createAttribute": "Create Attribute",
     "searchAttributes": "Search attributes",
     "noAttributesFound": "No attributes found.",
