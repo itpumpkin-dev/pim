@@ -670,6 +670,8 @@
     "currencyCode": "รหัสสกุลเงิน",
     "currencyName": "ชื่อสกุลเงิน",
     "currencyCodeHelperText": "รหัสแบบ ISO ที่ใช้อ้างอิงจุดอื่น (ช่องทางขาย, เวนเดอร์) เช่น USD, THB",
+    "currencyExchangeRate": "อัตราแลกเปลี่ยน",
+    "currencyExchangeRateHelperText": "อัตราเทียบกับบาท (THB) เช่น 36.5000 สำหรับ USD หมายถึง 1 USD แลกได้ 36.50 บาท ยังไม่มีการคำนวณไหนใช้ค่านี้จริงจัง เก็บไว้เป็นข้อมูลอ้างอิงเท่านั้น",
     "createCurrency": "เพิ่มสกุลเงิน",
     "editCurrency": "แก้ไขสกุลเงิน",
     "searchCurrencies": "ค้นหาสกุลเงิน",

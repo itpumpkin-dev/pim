@@ -37,6 +37,7 @@ interface CurrencyItem {
     id: number;
     code: string;
     name: string;
+    exchange_rate: string;
     channels_count: number;
     vendors_count: number;
 }
@@ -118,6 +119,21 @@ export default function CurrencyIndex({ currencies, filters }: Props) {
             ),
             priority: 'always',
             render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.name}</Typography>,
+        },
+        {
+            key: 'exchange_rate',
+            header: (
+                <TableSortLabel
+                    active={sortField === 'exchange_rate'}
+                    direction={sortField === 'exchange_rate' ? sortDir : 'asc'}
+                    onClick={() => handleSort('exchange_rate')}
+                >
+                    {t('currencyExchangeRate')}
+                </TableSortLabel>
+            ),
+            priority: 'medium',
+            align: 'right',
+            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.exchange_rate}</Typography>,
         },
         {
             key: 'channels_count',

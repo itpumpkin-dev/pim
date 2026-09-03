@@ -16,6 +16,7 @@ interface CurrencyData {
     id: number;
     code: string;
     name: string;
+    exchange_rate: string;
 }
 
 interface Props {
@@ -36,6 +37,7 @@ export default function CurrencyEdit({ currency, translations }: Props) {
     const { data, setData, put, processing, errors, isDirty } = useForm({
         code: currency.code ?? '',
         translations: translations || ({} as Record<string, string>),
+        exchange_rate: currency.exchange_rate ?? '1',
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -75,6 +77,25 @@ export default function CurrencyEdit({ currency, translations }: Props) {
                             value={data.code}
                             onChange={(e) => setData('code', e.target.value.toUpperCase())}
                             sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                        />
+                    </FioriField>
+
+                    <FioriField
+                        label={t('currencyExchangeRate')}
+                        htmlFor="cur-exchange-rate"
+                        valueState={valueStateOf(errors.exchange_rate)}
+                        message={errors.exchange_rate}
+                        hint={t('currencyExchangeRateHelperText')}
+                    >
+                        <TextField
+                            id="cur-exchange-rate"
+                            fullWidth
+                            size="small"
+                            type="number"
+                            inputProps={{ step: '0.0001', min: 0 }}
+                            value={data.exchange_rate}
+                            onChange={(e) => setData('exchange_rate', e.target.value)}
+                            sx={fioriFieldStateSx(valueStateOf(errors.exchange_rate))}
                         />
                     </FioriField>
                 </FioriFormGroup>

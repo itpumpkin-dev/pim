@@ -670,6 +670,8 @@
     "currencyCode": "Currency Code",
     "currencyName": "Currency Name",
     "currencyCodeHelperText": "The ISO-style code used elsewhere (Channels, Vendors), e.g. USD, THB.",
+    "currencyExchangeRate": "Exchange Rate",
+    "currencyExchangeRateHelperText": "Rate against THB — e.g. 36.5000 for USD means 1 USD = 36.50 THB. Not used in any calculation yet, for reference only.",
     "createCurrency": "Add Currency",
     "editCurrency": "Edit Currency",
     "searchCurrencies": "Search currencies",

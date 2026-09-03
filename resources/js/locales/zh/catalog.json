@@ -658,6 +658,8 @@
     "currencyCode": "货币代码",
     "currencyName": "货币名称",
     "currencyCodeHelperText": "在其他位置（渠道、供应商）使用的 ISO 样式代码，例如 USD、THB。",
+    "currencyExchangeRate": "汇率",
+    "currencyExchangeRateHelperText": "相对于泰铢（THB）的汇率 — 例如 USD 为 36.5000 表示 1 美元 = 36.50 泰铢。目前尚未用于任何计算，仅作参考。",
     "createCurrency": "添加货币",
     "editCurrency": "编辑货币",
     "searchCurrencies": "搜索货币",

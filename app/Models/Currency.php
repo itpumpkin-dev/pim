@@ -18,7 +18,17 @@ class Currency extends Model
     protected $fillable = [
         'code',
         'name',
+        'exchange_rate',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            // decimal:4 คืนค่าเป็น string เสมอ (ไม่ใช่ float) กัน rounding error
+            // แบบเดียวกับที่ระบบราคา/สต๊อกของ Product ใช้อยู่แล้ว
+            'exchange_rate' => 'decimal:4',
+        ];
+    }
 
     public function channels(): BelongsToMany
     {

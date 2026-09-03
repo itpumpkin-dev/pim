@@ -25,6 +25,7 @@ export default function CurrencyCreate() {
     const { data, setData, post, processing, errors, isDirty } = useForm({
         code: '',
         translations: {} as Record<string, string>,
+        exchange_rate: '1',
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -67,6 +68,24 @@ export default function CurrencyCreate() {
                         />
                     </FioriField>
 
+                    <FioriField
+                        label={t('currencyExchangeRate')}
+                        htmlFor="cur-exchange-rate"
+                        valueState={valueStateOf(errors.exchange_rate)}
+                        message={errors.exchange_rate}
+                        hint={t('currencyExchangeRateHelperText')}
+                    >
+                        <TextField
+                            id="cur-exchange-rate"
+                            fullWidth
+                            size="small"
+                            type="number"
+                            inputProps={{ step: '0.0001', min: 0 }}
+                            value={data.exchange_rate}
+                            onChange={(e) => setData('exchange_rate', e.target.value)}
+                            sx={fioriFieldStateSx(valueStateOf(errors.exchange_rate))}
+                        />
+                    </FioriField>
                 </FioriFormGroup>
 
                 <Stack sx={{ mt: 2 }}>

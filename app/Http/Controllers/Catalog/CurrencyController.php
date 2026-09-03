@@ -46,7 +46,7 @@ class CurrencyController extends Controller
     {
         $search = trim((string) $request->input('search', ''));
 
-        $sortable = ['code', 'name'];
+        $sortable = ['code', 'name', 'exchange_rate'];
         $sort = in_array($request->input('sort'), $sortable, true) ? $request->input('sort') : 'code';
         $dir = strtolower((string) $request->input('dir')) === 'desc' ? 'desc' : 'asc';
 
@@ -87,6 +87,7 @@ class CurrencyController extends Controller
         $currency = Currency::create([
             'code' => $validated['code'],
             'name' => $validated['name'],
+            'exchange_rate' => $validated['exchange_rate'],
         ]);
 
         $this->syncTranslations($currency, $translations);
@@ -104,7 +105,7 @@ class CurrencyController extends Controller
             ->all();
 
         return Inertia::render('catalog/currencies/edit', [
-            'currency' => $currency->only(['id', 'code', 'name']),
+            'currency' => $currency->only(['id', 'code', 'name', 'exchange_rate']),
             'translations' => $translations,
         ]);
     }
@@ -118,6 +119,7 @@ class CurrencyController extends Controller
         $currency->update([
             'code' => $validated['code'],
             'name' => $validated['name'],
+            'exchange_rate' => $validated['exchange_rate'],
         ]);
 
         $this->syncTranslations($currency, $translations);
@@ -158,6 +160,9 @@ class CurrencyController extends Controller
             ],
             'translations' => ['required', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
+            // เทียบกับ THB — เช่น USD = 36.5000 หมายถึง 1 USD แลกได้ 36.50 บาท
+            // (ดู docblock ของ migration add_exchange_rate_to_currencies_table)
+            'exchange_rate' => ['required', 'numeric', 'gt:0', 'max:99999999.9999'],
         ]);
 
         $translations = $validated['translations'];
@@ -169,6 +174,7 @@ class CurrencyController extends Controller
             'code' => $validated['code'],
             'name' => $name,
             'translations' => $translations,
+            'exchange_rate' => $validated['exchange_rate'],
         ];
     }
 
