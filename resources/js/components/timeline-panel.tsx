@@ -41,9 +41,13 @@ const CATEGORY_FILTERS: Array<{ key: 'all' | TimelineCategory; labelKey: string 
 ];
 
 const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIcon; color: string }> = {
-    created: { label: 'Account created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
-    updated: { label: 'Profile updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
-    deleted: { label: 'Account deleted', icon: DeleteOutlineIcon, color: '#dc2626' },
+    // "created"/"updated"/"deleted" are the generic events the Auditable
+    // trait fires automatically for ANY model (see app/Models/Concerns/
+    // Auditable.php) — kept entity-agnostic ("Record ...") since this panel
+    // is shared across users, products, and anything else Auditable.
+    created: { label: 'Record created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
+    updated: { label: 'Record updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
+    deleted: { label: 'Record deleted', icon: DeleteOutlineIcon, color: '#dc2626' },
     login: { label: 'Logged in', icon: LoginIcon, color: '#16a34a' },
     logout: { label: 'Logged out', icon: LogoutIcon, color: '#64748b' },
     login_failed: { label: 'Failed login attempt', icon: ErrorOutlineIcon, color: '#dc2626' },
@@ -55,6 +59,11 @@ const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIc
     labels_updated: { label: 'Labels updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
     published_shops_updated: { label: 'Sales channels updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
     import_run: { label: 'Import run', icon: HistoryOutlinedIcon, color: '#0891b2' },
+    // ProductController::recordProductValueChanges() — the two events that
+    // cover almost every real product edit (plain product-row column
+    // changes already fall under "updated" above via the Auditable trait).
+    attribute_values_updated: { label: 'Product details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
+    variant_values_updated: { label: 'Variant details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
 };
 
 // 'work' entries land on humanize() for their label; keep a distinct icon/tint

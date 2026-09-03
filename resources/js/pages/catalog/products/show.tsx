@@ -25,6 +25,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLayout from '@/layouts/app-layout';
 import { CategoryPathReadOnly } from '@/components/category-cascade-select';
+import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { HistoryPanel } from '@/components/history-panel';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { useLocale } from '@/hooks/use-locale';
@@ -322,9 +323,22 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
     }
 
     if (attr.type === 'file') {
+        const filename = value.split('/').pop() || value;
+
+        // attribute แบบ 'file' รับได้ทุกชนิดไฟล์ (ดู AttributeValueFormatter::format())
+        // — preview เป็น FioriPdfViewer ให้เฉพาะไฟล์ที่เป็น .pdf จริงๆ ไฟล์ชนิดอื่น
+        // ยังคงเป็นลิงก์เปิดแท็บใหม่ธรรมดาเหมือนเดิม
+        if (filename.toLowerCase().endsWith('.pdf')) {
+            return (
+                <Box sx={{ maxWidth: 480 }}>
+                    <FioriPdfViewer src={resolveStorageUrl(value)} title={filename} height={320} />
+                </Box>
+            );
+        }
+
         return (
             <a href={resolveStorageUrl(value)} target="_blank" rel="noreferrer">
-                {value.split('/').pop() || value}
+                {filename}
             </a>
         );
     }

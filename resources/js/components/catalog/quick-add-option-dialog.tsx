@@ -25,9 +25,13 @@ export interface ExistingOption {
 /**
  * ให้ผู้ใช้เพิ่ม option ใหม่ให้ attribute แบบ select/multiselect ได้โดยไม่ต้อง
  * ออกจากฟอร์มสินค้า — เปิดจาก field ของ attribute นั้นในหน้าแก้ไขสินค้า ยิง
- * ไปที่ endpoint เดียวกับหน้า CRUD options เต็มรูปแบบในหน้าแก้ไข attribute
- * (attribute-options-panel.tsx) เพื่อให้สิทธิ์การใช้งานและ validation
- * เหมือนกันเป๊ะๆ ตัวนี้แค่เป็นทางเข้าแบบแคบๆ สำหรับเพิ่มทีละ option เท่านั้น
+ * ไปที่ endpoint แยกต่างหาก (attributes.options.quickAdd) ที่ใช้ controller
+ * method เดียวกันกับหน้า CRUD options เต็มรูปแบบในหน้าแก้ไข attribute
+ * (attribute-options-panel.tsx ยิงไป attributes.options.store) เพื่อให้
+ * validation เหมือนกันเป๊ะๆ แต่ *สิทธิ์* แยกกัน — ตัวนี้กด attributes.
+ * quick_add_options ต่างหาก ไม่ต้องมี attributes.edit_attributes เต็มรูปแบบ
+ * (ซึ่งเปิดให้แก้ไขนิยามของ attribute เองด้วย) ก็เพิ่ม option ทีละตัวจากหน้า
+ * สินค้าได้ ตัวนี้ยังเป็นแค่ทางเข้าแบบแคบๆ สำหรับเพิ่มทีละ option เท่านั้น
  *
  * เก็บ label แค่ของ locale ที่กำลังแก้อยู่ในหน้าสินค้าตอนนั้น (ไม่เก็บทุก
  * locale พร้อมกัน) — locale อื่นค่อยไปกรอกทีหลังจากหน้า options panel เต็ม
@@ -86,7 +90,7 @@ export function QuickAddOptionDialog({
         setError(null);
 
         router.post(
-            `/catalog/attributes/${attributeId}/options`,
+            `/catalog/attributes/${attributeId}/options/quick-add`,
             {
                 translations: activeLocale ? { [String(activeLocale.id)]: label } : {},
                 swatch_value: swatchType === 'color' ? swatchText : undefined,

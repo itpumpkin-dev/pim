@@ -14,6 +14,7 @@ use App\Http\Controllers\Catalog\CommissionGroupController;
 use App\Http\Controllers\Catalog\CurrencyController;
 use App\Http\Controllers\Catalog\PointController;
 use App\Http\Controllers\Catalog\ProductController;
+use App\Http\Controllers\Catalog\ProductGradeController;
 use App\Http\Controllers\Catalog\ProductGroupController;
 use App\Http\Controllers\Catalog\ProductTypeController;
 use App\Http\Controllers\Catalog\SubcategoryController;
@@ -61,6 +62,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
     Route::post('products/{product}/upload-description-image', [ProductController::class, 'uploadDescriptionImage'])->name('products.uploadDescriptionImage')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
+    Route::get('products/{product}/timeline', [ProductController::class, 'timeline'])->name('products.timeline')->middleware('permission:products,view_history');
     Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:products,edit_products');
     Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:products,edit_products');
     Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:products,edit_products');
@@ -108,6 +110,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::delete('attributes/{attribute}', [AttributeController::class, 'destroy'])->name('attributes.destroy')->middleware('permission:attributes,delete_attributes');
     Route::get('attributes/{attribute}/history', [AttributeController::class, 'history'])->name('attributes.history')->middleware('permission:attributes,view_history');
     Route::post('attributes/{attribute}/options', [AttributeOptionController::class, 'store'])->name('attributes.options.store')->middleware('permission:attributes,edit_attributes');
+    // เส้นทางเดียวกันเป๊ะกับด้านบน (AttributeOptionController::store() ตัวเดิม
+    // ไม่ได้แก้อะไรเลย) แค่แยกสิทธิ์ออกมาต่างหาก — ใช้โดย QuickAddOptionDialog
+    // บนหน้าแก้ไขสินค้าเท่านั้น (เพิ่ม option ทีละตัวแบบเร็วๆ ไม่ออกจากฟอร์ม
+    // สินค้า) เดิม dialog นี้ยิงไป route เดียวกับหน้า options CRUD เต็มรูปแบบ
+    // เลยต้องมีสิทธิ์ attributes.edit_attributes ทั้งที่ผู้ใช้ไม่จำเป็นต้องมีสิทธิ์
+    // แก้ไขตัว attribute เองเลยก็ได้ — แยกเป็น attributes.quick_add_options
+    // ต่างหาก (ดู migration split_quick_add_options_permission_from_attributes)
+    Route::post('attributes/{attribute}/options/quick-add', [AttributeOptionController::class, 'store'])->name('attributes.options.quickAdd')->middleware('permission:attributes,quick_add_options');
     // ต้อง register route นี้ไว้ก่อน route {option} ด้านล่าง ไม่งั้นคำว่า "batch" จะถูกตีความเป็น {option} id ไปแทน
     Route::put('attributes/{attribute}/options/batch', [AttributeOptionController::class, 'batchUpdate'])->name('attributes.options.batchUpdate')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'update'])->name('attributes.options.update')->middleware('permission:attributes,edit_attributes');
@@ -269,6 +279,13 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('product-types/{productType}', [ProductTypeController::class, 'update'])->name('productTypes.update')->middleware('permission:product_types,edit_product_types');
     Route::delete('product-types/{productType}', [ProductTypeController::class, 'destroy'])->name('productTypes.destroy')->middleware('permission:product_types,edit_product_types');
 
+    Route::get('product-grades', [ProductGradeController::class, 'index'])->name('productGrades.index')->middleware('permission:product_grades,list_product_grades');
+    Route::get('product-grades/create', [ProductGradeController::class, 'create'])->name('productGrades.create')->middleware('permission:product_grades,edit_product_grades');
+    Route::post('product-grades', [ProductGradeController::class, 'store'])->name('productGrades.store')->middleware('permission:product_grades,edit_product_grades');
+    Route::get('product-grades/{productGrade}/edit', [ProductGradeController::class, 'edit'])->name('productGrades.edit')->middleware('permission:product_grades,edit_product_grades');
+    Route::put('product-grades/{productGrade}', [ProductGradeController::class, 'update'])->name('productGrades.update')->middleware('permission:product_grades,edit_product_grades');
+    Route::delete('product-grades/{productGrade}', [ProductGradeController::class, 'destroy'])->name('productGrades.destroy')->middleware('permission:product_grades,edit_product_grades');
+
     // "เวนเดอร์" (Vendors) master — own `vendors` table, own `vendors.*`
     // permissions backfilled from `categories.*`. `edit_vendors` covers
     // every write.
@@ -389,7 +406,6 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::middleware('permission:products,list_products')->group(function () use ($stub) {
         Route::get('bom', $stub('bom'))->name('bom.index');
-        Route::get('product-grades', $stub('productGrades'))->name('productGrades.index');
 
         Route::get('marketplace/connect/{platform}', fn (string $platform) => Inertia::render('catalog/placeholder', [
             'titleKey' => 'marketplaceConnect',

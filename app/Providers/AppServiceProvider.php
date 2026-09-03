@@ -15,6 +15,8 @@ use App\Models\CommissionGroup;
 use App\Models\Currency;
 use App\Models\CurrencyTranslation;
 use App\Models\Point;
+use App\Models\ProductGrade;
+use App\Models\ProductGradeTranslation;
 use App\Models\ProductType;
 use App\Models\ProductTypeTranslation;
 use App\Models\Vendor;
@@ -30,7 +32,7 @@ use Illuminate\Support\ServiceProvider;
 class AppServiceProvider extends ServiceProvider
 {
     /** Master models whose rows mirror into a bound `select` attribute's options. */
-    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class, BaseUnit::class, Brand::class];
+    private const MASTER_MODELS = [Category::class, Point::class, CommissionGroup::class, BusinessType::class, Vendor::class, Currency::class, ProductType::class, BaseUnit::class, Brand::class, ProductGrade::class];
 
     /**
      * Register any application services.
@@ -125,6 +127,16 @@ class AppServiceProvider extends ServiceProvider
         };
         VendorTranslation::saved($syncVendorTranslationParent);
         VendorTranslation::deleted($syncVendorTranslationParent);
+
+        // เหตุผลเดียวกัน — ชื่อของ ProductGrade ก็มีหลาย locale อยู่บนโมเดลลูกแยก
+        // ต่างหาก (product_grade_translations) เช่นกัน
+        $syncProductGradeTranslationParent = function (ProductGradeTranslation $translation) use ($sync): void {
+            if ($productGrade = $translation->productGrade) {
+                $sync()->syncModel($productGrade);
+            }
+        };
+        ProductGradeTranslation::saved($syncProductGradeTranslationParent);
+        ProductGradeTranslation::deleted($syncProductGradeTranslationParent);
 
         // routes/api.php had no throttling at all — enabled via
         // ->throttleApi() in bootstrap/app.php, which applies this 'api'

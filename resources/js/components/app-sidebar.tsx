@@ -113,7 +113,7 @@ function useMainNavItems(): NavItem[] {
                             {
                                 title: t('productGrades'),
                                 url: '/catalog/product-grades',
-                                permission: 'products.list_products',
+                                permission: 'product_grades.list_product_grades',
                             },
                             {
                                 title: t('vendors'),

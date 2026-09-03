@@ -2001,6 +2001,32 @@ class ProductController extends Controller
     }
 
     /**
+     * Same audit trail as history() above (every AuditLog row against this
+     * product — plain field edits via the Auditable trait, plus the
+     * domain-specific attribute_values_updated/variant_values_updated/
+     * published_shops_updated/duplicated/pushed_to_{platform} events this
+     * controller and SyncProductToMarketplaceJob record explicitly), just
+     * reshaped for TimelinePanel (`{event, created_at, actor, diff}`) instead
+     * of HistoryPanel's numbered-version table shape — a vertical "who did
+     * what, when" view of the product for the Edit Product page's Timeline
+     * tab. `category`/`subject_type`/`subject_id` are left out on purpose:
+     * those only matter for UserController::history()'s multi-source query
+     * (sign-in vs account vs work), and TimelinePanel already treats them as
+     * optional for exactly this reason.
+     */
+    public function timeline(Product $product): JsonResponse
+    {
+        return response()->json([
+            'timeline' => $this->versionHistoryFor($product)->map(fn (array $entry) => [
+                'event' => $entry['event'],
+                'created_at' => $entry['created_at'],
+                'actor' => $entry['user'],
+                'diff' => $entry['diff'],
+            ])->values(),
+        ]);
+    }
+
+    /**
      * เช็คแบบ read-only แบบเรียลไทม์ว่าสินค้านี้ live อยู่บน Lazada สำหรับ shop
      * นี้จริงๆ ตอนนี้หรือเปล่า — ถูกเรียกจากหน้า Edit Product ตอนเปิด dialog
      * ยืนยัน Push/Deactivate เพื่อให้เห็นสถานะปัจจุบันจริงๆ ของ Lazada แทนที่

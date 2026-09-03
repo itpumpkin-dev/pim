@@ -13,6 +13,7 @@ use App\Models\CommissionGroup;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Models\Point;
+use App\Models\ProductGrade;
 use App\Models\ProductType;
 use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Model;
@@ -54,6 +55,7 @@ class MasterAttributeOptionSync
         'product_types' => ['label' => 'masterSourceProductTypes', 'model' => ProductType::class],
         'base_units' => ['label' => 'masterSourceBaseUnits', 'model' => BaseUnit::class],
         'brands' => ['label' => 'masterSourceBrands', 'model' => Brand::class],
+        'product_grades' => ['label' => 'masterSourceProductGrades', 'model' => ProductGrade::class],
     ];
 
     private const CATEGORY_DEPTH_KEYS = ['categories', 'subcategories', 'product_groups'];
@@ -223,6 +225,7 @@ class MasterAttributeOptionSync
             'product_types' => ProductType::with('translations')->get()->map(fn (ProductType $p) => $this->productTypeRow($p))->all(),
             'base_units' => BaseUnit::with('translations')->get()->map(fn (BaseUnit $u) => $this->baseUnitRow($u))->all(),
             'brands' => Brand::with('translations')->get()->map(fn (Brand $b) => $this->brandRow($b))->all(),
+            'product_grades' => ProductGrade::with('translations')->get()->map(fn (ProductGrade $g) => $this->productGradeRow($g))->all(),
             default => [],
         };
     }
@@ -261,6 +264,9 @@ class MasterAttributeOptionSync
         }
         if ($model instanceof Brand) {
             return $this->brandRow($model);
+        }
+        if ($model instanceof ProductGrade) {
+            return $this->productGradeRow($model);
         }
 
         return null;
@@ -327,6 +333,25 @@ class MasterAttributeOptionSync
             'label' => $productType->name,
             'is_active' => (bool) $productType->is_active,
             'translations' => $this->translationsMap($productType),
+        ];
+    }
+
+    /**
+     * @return array{code: string, label: string, is_active: bool, translations: array<int, string>}
+     *
+     * เหตุผลเดียวกับ currencyRow() — code ของ ProductGrade เก็บแบบมีตัวพิมพ์ใหญ่
+     * ไว้ให้อ่านง่าย (A/B/C/Z) ส่วน mirror ต้อง lowercase เสมอ
+     * (normaliseCode() ของ upsertOption() ด้านบน) ProductValue.value ของสินค้า
+     * ที่ import มา (ดู migration migrate_grade_standard_values) ก็เก็บเป็นตัว
+     * พิมพ์เล็กไว้ตรงกันแล้ว
+     */
+    private function productGradeRow(ProductGrade $grade): array
+    {
+        return [
+            'code' => strtolower((string) $grade->code),
+            'label' => $grade->name,
+            'is_active' => (bool) $grade->is_active,
+            'translations' => $this->translationsMap($grade),
         ];
     }
 
@@ -420,7 +445,7 @@ class MasterAttributeOptionSync
         if ($model instanceof Point) {
             return $model->wasChanged('point_type') ? (string) $model->getOriginal('point_type') : null;
         }
-        if ($model instanceof Currency) {
+        if ($model instanceof Currency || $model instanceof ProductGrade) {
             return $model->wasChanged('code') ? strtolower((string) $model->getOriginal('code')) : null;
         }
         if ($model instanceof CommissionGroup || $model instanceof BusinessType || $model instanceof Vendor || $model instanceof ProductType || $model instanceof BaseUnit || $model instanceof Brand) {

@@ -1,6 +1,10 @@
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import CloseIcon from '@mui/icons-material/Close';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import { Box, Paper, Typography, type SxProps, type Theme } from '@mui/material';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
+import { Box, IconButton, Paper, Typography, type SxProps, type Theme } from '@mui/material';
 import { type ReactNode } from 'react';
 
 /**
@@ -14,7 +18,14 @@ import { type ReactNode } from 'react';
  *                         compact 2rem height, 0.375rem corners, darker border, brand hover/focus,
  *                         plus the 2px border + tint for a non-None value state
  *  - valueStateOf       = map an Inertia error string → value state
- *  - <FioriFormErrorSummary> = message strip shown on submit when fields need fixing
+ *  - <FioriMessageStrip>    = Message Strip (ref: UI elements → Message Strip) — inline,
+ *                         dismissible banner for information/success/warning/error,
+ *                         reused anywhere a page needs to talk to the user in-context
+ *                         (status checks, background-job results, form-level errors)
+ *                         instead of a plain MUI <Alert>
+ *  - <FioriFormErrorSummary> = the error-severity Message Strip shown on submit when
+ *                         fields need fixing (kept as its own component since every
+ *                         master form already calls it with this exact narrow API)
  */
 
 export type FioriValueState = 'none' | 'error' | 'warning' | 'success' | 'information';
@@ -321,6 +332,71 @@ export function FioriField({
     );
 }
 
+export type FioriMessageStripSeverity = 'information' | 'success' | 'warning' | 'error';
+
+const MESSAGE_STRIP_ICON: Record<FioriMessageStripSeverity, typeof ErrorOutlineIcon> = {
+    information: InfoOutlinedIcon,
+    success: CheckCircleOutlineIcon,
+    warning: WarningAmberOutlinedIcon,
+    error: ErrorOutlineIcon,
+};
+
+interface FioriMessageStripProps {
+    severity?: FioriMessageStripSeverity;
+    /** shown as a trailing "×" button; omit for a non-dismissible strip */
+    onClose?: () => void;
+    /** override the default per-severity icon, or pass `false` to hide it */
+    icon?: ReactNode | false;
+    children: ReactNode;
+    sx?: SxProps<Theme>;
+}
+
+/**
+ * SAP Fiori "Message Strip" — a compact, inline banner for talking to the
+ * user in-context (validation feedback, a background job's result, a
+ * status check inside a dialog) rather than a full-page toast. Reuses the
+ * same value-state palette as the form fields above so a strip and the
+ * field it's commenting on always agree on what "error"/"warning"/etc. look
+ * like. Drop-in replacement for a plain MUI `<Alert severity="...">` —
+ * same `severity` values (MUI's "info" is spelled "information" here to
+ * match `FioriValueState`).
+ * ref: sap.com/design-system/fiori-design-web → UI elements → Message Strip
+ */
+export function FioriMessageStrip({ severity = 'information', onClose, icon, children, sx }: FioriMessageStripProps) {
+    const { fg, bg } = STATE_COLOR[severity];
+    const Icon = MESSAGE_STRIP_ICON[severity];
+
+    return (
+        <Box
+            role="alert"
+            sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                px: 2,
+                py: 1.25,
+                borderRadius: '8px',
+                bgcolor: bg,
+                border: `1px solid ${fg}`,
+                color: FIORI.textPrimary,
+                ...sx,
+            }}
+        >
+            {icon !== false && (icon ?? <Icon sx={{ fontSize: 18, color: fg, flexShrink: 0, mt: '1px' }} />)}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" component="div">
+                    {children}
+                </Typography>
+            </Box>
+            {onClose && (
+                <IconButton size="small" onClick={onClose} sx={{ mt: '-4px', mr: '-4px', color: fg, flexShrink: 0 }}>
+                    <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+            )}
+        </Box>
+    );
+}
+
 interface FioriFormErrorSummaryProps {
     /** the Inertia `errors` object; the strip only renders when it has keys */
     errors: Record<string, string | undefined>;
@@ -328,29 +404,14 @@ interface FioriFormErrorSummaryProps {
     sx?: SxProps<Theme>;
 }
 
-/** Fiori message strip — shown at the top/bottom of a form after a failed submit. */
+/** The error-severity Message Strip shown at the top/bottom of a form after a failed submit. */
 export function FioriFormErrorSummary({ errors, message, sx }: FioriFormErrorSummaryProps) {
     const count = Object.keys(errors).filter((k) => errors[k]).length;
     if (count === 0) return null;
 
     return (
-        <Box
-            role="alert"
-            sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                px: 2,
-                py: 1.25,
-                borderRadius: '8px',
-                bgcolor: FIORI.errorBg,
-                border: `1px solid ${FIORI.error}`,
-                color: FIORI.textPrimary,
-                ...sx,
-            }}
-        >
-            <ErrorOutlineIcon sx={{ fontSize: 18, color: FIORI.error, flexShrink: 0 }} />
-            <Typography variant="body2">{message}</Typography>
-        </Box>
+        <FioriMessageStrip severity="error" sx={sx}>
+            {message}
+        </FioriMessageStrip>
     );
 }

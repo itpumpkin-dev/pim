@@ -1,10 +1,12 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
-import { FioriFormGroup, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriFormGroup, FioriMessageStrip, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
 import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
+import { TimelinePanel } from '@/components/timeline-panel';
 import { useLocale } from '@/hooks/use-locale';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
@@ -37,8 +39,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import PublishIcon from '@mui/icons-material/Publish';
 import TranslateIcon from '@mui/icons-material/Translate';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
-    Alert,
     Autocomplete,
     Box,
     Button,
@@ -262,7 +264,11 @@ export default function ProductEdit({
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
     const { t } = useTranslation('catalog');
     const { auth } = usePage<SharedData>().props;
-    const canAddAttributeOptions = auth.permissions.includes('attributes.edit_attributes');
+    // แยกออกมาจาก attributes.edit_attributes แล้ว (ดู migration
+    // split_quick_add_options_permission_from_attributes) — ผู้ใช้ไม่ต้องมีสิทธิ์
+    // แก้ไขนิยามของ attribute เต็มรูปแบบ แค่มีสิทธิ์เพิ่ม option ทีละตัวจากหน้า
+    // สินค้าก็พอ
+    const canAddAttributeOptions = auth.permissions.includes('attributes.quick_add_options');
     const [tabIndex, setTabIndex] = useState(0);
     // แท็บย่อยภายในแท็บหลัก "General" ใช้จัดกลุ่มเนื้อหาฟอร์มฝั่งคอลัมน์ซ้าย —
     // ลำดับอ้างอิงตาม layout ต้นแบบ: General info -> Attributes -> Details ->
@@ -1309,6 +1315,24 @@ export default function ProductEdit({
                                 More
                             </Button>
 
+                            {/* ลิงก์ไปหน้า products.show ของสินค้าที่ id นี้ตรงๆ (เปิดแท็บใหม่ ไม่
+                                ทับหน้าฟอร์มที่ยังแก้ไขค้างอยู่) — เพราะสินค้าตัวนี้ถูกบันทึกไว้แล้ว
+                                (มี id ถึงมาถึงหน้า Edit ได้) ผู้ใช้เลยดูข้อมูลที่บันทึกไว้ล่าสุดได้เลย
+                                โดยไม่ต้องกด Save Product ก่อน (จะเห็นเป็นค่าที่ยังไม่ถูก save ล่าสุดถ้ามี
+                                การแก้ไขค้างอยู่ในฟอร์มนี้ ตามที่คาดหวังไว้)
+                            */}
+                            <Button
+                                component={Link}
+                                href={`/catalog/products/${product.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                variant="outlined"
+                                startIcon={<VisibilityIcon fontSize="small" />}
+                                sx={{ ...fioriDefaultSx, px: 2.5 }}
+                            >
+                                View Product
+                            </Button>
+
                             <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
                                 Back
                             </Button>
@@ -1337,7 +1361,7 @@ export default function ProductEdit({
                 <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
                     {Object.keys(errors).length > 0 && (
                         <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
-                            <Alert severity="error">
+                            <FioriMessageStrip severity="error">
                                 <Typography variant="body2" fontWeight={700}>
                                     {t('correctErrorsBeforeSaving')}
                                 </Typography>
@@ -1346,7 +1370,7 @@ export default function ProductEdit({
                                         {message}
                                     </Typography>
                                 ))}
-                            </Alert>
+                            </FioriMessageStrip>
                         </Box>
                     )}
 
@@ -1483,9 +1507,9 @@ export default function ProductEdit({
                                                             {visibleAttrs.length === 0 &&
                                                                 isGeneral &&
                                                                 assignedGroups.length === 1 && (
-                                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                    <FioriMessageStrip severity="information">
                                                                         {t('noAttributeFamilyBoundYet')}
-                                                                    </Typography>
+                                                                    </FioriMessageStrip>
                                                                 )}
 
                                                             {visibleAttrs.length === 0 &&
@@ -1826,6 +1850,24 @@ export default function ProductEdit({
                                             </Stack>
                                         </Paper> */}
 
+                                        {/* แผง "เส้นทางสินค้า" — timeline ของสินค้านี้ทั้งหมด (ใครแก้อะไร
+                                        ตอนไหน) วางไว้เป็น block ข้าง sidebar ของแท็บ General แทนที่จะเป็น
+                                        แท็บแยก จะได้เห็นควบคู่ไปกับฟอร์มหลักโดยไม่ต้องสลับแท็บ — ข้อมูลชุด
+                                        เดียวกับแท็บ History เป๊ะ (audit log ของสินค้านี้) แค่จัดรูปแบบเป็น
+                                        เส้นเวลาแนวตั้งแทนตาราง (ดู ProductController::timeline()) จำกัด
+                                        ความสูงแล้วให้ scroll ในตัวเอง ไม่งั้น sidebar จะยาวเกินไปถ้าสินค้ามี
+                                        ประวัติแก้ไขเยอะ */}
+                                        {canViewHistory && (
+                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
+                                                    Timeline
+                                                </Typography>
+                                                <Box sx={{ maxHeight: 480, overflowY: 'auto', pr: 0.5 }}>
+                                                    <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
+                                                </Box>
+                                            </Paper>
+                                        )}
+
                                         {/* แผง Sales Channels */}
                                         <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                             <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
@@ -1899,11 +1941,11 @@ export default function ProductEdit({
                                                                                 'published_shop_ids',
                                                                                 allInGroupChecked
                                                                                     ? data.published_shop_ids.filter(
-                                                                                          (id) => !groupShopIds.includes(id),
-                                                                                      )
+                                                                                        (id) => !groupShopIds.includes(id),
+                                                                                    )
                                                                                     : Array.from(
-                                                                                          new Set([...data.published_shop_ids, ...groupShopIds]),
-                                                                                      ),
+                                                                                        new Set([...data.published_shop_ids, ...groupShopIds]),
+                                                                                    ),
                                                                             );
                                                                         }}
                                                                         sx={{ p: 0.5 }}
@@ -2130,24 +2172,24 @@ export default function ProductEdit({
                                     </Typography>
                                 </Stack>
                             ) : pushStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
                                     {t('statusCheckFailed', { error: pushStatusCheck.error })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : pushStatusCheck.never_pushed ? (
-                                <Alert severity="info" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="information" sx={{ py: 0.5 }}>
                                     {t('neverPushedCreateNew')}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : pushStatusCheck.is_live ? (
-                                <Alert severity="success" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
                                     {t('currentlyLiveWillUpdate', { platform: pushConfirmShop?.platform })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : (
-                                <Alert severity="info" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="information" sx={{ py: 0.5 }}>
                                     {t('existsNotActiveWillUpdate', {
                                         platform: pushConfirmShop?.platform,
                                         status: pushStatusCheck.status ?? t('statusUnknown'),
                                     })}
-                                </Alert>
+                                </FioriMessageStrip>
                             )}
                         </Box>
                     )}
@@ -2182,9 +2224,9 @@ export default function ProductEdit({
                                 )}
                             </Stack>
                             {fillTranslationResult && (
-                                <Alert severity={fillTranslationResult.severity} sx={{ mt: 1.5, py: 0 }}>
+                                <FioriMessageStrip severity={fillTranslationResult.severity === 'info' ? 'information' : fillTranslationResult.severity} sx={{ mt: 1.5, py: 0.5 }}>
                                     {fillTranslationResult.message}
-                                </Alert>
+                                </FioriMessageStrip>
                             )}
                         </>
                     )}
@@ -2221,24 +2263,24 @@ export default function ProductEdit({
                                     </Typography>
                                 </Stack>
                             ) : deactivateStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
                                     {t('statusCheckFailed', { error: deactivateStatusCheck.error })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : deactivateStatusCheck.never_pushed ? (
-                                <Alert severity="error" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
                                     {t('neverPushedNothingToDeactivate')}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : !deactivateStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
                                     {t('alreadyNotActiveNothingToDeactivate', {
                                         platform: deactivateConfirmShop?.platform,
                                         status: deactivateStatusCheck.status ?? t('statusUnknown'),
                                     })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
                                     {t('confirmedCurrentlyLive', { platform: deactivateConfirmShop?.platform })}
-                                </Alert>
+                                </FioriMessageStrip>
                             )}
                         </Box>
                     )}
@@ -2280,24 +2322,24 @@ export default function ProductEdit({
                                     </Typography>
                                 </Stack>
                             ) : deleteListingStatusCheck.error ? (
-                                <Alert severity="warning" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="warning" sx={{ py: 0.5 }}>
                                     {t('statusCheckFailed', { error: deleteListingStatusCheck.error })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : deleteListingStatusCheck.never_pushed ? (
-                                <Alert severity="error" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
                                     {t('neverPushedNothingToDelete')}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : !deleteListingStatusCheck.is_live ? (
-                                <Alert severity="error" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
                                     {t('alreadyNotActiveNothingToDelete', {
                                         platform: deleteListingConfirmShop?.platform,
                                         status: deleteListingStatusCheck.status ?? t('statusUnknown'),
                                     })}
-                                </Alert>
+                                </FioriMessageStrip>
                             ) : (
-                                <Alert severity="success" sx={{ py: 0 }}>
+                                <FioriMessageStrip severity="success" sx={{ py: 0.5 }}>
                                     {t('confirmedCurrentlyLive', { platform: deleteListingConfirmShop?.platform })}
-                                </Alert>
+                                </FioriMessageStrip>
                             )}
                         </Box>
                     )}
@@ -2374,15 +2416,15 @@ export default function ProductEdit({
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
                     {variantOverflow !== null && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
+                        <FioriMessageStrip severity="error" sx={{ mb: 2 }}>
                             {t('tooManyVariantCombinations', { count: variantOverflow, max: MAX_VARIANT_COMBINATIONS })}
-                        </Alert>
+                        </FioriMessageStrip>
                     )}
                     {data.variants.length > 0 && (
-                        <Alert severity="warning" sx={{ mb: 2 }}>
+                        <FioriMessageStrip severity="warning" sx={{ mb: 2 }}>
                             การสร้างใหม่จะแทนที่ตารางตัวเลือกสินค้าปัจจุบัน — ตัวเลือกที่ยังคงอยู่ (attribute/ค่าเดิม) จะเก็บ SKU/ราคา/สต๊อกเดิมไว้ให้
                             ส่วนตัวเลือกที่ไม่ได้อยู่ในชุดที่ generate ใหม่จะถูกลบออกเมื่อกด Save
-                        </Alert>
+                        </FioriMessageStrip>
                     )}
                     <Autocomplete
                         multiple
@@ -2414,9 +2456,9 @@ export default function ProductEdit({
                 onClose={() => setPushResult(null)}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-                <Alert onClose={() => setPushResult(null)} severity={pushResult?.severity ?? 'success'} sx={{ width: '100%' }}>
+                <FioriMessageStrip onClose={() => setPushResult(null)} severity={pushResult?.severity ?? 'success'} sx={{ width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.16)' }}>
                     {pushResult?.message}
-                </Alert>
+                </FioriMessageStrip>
             </Snackbar>
         </AppLayout>
     );
@@ -2621,7 +2663,7 @@ function RenderAttributeInput({
     const [galleryError, setGalleryError] = useState<string | null>(null);
 
     useEffect(() => {
-        if ((attr.type === 'image' || attr.type === 'video') && value instanceof File) {
+        if ((attr.type === 'image' || attr.type === 'video' || attr.type === 'file') && value instanceof File) {
             const url = URL.createObjectURL(value);
             setFilePreviewUrl(url);
             return () => URL.revokeObjectURL(url);
@@ -3065,14 +3107,27 @@ function RenderAttributeInput({
 
         let existingLabel = '';
         let existingImageUrl = '';
+        let existingFileUrl = '';
         if (!selectedName && stringValue) {
             existingLabel = stringValue.split('/').pop() || stringValue;
+            const resolvedUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/') ? stringValue : `/storage/${stringValue}`;
             if (isImage) {
-                existingImageUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/') ? stringValue : `/storage/${stringValue}`;
+                existingImageUrl = resolvedUrl;
+            } else {
+                existingFileUrl = resolvedUrl;
             }
         }
 
         const previewSrc = filePreviewUrl || existingImageUrl;
+
+        // แสดง FioriPdfViewer ให้เฉพาะ attribute แบบ 'file' (ไม่ใช่ 'image') ที่
+        // ไฟล์ปัจจุบัน (เพิ่งเลือกใหม่ยังไม่ได้ save หรือของเดิมที่ save ไว้แล้ว)
+        // เป็น .pdf — attribute แบบ 'file' เป็น field ทั่วไปที่รับได้ทุกชนิดไฟล์
+        // (ดู AttributeValueFormatter::format()) เลยต้องเช็คนามสกุล/ชนิดไฟล์ก่อน
+        // จะ preview เป็น PDF ไม่ใช่ preview ทุกไฟล์แบบ image
+        const selectedIsPdf = value instanceof File && (value.type === 'application/pdf' || value.name.toLowerCase().endsWith('.pdf'));
+        const existingIsPdf = !selectedName && existingLabel.toLowerCase().endsWith('.pdf');
+        const pdfPreviewSrc = !isImage && (selectedIsPdf || existingIsPdf) ? filePreviewUrl || existingFileUrl : '';
 
         return (
             <Box>
@@ -3117,6 +3172,11 @@ function RenderAttributeInput({
                             <Box component="img" src={previewSrc} alt={label} sx={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh' }} />
                         </DialogContent>
                     </Dialog>
+                )}
+                {pdfPreviewSrc && (
+                    <Box sx={{ mt: 1.5, maxWidth: 480 }}>
+                        <FioriPdfViewer src={pdfPreviewSrc} title={selectedName || existingLabel} height={320} />
+                    </Box>
                 )}
             </Box>
         );
