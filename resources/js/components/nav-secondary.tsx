@@ -209,35 +209,24 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
             <Fragment key={key}>
                 <ListItemButton disableRipple onClick={() => toggle(key)} sx={rowSx(depth, hasActiveDescendant, true)}>
                     {rootIcon}
-                    {/* group ที่ลึกกว่า depth 0 (ไม่มีไอคอนของตัวเอง) ยังใช้ลูกศรฝั่งซ้าย
-                    แบบเดิม — มีแค่ root (มีไอคอนแล้ว) เท่านั้นที่ย้ายลูกศรไปฝั่งขวาสุดแทน
-                    (ดู ExpandMoreIcon ตัวที่สองด้านล่าง หลัง ListItemText) */}
-                    {!rootIcon && (
-                        <ExpandMoreIcon
-                            fontSize="small"
-                            sx={{
-                                width: 18,
-                                flexShrink: 0,
-                                color: FIORI.textSecondary,
-                                transition: 'transform 0.15s ease',
-                                transform: isOpen ? 'none' : 'rotate(-90deg)',
-                            }}
-                        />
-                    )}
+                    {/* group ที่ไม่มีไอคอนของตัวเอง (ลึกกว่า depth 0 เช่น "มาร์เก็ตเพลส")
+                    ใช้ gutter ว่างขนาดเท่ากันแทนที่ตำแหน่งไอคอน — ให้ label เริ่มตรงกับ
+                    label ของ leaf ข้างเคียงที่ depth เดียวกัน (leaf ก็ใช้ gutter เดียวกันนี้
+                    ดูด้านบน) ลูกศรของทุก group ไม่ว่า depth ไหนย้ายไปอยู่ฝั่งขวาสุดเสมอ
+                    ไม่มีลูกศรฝั่งซ้ายอีกแล้ว */}
+                    {!rootIcon && <Box sx={{ width: 18, flexShrink: 0 }} />}
                     <ListItemText primary={item.title} sx={labelSx(depth, hasActiveDescendant)} />
-                    {rootIcon && (
-                        <ExpandMoreIcon
-                            fontSize="small"
-                            sx={{
-                                width: 18,
-                                flexShrink: 0,
-                                ml: 1,
-                                color: FIORI.textSecondary,
-                                transition: 'transform 0.15s ease',
-                                transform: isOpen ? 'none' : 'rotate(-90deg)',
-                            }}
-                        />
-                    )}
+                    <ExpandMoreIcon
+                        fontSize="small"
+                        sx={{
+                            width: 18,
+                            flexShrink: 0,
+                            ml: 1,
+                            color: FIORI.textSecondary,
+                            transition: 'transform 0.15s ease',
+                            transform: isOpen ? 'none' : 'rotate(-90deg)',
+                        }}
+                    />
                 </ListItemButton>
                 <Collapse in={isOpen} timeout="auto" unmountOnExit>
                     <List

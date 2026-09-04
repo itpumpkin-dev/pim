@@ -65,11 +65,22 @@ class VendorController extends Controller
 
         // name_en ไม่ใช่คอลัมน์จริงอีกต่อไป (ยุบเข้า translations แล้ว) — คำนวณ
         // ค่าเดิมกลับมาจากคำแปลของ locale อังกฤษแทน เพื่อให้ vendors/index.tsx
-        // (ที่โชว์ชื่ออังกฤษเป็นข้อความรองใต้ชื่อไทย) ไม่ต้องแก้อะไรเลย
+        // (ที่โชว์ชื่ออังกฤษเป็นข้อความรองใต้ชื่อหลัก) ไม่ต้องแก้อะไรเลย — คงไว้
+        // เป็น 'en' ตายตัวเสมอ ไม่ผูกกับ locale ปัจจุบัน (เป็นข้อความรองสำหรับ
+        // อ้างอิงข้าม locale ไม่ใช่ตัวเดียวกับ $localeId ด้านล่าง)
         $enLocaleId = Locale::idForCode('en');
-        $vendors->getCollection()->transform(function (Vendor $vendor) use ($enLocaleId) {
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่งค่านี้ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วยคำแปลของ
+        // locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้เป็น fallback)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $vendors->getCollection()->transform(function (Vendor $vendor) use ($enLocaleId, $localeId) {
             $vendor->currency_code = $vendor->currency?->code;
             $vendor->name_en = $enLocaleId ? ($vendor->translations->firstWhere('locale_id', $enLocaleId)?->label ?? null) : null;
+
+            $label = $localeId ? $vendor->translations->firstWhere('locale_id', $localeId)?->label : null;
+            if ($label !== null && trim($label) !== '') {
+                $vendor->name = $label;
+            }
 
             return $vendor;
         });

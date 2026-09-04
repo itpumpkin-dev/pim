@@ -63,6 +63,21 @@ class ProductTypeController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป (ดู docblock บน
+        // ProductType model) — หน้า list เดิมส่งค่านี้ตรงๆ ไม่เคย resolve ตาม
+        // locale ปัจจุบันเลย เลยเห็นเป็นภาษาเดิมเสมอไม่ว่าจะสลับภาษาอะไรก็ตาม
+        // ทับด้วยคำแปลของ locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคง
+        // ค่าดิบไว้เป็น fallback เหมือนเดิม)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $productTypes->through(function (ProductType $productType) use ($localeId) {
+            $label = $localeId ? $productType->translations->firstWhere('locale_id', $localeId)?->label : null;
+            if ($label !== null && trim($label) !== '') {
+                $productType->name = $label;
+            }
+
+            return $productType;
+        });
+
         return Inertia::render('catalog/product-types/index', [
             'productTypes' => $productTypes,
             'filters' => [

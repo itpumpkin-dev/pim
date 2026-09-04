@@ -58,6 +58,19 @@ class BusinessTypeController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่งค่านี้ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วยคำแปลของ
+        // locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้เป็น fallback)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $businessTypes->through(function (BusinessType $businessType) use ($localeId) {
+            $label = $localeId ? $businessType->translations->firstWhere('locale_id', $localeId)?->label : null;
+            if ($label !== null && trim($label) !== '') {
+                $businessType->name = $label;
+            }
+
+            return $businessType;
+        });
+
         return Inertia::render('catalog/business-types/index', [
             'businessTypes' => $businessTypes,
             'filters' => [

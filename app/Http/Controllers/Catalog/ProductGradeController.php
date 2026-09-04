@@ -67,6 +67,19 @@ class ProductGradeController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่งค่านี้ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วยคำแปลของ
+        // locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้เป็น fallback)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $productGrades->through(function (ProductGrade $productGrade) use ($localeId) {
+            $label = $localeId ? $productGrade->translations->firstWhere('locale_id', $localeId)?->label : null;
+            if ($label !== null && trim($label) !== '') {
+                $productGrade->name = $label;
+            }
+
+            return $productGrade;
+        });
+
         return Inertia::render('catalog/product-grades/index', [
             'productGrades' => $productGrades,
             'filters' => [

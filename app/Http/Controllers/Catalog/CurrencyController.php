@@ -64,6 +64,19 @@ class CurrencyController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่งค่านี้ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วยคำแปลของ
+        // locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้เป็น fallback)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $currencies->through(function (Currency $currency) use ($localeId) {
+            $label = $localeId ? $currency->translations->firstWhere('locale_id', $localeId)?->label : null;
+            if ($label !== null && trim($label) !== '') {
+                $currency->name = $label;
+            }
+
+            return $currency;
+        });
+
         return Inertia::render('catalog/currencies/index', [
             'currencies' => $currencies,
             'filters' => [

@@ -85,11 +85,18 @@ class BaseUnitController extends Controller
             ->get();
 
         $counts = $this->baseUnitProductCounts($attribute->id);
-        $rows = $units->map(function (BaseUnit $unit) use ($counts) {
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่ง $unit->name ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วย
+        // คำแปลของ locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้
+        // เป็น fallback)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $rows = $units->map(function (BaseUnit $unit) use ($counts, $localeId) {
+            $label = $localeId ? $unit->translations->firstWhere('locale_id', $localeId)?->label : null;
+
             return [
                 'id' => $unit->id,
                 'code' => $unit->code,
-                'admin_label' => $unit->name,
+                'admin_label' => ($label !== null && trim($label) !== '') ? $label : $unit->name,
                 'slug' => $unit->slug,
                 'description' => $unit->description,
                 'products_count' => (int) ($counts[$unit->code] ?? 0),

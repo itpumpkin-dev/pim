@@ -194,13 +194,24 @@ class BrandController extends Controller
         // (ProductValue.value = Brand.code ไม่ใช่ FK)
         $counts = $this->brandProductCounts($attribute->id);
 
-        $nameById = $brands->pluck('name', 'id');
+        // `name` ดิบเป็นแค่ fallback ของ locale เริ่มต้นของแอป — หน้า list เดิม
+        // ส่ง $brand->name ตรงๆ ไม่เคย resolve ตาม locale ปัจจุบันเลย ทับด้วย
+        // คำแปลของ locale ปัจจุบันตรงนี้ก่อนส่งออกไป ถ้ามี (ไม่งั้นคงค่าดิบไว้
+        // เป็น fallback) — ใช้ตัวเดียวกันทั้ง admin_label ของแถวเอง และ
+        // parent_name (ชื่อ brand แม่ที่อ้างอิงไว้ ก็ควรเป็น locale เดียวกัน)
+        $localeId = Locale::idForCode(app()->getLocale());
+        $resolveBrandLabel = function (Brand $brand) use ($localeId) {
+            $label = $localeId ? $brand->translations->firstWhere('locale_id', $localeId)?->label : null;
 
-        $rows = $brands->map(function (Brand $brand) use ($counts, $nameById) {
+            return ($label !== null && trim($label) !== '') ? $label : $brand->name;
+        };
+        $nameById = $brands->mapWithKeys(fn (Brand $b) => [$b->id => $resolveBrandLabel($b)]);
+
+        $rows = $brands->map(function (Brand $brand) use ($counts, $nameById, $resolveBrandLabel) {
             return [
                 'id' => $brand->id,
                 'code' => $brand->code,
-                'admin_label' => $brand->name,
+                'admin_label' => $resolveBrandLabel($brand),
                 'slug' => $brand->slug,
                 'description' => $brand->description,
                 'products_count' => (int) ($counts[$brand->code] ?? 0),
