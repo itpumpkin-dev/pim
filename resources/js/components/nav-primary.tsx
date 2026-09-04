@@ -7,9 +7,11 @@ interface NavPrimaryProps {
     items: NavItem[];
     activeTitle: string | null;
     onSelect: (item: NavItem) => void;
+    /** Fiori collapsed-mode flyout — parent only acts on this while the rail is collapsed (see app-sidebar.tsx). No-op prop is fine while expanded. */
+    onHoverItem?: (item: NavItem) => void;
 }
 
-export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
+export function NavPrimary({ items, activeTitle, onSelect, onHoverItem }: NavPrimaryProps) {
     return (
         <Box
             sx={{
@@ -31,6 +33,8 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                 const buttonContent = (
                     <ButtonBase
                         onClick={() => onSelect(item)}
+                        onMouseEnter={() => onHoverItem?.(item)}
+                        onFocus={() => onHoverItem?.(item)}
                         aria-current={isActive ? 'page' : undefined}
                         sx={{
                             width: 44,
@@ -66,15 +70,27 @@ export function NavPrimary({ items, activeTitle, onSelect }: NavPrimaryProps) {
                     </ButtonBase>
                 );
 
+                const wrapped = item.url ? (
+                    <Box key={item.title} component={Link} href={item.url} sx={{ display: 'block', textDecoration: 'none' }}>
+                        {buttonContent}
+                    </Box>
+                ) : (
+                    <Box key={item.title} sx={{ display: 'block' }}>
+                        {buttonContent}
+                    </Box>
+                );
+
+                // ตัวที่มี children จะโชว์ flyout panel อยู่แล้ว (มี title เป็นหัวข้อ
+                // panel ให้เห็นชัดๆ) — ไม่ต้องมี tooltip ข้อความเดิมซ้อนขึ้นมาอีกชั้น
+                // เหลือ tooltip ไว้แค่ตัวที่ไม่มี children (ไม่มี flyout ให้เลย เช่น
+                // Dashboard) ที่ยังต้องพึ่ง tooltip เป็นทางเดียวที่บอกชื่อได้
+                if (item.items && item.items.length > 0) {
+                    return wrapped;
+                }
+
                 return (
                     <Tooltip key={item.title} title={item.title} placement="right" arrow enterDelay={200}>
-                        {item.url ? (
-                            <Box component={Link} href={item.url} sx={{ display: 'block', textDecoration: 'none' }}>
-                                {buttonContent}
-                            </Box>
-                        ) : (
-                            <Box sx={{ display: 'block' }}>{buttonContent}</Box>
-                        )}
+                        {wrapped}
                     </Tooltip>
                 );
             })}

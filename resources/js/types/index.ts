@@ -1,4 +1,5 @@
 import { SvgIconComponent } from '@mui/icons-material';
+import { type IconName } from '@/components/icon';
 
 export interface Auth {
     user: User;
@@ -19,6 +20,15 @@ export interface NavItem {
     title: string;
     url?: string;
     icon?: SvgIconComponent | null;
+    /**
+     * SAP-icons glyph (see resources/js/components/icon.tsx) shown at the
+     * root level of the secondary "double sidebar" panel (NavSecondary) —
+     * distinct from `icon` above, which is only ever read by the primary
+     * icon rail (NavPrimary, the 4 top-level groups). Deeper-nested items
+     * inside NavSecondary intentionally stay icon-less (matches Fiori's own
+     * spec: only navigation *list items*, not child items, carry an icon).
+     */
+    iconName?: IconName;
     isActive?: boolean;
     items?: NavItem[];
     permission?: string;

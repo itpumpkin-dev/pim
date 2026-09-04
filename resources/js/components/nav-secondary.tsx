@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Box, Collapse, List, ListItemButton, ListItemText, Typography } from '@mui/material';
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Icon } from '@/components/icon';
 import { FIORI } from '@/lib/fiori-style';
 
 interface NavSecondaryProps {
@@ -158,6 +159,22 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
         const children = item.items ?? [];
         const key = keyOf(parentKey, item);
 
+        // เฉพาะ root ของแต่ละกลุ่ม (depth 0) เท่านั้นที่มีไอคอน — ตรงกับสเปก Fiori
+        // Side Navigation จริงๆ (navigation list item ถือไอคอน, navigation
+        // child item ไม่ถือ) ดู NavItem.iconName ใน types/index.ts และ
+        // useMainNavItems() ใน app-sidebar.tsx ว่าตัวไหนผูก iconName อะไรไว้บ้าง
+        //
+        // mr กันไอคอนไปชิดติดกับ label เกินไป (แต่ก่อนพึ่ง twistie gutter/chevron
+        // ตัวถัดไปเป็นตัวเว้นระยะให้แทน แต่ตอนนี้ root แบบ group ย้าย chevron ไป
+        // ฝั่งขวาสุดแล้ว ไม่มี element คั่นกลางเหลืออยู่อีก ต้องเว้นเองตรงนี้)
+        const rootIcon =
+            depth === 0 && item.iconName ? (
+                <Icon
+                    name={item.iconName}
+                    sx={{ fontSize: '1rem', width: 18, flexShrink: 0, mr: 1.25, color: 'inherit' }}
+                />
+            ) : null;
+
         if (children.length === 0) {
             const active = isLeafActive(item);
             return (
@@ -169,10 +186,17 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
                     disableRipple
                     sx={rowSx(depth, active, false)}
                 >
-                    {/* Empty twistie gutter so leaf labels line up with the
-                        labels of sibling groups (VSCode aligns text past the
-                        chevron column). */}
-                    <Box sx={{ width: 18, flexShrink: 0 }} />
+                    {rootIcon}
+                    {!rootIcon && (
+                        // Empty twistie gutter so leaf labels line up with the
+                        // labels of sibling groups at this same depth (VSCode
+                        // aligns text past the chevron column) — root rows (depth
+                        // 0) don't need this: their icon (above) already reserves
+                        // its own space, and sibling root groups no longer have a
+                        // left-side chevron to align against either (moved to the
+                        // row's far right instead).
+                        <Box sx={{ width: 18, flexShrink: 0 }} />
+                    )}
                     <ListItemText primary={item.title} sx={labelSx(depth, active)} />
                 </ListItemButton>
             );
@@ -184,17 +208,36 @@ export function NavSecondary({ title, items }: NavSecondaryProps) {
         return (
             <Fragment key={key}>
                 <ListItemButton disableRipple onClick={() => toggle(key)} sx={rowSx(depth, hasActiveDescendant, true)}>
-                    <ExpandMoreIcon
-                        fontSize="small"
-                        sx={{
-                            width: 18,
-                            flexShrink: 0,
-                            color: FIORI.textSecondary,
-                            transition: 'transform 0.15s ease',
-                            transform: isOpen ? 'none' : 'rotate(-90deg)',
-                        }}
-                    />
+                    {rootIcon}
+                    {/* group ที่ลึกกว่า depth 0 (ไม่มีไอคอนของตัวเอง) ยังใช้ลูกศรฝั่งซ้าย
+                    แบบเดิม — มีแค่ root (มีไอคอนแล้ว) เท่านั้นที่ย้ายลูกศรไปฝั่งขวาสุดแทน
+                    (ดู ExpandMoreIcon ตัวที่สองด้านล่าง หลัง ListItemText) */}
+                    {!rootIcon && (
+                        <ExpandMoreIcon
+                            fontSize="small"
+                            sx={{
+                                width: 18,
+                                flexShrink: 0,
+                                color: FIORI.textSecondary,
+                                transition: 'transform 0.15s ease',
+                                transform: isOpen ? 'none' : 'rotate(-90deg)',
+                            }}
+                        />
+                    )}
                     <ListItemText primary={item.title} sx={labelSx(depth, hasActiveDescendant)} />
+                    {rootIcon && (
+                        <ExpandMoreIcon
+                            fontSize="small"
+                            sx={{
+                                width: 18,
+                                flexShrink: 0,
+                                ml: 1,
+                                color: FIORI.textSecondary,
+                                transition: 'transform 0.15s ease',
+                                transform: isOpen ? 'none' : 'rotate(-90deg)',
+                            }}
+                        />
+                    )}
                 </ListItemButton>
                 <Collapse in={isOpen} timeout="auto" unmountOnExit>
                     <List

@@ -11,7 +11,7 @@ import ImportExportIcon from '@mui/icons-material/ImportExport';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { Box, Divider, Drawer, ThemeProvider, Toolbar, Typography } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLogo from './app-logo';
 
@@ -46,11 +46,19 @@ function useMainNavItems(): NavItem[] {
                                 title: t('products'),
                                 url: '/catalog/products',
                                 permission: 'products.list_products',
+                                // ไม่ใช่แค่ item เฉยๆ — group นี้มีลูกตัวเดียวชื่อซ้ำกับตัวเอง
+                                // เลยโดน unwrap() ใน nav-secondary.tsx ยุบทิ้ง เหลือแค่ item
+                                // ตัวในนี้ตัวเดียวที่ render จริงที่ depth 0 — iconName เลย
+                                // ต้องมาอยู่ตรงนี้ ไม่ใช่ที่ wrapper ข้างบน (ซึ่งจะถูกทิ้งไป)
+                                iconName: 'navProduct',
                             },
                         ],
                     },
                     {
                         title: t('master'),
+                        // group นี้มีลูกหลายตัว (ไม่ได้โดน unwrap()) เลยยัง render เป็น
+                        // node ของตัวเองที่ depth 0 จริงๆ — iconName ใส่ตรงนี้ได้เลย
+                        iconName: 'navMaster',
                         items: [
                             {
                                 title: t('categories'),
@@ -169,6 +177,9 @@ function useMainNavItems(): NavItem[] {
                     },
                     {
                         title: t('attributes'),
+                        // 3 ลูก ไม่โดน unwrap() (ดูคอมเมนต์ที่ "หมวดหมู่หลัก" ด้านบน) —
+                        // ยัง render เป็น node ของตัวเองที่ depth 0 จริง
+                        iconName: 'navAttributes',
                         items: [
                             {
                                 title: t('attributes'),
@@ -204,6 +215,9 @@ function useMainNavItems(): NavItem[] {
                                 title: t('management'),
                                 url: '/catalog/management',
                                 permission: 'products.list_products',
+                                // ลูกตัวเดียวชื่อซ้ำ wrapper — โดน unwrap() เหมือน "สินค้า"
+                                // ด้านบน iconName เลยต้องมาอยู่ตรงนี้แทน
+                                iconName: 'navManagement',
                                 // Neither of these has its own sidebar/tab entry
                                 // (product-translations is a Management-hub card;
                                 // marketplace-sync is only reachable via the
@@ -230,21 +244,25 @@ function useMainNavItems(): NavItem[] {
                         title: t('imports'),
                         url: '/import-export/imports',
                         permission: 'import_configs.list_import_configs',
+                        iconName: 'navImport',
                     },
                     {
                         title: t('exports'),
                         url: '/import-export/exports',
                         permission: 'export_configs.list_export_configs',
+                        iconName: 'navExport',
                     },
                     {
                         title: t('jobTracker'),
                         url: '/import-export/jobs',
                         permission: 'job_trackers.list_job_trackers',
+                        iconName: 'navJobTracker',
                     },
                     {
                         title: t('wooConvert'),
                         url: '/import-export/woo-convert',
                         permission: 'woo_conversions.list_woo_conversions',
+                        iconName: 'navWooConvert',
                     },
                 ],
             },
@@ -260,46 +278,55 @@ function useMainNavItems(): NavItem[] {
                         // the whole sidebar lose its highlighted section.
                         matchUrls: ['/catalog/sales-platforms'],
                         permission: 'channels.list_channels',
+                        iconName: 'navChannels',
                     },
                     {
                         title: t('users'),
                         url: '/system/user',
                         permission: 'users.list_users',
+                        iconName: 'navUsers',
                     },
                     {
                         title: t('userGroups'),
                         url: '/system/userGroup',
                         permission: 'user_groups.list_user_groups',
+                        iconName: 'navUserGroups',
                     },
                     {
                         title: t('departments'),
                         url: '/system/department',
                         permission: 'departments.list_departments',
+                        iconName: 'navDepartments',
                     },
                     {
                         title: t('jobPositions'),
                         url: '/system/jobPosition',
                         permission: 'job_positions.list_job_positions',
+                        iconName: 'navJobPositions',
                     },
                     {
                         title: t('roles'),
                         url: '/system/roles',
                         permission: 'roles.list_roles',
+                        iconName: 'navRoles',
                     },
                     {
                         title: t('locales'),
                         url: '/system/locales',
                         permission: 'locales.list_locales',
+                        iconName: 'navLocales',
                     },
                     {
                         title: t('translationProviders'),
                         url: '/system/translationProviders',
                         permission: 'translation_providers.list_translation_providers',
+                        iconName: 'navTranslationProviders',
                     },
                     {
                         title: t('activityLogs'),
                         url: '/system/activity-logs',
                         permission: 'activity_logs.list_activity_logs',
+                        iconName: 'navActivityLogs',
                     },
                 ],
             },
@@ -330,7 +357,7 @@ function findActiveGroup(items: NavItem[], pageUrl: string): NavItem | null {
 }
 
 export function AppSidebar() {
-    const { isMobile, openMobile, setOpenMobile, state, setOpen } = useSidebar();
+    const { isMobile, openMobile, setOpenMobile, state } = useSidebar();
     const page = usePage();
     const { auth } = usePage<SharedData>().props;
     const { resolved } = useResolvedAppearance();
@@ -391,10 +418,73 @@ export function AppSidebar() {
     const hasSubmenus = selectedGroup && selectedGroup.items && selectedGroup.items.length > 0;
     const width = collapsed ? SIDEBAR_WIDTH_ICON : hasSubmenus ? SIDEBAR_WIDTH : SIDEBAR_WIDTH_ICON;
 
+    // Fiori Side Navigation's real "collapsed" behaviour: an icon-only rail
+    // that reveals a floating flyout of the hovered group's items *without*
+    // pushing the rail itself back open — this used to instead call
+    // setOpen(true) on click, permanently re-expanding the whole sidebar,
+    // which isn't how Fiori's collapsed rail behaves at all. flyoutGroup is
+    // only ever meaningful while collapsed (see the render guards below) —
+    // no need to reset it on expand/collapse toggles since AppSidebar fully
+    // remounts every navigation anyway (see the lazy-init comment above).
+    const [flyoutGroup, setFlyoutGroup] = useState<NavItem | null>(null);
+    const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const clearFlyoutCloseTimer = () => {
+        if (closeTimerRef.current) {
+            clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = null;
+        }
+    };
+    // Small grace delay (not an immediate close) so moving the mouse
+    // diagonally from a rail icon toward the flyout panel itself doesn't
+    // slam it shut mid-transit — standard flyout-menu hover-intent pattern.
+    const scheduleFlyoutClose = () => {
+        clearFlyoutCloseTimer();
+        closeTimerRef.current = setTimeout(() => setFlyoutGroup(null), 150);
+    };
+    const openFlyout = (item: NavItem) => {
+        clearFlyoutCloseTimer();
+        setFlyoutGroup(item.items && item.items.length > 0 ? item : null);
+    };
+
+    useEffect(() => clearFlyoutCloseTimer, []);
+
+    // Shared by the docked secondary panel (expanded state) and the
+    // collapsed-state flyout overlay below — same title/list, just a
+    // different container around it.
+    const renderSecondaryPanelContent = (group: NavItem | null) => (
+        <>
+            <Toolbar
+                sx={{
+                    px: 3,
+                    minHeight: '57px !important',
+                    justifyContent: 'flex-start',
+                }}
+            >
+                <Typography
+                    variant="h6"
+                    noWrap
+                    sx={{
+                        fontWeight: 600,
+                        fontSize: '1.05rem',
+                        color: FIORI.textPrimary,
+                    }}
+                >
+                    PIM PK
+                </Typography>
+            </Toolbar>
+            <Divider sx={{ borderColor: FIORI.border }} />
+            <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+                {group && <NavSecondary title={group.title} items={group.items ?? []} />}
+            </Box>
+        </>
+    );
+
     const content = (
         <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
             {/* Primary Sidebar (Narrow Left Column) */}
             <Box
+                onMouseLeave={collapsed ? scheduleFlyoutClose : undefined}
                 sx={{
                     width: SIDEBAR_WIDTH_ICON,
                     height: '100%',
@@ -425,18 +515,30 @@ export function AppSidebar() {
                 <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', alignSelf: 'stretch' }}>
                     <NavPrimary
                         items={filteredMainNavItems}
+                        // "Active" หมายถึง section ที่กำลังอยู่จริง (ตาม URL ปัจจุบัน) — คงที่
+                        // เสมอ ไม่ผูกกับ flyoutGroup (สถานะแค่ตอน hover/focus ชั่วคราว)
+                        // ไม่งั้นแค่ hover ไอคอนอื่นเฉยๆ ระหว่าง collapsed จะไปแย่ง highlight
+                        // จาก section ที่ผู้ใช้อยู่จริง แล้วพอเลิก hover ก็จะไม่มีอะไร active
+                        // เลยสักตัว — hover ของแต่ละไอคอนมี :hover state ของตัวเองอยู่แล้วพอ
                         activeTitle={selectedGroup?.title ?? null}
                         onSelect={(item) => {
-                            if (collapsed) {
-                                setOpen(true);
-                            }
                             setSelectedGroup(item);
+                            // ปุ่ม/แตะ (ไม่ใช่แค่ hover) ก็เปิด flyout ได้เหมือนกัน — สำคัญ
+                            // สำหรับ touch/keyboard ที่ไม่มี hover ให้ใช้ ไม่ re-expand
+                            // sidebar ทั้งแถบแบบเดิมอีกต่อไป (ไม่ใช่พฤติกรรมของ Fiori
+                            // collapsed rail จริงๆ — ดูคอมเมนต์ flyoutGroup ด้านบน)
+                            if (collapsed) {
+                                openFlyout(item);
+                            }
                         }}
+                        onHoverItem={collapsed ? openFlyout : undefined}
                     />
                 </Box>
             </Box>
 
-            {/* Secondary Sidebar (Wider Right Column) */}
+            {/* Secondary Sidebar (Wider Right Column) — docked in-flow only
+            while expanded; while collapsed this stays width:0 and the
+            flyout overlay below (position: fixed) takes over on hover */}
             <Box
                 sx={{
                     flex: 1,
@@ -450,29 +552,7 @@ export function AppSidebar() {
                     bgcolor: FIORI.surface,
                 }}
             >
-                <Toolbar
-                    sx={{
-                        px: 3,
-                        minHeight: '57px !important',
-                        justifyContent: 'flex-start',
-                    }}
-                >
-                    <Typography
-                        variant="h6"
-                        noWrap
-                        sx={{
-                            fontWeight: 600,
-                            fontSize: '1.05rem',
-                            color: FIORI.textPrimary,
-                        }}
-                    >
-                        PIM PK
-                    </Typography>
-                </Toolbar>
-                <Divider sx={{ borderColor: FIORI.border }} />
-                <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-                    {selectedGroup && <NavSecondary title={selectedGroup.title} items={selectedGroup.items ?? []} />}
-                </Box>
+                {renderSecondaryPanelContent(selectedGroup)}
             </Box>
         </Box>
     );
@@ -514,6 +594,35 @@ export function AppSidebar() {
             >
                 {content}
             </Drawer>
+
+            {/* Fiori collapsed-rail flyout — position:fixed (not inside the
+            Drawer's own paper, which clips at SIDEBAR_WIDTH_ICON while
+            collapsed) so it floats OVER page content instead of pushing it,
+            anchored right at the rail's edge. Only ever mounted while
+            collapsed + hovering/focusing a rail item with children. */}
+            {collapsed && flyoutGroup && (
+                <Box
+                    onMouseEnter={clearFlyoutCloseTimer}
+                    onMouseLeave={scheduleFlyoutClose}
+                    sx={{
+                        position: 'fixed',
+                        top: 0,
+                        left: SIDEBAR_WIDTH_ICON,
+                        height: '100vh',
+                        width: SIDEBAR_WIDTH - SIDEBAR_WIDTH_ICON,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        bgcolor: FIORI.surface,
+                        borderRight: `1px solid ${FIORI.border}`,
+                        // ลอยเหนือเนื้อหาหน้า (ไม่ได้ดันเนื้อหา) เลยต้องมีเงาให้รู้สึกว่า
+                        // "ลอย" อยู่จริง ต่างจากแผงที่ docked ในโหมด expanded ที่ไม่ต้องมี
+                        boxShadow: '2px 0 10px rgba(0,0,0,0.18)',
+                        zIndex: (theme) => theme.zIndex.drawer + 1,
+                    }}
+                >
+                    {renderSecondaryPanelContent(flyoutGroup)}
+                </Box>
+            )}
         </ThemeProvider>
     );
 }
