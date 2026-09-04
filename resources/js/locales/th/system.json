@@ -24,6 +24,7 @@
     "roleFormAttributeGroupColumn": "กลุ่มแอตทริบิวต์",
     "roleFormAttributeColumn": "แอตทริบิวต์",
     "roleFormProductsPermissionRequired": "กำหนดสิทธิ์ \"Products\" ก่อนจึงจะสามารถกำหนดสิทธิ์ Attribute Access ได้",
+    "noResultsFound": "ไม่พบผลลัพธ์",
 
     "userGroupsCount": "{{count}} กลุ่ม",
     "createUserGroup": "สร้างกลุ่มผู้ใช้งาน",

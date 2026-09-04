@@ -199,6 +199,9 @@ interface Props {
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
+    /** สิทธิ์แยกต่างหากของแผง Sales Channels — ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) */
+    canViewSalesChannels?: boolean;
+    canEditSalesChannels?: boolean;
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
     masterSources?: MasterSourceOption[];
 }
@@ -272,6 +275,8 @@ export default function ProductEdit({
     publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
+    canViewSalesChannels = false,
+    canEditSalesChannels = false,
     masterSources = [],
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
@@ -1208,11 +1213,28 @@ export default function ProductEdit({
 
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
+    // Optimistic concurrency: ส่ง updated_at ที่ product prop ถืออยู่ ณ ตอนกด
+    // save กลับไปด้วยเสมอ — เป็นค่าล่าสุดที่หน้านี้ "เห็น" จริงๆ ไม่ว่าจะมาจาก
+    // ตอนโหลดหน้าครั้งแรก หรือจาก panel save (channels/master-categories) ก่อน
+    // หน้านี้เอง เพราะ product prop อัปเดตทุกครั้งที่ Inertia visit เสร็จ ไม่ว่า
+    // preserveState จะเป็นอะไรก็ตาม (preserveState คุมแค่ local state ของ
+    // component ไม่เกี่ยวกับ props) — ดู ProductController::assertNotStale()
+    const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+
+    // submit() ใช้ useForm() ตัวข้างบน (post/transform/errors ผูกกันหมด) ไม่ใช่
+    // router ตรงๆ เหมือน saveSection() เลยไม่ได้เรียก setConflictMessage เองตอน
+    // error ได้ตรงๆ (errors มาแบบ async ผ่าน useForm's re-render) ต้องจับผ่าน
+    // effect นี้แทน เพื่อให้แบนเนอร์เดียวกันโชว์ได้ไม่ว่า conflict จะมาจากฝั่งไหน
+    useEffect(() => {
+        if (errors.conflict) setConflictMessage(errors.conflict);
+    }, [errors.conflict]);
+
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        setConflictMessage(null);
         // PHP ไม่รองรับการ parse body แบบ multipart/form-data สำหรับ request แบบ PUT
         // เลยต้องส่งเป็น POST พร้อมปลอม _method ไว้ เพื่อให้ Laravel route เป็น PUT ให้
-        transform((formData) => ({ ...formData, _method: 'put' }));
+        transform((formData) => ({ ...formData, _method: 'put', expected_updated_at: product.updated_at }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/products/${product.id}`, {
             onFinish: () => {
@@ -1232,15 +1254,27 @@ export default function ProductEdit({
 
     const saveSection = (section: 'channels' | 'master-categories', payload: Record<string, FormDataConvertible>) => {
         setSavingSection(section);
+        setConflictMessage(null);
         skipNavigationGuardRef.current = true;
-        router.put(`/catalog/products/${product.id}/${section}`, payload, {
-            preserveScroll: true,
-            preserveState: true,
-            onFinish: () => {
-                setSavingSection(null);
-                skipNavigationGuardRef.current = false;
+        // panel save พวกนี้ไม่ได้ผ่าน useForm() (ใช้ router.put ตรงๆ) เลยไม่มี
+        // errors ของตัวเองให้ผูกกับ input ไหนโดยเฉพาะ — ต้องดัก conflict error
+        // เองผ่าน onError แล้วโชว์แบนเนอร์เดียวกับที่ submit() ใช้ (ดู errors.conflict
+        // useEffect ด้านล่าง) ไม่งั้น error นี้จะเงียบหายไปเฉยๆ ไม่มีที่ไหนแสดงเลย
+        router.put(
+            `/catalog/products/${product.id}/${section}`,
+            { ...payload, expected_updated_at: product.updated_at },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: (errs) => {
+                    if (errs.conflict) setConflictMessage(errs.conflict);
+                },
+                onFinish: () => {
+                    setSavingSection(null);
+                    skipNavigationGuardRef.current = false;
+                },
             },
-        });
+        );
     };
 
     const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
@@ -1372,17 +1406,41 @@ export default function ProductEdit({
                     เลยโชว์ตลอดโดยไม่ต้องใช้ sticky positioning หรือคำนวณความสูง
                     header ตอน runtime เลย */}
                 <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
-                    {Object.keys(errors).length > 0 && (
+                    {/* Optimistic-concurrency conflict — แยกจากกล่อง error ทั่วไปด้านล่าง
+                        เพราะกรณีนี้ "แก้ให้ถูกแล้วกดใหม่" ใช้ไม่ได้ ต้องโหลดหน้าใหม่ก่อน
+                        ถึงจะเห็นข้อมูลล่าสุดจริงๆ เลยมีปุ่ม Reload ต่างหากให้ ไม่ใช่แค่ข้อความเฉยๆ */}
+                    {conflictMessage && (
+                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                            <FioriMessageStrip severity="error">
+                                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                    {conflictMessage}
+                                </Typography>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="inherit"
+                                    onClick={() => router.reload()}
+                                    sx={{ mt: 0.5 }}
+                                >
+                                    {t('reloadPage')}
+                                </Button>
+                            </FioriMessageStrip>
+                        </Box>
+                    )}
+
+                    {Object.entries(errors).filter(([key]) => key !== 'conflict').length > 0 && (
                         <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
                             <FioriMessageStrip severity="error">
                                 <Typography variant="body2" fontWeight={700}>
                                     {t('correctErrorsBeforeSaving')}
                                 </Typography>
-                                {Object.values(errors).map((message, index) => (
-                                    <Typography key={index} variant="body2">
-                                        {message}
-                                    </Typography>
-                                ))}
+                                {Object.entries(errors)
+                                    .filter(([key]) => key !== 'conflict')
+                                    .map(([key, message]) => (
+                                        <Typography key={key} variant="body2">
+                                            {message}
+                                        </Typography>
+                                    ))}
                             </FioriMessageStrip>
                         </Box>
                     )}
@@ -1912,17 +1970,23 @@ export default function ProductEdit({
                                             </Paper>
                                         )}
 
-                                        {/* แผง Sales Channels */}
+                                        {/* แผง Sales Channels — มีสิทธิ์แยกของตัวเอง (sales_channels) ไม่ได้
+                                        พ่วงกับ products.edit_products ทั่วไปอีกต่อไป ไม่มี view = ไม่โชว์
+                                        แผงนี้เลย มี view แต่ไม่มี edit = โชว์ให้ดูได้แต่กดอะไรไม่ได้เลย
+                                        (ปิด Save + ปิด interaction ทั้งหมดในแผงด้วย pointerEvents แทนที่จะ
+                                        ไล่แก้ทีละ onClick เพราะแผงนี้มีปุ่ม/checkbox ซ้อนกันหลายชั้นมาก) */}
+                                        {canViewSalesChannels && (
                                         <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                             <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
                                                 <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
                                                     Sales Channels
                                                 </Typography>
-                                                {sectionSaveButton('channels', () =>
-                                                    saveSection('channels', { published_shop_ids: data.published_shop_ids }),
-                                                )}
+                                                {canEditSalesChannels &&
+                                                    sectionSaveButton('channels', () =>
+                                                        saveSection('channels', { published_shop_ids: data.published_shop_ids }),
+                                                    )}
                                             </Stack>
-                                            <Stack spacing={0.5}>
+                                            <Stack spacing={0.5} sx={!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                                                 {/* การแก้ไขตรงนี้ (activeChannelId = null) คือการตั้งค่า fallback ของ
                                             ฟิลด์ที่เป็น channel-based — channel ไหนด้านล่างที่ไม่มีค่าของตัวเอง
                                             จะใช้ค่านี้แทน เลยไม่ต้องมากรอกซ้ำทีละ channel */}
@@ -2190,6 +2254,7 @@ export default function ProductEdit({
                                                 )}
                                             </Stack>
                                         </Paper>
+                                        )}
                                     </Stack>
                                 </Grid>
                             </Grid>

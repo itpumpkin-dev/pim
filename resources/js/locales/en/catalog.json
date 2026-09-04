@@ -65,6 +65,7 @@
     "skuRequired": "SKU *",
     "skuPlaceholder": "50xxx",
     "correctErrorsBeforeSaving": "Please correct the errors before saving.",
+    "reloadPage": "Reload page",
     "save": "Save",
     "saving": "Saving...",
     "back": "Back",

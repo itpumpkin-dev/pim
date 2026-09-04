@@ -57,7 +57,16 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // Master pages + the pcatname/psubcatname/productgroupname "Master
     // Categories" panel below, which gained its own save route back (see its
     // docblock in products/edit.tsx).
-    Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:products,edit_products');
+    // Sales Channels panel (edit.tsx) — ทั้งการ toggle assignment (updateChannels)
+    // และปุ่ม push/deactivate/delete-listing/สถานะทุกแพลตฟอร์มด้านล่างนี้ ล้วน
+    // เป็นการกระทำที่มาจากแผงเดียวกันนี้ทั้งหมด — แยกออกมาเป็นสิทธิ์ของตัวเอง
+    // (sales_channels) แทนที่จะพ่วงไปกับ products,edit_products แบบเดิม เพื่อให้
+    // จำกัดสิทธิ์แก้ไข/ดู Sales Channels แยกจากสิทธิ์แก้ไขสินค้าทั่วไปได้ (ดู
+    // ProductController::buildProductFormProps()'s canViewSalesChannels/
+    // canEditSalesChannels) — endpoint แบบอ่านอย่างเดียว (เช็คสถานะ) ใช้
+    // view_sales_channels พอ ส่วนที่ push/deactivate/toggle จริงต้อง
+    // edit_sales_channels
+    Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:sales_channels,edit_sales_channels');
     Route::put('products/{product}/master-categories', [ProductController::class, 'updateMasterCategories'])->name('products.updateMasterCategories')->middleware('permission:products,edit_products');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
@@ -65,22 +74,22 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/upload-description-image', [ProductController::class, 'uploadDescriptionImage'])->name('products.uploadDescriptionImage')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
     Route::get('products/{product}/timeline', [ProductController::class, 'timeline'])->name('products.timeline')->middleware('permission:products,view_history');
-    Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:products,edit_products');
-    Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/delete-shopee/{shop}', [ProductController::class, 'deleteFromShopee'])->name('products.deleteFromShopee')->middleware('permission:products,edit_products');
-    Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/push-tiktok/{shop}', [ProductController::class, 'pushToTikTok'])->name('products.pushTiktok')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:products,edit_products');
-    Route::get('products/{product}/tiktok-status/{shop}', [ProductController::class, 'checkTikTokStatus'])->name('products.checkTiktokStatus')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/push-woocommerce/{shop}', [ProductController::class, 'pushToWoocommerce'])->name('products.pushWoocommerce')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/deactivate-woocommerce/{shop}', [ProductController::class, 'deactivateWoocommerce'])->name('products.deactivateWoocommerce')->middleware('permission:products,edit_products');
-    Route::get('products/{product}/woocommerce-status/{shop}', [ProductController::class, 'checkWoocommerceStatus'])->name('products.checkWoocommerceStatus')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/fill-woocommerce-translations', [ProductController::class, 'fillWoocommerceTranslationsForProduct'])->name('products.fillWoocommerceTranslations')->middleware('permission:products,edit_products');
-    Route::get('products/{product}/sync-jobs/{syncJob}', [ProductController::class, 'marketplaceSyncJobStatus'])->name('products.marketplaceSyncJobStatus')->middleware('permission:products,edit_products');
-    Route::post('products/{product}/check-live-status', [ProductController::class, 'checkLiveStatus'])->name('products.checkLiveStatus')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:sales_channels,view_sales_channels');
+    Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/delete-shopee/{shop}', [ProductController::class, 'deleteFromShopee'])->name('products.deleteFromShopee')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:sales_channels,view_sales_channels');
+    Route::post('products/{product}/push-tiktok/{shop}', [ProductController::class, 'pushToTikTok'])->name('products.pushTiktok')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::get('products/{product}/tiktok-status/{shop}', [ProductController::class, 'checkTikTokStatus'])->name('products.checkTiktokStatus')->middleware('permission:sales_channels,view_sales_channels');
+    Route::post('products/{product}/push-woocommerce/{shop}', [ProductController::class, 'pushToWoocommerce'])->name('products.pushWoocommerce')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/deactivate-woocommerce/{shop}', [ProductController::class, 'deactivateWoocommerce'])->name('products.deactivateWoocommerce')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::get('products/{product}/woocommerce-status/{shop}', [ProductController::class, 'checkWoocommerceStatus'])->name('products.checkWoocommerceStatus')->middleware('permission:sales_channels,view_sales_channels');
+    Route::post('products/{product}/fill-woocommerce-translations', [ProductController::class, 'fillWoocommerceTranslationsForProduct'])->name('products.fillWoocommerceTranslations')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::get('products/{product}/sync-jobs/{syncJob}', [ProductController::class, 'marketplaceSyncJobStatus'])->name('products.marketplaceSyncJobStatus')->middleware('permission:sales_channels,view_sales_channels');
+    Route::post('products/{product}/check-live-status', [ProductController::class, 'checkLiveStatus'])->name('products.checkLiveStatus')->middleware('permission:sales_channels,view_sales_channels');
 
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/export', [AttributeController::class, 'export'])->name('attributes.export')->middleware('permission:attributes,list_attributes');

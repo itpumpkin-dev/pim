@@ -65,6 +65,7 @@
     "skuRequired": "SKU *",
     "skuPlaceholder": "50***",
     "correctErrorsBeforeSaving": "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก",
+    "reloadPage": "โหลดหน้าใหม่",
     "save": "บันทึก",
     "saving": "กำลังบันทึก...",
     "back": "ย้อนกลับ",

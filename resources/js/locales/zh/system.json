@@ -23,6 +23,7 @@
     "roleFormAttributeGroupColumn": "属性组",
     "roleFormAttributeColumn": "属性",
     "roleFormProductsPermissionRequired": "请先设置「Products」权限，才能配置属性访问权限。",
+    "noResultsFound": "未找到结果。",
 
     "userGroupsCount": "{{count}} 组",
     "createUserGroup": "核心小组",

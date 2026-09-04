@@ -10,7 +10,6 @@ import {
     Box,
     Button,
     Chip,
-    Divider,
     Grid,
     IconButton,
     MenuItem,
@@ -24,15 +23,14 @@ import {
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AppLayout from '@/layouts/app-layout';
-import { CategoryPathReadOnly } from '@/components/category-cascade-select';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { HistoryPanel } from '@/components/history-panel';
+import { TimelinePanel } from '@/components/timeline-panel';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { useLocale } from '@/hooks/use-locale';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FIORI, FioriStatus, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 import { UI_BORDER } from '@/lib/ui-style';
-import type { MarketplacePlatform } from '@/components/marketplace-category-picker';
 
 interface AttributeOption {
     id: number;
@@ -113,10 +111,13 @@ interface Props {
     productValues: Record<number | string, Record<string, Record<string | number, string>>>;
     variants?: VariantItem[];
     channelGroups?: ChannelGroup[];
-    categoryIds?: number[];
+    /** 3 attribute แบบเดียวกับที่หน้าแก้ไขใช้ (pcatname/psubcatname/productgroupname เรียงตามลำดับนี้เสมอ — ดู ProductController::MASTER_CATEGORY_ATTRIBUTE_CODES) มาเพื่อโชว์แบบอ่านอย่างเดียวคู่กัน 3 ขั้น แทน breadcrumb เดียวแบบเดิม */
+    masterCategoryAttributes?: AttributeItem[];
     publishedShopIds?: number[];
     associations?: { related: ProductOption[]; up_sell: ProductOption[]; cross_sell: ProductOption[] };
     canViewHistory?: boolean;
+    /** สิทธิ์แยกต่างหากของแผง Sales Channels — ไม่ได้พ่วงกับ products.list_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) */
+    canViewSalesChannels?: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -159,90 +160,6 @@ function EmptyValue() {
             (ไม่ได้กรอก)
         </Typography>
     );
-}
-
-/**
- * Read-only display of one platform's marketplace-category override (see
- * edit.tsx's MarketplaceCategoryPicker, which this mirrors minus the
- * picker dialog) — resolves the stored id to its root-to-leaf name path via
- * the same lookup endpoint that dialog preloads on open. `id` null means no
- * override is set for this product/platform, which just falls back to
- * whatever System Categories resolves to for it (see Shopee/Lazada/TikTok/
- * WooCommerceProductSyncService::resolve*CategoryId()) — shown as an
- * explanatory note here, not as "nothing entered", since it's a legitimate
- * resting state, not an omission.
- */
-function MarketplaceCategoryReadOnly({ platform, id }: { platform: MarketplacePlatform; id: number | null | undefined }) {
-    const { t } = useTranslation('catalog');
-    const [path, setPath] = useState<{ id: number; name: string }[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (!id) {
-            setPath([]);
-            return;
-        }
-        setLoading(true);
-        fetch(`/catalog/marketplace-categories/${platform}/path?id=${id}`, { headers: { Accept: 'application/json' } })
-            .then((res) => (res.ok ? res.json() : []))
-            .then(setPath)
-            .finally(() => setLoading(false));
-    }, [platform, id]);
-
-    if (loading) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                {t('loadingEllipsis')}
-            </Typography>
-        );
-    }
-
-    if (path.length === 0) {
-        return (
-            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                {t('followsSystemCategory')}
-            </Typography>
-        );
-    }
-
-    return <Typography variant="body2">{path.map((n) => n.name).join(' > ')}</Typography>;
-}
-
-/** Read-only display of one platform's marketplace-brand override — same shape as MarketplaceCategoryReadOnly above, see its docblock. */
-function MarketplaceBrandReadOnly({ platform, id }: { platform: MarketplacePlatform; id: number | null | undefined }) {
-    const { t } = useTranslation('catalog');
-    const [name, setName] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (!id) {
-            setName(null);
-            return;
-        }
-        setLoading(true);
-        fetch(`/catalog/marketplace-brands/${platform}/lookup?id=${id}`, { headers: { Accept: 'application/json' } })
-            .then((res) => (res.ok ? res.json() : null))
-            .then((brand: { id: number; name: string } | null) => setName(brand?.name ?? null))
-            .finally(() => setLoading(false));
-    }, [platform, id]);
-
-    if (loading) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                {t('loadingEllipsis')}
-            </Typography>
-        );
-    }
-
-    if (!name) {
-        return (
-            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                {t('followsSystemBrand')}
-            </Typography>
-        );
-    }
-
-    return <Typography variant="body2">{name}</Typography>;
 }
 
 /**
@@ -363,10 +280,11 @@ export default function ProductShow({
     productValues,
     variants = [],
     channelGroups = [],
-    categoryIds = [],
+    masterCategoryAttributes = [],
     publishedShopIds = [],
     associations = { related: [], up_sell: [], cross_sell: [] },
     canViewHistory = false,
+    canViewSalesChannels = false,
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
     const { t } = useTranslation('catalog');
@@ -393,14 +311,6 @@ export default function ProductShow({
         const localeKey = attr.is_locale_based ? String(activeLocaleId) : 'default';
         return productValues[attr.id]?.['global']?.[localeKey] ?? productValues[attr.id]?.['global']?.['default'] ?? '';
     };
-
-    const brandAttr = (() => {
-        for (const group of assignedGroups) {
-            const found = group.attributes.find((attr) => attr.code === 'pbrand');
-            if (found) return found;
-        }
-        return null;
-    })();
 
     const publishedChannels = channelGroups
         .map((group) => ({
@@ -510,7 +420,12 @@ export default function ProductShow({
                                     {assignedGroups.map((group) => {
                                         const isGeneral = group.code.toLowerCase() === 'general';
                                         const isSales = group.code.toLowerCase() === 'pricing_packaging';
-                                        const visibleAttrs = group.attributes.filter((attr) => attr.code !== 'pbrand');
+                                        // pbrand (Brand) เคยถูกแยกออกไปโชว์ในการ์ด "Brand" ต่างหาก
+                                        // (มี marketplace-mapping info เพิ่ม) — เอาการ์ดนั้นออกแล้ว
+                                        // ให้ปนกับ attribute อื่นตามปกติในลิสต์นี้แทน เหมือนกับที่หน้า
+                                        // Edit เองก็ไม่มีแผง Brand แยกต่างหากอีกต่อไปเช่นกัน (ดู
+                                        // edit.tsx's docblock ตรง Master Categories panel)
+                                        const visibleAttrs = group.attributes;
                                         const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
 
                                         return (
@@ -617,91 +532,42 @@ export default function ProductShow({
                                         </Stack>
                                     </Paper>
 
-                                    <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                            {t('categoriesBlockTitle')}
-                                        </Typography>
-                                        <Stack spacing={1}>
-                                            <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                {t('systemCategoriesLabel')}
-                                            </Typography>
-                                            <CategoryPathReadOnly categoryIds={categoryIds} />
-                                        </Stack>
-                                        <Divider sx={{ my: 2 }} />
-                                        <Stack spacing={1.5}>
-                                            <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                {t('marketplaceCategoriesLabel')}
-                                            </Typography>
-                                            {(
-                                                [
-                                                    ['shopee', 'Shopee', product.shopee_category_id],
-                                                    ['lazada', 'Lazada', product.lazada_category_id],
-                                                    ['tiktok', 'TikTok', product.tiktok_category_id],
-                                                    ['woocommerce', 'WooCommerce', product.woocommerce_category_id],
-                                                ] as const
-                                            ).map(([platform, label, id]) => (
-                                                <Box key={platform}>
-                                                    <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.25 }}>
-                                                        {label}
-                                                    </Typography>
-                                                    <MarketplaceCategoryReadOnly platform={platform} id={id} />
-                                                </Box>
-                                            ))}
-                                        </Stack>
-                                    </Paper>
-
-                                    {brandAttr && (
+                                    {/* เหมือนกับ "Timeline" ในหน้าแก้ไข (edit.tsx) เป๊ะ — ข้อมูลชุดเดียวกับ
+                                    แท็บ History (audit log ของสินค้านี้) แค่จัดเป็นเส้นเวลาแนวตั้งแทนตาราง
+                                    ให้เห็นควบคู่ไปกับข้อมูลสินค้าได้เลยโดยไม่ต้องสลับแท็บ — ก่อนหน้านี้หน้า
+                                    View ยังไม่มี block นี้เลย มีแค่แท็บ History แบบตารางเก่าอันเดียว */}
+                                    {canViewHistory && (
                                         <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                             <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                {t('brandBlockTitle')}
+                                                Timeline
                                             </Typography>
-                                            <Stack spacing={1}>
-                                                <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                    {t('systemBrandLabel')}
-                                                </Typography>
-                                                <RenderAttributeValue attr={brandAttr} value={getValue(brandAttr)} />
-                                                {(() => {
-                                                    const stringValue = getValue(brandAttr);
-                                                    const selectedOption = brandAttr.options?.find((opt) => optionValue(opt) === stringValue);
-                                                    const mapped = selectedOption?.mapped_platforms ?? [];
-                                                    if (!selectedOption) return null;
+                                            <Box sx={{ maxHeight: 480, overflowY: 'auto', pr: 0.5 }}>
+                                                <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
+                                            </Box>
+                                        </Paper>
+                                    )}
 
-                                                    return (
-                                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ pt: 0.5 }}>
-                                                            <Typography variant="caption" color="text.secondary">
-                                                                {t('marketplaceMappingLabel')}
-                                                            </Typography>
-                                                            {mapped.length > 0 ? (
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {t('mappedToPlatformsCount', { count: mapped.length })} ({mapped.join(', ')})
-                                                                </Typography>
-                                                            ) : (
-                                                                <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                                                                    {t('notMappedToAnyMarketplace')}
-                                                                </Typography>
-                                                            )}
-                                                        </Stack>
-                                                    );
-                                                })()}
-                                            </Stack>
-                                            <Divider sx={{ my: 2 }} />
-                                            <Stack spacing={1.5}>
-                                                <Typography variant="caption" fontWeight={800} fontSize="large" color="text.secondary">
-                                                    {t('marketplaceBrandLabel')}
-                                                </Typography>
-                                                {(
-                                                    [
-                                                        ['shopee', 'Shopee', product.shopee_brand_id],
-                                                        ['lazada', 'Lazada', product.lazada_brand_id],
-                                                        ['tiktok', 'TikTok', product.tiktok_brand_id],
-                                                        ['woocommerce', 'WooCommerce', product.woocommerce_brand_id],
-                                                    ] as const
-                                                ).map(([platform, label, id]) => (
-                                                    <Box key={platform}>
-                                                        <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.25 }}>
-                                                            {label}
+                                    {/* 3 ขั้นตอนแยกกัน (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) จาก
+                                    masterCategoryAttributes ตัวเดียวกับที่หน้าแก้ไขใช้ (pcatname/
+                                    psubcatname/productgroupname) แทน breadcrumb เดียวแบบเดิม
+                                    (CategoryPathReadOnly ที่ derive จากต้นไม้ categories) — โชว์ตรงกับ
+                                    ที่แก้ได้จริงในหน้า Edit เป๊ะๆ ไม่ใช่แค่ผลลัพธ์ที่ sync ไปแล้ว
+                                    ส่วน Marketplace Categories (Shopee/Lazada/TikTok/WooCommerce
+                                    category override ต่อสินค้า) เอาออกไปแล้ว เพราะหน้า Edit เองก็ไม่มี
+                                    ช่องให้แก้ค่าพวกนี้อีกต่อไป (ย้ายไปแมปที่ระดับ Master ครั้งเดียว
+                                    ทุกสินค้า inherit อัตโนมัติแทน — ดู catalog/categories/*-mapping.tsx) */}
+                                    {masterCategoryAttributes.length > 0 && (
+                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                            <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
+                                                {t('categoriesBlockTitle')}
+                                            </Typography>
+                                            <Stack spacing={2}>
+                                                {masterCategoryAttributes.map((attr) => (
+                                                    <Box key={attr.id}>
+                                                        <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                            {localizedLabel(attr, activeLocaleId)}
                                                         </Typography>
-                                                        <MarketplaceBrandReadOnly platform={platform} id={id} />
+                                                        <RenderAttributeValue attr={attr} value={getValue(attr)} />
                                                     </Box>
                                                 ))}
                                             </Stack>
@@ -738,6 +604,9 @@ export default function ProductShow({
                                         </Stack>
                                     </Paper> */}
 
+                                    {/* มีสิทธิ์แยกของตัวเอง (sales_channels) ไม่ได้พ่วงกับ products.list_products
+                                    ทั่วไปอีกต่อไป — ดู routes/catalog.php และ edit.tsx's Sales Channels panel */}
+                                    {canViewSalesChannels && (
                                     <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                         <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                             Sales Channels
@@ -770,6 +639,7 @@ export default function ProductShow({
                                             <EmptyValue />
                                         )}
                                     </Paper>
+                                    )}
                                 </Stack>
                             </Grid>
                         </Grid>

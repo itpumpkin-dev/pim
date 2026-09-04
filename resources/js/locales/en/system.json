@@ -25,6 +25,7 @@
     "roleFormAttributeGroupColumn": "Attribute Group",
     "roleFormAttributeColumn": "Attribute",
     "roleFormProductsPermissionRequired": "Set the \"Products\" permission first to configure Attribute Access.",
+    "noResultsFound": "No results found.",
 
     "userGroupsCount": "{{count}} groups",
     "createUserGroup": "CREATE GROUP",

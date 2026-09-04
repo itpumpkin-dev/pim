@@ -41,6 +41,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -2000,6 +2001,11 @@ class ProductController extends Controller
             'publishedShopIds' => $product->platformShops()->pluck('sales_platform_shops.id')->all(),
             'associations' => $this->associationsFor($product),
             'canViewHistory' => auth()->user()?->hasPermission('products', 'view_history') ?? false,
+            // Sales Channels panel มีสิทธิ์แยกของตัวเอง (resource `sales_channels`)
+            // ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป — ดู routes/
+            // catalog.php ตรง updateChannels()/push-*/deactivate-*/*-status ทุกตัว
+            'canViewSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'view_sales_channels') ?? false,
+            'canEditSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'edit_sales_channels') ?? false,
             // ให้ frontend แปล attribute.master_source (โค้ดดิบ เช่น 'brands')
             // เป็นชื่อที่อ่านง่ายสำหรับ chip "Master: ..." บน field ของ attribute
             // นั้นๆ — รูปแบบเดียวกับที่ AttributeController ส่งให้หน้าแก้ไข
@@ -2536,6 +2542,55 @@ class ProductController extends Controller
         ]);
     }
 
+    /**
+     * Optimistic concurrency check for every write path that persists to
+     * this product (the main save plus the per-panel Sales Channels /
+     * Master Categories saves — see updateChannels()/updateMasterCategories()).
+     * The client round-trips the `updated_at` it was handed at page-load
+     * (buildProductFormProps(), as an ISO-8601 string via toIso8601String())
+     * back as `expected_updated_at` on every save; if the row has since been
+     * saved by someone else — another device, another tab, a teammate — this
+     * won't match and the save is rejected before anything is written,
+     * instead of silently overwriting whatever they just saved with this
+     * request's now-stale form state.
+     *
+     * There's no dedicated version/lock column on `products` to compare
+     * against (the `product_versions` table some earlier migration added
+     * for this purpose was never wired up to anything — nothing reads or
+     * writes it) so `updated_at` is what's available. `$product` must be
+     * freshly read under `lockForUpdate()` inside the same transaction
+     * right before this call — see update()/updateChannels()/
+     * updateMasterCategories() — so the comparison is against the row's
+     * true current state, not whatever this request's route-bound instance
+     * happened to load before another request's write landed.
+     *
+     * `expected_updated_at` is optional/nullable — omitting it (e.g. some
+     * future caller that doesn't send it) skips the check entirely rather
+     * than failing closed, matching how every other optional field in this
+     * controller behaves.
+     */
+    private function assertNotStale(Request $request, Product $product): void
+    {
+        $expected = $request->input('expected_updated_at');
+        if ($expected === null || $expected === '' || $product->updated_at === null) {
+            return;
+        }
+
+        try {
+            $matches = Carbon::parse($expected)->equalTo($product->updated_at);
+        } catch (\Exception $e) {
+            // ค่าที่ส่งมา parse ไม่ขึ้นเลย (เช่น format ผิดจริงๆ) — ปล่อยผ่านแทนที่จะ
+            // บล็อกการเซฟเพราะ bug ฝั่ง client ที่ไม่เกี่ยวกับการชนกันของข้อมูลจริงๆ
+            return;
+        }
+
+        if (! $matches) {
+            throw ValidationException::withMessages([
+                'conflict' => "This product was updated by someone else since you opened this page. Reload the page to see the latest version before saving your changes.",
+            ]);
+        }
+    }
+
     public function update(Request $request, Product $product): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
@@ -2601,6 +2656,15 @@ class ProductController extends Controller
         $validated = $validator->validate();
 
         DB::transaction(function () use ($validated, $request, $product) {
+            // lockForUpdate() ก่อน ไม่ใช่แค่เช็ค $product->updated_at ที่โหลดมา
+            // ตั้งแต่ต้น request — ป้องกัน race แคบๆ ที่ request คู่ขนานอีกตัว
+            // insert/update แถวนี้เสร็จไปแล้วระหว่างที่ request นี้กำลัง validate
+            // อยู่ (ก่อนถึงบรรทัดนี้) ให้เห็นค่าจริงที่สุดเท่าที่จะทำได้ ก่อนตัดสินใจ
+            // ว่าค่าที่ client ถืออยู่ล้าสมัยหรือยัง ($product ตัวเดิมยังใช้ต่อได้
+            // ปกติด้านล่าง — lock เป็น row-level lock ในฐานข้อมูล ไม่ผูกกับ
+            // instance ของ Eloquent ตัวไหนเป็นการเฉพาะ)
+            $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
+
             $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
             $product->update([
@@ -3096,13 +3160,20 @@ class ProductController extends Controller
             'published_shop_ids.*' => ['exists:sales_platform_shops,id'],
         ]);
 
-        DB::transaction(function () use ($validated, $product) {
+        DB::transaction(function () use ($validated, $request, $product) {
+            $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
+
             $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
             $newShopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
             $product->platformShops()->sync($newShopIds);
 
             if ($oldShopIds !== $newShopIds) {
                 AuditLog::record('published_shops_updated', $product, ['shop_ids' => $oldShopIds], ['shop_ids' => $newShopIds]);
+                // sync() ด้านบนแตะแค่ pivot table เฉยๆ ไม่ทำให้ products.updated_at
+                // ขยับเองตามธรรมชาติ — ต้อง touch() มือ ไม่งั้นทั้ง OCC check ของแผงนี้
+                // เองตอน save ซ้ำ และของฟอร์มใหญ่ (update() เทียบ updated_at ตัวเดียวกัน)
+                // จะไม่รู้เลยว่ามีการเปลี่ยนแปลงเกิดขึ้นไปแล้วจากแผงนี้
+                $product->touch();
             }
         });
 
@@ -3131,7 +3202,9 @@ class ProductController extends Controller
         }
         $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($validated, $attributeIdsByCode, $product) {
+        DB::transaction(function () use ($validated, $attributeIdsByCode, $request, $product) {
+            $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
+
             $codes = [];
             $oldCodes = [];
 
@@ -3171,6 +3244,14 @@ class ProductController extends Controller
             }
 
             $this->relinkMasterCategoryCodes($product, $oldCodes, $codes);
+
+            // เหตุผลเดียวกับ updateChannels() ด้านบน — ProductValue::update()/
+            // create()/delete() ในลูปข้างบนไม่ได้ทำให้ products.updated_at ขยับ
+            // เองเลย (คนละแถว/ตาราง) ต้อง touch() ให้ OCC check เห็นว่าแผงนี้
+            // เพิ่งเปลี่ยนแปลงไปแล้วจริงๆ
+            if ($oldCodes !== $codes) {
+                $product->touch();
+            }
         });
 
         return back()->with('success', 'Categories saved.');

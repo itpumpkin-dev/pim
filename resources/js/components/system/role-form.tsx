@@ -4,6 +4,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import {
     Box,
     Button,
@@ -12,6 +13,7 @@ import {
     Divider,
     FormControlLabel,
     IconButton,
+    InputAdornment,
     Tab,
     Tabs,
     TextField,
@@ -104,6 +106,13 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
     const [tab, setTab] = useState(0);
     const [expandedAttrGroups, setExpandedAttrGroups] = useState(true);
     const [expandedAttributes, setExpandedAttributes] = useState(true);
+    // ค้นหาแยกกันคนละกล่องสำหรับตาราง "กลุ่มแอตทริบิวต์"/"แอตทริบิวต์รายตัว" —
+    // แอตทริบิวต์รายตัวมักมีเป็นร้อยรายการ (ดูคอมเมนต์ maxHeight/stickyHeader
+    // ด้านล่าง) เลื่อนหาทีละบรรทัดไม่ไหว ต้องกรองด้วยชื่อได้ ส่วน "select all"
+    // ของแต่ละตารางยังคงอิงจากลิสต์เต็มเสมอ (ไม่ผูกกับผลค้นหา) — ค้นหาไว้กรอง
+    // แค่ว่าจะ "เห็น" แถวไหนบ้างเท่านั้น ไม่กระทบว่า "เลือกทั้งหมด" จะติ๊กอะไรบ้าง
+    const [attrGroupSearch, setAttrGroupSearch] = useState('');
+    const [attributeSearch, setAttributeSearch] = useState('');
 
     const allResources = useMemo(() => {
         const res: Record<string, PermissionResource> = {};
@@ -497,6 +506,18 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
         },
     ];
 
+    const filteredAttributeGroups = useMemo(() => {
+        const term = attrGroupSearch.trim().toLowerCase();
+        if (!term) return attributeGroups;
+        return attributeGroups.filter((g) => g.name.toLowerCase().includes(term));
+    }, [attributeGroups, attrGroupSearch]);
+
+    const filteredAttributes = useMemo(() => {
+        const term = attributeSearch.trim().toLowerCase();
+        if (!term) return attributes;
+        return attributes.filter((a) => a.name.toLowerCase().includes(term));
+    }, [attributes, attributeSearch]);
+
     return (
         <AppLayout
             breadcrumbs={breadcrumbs}
@@ -724,12 +745,31 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttrGroups && (
-                                <FioriResponsiveTable
-                                    columns={attributeGroupColumns}
-                                    rows={attributeGroups}
-                                    getRowKey={(group) => group.id}
-                                    rowSx={() => fioriTableRowSx(false)}
-                                />
+                                <>
+                                    <TextField
+                                        size="small"
+                                        placeholder={t('searchByName')}
+                                        value={attrGroupSearch}
+                                        onChange={(e) => setAttrGroupSearch(e.target.value)}
+                                        sx={{ mb: 1.5, width: 280 }}
+                                        slotProps={{
+                                            input: {
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            },
+                                        }}
+                                    />
+                                    <FioriResponsiveTable
+                                        columns={attributeGroupColumns}
+                                        rows={filteredAttributeGroups}
+                                        getRowKey={(group) => group.id}
+                                        rowSx={() => fioriTableRowSx(false)}
+                                        emptyMessage={t('noResultsFound')}
+                                    />
+                                </>
                             )}
                         </Box>
 
@@ -756,19 +796,38 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             </Box>
 
                             {expandedAttributes && (
-                                // maxHeight ต้องอยู่บน FioriResponsiveTable เอง (ไม่ใช่ Box ที่ห่อ
-                                // ข้างนอกแบบเดิม) — TableContainer ข้างในมันตั้ง overflow-x:auto
-                                // เป็นของตัวเองเสมออยู่แล้ว กลายเป็น scrolling ancestor ที่ใกล้กว่า
-                                // Box ข้างนอก ทำให้ stickyHeader เกาะกับ Box ข้างนอกไม่ได้จริงๆ
-                                // (เลื่อนพ้นไปแล้วหัวตารางก็หายไปด้วย) ดู FioriResponsiveTable ทีคอมเมนต์
-                                <FioriResponsiveTable
-                                    stickyHeader
-                                    maxHeight={500}
-                                    columns={attributeColumns}
-                                    rows={attributes}
-                                    getRowKey={(attr) => attr.id}
-                                    rowSx={() => fioriTableRowSx(false)}
-                                />
+                                <>
+                                    <TextField
+                                        size="small"
+                                        placeholder={t('searchByName')}
+                                        value={attributeSearch}
+                                        onChange={(e) => setAttributeSearch(e.target.value)}
+                                        sx={{ mb: 1.5, width: 280 }}
+                                        slotProps={{
+                                            input: {
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            },
+                                        }}
+                                    />
+                                    {/* maxHeight ต้องอยู่บน FioriResponsiveTable เอง (ไม่ใช่ Box ที่ห่อ
+                                    ข้างนอกแบบเดิม) — TableContainer ข้างในมันตั้ง overflow-x:auto
+                                    เป็นของตัวเองเสมออยู่แล้ว กลายเป็น scrolling ancestor ที่ใกล้กว่า
+                                    Box ข้างนอก ทำให้ stickyHeader เกาะกับ Box ข้างนอกไม่ได้จริงๆ
+                                    (เลื่อนพ้นไปแล้วหัวตารางก็หายไปด้วย) ดู FioriResponsiveTable ทีคอมเมนต์ */}
+                                    <FioriResponsiveTable
+                                        stickyHeader
+                                        maxHeight={500}
+                                        columns={attributeColumns}
+                                        rows={filteredAttributes}
+                                        getRowKey={(attr) => attr.id}
+                                        rowSx={() => fioriTableRowSx(false)}
+                                        emptyMessage={t('noResultsFound')}
+                                    />
+                                </>
                             )}
                         </Box>
                     </Box>
