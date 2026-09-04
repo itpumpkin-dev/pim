@@ -226,7 +226,7 @@ class AttributeController extends Controller
             'translations' => $attribute->translations()->get()
                 ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
             'options' => $attribute->options()->orderBy('sort_order')->orderBy('id')->get([
-                'id', 'attribute_id', 'code', 'admin_label', 'swatch_value', 'sort_order',
+                'id', 'attribute_id', 'code', 'admin_label', 'swatch_value', 'sort_order', 'is_active', 'is_customized',
             ])->map(fn ($option) => [
                 'id' => $option->id,
                 'code' => $option->code,
@@ -236,6 +236,8 @@ class AttributeController extends Controller
                     ? Storage::disk('public')->url($option->swatch_value)
                     : $option->swatch_value,
                 'sort_order' => $option->sort_order,
+                'is_active' => $option->is_active,
+                'is_customized' => $option->is_customized,
             ]),
             'canViewHistory' => auth()->user()?->hasPermission('attributes', 'view_history') ?? false,
         ]);

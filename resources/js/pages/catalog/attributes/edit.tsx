@@ -11,7 +11,7 @@ import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel,
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const swatchTypeKeys: Record<string, string> = {
@@ -249,18 +249,22 @@ export default function AttributeEdit({ attribute, translations, options = [], m
                         onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                     />
 
-                    {showSwatchType && masterBound && (
+                    {showSwatchType && (
                         <FioriFormGroup title={t('optionsTitle')}>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('masterSourceOptionsLocked', {
-                                    source: t(masterSources.find((s) => s.value === data.master_source)?.labelKey ?? data.master_source),
-                                })}
-                            </Typography>
+                            {masterBound && (
+                                <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
+                                    {t('masterSourceOptionsCustomizable', {
+                                        source: t(masterSources.find((s) => s.value === data.master_source)?.labelKey ?? data.master_source),
+                                    })}
+                                </FioriMessageStrip>
+                            )}
+                            <AttributeOptionsPanel
+                                attributeId={attribute.id}
+                                swatchType={data.swatch_type}
+                                options={options}
+                                isMasterBound={masterBound}
+                            />
                         </FioriFormGroup>
-                    )}
-
-                    {showSwatchType && !masterBound && (
-                        <AttributeOptionsPanel attributeId={attribute.id} swatchType={data.swatch_type} options={options} />
                     )}
                 </Stack>
 

@@ -19,8 +19,9 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEventHandler, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx, fioriTabsSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -95,9 +96,10 @@ interface RoleForm {
     [key: string]: string | boolean | number[] | Record<string, string[]>;
 }
 
-const TABS = ['General', 'Permissions', 'Users'];
+const TAB_KEYS = ['roleFormTabGeneral', 'roleFormTabPermissions', 'roleFormTabUsers'];
 
 export default function RoleFormPage({ catalog, users, role, attributeGroups, attributes }: RoleFormProps) {
+    const { t } = useTranslation('system');
     const isEdit = Boolean(role);
     const [tab, setTab] = useState(0);
     const [expandedAttrGroups, setExpandedAttrGroups] = useState(true);
@@ -369,7 +371,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
     const attributeGroupColumns: FioriResponsiveColumn<AttributeGroup>[] = [
         {
             key: 'name',
-            header: 'Attribute Group',
+            header: t('roleFormAttributeGroupColumn'),
             priority: 'always',
             render: (group) => group.name,
         },
@@ -386,7 +388,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         }
                         onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'read', e.target.checked)}
                     />
-                    Read
+                    {t('roleFormReadColumn')}
                 </>
             ),
             priority: 'always',
@@ -413,7 +415,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         }
                         onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'edit', e.target.checked)}
                     />
-                    Edit
+                    {t('roleFormEditColumn')}
                 </>
             ),
             priority: 'always',
@@ -432,7 +434,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
     const attributeColumns: FioriResponsiveColumn<Attribute>[] = [
         {
             key: 'name',
-            header: 'Attribute',
+            header: t('roleFormAttributeColumn'),
             priority: 'always',
             render: (attr) => attr.name,
         },
@@ -449,7 +451,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         }
                         onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'read', e.target.checked)}
                     />
-                    Read
+                    {t('roleFormReadColumn')}
                 </>
             ),
             priority: 'always',
@@ -476,8 +478,8 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                         }
                         onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
                     />
-                    Edit
-                    <Tooltip title="A Read-only Attribute Group overrides this — an attribute stays read-only on the product if its group isn't editable, even when checked here.">
+                    {t('roleFormEditColumn')}
+                    <Tooltip title={t('roleFormEditOverrideTooltip')}>
                         <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: FIORI.textSecondary }} />
                     </Tooltip>
                 </>
@@ -523,8 +525,8 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 </Typography>
 
                 <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ ...fioriTabsSx, mb: 3 }}>
-                    {TABS.map((label, index) => (
-                        <Tab key={label} label={label} value={index} />
+                    {TAB_KEYS.map((key, index) => (
+                        <Tab key={key} label={t(key)} value={index} />
                     ))}
                 </Tabs>
 
@@ -693,11 +695,10 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                     {hasProductsPermission ? (
                     <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: FIORI.brand }}>
-                            📋 Attribute Access
+                            📋 {t('roleFormAttributeAccessTitle')}
                         </Typography>
                         <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 2 }}>
-                            Read lets this role see the field on a product; Edit lets it change the value (checking Edit turns Read on too).
-                            An attribute's Edit is overridden by its Attribute Group's setting — if the group is Read-only, the attribute stays read-only on the product even when Edit is checked here.
+                            {t('roleFormAttributeAccessDescription')}
                         </Typography>
 
                         {/* Attribute Groups */}
@@ -718,7 +719,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                     {expandedAttrGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                                 </IconButton>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    🏷️ Attribute Groups
+                                    🏷️ {t('roleFormAttributeGroupsTitle')}
                                 </Typography>
                             </Box>
 
@@ -750,30 +751,31 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                                     {expandedAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                                 </IconButton>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    ⚙️ Individual Attributes
+                                    ⚙️ {t('roleFormIndividualAttributesTitle')}
                                 </Typography>
                             </Box>
 
                             {expandedAttributes && (
-                                // FioriResponsiveTable doesn't expose a stickyHeader option, so the
-                                // header no longer sticks while scrolling this box — the maxHeight/
-                                // scroll behavior itself is preserved via this wrapper.
-                                <Box sx={{ ...fioriCardSx, maxHeight: 500, overflowY: 'auto' }}>
-                                    <FioriResponsiveTable
-                                        variant="plain"
-                                        columns={attributeColumns}
-                                        rows={attributes}
-                                        getRowKey={(attr) => attr.id}
-                                        rowSx={() => fioriTableRowSx(false)}
-                                    />
-                                </Box>
+                                // maxHeight ต้องอยู่บน FioriResponsiveTable เอง (ไม่ใช่ Box ที่ห่อ
+                                // ข้างนอกแบบเดิม) — TableContainer ข้างในมันตั้ง overflow-x:auto
+                                // เป็นของตัวเองเสมออยู่แล้ว กลายเป็น scrolling ancestor ที่ใกล้กว่า
+                                // Box ข้างนอก ทำให้ stickyHeader เกาะกับ Box ข้างนอกไม่ได้จริงๆ
+                                // (เลื่อนพ้นไปแล้วหัวตารางก็หายไปด้วย) ดู FioriResponsiveTable ทีคอมเมนต์
+                                <FioriResponsiveTable
+                                    stickyHeader
+                                    maxHeight={500}
+                                    columns={attributeColumns}
+                                    rows={attributes}
+                                    getRowKey={(attr) => attr.id}
+                                    rowSx={() => fioriTableRowSx(false)}
+                                />
                             )}
                         </Box>
                     </Box>
                     ) : (
                         <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#FFF4E5', border: `1px solid ${FIORI.warning}`, borderRadius: '8px' }}>
                             <Typography variant="body2" sx={{ color: FIORI.warning }}>
-                                ⚠️ กำหนดสิทธิ์ "Products" ก่อนจึงจะสามารถกำหนดสิทธิ์ Attribute Access ได้
+                                ⚠️ {t('roleFormProductsPermissionRequired')}
                             </Typography>
                         </Box>
                     )}

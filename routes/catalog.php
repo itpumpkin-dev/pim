@@ -124,6 +124,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('attributes/{attribute}/options/batch', [AttributeOptionController::class, 'batchUpdate'])->name('attributes.options.batchUpdate')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'update'])->name('attributes.options.update')->middleware('permission:attributes,edit_attributes');
     Route::delete('attributes/{attribute}/options/{option}', [AttributeOptionController::class, 'destroy'])->name('attributes.options.destroy')->middleware('permission:attributes,edit_attributes');
+    // "ยกเลิก custom" ตัวเลือกหนึ่งตัว แล้วดึงค่ากลับจาก master — เฉพาะ
+    // attribute ที่ผูก master_source ไว้เท่านั้น (ดู AttributeOptionController::resetToMaster())
+    Route::post('attributes/{attribute}/options/{option}/reset-to-master', [AttributeOptionController::class, 'resetToMaster'])->name('attributes.options.resetToMaster')->middleware('permission:attributes,edit_attributes');
 
     Route::get('brands', [BrandController::class, 'index'])->name('brands.index')->middleware('permission:brands,list_brands');
     Route::get('brands/create', [BrandController::class, 'create'])->name('brands.create')->middleware('permission:brands,edit_brands');

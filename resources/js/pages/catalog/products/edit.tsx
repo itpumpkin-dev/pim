@@ -87,6 +87,8 @@ interface AttributeOption {
     admin_label?: string;
     /** ตัวเลือกนี้ (เช่น ค่าของ `pbrand`) ถูก map ไปยัง marketplace ไหนแล้วบ้าง — ดูที่ ProductController::decorateOptionsWithMappedPlatforms() */
     mapped_platforms?: string[];
+    /** false = ถูกปิดใช้งานจากหน้า Options ของ attribute — ไม่ควรโชว์เป็นตัวเลือกใหม่ในดรอปดาวน์ (แต่ถ้าเป็นค่าที่สินค้านี้เลือกอยู่แล้วต้องยังโชว์ไว้ ไม่งั้นค่าจะหาย) ไม่มีค่า/true = เปิดใช้งานปกติ */
+    is_active?: boolean;
 }
 
 interface AttributeItem {
@@ -1716,11 +1718,17 @@ export default function ProductEdit({
                                                         SelectProps={{ IconComponent: KeyboardArrowDownIcon, displayEmpty: true }}
                                                     >
                                                         <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
-                                                        {(productTypeAttribute.options || []).map((opt) => (
-                                                            <MenuItem key={opt.id} value={opt.code || ''}>
-                                                                {opt.admin_label || opt.code}
-                                                            </MenuItem>
-                                                        ))}
+                                                        {(productTypeAttribute.options || [])
+                                                            .filter(
+                                                                (opt) =>
+                                                                    opt.is_active !== false ||
+                                                                    opt.code === (data.values[productTypeAttribute.id]?.['global']?.['default'] as string),
+                                                            )
+                                                            .map((opt) => (
+                                                                <MenuItem key={opt.id} value={opt.code || ''}>
+                                                                    {opt.admin_label || opt.code}
+                                                                </MenuItem>
+                                                            ))}
                                                     </TextField>
                                                 </Box>
                                             )}
@@ -1796,6 +1804,12 @@ export default function ProductEdit({
                                                             data.values[attr.id]?.[channelKey]?.[localeKey] ??
                                                             data.values[attr.id]?.[channelKey]?.['default'] ??
                                                             '';
+                                                        // ไม่ส่ง activeLocaleCode มาก่อนหน้านี้ — QuickAddOptionDialog
+                                                        // เลย fallback ไปที่ locales[0] เสมอ (ปกติคือ EN) แทนที่จะเป็น
+                                                        // locale ที่กำลังแก้ไขอยู่จริงตาม dropdown "กำลังแก้ไขในภาษา"
+                                                        // ด้านบน ทำให้ช่อง "ชื่อ (...)" ในไดอะล็อกเพิ่มตัวเลือกโชว์
+                                                        // ภาษาอังกฤษค้างไว้แม้ผู้ใช้จะสลับมาแก้ไทยอยู่ก็ตาม
+                                                        const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
                                                         return (
                                                             <RenderAttributeInput
                                                                 key={attr.id}
@@ -1805,6 +1819,7 @@ export default function ProductEdit({
                                                                 localeKey={localeKey}
                                                                 onValueChange={handleMasterCategoryChange}
                                                                 label={localizedLabel(attr, activeLocaleId)}
+                                                                activeLocaleCode={activeLocaleCode}
                                                                 canAddOptions={canAddAttributeOptions}
                                                                 sku={data.sku}
                                                                 productId={product.id}
@@ -2603,12 +2618,15 @@ const SelectControl = memo(function SelectControl({
     disabled: boolean;
 }) {
     const selectedOption = options.find((opt) => optionValue(opt) === value) ?? null;
+    // ตัวเลือกที่ถูกปิดใช้งาน (is_active === false) ไม่ควรโชว์เป็นตัวเลือกใหม่ให้เลือก
+    // แต่ถ้าสินค้านี้เลือกค่านั้นไว้อยู่แล้วต้องยังคงโชว์ต่อไป ไม่งั้นค่าที่มีอยู่จะหายไปจาก dropdown
+    const visibleOptions = options.filter((opt) => opt.is_active !== false || opt === selectedOption);
     return (
         <Autocomplete
             size="small"
             fullWidth
             disabled={disabled}
-            options={options}
+            options={visibleOptions}
             value={selectedOption}
             autoHighlight
             popupIcon={<KeyboardArrowDownIcon />}

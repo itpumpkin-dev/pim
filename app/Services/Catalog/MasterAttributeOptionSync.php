@@ -80,19 +80,77 @@ class MasterAttributeOptionSync
 
     // ── attribute side ──────────────────────────────────────────────────
 
-    /** Wipe an attribute's options and regenerate them from its master_source. */
+    /**
+     * Regenerate an attribute's options from its master_source — refreshes
+     * (or creates) one row per current master row via upsertOption(), and
+     * prunes only the options that no longer correspond to any current
+     * master row (e.g. a master row got deleted without forgetModel()
+     * having run for some reason).
+     *
+     * ตั้งใจไม่ "ลบทุกอย่างทิ้งแล้วสร้างใหม่หมด" แบบเดิมอีกต่อไป — ตัวเลือกที่
+     * แอดมิน custom ไว้ (is_customized = true, ดู upsertOption()) ต้องยังคง
+     * อยู่ (id เดิม แถวเดิม) ข้ามการ rebuild แต่ละครั้งได้ ถ้าลบตัวเลือกเดิมทิ้ง
+     * ก่อนเสมอแบบเดิม แถวที่ถูก insert ใหม่จะไม่มีทาง "มีอยู่แล้ว" ให้
+     * upsertOption() เช็ค is_customized เจอเลย (เป็นแถวใหม่ล้วนๆ ทุกครั้ง)
+     * ทำให้ค่าที่ custom ไว้หายไปเงียบๆ ทุกครั้งที่มีคน save หน้าแก้ไข
+     * attribute นี้ หรือรันคำสั่ง `catalog:sync-master-options`
+     */
     public function rebuildAttribute(Attribute $attribute): void
     {
-        AttributeOption::where('attribute_id', $attribute->id)->get()->each->delete();
-
         $key = $attribute->master_source;
         if ($key === null || ! isset(self::SOURCES[$key])) {
+            // master_source ถูกเอาออกแล้ว/ไม่รู้จัก — ตัวเลือกเดิมทั้งหมดไม่มี
+            // ความหมายอะไรให้ sync อีกต่อไปจริงๆ (ไม่ใช่แค่ "ยังไม่ได้ sync
+            // รอบนี้" เฉยๆ) เลยยังคงลบทิ้งทั้งหมดเหมือนพฤติกรรมเดิม
+            AttributeOption::where('attribute_id', $attribute->id)->get()->each->delete();
+
             return;
         }
 
-        foreach ($this->rowsFor($key) as $row) {
+        $rows = $this->rowsFor($key);
+        $currentCodes = collect($rows)->map(fn ($row) => $this->normaliseCode($row['code']))->filter()->all();
+
+        AttributeOption::where('attribute_id', $attribute->id)
+            ->whereNotIn('code', $currentCodes)
+            ->get()
+            ->each->delete();
+
+        foreach ($rows as $row) {
             $this->upsertOption($attribute->id, $row);
         }
+    }
+
+    /**
+     * ยกเลิกการ custom ของตัวเลือกหนึ่งตัว แล้ว sync ค่ากลับจาก master ทันที —
+     * ใช้จากปุ่ม "Reset to master" บนแผง Options ของหน้าแก้ไข attribute (ดู
+     * AttributeOptionController::resetToMaster()) คืน false เฉยๆ ถ้า
+     * attribute ไม่ได้ผูก master ไว้ หรือหา row ที่ตรงกับ code นี้ในมาสเตอร์
+     * ตอนนี้ไม่เจอแล้ว (เช่น ถูกลบไปจาก master แล้วจริงๆ)
+     */
+    public function resetOptionToMaster(AttributeOption $option): bool
+    {
+        $attribute = $option->attribute;
+        $key = $attribute?->master_source;
+        if ($key === null || ! isset(self::SOURCES[$key])) {
+            return false;
+        }
+
+        $row = collect($this->rowsFor($key))->first(fn (array $r) => $this->normaliseCode($r['code']) === $option->code);
+        if ($row === null) {
+            return false;
+        }
+
+        // ต้องเซฟ is_customized = false ให้เสร็จก่อน แล้วค่อยเรียก
+        // upsertOption() แยกที (ไม่ใช่แก้ $option ตรงๆ ต่อ) เพราะ upsertOption()
+        // ข้างในจะ query หา AttributeOption แถวนี้ขึ้นมาใหม่เอง (firstOrNew)
+        // ต้องเจอ is_customized เป็น false ในฐานข้อมูลแล้วจริงๆ ตอนนั้น ไม่งั้น
+        // จะโดนเงื่อนไข skip-overwrite กันไว้เหมือนเดิม
+        $option->is_customized = false;
+        $option->save();
+
+        $this->upsertOption($attribute->id, $row);
+
+        return true;
     }
 
     /** Rebuild every attribute that has a master_source. Returns the count. */
@@ -124,7 +182,27 @@ class MasterAttributeOptionSync
 
             foreach ($attributeIds as $attributeId) {
                 if ($oldCode !== null && $oldCode !== $newCode) {
-                    AttributeOption::where('attribute_id', $attributeId)->where('code', $oldCode)->get()->each->delete();
+                    $stale = AttributeOption::where('attribute_id', $attributeId)->where('code', $oldCode)->get();
+                    foreach ($stale as $option) {
+                        // Currency/ProductGrade/CommissionGroup/Vendor/... all
+                        // let their own `code` be edited directly — a plain
+                        // rename, not a delete. Blowing away a customized
+                        // option here just because its code moved would
+                        // silently erase the very customization this feature
+                        // exists to protect, on an action that has nothing to
+                        // do with "Reset to master". Migrate the row onto the
+                        // new code instead so upsertOption()'s is_customized
+                        // guard below still recognises and preserves it; only
+                        // a genuinely non-customized (plain mirror) row gets
+                        // deleted outright — it's about to be recreated fresh
+                        // by the upsertOption() call right after anyway.
+                        if ($option->is_customized && $newCode !== null) {
+                            $option->code = $newCode;
+                            $option->save();
+                        } else {
+                            $option->delete();
+                        }
+                    }
                 }
                 if ($row !== null) {
                     $this->upsertOption($attributeId, $row);
@@ -168,6 +246,18 @@ class MasterAttributeOptionSync
         }
 
         $option = AttributeOption::firstOrNew(['attribute_id' => $attributeId, 'code' => $code]);
+
+        if ($option->exists && $option->is_customized) {
+            // แอดมิน custom label/สถานะเปิดปิด/คำแปลของตัวเลือกนี้ไว้แล้วเอง
+            // ผ่านแผง Options บนหน้าแก้ไข attribute (ดู
+            // AttributeOptionController::update()/batchUpdate()) — master
+            // ยังคงเป็นแหล่งข้อมูลตั้งต้น (ตัวเลือกใหม่ๆ จาก master ที่ยังไม่
+            // เคยมีแถวมาก่อนจะยัง insert ตามปกติด้านล่าง) แต่ตัวเลือกที่ถูก
+            // custom แล้วจะไม่โดนทับค่ากลับไปเป็นของ master อีกจนกว่าจะกด
+            // "Reset to master" (ดู resetToMaster())
+            return;
+        }
+
         $option->admin_label = trim((string) ($row['label'] ?? '')) ?: $code;
         if (array_key_exists('is_active', $row)) {
             $option->is_active = (bool) $row['is_active'];

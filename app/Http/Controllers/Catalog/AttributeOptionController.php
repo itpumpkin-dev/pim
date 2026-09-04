@@ -16,6 +16,7 @@ use App\Models\BusinessTypeTranslation;
 use App\Models\Locale;
 use App\Models\ProductType;
 use App\Models\ProductTypeTranslation;
+use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\CodeGenerator;
 use App\Support\TranslationTracking;
 use Illuminate\Database\Eloquent\Model;
@@ -209,6 +210,7 @@ class AttributeOptionController extends Controller
             'swatch_value' => ['nullable', 'string', 'max:255'],
             'swatch_image' => ['nullable', 'image', 'max:2048'],
             'sort_order' => ['nullable', 'integer'],
+            'is_active' => ['boolean'],
         ]);
 
         $translations = $validated['translations'] ?? [];
@@ -218,12 +220,25 @@ class AttributeOptionController extends Controller
             $swatchValue = $request->file('swatch_image')->store('attribute-options', 'public');
         }
 
+        $newAdminLabel = $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null);
+        $newIsActive = $request->boolean('is_active', $option->is_active);
+        $edited = $this->optionWasActuallyEdited($option, $newAdminLabel, $newIsActive, $swatchValue, $translations);
+
         $oldFields = $this->optionAuditFields($option);
 
         $option->update([
-            'admin_label' => $this->resolveAdminLabel($translations, $validated['admin_label'] ?? null),
+            'admin_label' => $newAdminLabel,
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? $option->sort_order,
+            'is_active' => $newIsActive,
+            // แก้ผ่านแผงนี้ตรงๆ = "custom" ถ้า attribute ผูก master ไว้ *และ*
+            // ค่าจริงๆ เปลี่ยนไปจากเดิม (ดู optionWasActuallyEdited()) — เช็ค
+            // ให้ชัวร์ว่ามีอะไรเปลี่ยนจริง ไม่ใช่ตั้ง flag เพราะแค่มี request
+            // เข้ามา ไม่งั้น resave ค่าเดิมเป๊ะๆ ก็จะโดนล็อกไม่ให้ sync จาก
+            // master อีกทั้งที่ไม่มีใครตั้งใจ custom อะไรเลย —
+            // MasterAttributeOptionSync::upsertOption() จะไม่ทับค่านี้อีกจน
+            // กว่าจะกด "Reset to master" (ดู resetToMaster() ด้านล่าง)
+            'is_customized' => $attribute->master_source !== null && ($edited || $option->is_customized),
         ]);
 
         $this->syncTranslations($option, $translations);
@@ -235,6 +250,28 @@ class AttributeOptionController extends Controller
         }
 
         return back()->with('success', 'Option updated successfully.');
+    }
+
+    /**
+     * ยกเลิกการ custom ของตัวเลือกหนึ่งตัว แล้วให้ค่ากลับไปตาม master ทันที —
+     * ใช้ได้เฉพาะ attribute ที่ผูก master_source ไว้เท่านั้น (ปุ่มนี้จะไม่โผล่
+     * ในหน้าจอสำหรับ attribute อื่น)
+     */
+    public function resetToMaster(Attribute $attribute, AttributeOption $option, MasterAttributeOptionSync $sync): RedirectResponse
+    {
+        $oldFields = $this->optionAuditFields($option);
+
+        if (! $sync->resetOptionToMaster($option)) {
+            return back()->withErrors(['option' => 'This option could not be reset — its master record may have been removed.']);
+        }
+
+        $option->refresh();
+        $newFields = $this->optionAuditFields($option);
+        if ($oldFields !== $newFields) {
+            AuditLog::record('option_updated', $attribute, $oldFields, $newFields);
+        }
+
+        return back()->with('success', 'Option reset to its master value.');
     }
 
     /**
@@ -261,6 +298,7 @@ class AttributeOptionController extends Controller
             'options.*.translations.*' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_value' => ['nullable', 'string', 'max:255'],
             'options.*.swatch_image' => ['nullable', 'image', 'max:2048'],
+            'options.*.is_active' => ['boolean'],
         ]);
 
         $allOldFields = [];
@@ -278,9 +316,26 @@ class AttributeOptionController extends Controller
 
                 $oldFields = $this->optionAuditFields($option);
 
+                $newAdminLabel = $this->resolveAdminLabel($translations, $optionData['admin_label'] ?? null);
+                // multipart/form-data (forceFormData: true ที่ saveAll()) ส่ง
+                // ทุกค่าเป็น string เสมอ — ต้องใช้ $request->boolean() ไม่ใช่
+                // (bool) cast ตรงๆ ไม่งั้น "false"/"0" จะกลายเป็น true เพราะ
+                // เป็น non-empty string
+                $newIsActive = $request->boolean("options.{$index}.is_active", $option->is_active);
+                $edited = $this->optionWasActuallyEdited($option, $newAdminLabel, $newIsActive, $swatchValue, $translations);
+
                 $option->update([
-                    'admin_label' => $this->resolveAdminLabel($translations, $optionData['admin_label'] ?? null),
+                    'admin_label' => $newAdminLabel,
                     'swatch_value' => $swatchValue,
+                    'is_active' => $newIsActive,
+                    // "Save all" ส่งทุกแถวในลิสต์กลับมาเสมอ ไม่ใช่แค่แถวที่
+                    // แก้จริง (ดู docblock ของ batchUpdate() ด้านบน) ถ้าตั้ง
+                    // is_customized = true ให้ทุกแถวแบบไม่มีเงื่อนไข การกด
+                    // "Save all" เพียงครั้งเดียว (ต่อให้แก้แค่ตัวเดียว) จะ
+                    // ล็อกตัวเลือกทั้งหมดของ attribute นี้ไม่ให้รับการอัปเดต
+                    // จาก master อีกเลยตลอดไป ต้องเช็คว่าแถวนี้ถูกแก้จริงๆ
+                    // ก่อน (ดู optionWasActuallyEdited())
+                    'is_customized' => $attribute->master_source !== null && ($edited || $option->is_customized),
                 ]);
 
                 $this->syncTranslations($option, $translations);
@@ -308,6 +363,40 @@ class AttributeOptionController extends Controller
         AuditLog::record('option_deleted', $attribute, $oldFields, null);
 
         return back()->with('success', 'Option deleted successfully.');
+    }
+
+    /**
+     * เทียบค่าที่กำลังจะเซฟกับค่าปัจจุบันในฐานข้อมูลจริงๆ ก่อนตัดสินใจตั้ง
+     * `is_customized` — ต้องเช็คแบบนี้เพราะทั้ง update() (single row) และ
+     * batchUpdate() ("Save all" ที่ส่งทุกแถวกลับมาเสมอ ไม่ใช่แค่แถวที่ถูกแก้
+     * จริง) เรียก $option->update() ไม่ว่าค่าจะเปลี่ยนจริงหรือเปล่าก็ตาม ถ้า
+     * ไม่เช็คก่อน กด "Save all" เฉยๆ (หรือกด Save โดยไม่ได้แก้อะไรเลย) จะไป
+     * ล็อกตัวเลือกทุกตัวไม่ให้รับการอัปเดตจาก master อีกเลย ทั้งที่ไม่มีใคร
+     * ตั้งใจ custom อะไรจริงๆ
+     *
+     * เทียบ admin_label ด้วย getRawOriginal() (ไม่ใช่ ->admin_label ตรงๆ)
+     * เพราะ AttributeOption::adminLabel() เป็น accessor ที่ resolve ตาม
+     * locale ปัจจุบันของ request — ไม่ใช่ค่าดิบที่ resolveAdminLabel() เขียน
+     * ลงคอลัมน์จริง เทียบกันแบบนั้นจะผิดพลาดถ้า admin เปิดหน้าด้วยคนละ locale
+     */
+    private function optionWasActuallyEdited(AttributeOption $option, ?string $newAdminLabel, bool $newIsActive, ?string $newSwatchValue, array $newTranslations): bool
+    {
+        if ($newAdminLabel !== $option->getRawOriginal('admin_label')) {
+            return true;
+        }
+        if ($newIsActive !== $option->is_active) {
+            return true;
+        }
+        if ($newSwatchValue !== $option->getRawOriginal('swatch_value')) {
+            return true;
+        }
+
+        $oldTranslations = $option->translations->mapWithKeys(fn ($t) => [(string) $t->locale_id => $t->label])->all();
+        $normalizedNewTranslations = collect($newTranslations)
+            ->mapWithKeys(fn ($label, $localeId) => [(string) $localeId => (string) $label])
+            ->all();
+
+        return $normalizedNewTranslations !== $oldTranslations;
     }
 
     /**

@@ -12,6 +12,7 @@ import {
     Typography,
 } from '@mui/material';
 import { KeyboardEvent, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
 import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
@@ -70,6 +71,7 @@ export function QuickAddOptionDialog({
     onClose: () => void;
     onCreated: (code: string) => void;
 }) {
+    const { t } = useTranslation('catalog');
     const { locales } = useLocale();
     const { props } = usePage<SharedData>();
     const activeLocale = locales.find((l) => l.code === activeLocaleCode) ?? locales[0];
@@ -94,7 +96,7 @@ export function QuickAddOptionDialog({
 
     const submit = () => {
         if (!label.trim()) {
-            setError('Label is required.');
+            setError(t('quickAddOptionLabelRequired'));
             return;
         }
 
@@ -119,7 +121,7 @@ export function QuickAddOptionDialog({
                     onClose();
                 },
                 onError: (errors) => {
-                    setError((Object.values(errors)[0] as string) ?? 'Could not add option.');
+                    setError((Object.values(errors)[0] as string) ?? t('quickAddOptionGenericError'));
                 },
                 onFinish: () => setProcessing(false),
             },
@@ -138,13 +140,13 @@ export function QuickAddOptionDialog({
     const existingOptionColumns: FioriResponsiveColumn<ExistingOption>[] = [
         {
             key: 'code',
-            header: 'Code',
+            header: t('quickAddOptionCode'),
             priority: 'always',
             render: (option) => option.code,
         },
         {
             key: 'label',
-            header: 'Label',
+            header: t('quickAddOptionLabelColumn'),
             priority: 'always',
             render: (option) => option.admin_label || '—',
         },
@@ -152,18 +154,23 @@ export function QuickAddOptionDialog({
 
     return (
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Add option — {attributeLabel}</DialogTitle>
+            <DialogTitle>{t('quickAddOptionTitle', { attribute: attributeLabel })}</DialogTitle>
             <DialogContent>
                 {masterSourceLabel && (
                     <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
-                        This will add a new record to the <strong>{masterSourceLabel}</strong> master data screen, not just this attribute.
+                        <Trans
+                            t={t}
+                            i18nKey="quickAddOptionMasterNotice"
+                            values={{ source: masterSourceLabel }}
+                            components={{ strong: <strong /> }}
+                        />
                     </FioriMessageStrip>
                 )}
 
                 {existingOptions.length > 0 && (
                     <>
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
-                            Existing options ({existingOptions.length})
+                            {t('quickAddOptionExistingOptions', { count: existingOptions.length })}
                         </Typography>
                         <Box sx={{ maxHeight: 220, mb: 2, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                             <FioriResponsiveTable
@@ -178,11 +185,11 @@ export function QuickAddOptionDialog({
                 )}
 
                 <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                    New option
+                    {t('quickAddOptionNewOptionTitle')}
                 </Typography>
                 <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                     <TextField
-                        label={`Label (${activeLocale?.display_name ?? activeLocale?.code ?? 'default'})`}
+                        label={t('quickAddOptionLabelField', { locale: activeLocale?.display_name ?? activeLocale?.code ?? 'default' })}
                         size="small"
                         value={label}
                         onChange={(e) => setLabel(e.target.value)}
@@ -192,7 +199,7 @@ export function QuickAddOptionDialog({
                     />
                     {!masterSourceLabel && swatchType === 'color' && (
                         <TextField
-                            label="Color (hex)"
+                            label={t('quickAddOptionColorHex')}
                             size="small"
                             value={swatchText}
                             onChange={(e) => setSwatchText(e.target.value)}
@@ -218,7 +225,7 @@ export function QuickAddOptionDialog({
             </DialogContent>
             <DialogActions>
                 <Button onClick={handleClose} disabled={processing}>
-                    Cancel
+                    {t('quickAddOptionCancel')}
                 </Button>
                 <Button
                     variant="contained"
@@ -226,7 +233,7 @@ export function QuickAddOptionDialog({
                     disabled={processing || !label.trim()}
                     startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                 >
-                    {processing ? 'Adding…' : 'Add'}
+                    {processing ? t('quickAddOptionAdding') : t('quickAddOptionAdd')}
                 </Button>
             </DialogActions>
         </Dialog>

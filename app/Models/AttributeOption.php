@@ -23,6 +23,7 @@ class AttributeOption extends Model
         'swatch_value',
         'sort_order',
         'is_active',
+        'is_customized',
         'shopee_brand_id',
         'woocommerce_brand_id',
         'lazada_brand_id',
@@ -34,6 +35,7 @@ class AttributeOption extends Model
         return [
             'sort_order' => 'integer',
             'is_active' => 'boolean',
+            'is_customized' => 'boolean',
         ];
     }
 

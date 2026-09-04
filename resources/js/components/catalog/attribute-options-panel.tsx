@@ -4,10 +4,12 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import SearchIcon from '@mui/icons-material/Search';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import {
     Alert,
     Box,
     Button,
+    Checkbox,
     CircularProgress,
     IconButton,
     InputAdornment,
@@ -16,6 +18,7 @@ import {
     Select,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { router, usePage } from '@inertiajs/react';
@@ -30,6 +33,9 @@ export interface AttributeOptionItem {
     translations?: Record<string, string>;
     swatch_value: string | null;
     sort_order: number;
+    is_active?: boolean;
+    /** true = แก้ label/สถานะเองแล้ว ผ่านแผงนี้ ตอน attribute ผูก master_source ไว้ — master sync จะไม่ทับค่านี้อีกจนกว่าจะกด "Reset to master" */
+    is_customized?: boolean;
 }
 
 interface EditableOption {
@@ -40,6 +46,8 @@ interface EditableOption {
     swatchText: string;
     swatchImage: File | null;
     existingSwatchValue: string | null;
+    isActive: boolean;
+    isCustomized: boolean;
 }
 
 const toEditableOption = (option: AttributeOptionItem, swatchType: string): EditableOption => ({
@@ -50,6 +58,8 @@ const toEditableOption = (option: AttributeOptionItem, swatchType: string): Edit
     swatchText: swatchType === 'color' ? (option.swatch_value ?? '') : '',
     swatchImage: null,
     existingSwatchValue: option.swatch_value,
+    isActive: option.is_active ?? true,
+    isCustomized: option.is_customized ?? false,
 });
 
 function SwatchPreview({ swatchType, value }: { swatchType: string; value: string | null }) {
@@ -88,10 +98,13 @@ export function AttributeOptionsPanel({
     attributeId,
     swatchType,
     options,
+    isMasterBound = false,
 }: {
     attributeId: number;
     swatchType: string;
     options: AttributeOptionItem[];
+    /** attribute นี้ผูก master_source ไว้ — โชว์คอลัมน์ "Customized" + ปุ่ม "Reset to master" เพิ่ม และซ่อนปุ่มลบ (ลบแล้วจะโดน master sync คืนกลับมาใหม่อยู่ดี) */
+    isMasterBound?: boolean;
 }) {
     const { locale, locales } = useLocale();
     const { errors } = usePage<any>().props;
@@ -99,6 +112,7 @@ export function AttributeOptionsPanel({
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
     const [perPage, setPerPage] = useState(10);
+    const [resettingId, setResettingId] = useState<number | null>(null);
     const [page, setPage] = useState(1);
     const activeLocale = locales.find((l) => l.code === locale) ?? locales[0];
     const activeLocaleId = activeLocale?.id;
@@ -160,11 +174,36 @@ export function AttributeOptionsPanel({
                     translations: row.translations,
                     swatch_value: swatchType === 'color' ? row.swatchText : undefined,
                     swatch_image: row.swatchImage ?? undefined,
+                    // ต้องส่งเป็น '1'/'0' ตรงๆ ไม่ใช่ true/false — multipart
+                    // form data (forceFormData ด้านล่าง) จะ stringify ทุกค่า
+                    // เป็น string เสมออยู่ดี แต่ระบุชัดเจนแบบนี้กันความสับสน
+                    // ตอนอ่านฝั่ง backend ($request->boolean() แปลค่านี้ถูก)
+                    is_active: row.isActive ? '1' : '0',
                 })),
             },
             {
                 preserveScroll: true,
                 forceFormData: true,
+                // is_customized เป็นค่าที่ backend เป็นคนตัดสินใจเอง (ดู
+                // AttributeOptionController::optionWasActuallyEdited()) ไม่ใช่
+                // ฟิลด์ที่ผู้ใช้พิมพ์ตรงๆ — effect reconciliation ด้านบน (บรรทัด
+                // ~123) จะเก็บค่าเดิมในเครื่องไว้เสมอสำหรับแถวที่มีอยู่แล้ว (ตั้งใจ
+                // กันงานพิมพ์ค้างของแถวอื่นตอนมีแถวถูกเพิ่ม/ลบ) ผลข้างเคียงคือถ้า
+                // แถวไหนเพิ่งถูกแท็กเป็น custom ครั้งแรกจากการ save รอบนี้ คอลัมน์
+                // "Customized"/ปุ่ม "Reset to master" จะยังไม่โผล่จนกว่าจะโหลดหน้า
+                // ใหม่ทั้งหน้า จึงต้องดึงค่า is_active/is_customized สดจาก
+                // response มาเขียนทับทุกแถวตรงนี้ทันที (ส่วนฟิลด์ที่พิมพ์เอง เช่น
+                // label/translations ปล่อยเป็นของเดิมในเครื่องต่อไปตามปกติ)
+                onSuccess: (page) => {
+                    const freshOptions = (page.props as { options?: AttributeOptionItem[] }).options ?? [];
+                    const freshById = new Map(freshOptions.map((o) => [o.id, o]));
+                    setRows((prev) =>
+                        prev.map((r) => {
+                            const fresh = freshById.get(r.id);
+                            return fresh ? { ...r, isActive: fresh.is_active ?? true, isCustomized: fresh.is_customized ?? false } : r;
+                        }),
+                    );
+                },
                 onFinish: () => setSaving(false),
             },
         );
@@ -178,6 +217,37 @@ export function AttributeOptionsPanel({
             preserveScroll: true,
             onFinish: () => setDeletingId(null),
         });
+    };
+
+    const resetToMaster = (id: number) => {
+        setResettingId(id);
+        router.post(
+            `/catalog/attributes/${attributeId}/options/${id}/reset-to-master`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    // ทำไมต้องแก้ตรงนี้ตรงๆ แทนที่จะรอ effect reconciliation
+                    // ด้านบน (บรรทัด ~123): effect นั้นตั้งใจ "เก็บของเดิมไว้ก่อน"
+                    // เสมอสำหรับแถวที่มีอยู่แล้วในเครื่อง (กันงานที่ยังพิมพ์ค้างอยู่
+                    // หายตอน add/delete/save-all แถวอื่น) แต่พอเอามาใช้กับ
+                    // resetToMaster ผลข้างเคียงคือแถวที่เพิ่ง reset สำเร็จจะยังโชว์
+                    // ค่า custom เดิมค้างอยู่ (ปุ่ม "Reset to master" ไม่หายไปด้วย)
+                    // จนกว่าจะโหลดหน้าใหม่ทั้งหน้า — แย่กว่านั้นคือถ้าเผลอกด
+                    // "Save all" ต่อจากนั้น ค่า custom เดิมที่ยังค้างอยู่ในฟอร์มจะถูก
+                    // ส่งไปทับค่าที่เพิ่ง reset กลับไปเป็น master แล้ว กลาย
+                    // เป็น custom ใหม่อีกรอบทั้งที่ไม่มีใครตั้งใจแก้อะไรเลย จึง
+                    // ต้องดึงค่าสดของแถวนี้ตัวเดียวจาก response แล้วเขียนทับ
+                    // ในเครื่องทันที ไม่รอ effect ด้านบน
+                    const freshOptions = (page.props as { options?: AttributeOptionItem[] }).options ?? [];
+                    const fresh = freshOptions.find((o) => o.id === id);
+                    if (fresh) {
+                        setRows((prev) => prev.map((r) => (r.id === id ? toEditableOption(fresh, swatchType) : r)));
+                    }
+                },
+                onFinish: () => setResettingId(null),
+            },
+        );
     };
 
     // panel นี้จะถูก render อยู่ใน <form> ของหน้าแก้ไขแอตทริบิวต์เสมอ เลยทำ
@@ -280,6 +350,53 @@ export function AttributeOptionsPanel({
         },
     ];
 
+    // "Active" คุมว่า option นี้จะโผล่ให้เลือกในหน้าแก้ไขสินค้าจริงไหม (ปิดแล้ว
+    // ไม่ลบ ยังเก็บค่าประวัติของสินค้าที่เคยเลือกไปแล้วไว้ได้) ใช้ได้กับ
+    // attribute ทุกตัว ไม่ใช่แค่ตัวที่ผูก master — สำหรับ attribute ที่ผูก
+    // master นี่แหละคือกลไก "เลือกว่าจะเอาตัวไหนจาก master บ้าง" ที่ user ขอ
+    columns.push({
+        key: 'is_active',
+        header: 'Active',
+        priority: 'medium',
+        render: (row) =>
+            row.kind === 'new' ? null : (
+                <Checkbox
+                    size="small"
+                    checked={row.option.isActive}
+                    onChange={(e) => updateRow(row.option.id, { ...row.option, isActive: e.target.checked })}
+                />
+            ),
+    });
+
+    if (isMasterBound) {
+        columns.push({
+            key: 'customized',
+            header: 'Customized',
+            priority: 'low',
+            render: (row) =>
+                row.kind === 'new' || !row.option.isCustomized ? (
+                    <Typography variant="caption" color="text.disabled">
+                        {row.kind === 'new' ? '' : 'From master'}
+                    </Typography>
+                ) : (
+                    <Tooltip title="Reset this option back to its master value">
+                        <span>
+                            <Button
+                                size="small"
+                                startIcon={
+                                    resettingId === row.option.id ? <CircularProgress size={12} color="inherit" /> : <RestartAltIcon fontSize="small" />
+                                }
+                                onClick={() => resetToMaster(row.option.id)}
+                                disabled={resettingId === row.option.id}
+                            >
+                                Reset to master
+                            </Button>
+                        </span>
+                    </Tooltip>
+                ),
+        });
+    }
+
     if (showSwatchColumn) {
         columns.push({
             key: 'swatch',
@@ -348,6 +465,18 @@ export function AttributeOptionsPanel({
                 >
                     {adding ? 'Adding…' : 'Add Row'}
                 </Button>
+            ) : isMasterBound ? (
+                // ลบไม่ได้สำหรับ attribute ที่ผูก master — master record ต้นทาง
+                // ยังอยู่ ตัวเลือกจะถูก sync กลับมาใหม่ทันทีอยู่ดี (ดู
+                // MasterAttributeOptionSync::rebuildAttribute()) ปิดที่ Active
+                // แทนถ้าไม่อยากให้โผล่ในหน้าสินค้า
+                <Tooltip title="Can't delete an option mirrored from a Master — turn off Active instead, or delete it from the Master itself.">
+                    <span>
+                        <IconButton size="small" disabled>
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    </span>
+                </Tooltip>
             ) : (
                 <IconButton size="small" onClick={() => destroy(row.option.id)} disabled={deletingId === row.option.id} title="Delete">
                     {deletingId === row.option.id ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon fontSize="small" />}
@@ -373,10 +502,15 @@ export function AttributeOptionsPanel({
                 </Button>
             </Stack>
 
-            {/* กล่องแจ้ง Error ของ Options */}
-            {(errors.options || Object.keys(errors).some(k => k.startsWith('options.'))) && (
+            {/* กล่องแจ้ง Error ของ Options — 'option' (เอกพจน์) เป็นคีย์ที่
+                AttributeOptionController::resetToMaster() ใช้ตอน reset ไม่สำเร็จ
+                (master row ถูกลบไปแล้ว) ต่างจาก 'options'/'options.*' ที่มาจาก
+                store()/batchUpdate() ต้องเช็คแยกไว้ ไม่งั้น error นี้จะไม่โผล่ให้
+                เห็นเลยเงียบๆ ผู้ใช้กด "Reset to master" แล้วเหมือนไม่มีอะไรเกิดขึ้น */}
+            {(errors.options || errors.option || Object.keys(errors).some(k => k.startsWith('options.'))) && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                     {errors.options}
+                    {errors.option}
                     {Object.entries(errors)
                         .filter(([key]) => key.startsWith('options.'))
                         .map(([key, val]) => (

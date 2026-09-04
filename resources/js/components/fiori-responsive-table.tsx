@@ -59,6 +59,25 @@ export interface FioriResponsiveTableProps<Row> {
      * where a second border would double up against the outer one.
      */
     variant?: 'card' | 'plain';
+    /**
+     * Pins the header row in place while the table's own content scrolls
+     * past underneath. Off by default, matching every existing table's
+     * plain (non-sticky) header. Must be paired with `maxHeight` below —
+     * `position: sticky` only sticks against the *nearest* scrolling
+     * ancestor, and MUI's own `TableContainer` always sets its own
+     * `overflow-x: auto` regardless of variant. That makes TableContainer
+     * itself the nearest scrolling ancestor no matter what wraps it from
+     * the outside, so a wrapping `<Box maxHeight/overflowY:'auto'>` placed
+     * around this component (as this used to be documented) never actually
+     * receives the sticky positioning — the header just scrolls away with
+     * everything else the moment it's scrolled past. Setting `maxHeight`
+     * here instead makes THIS component's own TableContainer the bounded,
+     * actually-scrolling ancestor, which is what MUI's own sticky-header
+     * examples do too.
+     */
+    stickyHeader?: boolean;
+    /** Bounds the table's own height and makes it scroll internally — required for `stickyHeader` to actually stick (see above). */
+    maxHeight?: number | string;
 }
 
 /** Which priority tiers stay as real columns at the current breakpoint — narrower viewport keeps fewer tiers, mirroring Fiori's auto pop-in mode. */
@@ -78,6 +97,10 @@ const headCellSx = {
     fontWeight: 600,
     color: FIORI.textPrimary,
     borderBottom: `1px solid ${FIORI.border}`,
+    // ตั้ง background ตรงนี้ (ไม่ใช่แค่ที่ TableHead) ด้วย — ตอน stickyHeader
+    // เป็น true เซลล์จะลอยค้าง top:0 อยู่เหนือแถวข้อมูลที่เลื่อนผ่านด้านล่าง
+    // ถ้าไม่มี background ทึบเป็นของตัวเอง จะเห็นเนื้อหาทะลุออกมาด้านหลัง
+    backgroundColor: FIORI.headerBg,
 };
 
 /**
@@ -87,7 +110,18 @@ const headCellSx = {
  * across every catalog admin list/mapping table instead of each page
  * hand-rolling its own `<TableContainer>` breakpoint logic.
  */
-export function FioriResponsiveTable<Row>({ columns, rows, getRowKey, rowSx, onRowClick, emptyMessage, size = 'small', variant = 'card' }: FioriResponsiveTableProps<Row>) {
+export function FioriResponsiveTable<Row>({
+    columns,
+    rows,
+    getRowKey,
+    rowSx,
+    onRowClick,
+    emptyMessage,
+    size = 'small',
+    variant = 'card',
+    stickyHeader = false,
+    maxHeight,
+}: FioriResponsiveTableProps<Row>) {
     const visiblePriorities = useVisiblePriorities();
     const visibleColumns = columns.filter((c) => visiblePriorities.includes(c.priority ?? 'always'));
     const popinColumns = columns.filter((c) => !visiblePriorities.includes(c.priority ?? 'always') && !c.hideInPopin);
@@ -95,7 +129,7 @@ export function FioriResponsiveTable<Row>({ columns, rows, getRowKey, rowSx, onR
     const colSpan = visibleColumns.length || 1;
 
     const table = (
-        <Table size={size}>
+        <Table size={size} stickyHeader={stickyHeader}>
             <TableHead sx={{ bgcolor: FIORI.headerBg }}>
                 <TableRow>
                     {visibleColumns.map((column) => (
@@ -167,12 +201,17 @@ export function FioriResponsiveTable<Row>({ columns, rows, getRowKey, rowSx, onR
         </Table>
     );
 
+    const scrollSx = maxHeight ? { maxHeight, overflowY: 'auto' as const } : {};
+
     if (variant === 'plain') {
-        return <TableContainer>{table}</TableContainer>;
+        return <TableContainer sx={scrollSx}>{table}</TableContainer>;
     }
 
     return (
-        <TableContainer component={Paper} elevation={0} sx={fioriCardSx}>
+        // fioriCardSx เป็น SxProps<Theme> (type รวม function/array ไว้ด้วยเผื่อ
+        // เคสอื่นๆ) แต่ตัวจริงเป็น plain object เสมอ — cast ก่อน spread แทนที่จะ
+        // ยัดใส่ sx array ตรงๆ (แบบนั้น type ไม่ผ่านเพราะ nested SxProps array)
+        <TableContainer component={Paper} elevation={0} sx={{ ...(fioriCardSx as Record<string, unknown>), ...scrollSx }}>
             {table}
         </TableContainer>
     );

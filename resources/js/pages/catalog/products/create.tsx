@@ -47,6 +47,8 @@ interface AttributeOption {
     id: number;
     code?: string;
     admin_label?: string;
+    /** false = ถูกปิดใช้งานจากหน้า Options ของ attribute — ไม่ควรโชว์เป็นตัวเลือกในดรอปดาวน์ */
+    is_active?: boolean;
 }
 
 interface AttributeItem {
@@ -373,11 +375,13 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                                         onChange={(e) => setData('product_type_code', e.target.value)}
                                     >
                                         <MenuItem value="">{t('masterProductTypeNone')}</MenuItem>
-                                        {(productTypeAttribute.options || []).map((opt) => (
-                                            <MenuItem key={opt.id} value={opt.code || ''}>
-                                                {opt.admin_label || opt.code}
-                                            </MenuItem>
-                                        ))}
+                                        {(productTypeAttribute.options || [])
+                                            .filter((opt) => opt.is_active !== false)
+                                            .map((opt) => (
+                                                <MenuItem key={opt.id} value={opt.code || ''}>
+                                                    {opt.admin_label || opt.code}
+                                                </MenuItem>
+                                            ))}
                                     </Select>
                                 </FormControl>
                             </FioriField>
