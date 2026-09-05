@@ -1312,9 +1312,9 @@ class ProductController extends Controller
             // ไม่มี family_id/category_id ให้เลือกตอนสร้างสินค้าแล้ว (เอาออกตาม
             // ที่ user ขอ) — สินค้าใหม่จะยังไม่มีตระกูล/กลุ่มสินค้าจนกว่าจะไปเลือก
             // กลุ่มสินค้าที่หน้าแก้ไข (ผ่านแอตทริบิวต์ productgroupname ในแผง
-            // "Master Categories" — ดู products/edit.tsx) effectiveFamilyIds()
-            // จะ fallback ไปโชว์ system attribute ทั้งหมดใต้กลุ่ม "General" เอง
-            // ถ้ายังไม่มีทั้ง family_id และกลุ่มสินค้า (ดู buildProductFormProps())
+            // "Master Categories" — ดู products/edit.tsx) ระหว่างนั้น
+            // effectiveFamilyIds() จะคืน [] ว่างเปล่า เลยยังไม่มีฟิลด์ attribute
+            // ไหนให้กรอกเลยนอกจาก SKU (ดู buildProductFormProps())
             'type' => ['required', 'in:simple,configurable'],
             'enabled' => ['required', 'boolean'],
             // ประเภทสินค้า (producttype attribute — mirror จาก master
@@ -1613,10 +1613,12 @@ class ProductController extends Controller
      * สินค้าเดิมที่อยู่ในกลุ่มนั้นจะเห็นแอตทริบิวต์ของตระกูลใหม่ทันทีตอนเปิดแก้ไข
      * โดยไม่ต้องแก้อะไรที่ตัวสินค้าเองเลย
      *
-     * Fallback กลับไปที่ product.family_id เดิมก็ต่อเมื่อไม่มีกลุ่มสินค้าไหนของ
-     * สินค้าตัวนี้ผูกตระกูลไว้เลยสักตัว — กันไม่ให้สินค้าที่มีอยู่เดิมทุกตัวเจอฟอร์ม
-     * แอตทริบิวต์ว่างเปล่าทันทีตั้งแต่วันที่ deploy ฟีเจอร์นี้ ก่อนที่แอดมินจะไปผูก
-     * ตระกูลให้กลุ่มสินค้าจริงๆ ทีละกลุ่ม
+     * ไม่มี fallback กลับไปที่ product.family_id เดิมอีกต่อไป (เคยมีไว้ตอน
+     * migrate จากระบบเก่า — กันสินค้าที่มีอยู่แล้วทุกตัวเจอฟอร์มแอตทริบิวต์ว่างเปล่า
+     * ทันทีตั้งแต่วันที่ deploy ฟีเจอร์นี้ ก่อนแอดมินจะไปผูกตระกูลให้กลุ่มสินค้าจริงๆ
+     * ทีละกลุ่ม — ตอนนี้ผ่านช่วง migrate นั้นมานานแล้ว ตัดออกตามที่ user ขอ) ยังไม่ได้
+     * ผูกกลุ่มสินค้ากับตระกูลไหนเลย = ไม่มีตระกูล ไม่ว่า family_id เดิมจะมีค่าค้างอยู่
+     * หรือไม่ก็ตาม
      *
      * @return array<int, int>  ลำดับความสำคัญจากมากไปน้อย — ถ้า attribute
      *                            ตัวเดียวกันถูกผูกซ้ำในหลายตระกูล ตัวจากตระกูล
@@ -1628,31 +1630,13 @@ class ProductController extends Controller
             ? $product->categories->pluck('id')
             : $product->categories()->pluck('categories.id');
 
-        $groupFamilyIds = DB::table('category_attribute_family')
+        return DB::table('category_attribute_family')
             ->whereIn('category_id', $categoryIds)
             ->orderBy('sort_order')
             ->pluck('family_id')
             ->unique()
             ->values()
             ->all();
-
-        if (! empty($groupFamilyIds)) {
-            return $groupFamilyIds;
-        }
-
-        // fallback ไปที่ family_id เดิม (legacy — ก่อนจะย้ายมาผูกตระกูลกับกลุ่ม
-        // สินค้าแทน) เฉพาะตอนที่สินค้ายังไม่เคยผูกหมวดหมู่/กลุ่มสินค้าอะไรเลยสักตัว
-        // เท่านั้น — ถ้าสินค้ามีหมวดหมู่ผูกอยู่แล้ว (ผ่านแผง Master Categories) แต่
-        // หมวดหมู่นั้นดันยังไม่มีตระกูลผูกไว้ ให้ถือว่า "ตั้งใจให้ไม่มีตระกูล" ไปเลย
-        // ไม่งั้น family_id เดิมที่ค้างอยู่ (ไม่เคยถูกล้างตอนกำหนดกลุ่มสินค้าใหม่ —
-        // ดู updateMasterCategories()/ProductCategoryLinker::linkFromCodes() ที่
-        // เป็น additive-only ไม่แตะ family_id) จะทำให้ผู้ใช้กำหนดกลุ่มสินค้าใหม่ไป
-        // แล้ว แต่ยังเห็นข้อมูลแอตทริบิวต์ของตระกูลเก่าที่ไม่เกี่ยวข้องโผล่มาอยู่ดี
-        if ($categoryIds->isNotEmpty()) {
-            return [];
-        }
-
-        return $product->family_id ? [$product->family_id] : [];
     }
 
     /**
@@ -1777,8 +1761,8 @@ class ProductController extends Controller
         //
         // เงื่อนไข !empty($effectiveFamilyIds) กันไว้ด้วย — fallback นี้มีไว้เฉพาะ
         // กรณี "มีตระกูลที่ resolve ได้จริง แต่ตระกูลนั้นดันยังไม่มี attribute ผูกไว้
-        // เลยสักตัว" เท่านั้น ถ้าสินค้ายังไม่มีทั้งกลุ่มสินค้าที่ผูกตระกูลไว้ และไม่มี
-        // family_id เดิมเลย (effectiveFamilyIds() คืน [] ว่างเปล่า) ต้องปล่อยให้
+        // เลยสักตัว" เท่านั้น ถ้าสินค้ายังไม่มีกลุ่มสินค้าที่ผูกตระกูลไว้เลย
+        // (effectiveFamilyIds() คืน [] ว่างเปล่า) ต้องปล่อยให้
         // $groupsData ว่างจริงๆ ไม่ใช่โชว์ system attribute ทั้งหมดแทน — ไม่งั้นสินค้า
         // ทุกตัวที่ยังไม่ได้ผูกกลุ่มสินค้ากับตระกูลอะไรเลย (ค่าเริ่มต้นของสินค้าใหม่
         // ทุกตัวตอนนี้ ตั้งแต่เอา family ออกจากหน้า Create ไปแล้ว) จะเห็น attribute
@@ -1829,8 +1813,8 @@ class ProductController extends Controller
             $groupsData = array_values($groupsData);
         }
 
-        // สินค้าที่ไม่มีทั้งกลุ่มสินค้าที่ผูกตระกูล และไม่มี family_id เดิมเลย
-        // (effectiveFamilyIds() ว่างเปล่า — ค่าเริ่มต้นของสินค้าใหม่ทุกตัวตอนนี้)
+        // สินค้าที่ไม่มีกลุ่มสินค้าที่ผูกตระกูลเลย (effectiveFamilyIds() ว่างเปล่า
+        // — ค่าเริ่มต้นของสินค้าใหม่ทุกตัวตอนนี้ จนกว่าจะไปกำหนดกลุ่มสินค้า)
         // จะไม่มี group ไหนเลยตรงนี้ตามที่ตั้งใจ (ดูเงื่อนไข !empty($effectiveFamilyIds)
         // ด้านบน) — แต่ฟิลด์ SKU ฝั่ง frontend (products/edit.tsx) ถูกปักไว้ใน
         // panel ของ group ที่ code = 'general' โดยเฉพาะ ไม่ใช่ element แยกต่างหาก
@@ -3593,8 +3577,8 @@ class ProductController extends Controller
             // ยังไม่มี family attribute ให้ใช้เลย (แต่ resolve family ได้จริง) —
             // edit() จะ fallback ไปโชว์ system attribute ทั้งหมดใต้หมวด "General"
             // เลยทำแบบเดียวกันตรงนี้ด้วย (เงื่อนไข !empty($effectiveFamilyIds) กัน
-            // เหมือนกับ buildProductFormProps() — สินค้าที่ไม่มีทั้งกลุ่มสินค้าที่
-            // ผูกตระกูลและไม่มี family_id เดิมเลย ไม่ควรได้ attribute ทั้งระบบมาด้วย)
+            // เหมือนกับ buildProductFormProps() — สินค้าที่ไม่มีกลุ่มสินค้าที่ผูก
+            // ตระกูลไว้เลย ไม่ควรได้ attribute ทั้งระบบมาด้วย)
             $attributes = Attribute::whereNotIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
                 ->where('code', '!=', self::PRODUCT_TYPE_ATTRIBUTE_CODE)
                 ->get();
