@@ -1946,7 +1946,27 @@ class ProductController extends Controller
             }
         }
 
-        $family = $product->family;
+        // ใช้ effectiveFamilyIds() (ตัวเดียวกับที่คำนวณ assignedGroups ด้านบน)
+        // แทน $product->family_id/family ดิบๆ ตรงๆ — คอลัมน์ family_id บนตัว
+        // product เองเป็น legacy (เหลือไว้เพราะเคยเลือกได้ตอนสร้าง/แก้ไขสินค้า
+        // ก่อนจะย้ายมาผูกตระกูลกับกลุ่มสินค้าแทน — ดู effectiveFamilyIds()) และ
+        // ไม่มีช่องให้แก้จากหน้าแก้ไขสินค้าอีกต่อไปแล้ว (edit.tsx ไม่มี selector
+        // ของ family_id เหลืออยู่) ปุ่ม Save Product หลักเลยแค่ยิงค่าเดิมกลับไป
+        // ทับตัวเองทุกครั้ง ถ้ามีคนไปแก้ไขว่ากลุ่มสินค้านี้ผูกกับตระกูลไหนทีหลัง
+        // (ที่แผงจัดการ Category/Attribute Family) คอลัมน์นี้จะไม่มีวันขยับตาม
+        // เลย ทำให้ตัวเลข family_id/ชื่อ family_code ที่ส่งไปหน้าแก้ไข/ดูสินค้า
+        // ค้างเป็นของตระกูลเก่าอยู่ตลอด (badge "Family" ในหน้า Read และตัวกรอง
+        // variant-attribute picker ของหน้าแก้ไข — familyScopedVariantAttributes
+        // ใน edit.tsx — อ้างอิงค่านี้ตรงๆ) ทั้งที่ฟิลด์ attribute ที่โชว์จริงด้านบน
+        // (assignedGroups) รีเฟรชตามตระกูลใหม่ถูกต้องอยู่แล้วทุกครั้งที่เปิดหน้านี้
+        // เอา effectiveFamilyIds()[0] (ตระกูลอันดับแรกตามลำดับความสำคัญ — ตัว
+        // เดียวกับที่ frontend สมมติว่ามี "family ปัจจุบัน" แค่ตัวเดียว) มาแทนที่
+        // ตรงนี้แก้ปัญหาข้อมูลเก่าค้างได้ทั้งสองจุดโดยไม่ต้องแตะ frontend เลย —
+        // แถมยัง "self-heal" คอลัมน์ family_id ให้ตรงของจริงไปในตัว เพราะ Save
+        // Product หลักจะเขียนค่านี้ (ที่ตอนนี้เป็นค่าที่ resolve ใหม่แล้ว) กลับไป
+        // ทับคอลัมน์เดิมตามปกติ (ดู update())
+        $effectiveFamilyId = $effectiveFamilyIds[0] ?? null;
+        $family = $effectiveFamilyId ? $families->firstWhere('id', $effectiveFamilyId) : null;
 
         $categoryIds = $product->categories()->pluck('categories.id')->all();
 
@@ -1969,7 +1989,7 @@ class ProductController extends Controller
             'product' => [
                 'id' => $product->id,
                 'sku' => $product->sku,
-                'family_id' => $product->family_id,
+                'family_id' => $effectiveFamilyId,
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
                 'enabled' => (bool) $product->enabled,
