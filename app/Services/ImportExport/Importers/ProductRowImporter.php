@@ -17,7 +17,9 @@ use App\Services\ImportExport\RowImportException;
 
 class ProductRowImporter implements RowImporterInterface
 {
-    public const FIXED_COLUMNS = ['sku', 'family_code', 'type', 'enabled'];
+    // ไม่มี 'family_code' ในนี้ตั้งใจ — ไม่ตั้ง family_id จาก import อีกต่อไป
+    // (ดู docblock ของ importRow() ตรง Product::updateOrCreate())
+    public const FIXED_COLUMNS = ['sku', 'type', 'enabled'];
 
     private ?array $allowedAttributeCodesCache = null;
 
@@ -197,20 +199,6 @@ class ProductRowImporter implements RowImporterInterface
             return [];
         }
 
-        // A per-row family_code column still wins; otherwise fall back to the
-        // family the whole import was scoped to in the wizard.
-        $familyCode = trim((string) ($row['family_code'] ?? ''));
-        if ($familyCode === '') {
-            $familyCode = trim((string) $this->familyCode);
-        }
-        $family = null;
-        if ($familyCode !== '') {
-            $family = AttributeFamily::where('code', $familyCode)->first();
-            if (!$family) {
-                throw new RowImportException("Unknown family_code '{$familyCode}'");
-            }
-        }
-
         $type = strtolower(trim((string) ($row['type'] ?? 'simple')));
         if (!in_array($type, ['simple', 'configurable'], true)) {
             throw new RowImportException("type must be 'simple' or 'configurable'");
@@ -219,10 +207,17 @@ class ProductRowImporter implements RowImporterInterface
         $enabledRaw = strtolower(trim((string) ($row['enabled'] ?? '1')));
         $enabled = in_array($enabledRaw, ['1', 'true', 'yes'], true);
 
+        // ไม่ตั้ง family_id จาก import อีกต่อไป (ตัดตามที่ user ขอ) — ให้ตรงกับหน้า
+        // Create/Edit ที่ไม่มี family picker ให้เลือกตรงๆ มาตั้งแต่ตัด family_id/
+        // category_id ออกจากฟอร์มไปแล้ว ตระกูลแอตทริบิวต์ที่ "มีผลจริง" คำนวณจาก
+        // pcatname/psubcatname/productgroupname ด้านล่าง (ผ่าน ProductCategoryLinker
+        // ผูกเข้าต้นไม้ categories) แทน — ดู ProductController::effectiveFamilyIds()
+        // ซึ่งไม่ fallback ไปที่ family_id เดิมอีกต่อไปแล้วเช่นกัน ตั้งค่านี้ตรงๆ
+        // ที่นี่จะโดนเพิกเฉยเงียบๆ ถ้าหมวดหมู่ที่ผูกไว้ยังไม่มีตระกูลผูกอยู่ ทำให้
+        // สินค้าที่ import มาไม่เห็น attribute field ไหนเลยในหน้า Edit อย่างงงๆ
         $product = Product::updateOrCreate(
             ['sku' => $sku],
             [
-                'family_id' => $family?->id,
                 'type' => $type,
                 'enabled' => $enabled,
             ]

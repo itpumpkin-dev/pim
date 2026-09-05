@@ -20,7 +20,11 @@ class SampleTemplateBuilder
      * on import, so this is purely cosmetic for the importer side.
      *
      * $familyCode (products only) narrows the columns to that Attribute
-     * Family and is pre-filled into the example row's family_code cell.
+     * Family's own attributes — it no longer sets anything on the product
+     * itself (see ProductRowImporter::importRow()'s docblock on
+     * Product::updateOrCreate() — family_id isn't settable from import
+     * anymore, same as the Create/Edit product pages), so there's no
+     * family_code cell to pre-fill in the example row either.
      *
      * @return array{columns: array<int, string>, rows: array<int, array<string, string>>}
      */
@@ -30,10 +34,6 @@ class SampleTemplateBuilder
         $columns = $importer->columns();
         $labels = $importer->columnLabels();
         $example = self::exampleRow($type);
-
-        if ($type === 'products' && trim((string) $familyCode) !== '') {
-            $example['family_code'] = trim((string) $familyCode);
-        }
 
         $headerLabels = array_map(fn ($col) => $labels[$col] ?? $col, $columns);
         $row = [];
@@ -47,7 +47,7 @@ class SampleTemplateBuilder
     private static function exampleRow(string $type): array
     {
         return match ($type) {
-            'products' => ['sku' => 'SKU-0001', 'family_code' => 'default', 'type' => 'simple', 'enabled' => '1'],
+            'products' => ['sku' => 'SKU-0001', 'type' => 'simple', 'enabled' => '1'],
             'categories' => [
                 'code' => 'shoes', 'name' => 'Shoes', 'slug' => 'shoes', 'description' => 'Footwear', 'parent_code' => '',
                 'display_type' => 'default', 'thumbnail' => '', 'is_active' => '1',

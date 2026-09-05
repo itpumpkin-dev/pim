@@ -7,7 +7,6 @@
 return [
     'columns' => [
         'sku' => 'SKU',
-        'family_code' => 'Family Code',
         'type' => 'Type',
         'enabled' => 'Enabled',
         'code' => 'Code',
