@@ -67,7 +67,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // view_sales_channels พอ ส่วนที่ push/deactivate/toggle จริงต้อง
     // edit_sales_channels
     Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::put('products/{product}/master-categories', [ProductController::class, 'updateMasterCategories'])->name('products.updateMasterCategories')->middleware('permission:products,edit_products');
+    // Master Categories panel (edit.tsx) — แยกออกมาเป็นสิทธิ์ของตัวเอง
+    // (master_categories) แบบเดียวกับ Sales Channels ด้านบน แทนที่จะพ่วงไปกับ
+    // products,edit_products แบบเดิม เพื่อให้จำกัดสิทธิ์แก้ไขหมวดหมู่-หมวดหมู่ย่อย-
+    // กลุ่มสินค้าแยกจากสิทธิ์แก้ไขสินค้าทั่วไปได้ (ดู
+    // ProductController::buildProductFormProps()'s canEditMasterCategories —
+    // ไม่มี canViewMasterCategories คู่กัน เพราะแผงนี้ไม่มี endpoint แบบอ่านอย่างเดียว
+    // ให้แยกสิทธิ์ view ออกจาก edit เหมือน Sales Channels)
+    Route::put('products/{product}/master-categories', [ProductController::class, 'updateMasterCategories'])->name('products.updateMasterCategories')->middleware('permission:master_categories,edit_master_categories');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
@@ -208,6 +215,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributeFamilies', [AttributeFamilyController::class, 'store'])->name('attributeFamilies.store')->middleware('permission:attribute_families,create_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/edit', [AttributeFamilyController::class, 'edit'])->name('attributeFamilies.edit')->middleware('permission:attribute_families,edit_attribute_families');
     Route::put('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'update'])->name('attributeFamilies.update')->middleware('permission:attribute_families,edit_attribute_families');
+    // ปุ่ม "ตั้งเป็นค่าเริ่มต้นให้ทุกกลุ่มสินค้า" แยกออกมาเป็นสิทธิ์ของตัวเอง
+    // (attribute_families,assign_default_family) จาก edit_attribute_families
+    // ทั่วไป — เพราะเป็น action ที่ทับ default family ของ "ทุก" กลุ่มสินค้าใน
+    // ระบบพร้อมกันทีเดียว ต่างจากการแก้ไข attribute family ทีละตัวตามปกติ อยาก
+    // ให้แยกสิทธิ์ทำ mass-overwrite นี้ออกจากสิทธิ์แก้ไขทั่วไปได้ (ดู migration
+    // backfill_attribute_family_assign_default_permission ที่ copy สิทธิ์นี้ไป
+    // ให้ทุก role ที่มี edit_attribute_families อยู่แล้วตอน deploy)
+    Route::post('attributeFamilies/{attributeFamily}/set-default-for-all-groups', [AttributeFamilyController::class, 'setDefaultForAllGroups'])->name('attributeFamilies.setDefaultForAllGroups')->middleware('permission:attribute_families,assign_default_family');
     Route::delete('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'destroy'])->name('attributeFamilies.destroy')->middleware('permission:attribute_families,delete_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/history', [AttributeFamilyController::class, 'history'])->name('attributeFamilies.history')->middleware('permission:attribute_families,view_history');
 

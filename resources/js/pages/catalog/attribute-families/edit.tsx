@@ -38,6 +38,7 @@ import {
     Tab,
     Tabs,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
@@ -85,6 +86,7 @@ interface Props {
     attributes: AttributeItem[];
     familyAttributes?: FamilyAttributePivot[];
     canViewHistory?: boolean;
+    canAssignDefaultFamily?: boolean;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -93,7 +95,15 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE FAMILY', href: '#' },
 ];
 
-export default function AttributeFamilyEdit({ family, translations, groups, attributes, familyAttributes = [], canViewHistory = false }: Props) {
+export default function AttributeFamilyEdit({
+    family,
+    translations,
+    groups,
+    attributes,
+    familyAttributes = [],
+    canViewHistory = false,
+    canAssignDefaultFamily = false,
+}: Props) {
     const { t } = useTranslation('catalog');
     const [tabIndex, setTabIndex] = useState(0);
     const { data, setData, put, processing, errors, isDirty } = useForm({
@@ -304,6 +314,22 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                 skipNavigationGuardRef.current = false;
             },
         });
+    };
+
+    const [settingDefault, setSettingDefault] = useState(false);
+    const setAsDefaultForAllGroups = () => {
+        if (!window.confirm(t('setDefaultForAllGroupsConfirm', { name: family.name || family.code }))) return;
+
+        setSettingDefault(true);
+        router.post(
+            `/catalog/attributeFamilies/${family.id}/set-default-for-all-groups`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setSettingDefault(false),
+            },
+        );
     };
 
     return (
@@ -672,6 +698,37 @@ export default function AttributeFamilyEdit({ family, translations, groups, attr
                                 values={data.translations}
                                 onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                             />
+
+                            {/* ตั้งเป็นตระกูลเริ่มต้นให้ทุกกลุ่มสินค้า — ดัน family นี้ไปไว้ที่
+                                sort_order=0 ของทุกกลุ่มสินค้าในระบบ (ทับของเดิมถ้ามี) */}
+                            <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                    {t('defaultFamilyBadge')}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
+                                    {t('setDefaultForAllGroupsDescription')}
+                                </Typography>
+                                {/* สิทธิ์ "assign_default_family" แยกออกมาจาก edit_attribute_families
+                                    ทั่วไป (ดู routes/catalog.php) เพราะปุ่มนี้ทับ default family ของ
+                                    "ทุก" กลุ่มสินค้าในระบบพร้อมกัน — ต่างจากการแก้ไข family ทีละตัว —
+                                    ไม่ซ่อนปุ่มไปเลย แค่ disable + บอกเหตุผลผ่าน tooltip ให้รู้ว่า
+                                    ฟีเจอร์นี้มีอยู่แต่ต้องขอสิทธิ์เพิ่ม */}
+                                <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
+                                    <span>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            color="warning"
+                                            disabled={settingDefault || !canAssignDefaultFamily}
+                                            startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                            onClick={setAsDefaultForAllGroups}
+                                            sx={fioriGhostSx}
+                                        >
+                                            {t('setDefaultForAllGroups')}
+                                        </Button>
+                                    </span>
+                                </Tooltip>
+                            </Paper>
                         </Stack>
                     </Grid>
                 </Grid>

@@ -1,6 +1,13 @@
 import { createTheme, type PaletteMode, type ThemeOptions } from '@mui/material/styles';
 
+// '72' (SAP's proprietary Fiori typeface, self-hosted — see the @font-face
+// block in resources/css/app.css) goes first: it only covers Latin/Cyrillic/
+// Greek, no Thai/CJK glyphs, so it renders this app's English UI chrome while
+// Thai text still falls through to Sarabun right behind it exactly as
+// before — this is the stack CssBaseline actually applies to <body> (MUI's
+// theme.typography.fontFamily, not the plain CSS rule in app.css).
 const fontFamily = [
+    '"72"',
     '"Sarabun"',
     'ui-sans-serif',
     'system-ui',

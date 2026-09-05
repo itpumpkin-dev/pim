@@ -202,6 +202,8 @@ interface Props {
     /** สิทธิ์แยกต่างหากของแผง Sales Channels — ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) */
     canViewSalesChannels?: boolean;
     canEditSalesChannels?: boolean;
+    /** สิทธิ์ "แก้ไข" แยกต่างหากของแผง Master Categories (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) — ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) ตั้งใจไม่มี view แยก (ต่างจาก Sales Channels) เพราะแผงนี้ไม่มีเหตุผลต้องซ่อนจากการดู */
+    canEditMasterCategories?: boolean;
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
     masterSources?: MasterSourceOption[];
 }
@@ -277,6 +279,7 @@ export default function ProductEdit({
     canViewHistory = false,
     canViewSalesChannels = false,
     canEditSalesChannels = false,
+    canEditMasterCategories = false,
     masterSources = [],
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
@@ -1840,22 +1843,28 @@ export default function ProductEdit({
                                         ตระกูลแอตทริบิวต์ผูกไว้ (ดู Category::attributeFamilies()) แอตทริบิวต์ของ
                                         ตระกูลนั้นจะโผล่มาให้กรอกทันทีตอนเปิดแก้ไขสินค้านี้รอบถัดไป — เหมือนกับที่
                                         field Family เคยมีผลแบบเดียวกันตอน save+reload มาก่อน ไม่ต้อง fetch สดๆ
-                                        ก่อน save แต่อย่างใด */}
+                                        ก่อน save แต่อย่างใด
+
+                                        สิทธิ์ "แก้ไข" แยกของตัวเอง (resource `master_categories`) ไม่ได้พ่วงกับ
+                                        products.edit_products ทั่วไปอีกต่อไป — แผงนี้ยังโชว์ให้ดูได้เสมอ (ไม่มี
+                                        view แยกแบบ Sales Channels เพราะไม่มีเหตุผลต้องซ่อนจากการดู) แค่ไม่มีสิทธิ์
+                                        แก้จะปิด Save + ปิด interaction ทั้งหมดในแผงแทน (pointerEvents) */}
                                         {cascadedMasterCategoryAttributes.length > 0 && (
                                             <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                                 <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
                                                     <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
                                                         {t('masterCategoriesBlockTitle')}
                                                     </Typography>
-                                                    {sectionSaveButton('master-categories', () => {
-                                                        const payload: Record<string, FormDataConvertible> = {};
-                                                        masterCategoryAttributes.forEach((attr) => {
-                                                            payload[attr.code] = selectedMasterCategoryCode(attr);
-                                                        });
-                                                        saveSection('master-categories', payload);
-                                                    })}
+                                                    {canEditMasterCategories &&
+                                                        sectionSaveButton('master-categories', () => {
+                                                            const payload: Record<string, FormDataConvertible> = {};
+                                                            masterCategoryAttributes.forEach((attr) => {
+                                                                payload[attr.code] = selectedMasterCategoryCode(attr);
+                                                            });
+                                                            saveSection('master-categories', payload);
+                                                        })}
                                                 </Stack>
-                                                <Stack spacing={2}>
+                                                <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                                                     {cascadedMasterCategoryAttributes.map((attr) => {
                                                         const { channelKey, localeKey } = getValueKeys(attr);
                                                         const val =

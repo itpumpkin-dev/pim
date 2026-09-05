@@ -1,5 +1,74 @@
 @import url('https://fonts.bunny.net/css?family=sarabun:400,500,600,700,800');
 
+/*
+ * "72" — SAP's proprietary Fiori typeface (font-family: "72"; NOT Fiori's
+ * icon font despite the confusing "72" name). Self-hosted (public/fonts/72/)
+ * since it's a licensed asset, not something a public font CDN may serve —
+ * see public/fonts/72/README.md for provenance/licensing notes. Only covers
+ * Latin/Cyrillic/Greek glyphs, no Thai or CJK, so it goes *before* Sarabun in
+ * the stack below rather than replacing it: Latin/English UI chrome renders
+ * in 72, Thai text still falls through to Sarabun exactly as before, and any
+ * Chinese/CJK content already falls through past both to the OS's own CJK
+ * font as it always has.
+ *
+ * Weights: only the ones this app's `fontWeight` usage actually needs
+ * (300/400/600/700/900 — see resources/js/theme.ts's matching `fontFamily`,
+ * which MUI's CssBaseline actually applies to <body>; this plain CSS rule
+ * below only matters pre-hydration / for any non-MUI-styled text). 500
+ * deliberately has no face of its own — 72 has no distinct "Medium" weight,
+ * and the browser's nearest-weight fallback already lands on Regular (400)
+ * for it, which is the right visual result.
+ */
+@font-face {
+    font-family: '72';
+    src:
+        url('/fonts/72/72-Light.woff2') format('woff2'),
+        url('/fonts/72/72-Light.woff') format('woff');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: '72';
+    src:
+        url('/fonts/72/72-Regular.woff2') format('woff2'),
+        url('/fonts/72/72-Regular.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: '72';
+    src:
+        url('/fonts/72/72-Semibold.woff2') format('woff2'),
+        url('/fonts/72/72-Semibold.woff') format('woff');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: '72';
+    src:
+        url('/fonts/72/72-Bold.woff2') format('woff2'),
+        url('/fonts/72/72-Bold.woff') format('woff');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: '72';
+    src:
+        url('/fonts/72/72-Black.woff2') format('woff2'),
+        url('/fonts/72/72-Black.woff') format('woff');
+    font-weight: 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 *,
 *::before,
 *::after {
@@ -16,7 +85,7 @@ body,
 
 body {
     font-family:
-        'Sarabun', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+        '72', 'Sarabun', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
 }
 
 /*

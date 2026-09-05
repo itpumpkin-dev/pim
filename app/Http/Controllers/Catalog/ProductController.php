@@ -2006,6 +2006,13 @@ class ProductController extends Controller
             // catalog.php ตรง updateChannels()/push-*/deactivate-*/*-status ทุกตัว
             'canViewSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'view_sales_channels') ?? false,
             'canEditSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'edit_sales_channels') ?? false,
+            // แผง "Master Categories" (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) มีสิทธิ์ "แก้ไข"
+            // แยกของตัวเอง (resource `master_categories`) ไม่ได้พ่วงกับ
+            // products.edit_products ทั่วไปอีกต่อไป — ดู routes/catalog.php ตรง
+            // updateMasterCategories() ตั้งใจไม่มี view แยก (ต่างจาก Sales Channels
+            // ที่มีทั้งคู่) เพราะแผงนี้เป็นแค่ข้อมูลจัดหมวดหมู่พื้นฐาน ไม่มีเหตุผลต้องซ่อน
+            // จากการดู — ดู docblock ของ migration backfill_master_categories_permissions
+            'canEditMasterCategories' => auth()->user()?->hasPermission('master_categories', 'edit_master_categories') ?? false,
             // ให้ frontend แปล attribute.master_source (โค้ดดิบ เช่น 'brands')
             // เป็นชื่อที่อ่านง่ายสำหรับ chip "Master: ..." บน field ของ attribute
             // นั้นๆ — รูปแบบเดียวกับที่ AttributeController ส่งให้หน้าแก้ไข

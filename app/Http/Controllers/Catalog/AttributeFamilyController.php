@@ -11,6 +11,7 @@ use App\Models\AttributeGroup;
 use App\Models\AuditLog;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
+use App\Services\Catalog\DefaultAttributeFamilyAssigner;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
@@ -161,6 +162,7 @@ class AttributeFamilyController extends Controller
             'attributes' => $attributes,
             'familyAttributes' => $familyAttributes,
             'canViewHistory' => auth()->user()?->hasPermission('attribute_families', 'view_history') ?? false,
+            'canAssignDefaultFamily' => auth()->user()?->hasPermission('attribute_families', 'assign_default_family') ?? false,
         ]);
     }
 
@@ -218,6 +220,29 @@ class AttributeFamilyController extends Controller
         AttributeFamily::bumpListVersion();
 
         return to_route('catalog.attributeFamilies.index')->with('success', 'Attribute Family updated successfully.');
+    }
+
+    /**
+     * "Set as default for every product group" button on this page's edit
+     * form — see DefaultAttributeFamilyAssigner for the shared logic (also
+     * used by the `catalog:assign-default-family` artisan command). Always
+     * overrides any product group's current default, never just fills in
+     * empty ones — matches the CLI command's own default behavior.
+     *
+     * Gated on its own `attribute_families,assign_default_family` permission
+     * (routes/catalog.php), separate from `edit_attribute_families` — this
+     * mass-overwrites every product group's default at once, unlike editing
+     * one family at a time.
+     */
+    public function setDefaultForAllGroups(AttributeFamily $attributeFamily, DefaultAttributeFamilyAssigner $assigner): RedirectResponse
+    {
+        $result = $assigner->assignToAllProductGroups($attributeFamily);
+
+        if ($result['updated'] === 0) {
+            return back()->with('success', "'{$attributeFamily->name}' was already the default for every product group.");
+        }
+
+        return back()->with('success', "Set '{$attributeFamily->name}' as the default attribute family for {$result['updated']} product group(s).");
     }
 
     private function resolveName(array $translations, ?string $name, ?string $code = null): string

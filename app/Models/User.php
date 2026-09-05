@@ -241,10 +241,24 @@ class User extends Authenticatable
                         return $item->resource . '.' . $item->action;
                     });
 
-                return $directPermissions->concat($groupPermissions)
-                    ->unique()
-                    ->values()
-                    ->toArray();
+                // Plain array merge+dedupe, not $collection->concat()->unique() —
+                // ->map() above returns an Eloquent\Collection whenever the
+                // source list was empty (Eloquent's map() only downgrades to a
+                // base Support\Collection via toBase() when it finds at least
+                // one non-Model item — see Eloquent\Collection::map()). If
+                // $directPermissions ends up empty (e.g. this user has no
+                // directly-assigned role, only group-assigned ones) it stays
+                // an Eloquent\Collection of strings, and concat() then keeps
+                // that same class ("new static($this)"), so the merged
+                // collection's ->unique() (no $key given) runs Eloquent
+                // Collection's own override — which assumes every item is a
+                // Model and calls $item->getKey() on it — and crashes with
+                // "Call to a member function getKey() on string" the first
+                // time this permission set has to be computed fresh (a cache
+                // miss after permissions_version bumps, e.g. right after a
+                // role/group change). Working with plain arrays here sidesteps
+                // the Eloquent\Collection type entirely, so this can't recur.
+                return array_values(array_unique(array_merge($directPermissions->all(), $groupPermissions->all())));
             }
         );
     }
