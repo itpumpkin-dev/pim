@@ -88,7 +88,33 @@ class ProductController extends Controller
     // ดู buildProductFormProps()
     private const PRODUCT_TYPE_ATTRIBUTE_CODE = 'producttype';
 
+    // Category code ของสาย "หมวดหมู่" วัตถุดิบ (v -> v001 -> v001001 — ดู
+    // rawMaterialCategoryIds()) ใช้แทนกลไก flag Product.is_raw_material เดิม
+    // (ดู migration add_is_raw_material_to_products_table) ที่ต้องไปติ๊กเลือก
+    // สินค้าทีละตัวเองผ่านหน้า Master /catalog/raw-materials (RawMaterialController)
+    // — เปลี่ยนมาถือว่า "สินค้าที่ถูกจัดอยู่ในหมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า
+    // สายนี้ (แผง Master Categories ของหน้าแก้ไขสินค้า) = วัตถุดิบ" แทน ตามที่
+    // user ขอ ตอนนี้ยังจำกัดผลแค่ตัวเลือกส่วนประกอบใน BOM picker เท่านั้น (ดูที่
+    // search() ด้านล่าง กับ BomController::update()) — หน้า /catalog/raw-materials
+    // เดิมกับคอลัมน์ is_raw_material ยังคงอยู่ไม่ได้ถูกแตะ แค่ไม่มีอะไรมาอ่านค่า
+    // มันต่อจากนี้แล้วเฉยๆ
+    private const RAW_MATERIAL_CATEGORY_CODE = 'v';
+
     public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
+
+    /**
+     * Category id ทั้งหมดในสายหมวดหมู่ "วัตถุดิบ" (RAW_MATERIAL_CATEGORY_CODE
+     * เอง บวกลูกหลานทุกระดับ — code ของลูกขึ้นต้นด้วย code ของพ่อเสมอ ดู
+     * ProductCategoryLinker) ใช้ทั้งที่ search() ด้านล่าง (ค้นหาตัวเลือกให้
+     * BOM picker) และ BomController::update() (validate ตอน save)
+     */
+    private function rawMaterialCategoryIds(): array
+    {
+        return Category::where('code', self::RAW_MATERIAL_CATEGORY_CODE)
+            ->orWhere('code', 'like', self::RAW_MATERIAL_CATEGORY_CODE.'%')
+            ->pluck('id')
+            ->all();
+    }
 
     public function index(Request $request): Response
     {
@@ -382,14 +408,15 @@ class ProductController extends Controller
      *
      * ใช้ endpoint เดียวกันนี้ซ้ำสำหรับตัวเลือกวัตถุดิบ (RM) ของ BOM ด้วย (ดู
      * BomController/catalog/bom/edit.tsx) ผ่าน `raw_material_only=1` — จำกัด
-     * ผลลัพธ์ให้เหลือแค่สินค้าที่ถูกจัดเป็นวัตถุดิบไว้แล้ว
-     * (Product.is_raw_material) เท่านั้น ไม่ต้องแยก endpoint ใหม่
+     * ผลลัพธ์ให้เหลือแค่สินค้าที่อยู่ในสายหมวดหมู่ "วัตถุดิบ" (ดู
+     * rawMaterialCategoryIds()) เท่านั้น ไม่ต้องแยก endpoint ใหม่
      */
     public function search(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
         $excludeIds = array_filter(array_map('intval', (array) $request->query('exclude', [])));
         $rawMaterialOnly = $request->boolean('raw_material_only');
+        $rawMaterialCategoryIds = $rawMaterialOnly ? $this->rawMaterialCategoryIds() : [];
 
         if ($query === '') {
             return response()->json([]);
@@ -407,7 +434,7 @@ class ProductController extends Controller
                 $q->orWhereIn('id', $matchingProductIds);
             }
         })
-            ->when($rawMaterialOnly, fn ($q) => $q->where('is_raw_material', true))
+            ->when($rawMaterialOnly, fn ($q) => $q->whereHas('categories', fn ($c) => $c->whereIn('categories.id', $rawMaterialCategoryIds)))
             ->when(! empty($excludeIds), fn ($q) => $q->whereNotIn('id', $excludeIds))
             ->limit(20)
             ->get(['id', 'sku']);

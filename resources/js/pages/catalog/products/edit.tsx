@@ -1490,21 +1490,23 @@ export default function ProductEdit({
                                                 {t('missingTranslationsTranslateAction')}
                                             </MenuItem>
                                         )}
-                                        {canDeleteProduct && (
-                                            <>
-                                                <Divider />
-                                                <MenuItem
-                                                    onClick={() => {
-                                                        setMoreMenuAnchor(null);
-                                                        setDeleteConfirmOpen(true);
-                                                    }}
-                                                    sx={{ color: 'error.main' }}
-                                                >
-                                                    <DeleteForeverIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                                    {t('delete')}
-                                                </MenuItem>
-                                            </>
-                                        )}
+                                        {canDeleteProduct && [
+                                            // Menu ของ MUI clone children เพื่อฉีด prop เข้าไปทีละตัว — ไม่รับ
+                                            // Fragment เป็นลูก (warning "doesn't accept a Fragment as a child")
+                                            // ต้องเป็น array ของ element จริงๆ พร้อม key เอง แทน <>...</>
+                                            <Divider key="more-menu-delete-divider" />,
+                                            <MenuItem
+                                                key="more-menu-delete"
+                                                onClick={() => {
+                                                    setMoreMenuAnchor(null);
+                                                    setDeleteConfirmOpen(true);
+                                                }}
+                                                sx={{ color: 'error.main' }}
+                                            >
+                                                <DeleteForeverIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                                {t('delete')}
+                                            </MenuItem>,
+                                        ]}
                                     </Menu>
                                 </>
                             )}
@@ -1613,7 +1615,7 @@ export default function ProductEdit({
                                 ref={groupTabBarRef}
                                 variant="outlined"
                                 sx={{
-                                    mb: 3,
+                                    mb: 1,
                                     borderRadius: 0,
                                     bgcolor: '#fff',
                                     position: 'sticky',

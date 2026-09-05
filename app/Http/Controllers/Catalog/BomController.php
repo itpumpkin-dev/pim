@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductBom;
@@ -21,13 +22,37 @@ use Inertia\Response;
  * stub ในเมนู มาสเตอร์ ดู routes/catalog.php) สร้างโดยเลือกสินค้าที่มีอยู่
  * แล้วในระบบด้วย SKU (ไม่ได้สร้างสินค้าใหม่ — สินค้านั้นกลายเป็น "หัว"/finished
  * good ของ BOM ชุดนี้) แล้วค่อยกลับมาที่หน้าแก้ไขเพื่อเพิ่มรายการวัตถุดิบ (RM —
- * จำกัดแค่สินค้าที่ถูกจัดเป็นวัตถุดิบไว้แล้วผ่านหน้า Master
- * /catalog/raw-materials เท่านั้น ดู RawMaterialController) เลือกได้มากกว่า 1
- * ยังไม่มี "จำนวนที่ใช้" ต่อรายการตามที่ตกลงกันไว้ (ดู docblock ของ migration
- * create_product_boms_table)
+ * จำกัดแค่สินค้าที่อยู่ในสายหมวดหมู่ "วัตถุดิบ" (code v — ดู
+ * rawMaterialCategoryIds() และ ProductController::search()) เท่านั้น เลือกได้
+ * มากกว่า 1 ยังไม่มี "จำนวนที่ใช้" ต่อรายการตามที่ตกลงกันไว้ (ดู docblock ของ
+ * migration create_product_boms_table)
+ *
+ * หมายเหตุ: เดิมจำกัดผ่าน flag Product.is_raw_material (ติ๊กเลือกทีละตัวผ่าน
+ * หน้า Master /catalog/raw-materials — ดู RawMaterialController) เปลี่ยนมาอิง
+ * หมวดหมู่แทนตามที่ user ขอ — หน้า /catalog/raw-materials กับคอลัมน์
+ * is_raw_material เดิมยังอยู่เหมือนเดิม (ยังไม่ได้ลบ/ย้าย) แค่ไม่มีจุดไหนใน BOM
+ * มาอ่านค่ามันต่อแล้วเท่านั้น
  */
 class BomController extends Controller
 {
+    // ดู docblock ของ rawMaterialCategoryIds() ด้านล่าง — ตรงกับ
+    // ProductController::RAW_MATERIAL_CATEGORY_CODE เป๊ะๆ (คัดลอกมาแทนที่จะ
+    // ดึงจากคลาสนั้นตรงๆ เพื่อไม่ต้องผูก BomController เข้ากับ ProductController)
+    private const RAW_MATERIAL_CATEGORY_CODE = 'v';
+
+    /**
+     * Category id ทั้งหมดในสายหมวดหมู่ "วัตถุดิบ" — คัดลอกมาจาก
+     * ProductController::rawMaterialCategoryIds() (ต้องคำนวณเหมือนกันเป๊ะ ไม่งั้น
+     * ตัวเลือกที่ ProductPicker ค้นเจอ กับตัวที่ validate ผ่านตอน save จะไม่ตรงกัน)
+     */
+    private function rawMaterialCategoryIds(): array
+    {
+        return Category::where('code', self::RAW_MATERIAL_CATEGORY_CODE)
+            ->orWhere('code', 'like', self::RAW_MATERIAL_CATEGORY_CODE.'%')
+            ->pluck('id')
+            ->all();
+    }
+
     public function index(Request $request): Response
     {
         $search = trim((string) $request->input('search', ''));
@@ -125,11 +150,20 @@ class BomController extends Controller
      */
     public function update(Request $request, ProductBom $bom): RedirectResponse
     {
+        // เช็คผ่าน category แทน flag is_raw_material เดิม (ดู
+        // rawMaterialCategoryIds() ด้านบน) — คำนวณครั้งเดียวไว้นอก validate()
+        // ไม่งั้นแต่ละแถวใน component_ids.* จะยิง query นับ category ซ้ำเอง
+        $rawMaterialCategoryIds = $this->rawMaterialCategoryIds();
+
         $validated = $request->validate([
             'component_ids' => ['present', 'array'],
             'component_ids.*' => [
                 'integer',
-                Rule::exists('products', 'id')->where('is_raw_material', true),
+                Rule::exists('products', 'id'),
+                // แทนที่จะ join ผ่าน Product::categories() ตรงๆ — validate เข้า
+                // pivot table product_category ตรงๆ เลย ให้ผลเดียวกันแต่ไม่ต้อง
+                // ใช้ whereHas ที่ Rule::exists() ไม่รองรับ
+                Rule::exists('product_category', 'product_id')->whereIn('category_id', $rawMaterialCategoryIds),
                 // BOM ห้ามใช้ตัวเองเป็นวัตถุดิบของตัวเอง
                 Rule::notIn([$bom->product_id]),
             ],
