@@ -17,6 +17,7 @@ use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -243,6 +244,58 @@ class AttributeFamilyController extends Controller
         }
 
         return back()->with('success', "Set '{$attributeFamily->name}' as the default attribute family for {$result['updated']} product group(s).");
+    }
+
+    /**
+     * สร้างตระกูลแอตทริบิวต์ใหม่โดย copy จากตัวเดิม: name/คำแปลทุกภาษา และชุด
+     * attribute ที่ผูกกับ group ต่างๆ (family_attributes) เหมือนกันหมด แต่ใช้
+     * code ใหม่ที่ auto-generate ต่อท้ายด้วย "-copy" — เหมือนแพทเทิร์นเดียวกับ
+     * ProductController::duplicate()'s "{sku}-copy" ทุกประการ ผู้ใช้ต้องไป
+     * ตรวจสอบ/ปรับแก้ที่หน้า Edit เอง (ซึ่งจะพาไปที่นั่นต่อ)
+     */
+    public function duplicate(Request $request, AttributeFamily $attributeFamily): RedirectResponse
+    {
+        $duplicate = DB::transaction(function () use ($attributeFamily, $request) {
+            $newFamily = CodeGenerator::createWithRetry(
+                'attribute_families',
+                $attributeFamily->code.'-copy',
+                fn ($code) => AttributeFamily::create([
+                    'code' => $code,
+                    'name' => $attributeFamily->name,
+                    'created_by' => $request->user()?->id,
+                    'updated_by' => $request->user()?->id,
+                ]),
+            );
+
+            foreach ($attributeFamily->translations()->get() as $translation) {
+                AttributeFamilyTranslation::create([
+                    'attribute_family_id' => $newFamily->id,
+                    'locale_id' => $translation->locale_id,
+                    'label' => $translation->label,
+                ]);
+            }
+
+            foreach (FamilyAttribute::where('family_id', $attributeFamily->id)->get() as $familyAttribute) {
+                FamilyAttribute::create([
+                    'family_id' => $newFamily->id,
+                    'attribute_id' => $familyAttribute->attribute_id,
+                    'attribute_group_id' => $familyAttribute->attribute_group_id,
+                    'sort_order' => $familyAttribute->sort_order,
+                ]);
+            }
+
+            return $newFamily;
+        });
+
+        AuditLog::record('duplicated', $duplicate, null, [
+            'duplicated_from_id' => $attributeFamily->id,
+            'duplicated_from_code' => $attributeFamily->code,
+        ]);
+
+        AttributeFamily::bumpListVersion();
+
+        return to_route('catalog.attributeFamilies.edit', $duplicate)
+            ->with('success', "Duplicated as \"{$duplicate->code}\". Review and update before use.");
     }
 
     private function resolveName(array $translations, ?string $name, ?string $code = null): string

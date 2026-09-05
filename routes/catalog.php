@@ -215,6 +215,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributeFamilies', [AttributeFamilyController::class, 'store'])->name('attributeFamilies.store')->middleware('permission:attribute_families,create_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/edit', [AttributeFamilyController::class, 'edit'])->name('attributeFamilies.edit')->middleware('permission:attribute_families,edit_attribute_families');
     Route::put('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'update'])->name('attributeFamilies.update')->middleware('permission:attribute_families,edit_attribute_families');
+    // ทำสำเนา — ถือเป็นการ "สร้าง" ตระกูลใหม่ (โค้ดใหม่, id ใหม่) เลยใช้สิทธิ์
+    // create_attribute_families ตัวเดียวกับปุ่ม "Create" แทนที่จะแยกสิทธิ์ของตัว
+    // เอง — เหมือนแพทเทิร์นเดียวกับ ProductController::duplicate() ที่ใช้
+    // permission:products,create_products
+    Route::post('attributeFamilies/{attributeFamily}/duplicate', [AttributeFamilyController::class, 'duplicate'])->name('attributeFamilies.duplicate')->middleware('permission:attribute_families,create_attribute_families');
     // ปุ่ม "ตั้งเป็นค่าเริ่มต้นให้ทุกกลุ่มสินค้า" แยกออกมาเป็นสิทธิ์ของตัวเอง
     // (attribute_families,assign_default_family) จาก edit_attribute_families
     // ทั่วไป — เพราะเป็น action ที่ทับ default family ของ "ทุก" กลุ่มสินค้าใน

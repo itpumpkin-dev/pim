@@ -4,43 +4,89 @@ import { Box, ButtonBase, Menu, MenuItem, Typography, type BoxProps } from '@mui
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-// Maps an ISO 639-1 language code to the ISO 3166-1 country code whose flag
+// Real flag artwork (circle-flags — already-circular SVGs) instead of flag
+// emoji: Windows doesn't render regional-indicator emoji pairs as flags at
+// all (most fonts there fall back to showing the two letters themselves,
+// e.g. "GB"/"TH"/"CN" in little boxes), so the dropdown looked broken on
+// every Windows machine even though it rendered fine on macOS/Android.
+// Statically importing just the ~20 flags this app actually offers (via
+// Vite's `?url`) keeps the bundle to a handful of small SVGs instead of
+// pulling in circle-flags' full 400+ flag set.
+import flagDe from 'circle-flags/flags/de.svg?url';
+import flagDk from 'circle-flags/flags/dk.svg?url';
+import flagEs from 'circle-flags/flags/es.svg?url';
+import flagFr from 'circle-flags/flags/fr.svg?url';
+import flagGb from 'circle-flags/flags/gb.svg?url';
+import flagId from 'circle-flags/flags/id.svg?url';
+import flagIn from 'circle-flags/flags/in.svg?url';
+import flagIt from 'circle-flags/flags/it.svg?url';
+import flagJp from 'circle-flags/flags/jp.svg?url';
+import flagKr from 'circle-flags/flags/kr.svg?url';
+import flagCn from 'circle-flags/flags/cn.svg?url';
+import flagNl from 'circle-flags/flags/nl.svg?url';
+import flagNo from 'circle-flags/flags/no.svg?url';
+import flagPt from 'circle-flags/flags/pt.svg?url';
+import flagRu from 'circle-flags/flags/ru.svg?url';
+import flagSa from 'circle-flags/flags/sa.svg?url';
+import flagSe from 'circle-flags/flags/se.svg?url';
+import flagTh from 'circle-flags/flags/th.svg?url';
+import flagVn from 'circle-flags/flags/vn.svg?url';
+
+// Maps an ISO 639-1 language code to the flag image whose country
 // conventionally represents it (e.g. English -> GB), so locales without an
 // identically-named country still get a sensible flag.
-const COUNTRY_BY_LANGUAGE: Record<string, string> = {
-    en: 'gb',
-    th: 'th',
-    fr: 'fr',
-    da: 'dk',
-    no: 'no',
-    nb: 'no',
-    nn: 'no',
-    sv: 'se',
-    de: 'de',
-    es: 'es',
-    it: 'it',
-    pt: 'pt',
-    nl: 'nl',
-    ja: 'jp',
-    zh: 'cn',
-    ko: 'kr',
-    vi: 'vn',
-    id: 'id',
-    ru: 'ru',
-    ar: 'sa',
-    hi: 'in',
+const FLAG_BY_LANGUAGE: Record<string, string> = {
+    en: flagGb,
+    th: flagTh,
+    fr: flagFr,
+    da: flagDk,
+    no: flagNo,
+    nb: flagNo,
+    nn: flagNo,
+    sv: flagSe,
+    de: flagDe,
+    es: flagEs,
+    it: flagIt,
+    pt: flagPt,
+    nl: flagNl,
+    ja: flagJp,
+    zh: flagCn,
+    ko: flagKr,
+    vi: flagVn,
+    id: flagId,
+    ru: flagRu,
+    ar: flagSa,
+    hi: flagIn,
 };
 
-function flagEmoji(localeCode: string) {
+function flagUrl(localeCode: string): string | undefined {
     const language = localeCode.split('-')[0].toLowerCase();
-    const country = COUNTRY_BY_LANGUAGE[language] ?? language;
+    return FLAG_BY_LANGUAGE[language];
+}
 
-    if (country.length !== 2) {
-        return '🌐';
-    }
+function FlagIcon({ localeCode, size = 26 }: { localeCode: string; size?: number }) {
+    const url = flagUrl(localeCode);
 
-    const codePoints = [...country.toUpperCase()].map((char) => 0x1f1e6 + char.charCodeAt(0) - 65);
-    return String.fromCodePoint(...codePoints);
+    return (
+        <Box
+            sx={{
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: size * 0.7,
+                lineHeight: 1,
+                flexShrink: 0,
+                bgcolor: 'action.hover',
+                boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
+            }}
+        >
+            {url ? <img src={url} alt="" width={size} height={size} style={{ display: 'block' }} /> : '🌐'}
+        </Box>
+    );
 }
 
 export default function LocaleDropdown(props: BoxProps) {
@@ -53,6 +99,8 @@ export default function LocaleDropdown(props: BoxProps) {
         setAnchorEl(null);
     };
 
+    const current = locales.find((l) => l.code === locale);
+
     return (
         <Box {...props}>
             <ButtonBase
@@ -61,18 +109,20 @@ export default function LocaleDropdown(props: BoxProps) {
                 sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 0.5,
-                    px: 1.75,
-                    py: 0.75,
-                    borderRadius: 2,
+                    gap: 1,
+                    pl: 0.75,
+                    pr: 1.5,
+                    py: 0.5,
+                    borderRadius: 999,
                     border: 1,
                     borderColor: 'divider',
                     bgcolor: 'background.paper',
                     '&:hover': { bgcolor: 'action.hover' },
                 }}
             >
+                <FlagIcon localeCode={locale ?? 'en'} size={22} />
                 <Typography variant="body2" fontWeight={700} color="primary.main">
-                    {t('language')}
+                    {current?.display_name ?? t('language')}
                 </Typography>
                 <KeyboardArrowDownIcon fontSize="small" sx={{ color: 'primary.main' }} />
             </ButtonBase>
@@ -101,23 +151,7 @@ export default function LocaleDropdown(props: BoxProps) {
                             borderColor: 'divider',
                         }}
                     >
-                        <Box
-                            sx={{
-                                width: 26,
-                                height: 26,
-                                borderRadius: '50%',
-                                overflow: 'hidden',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: 18,
-                                lineHeight: 1,
-                                flexShrink: 0,
-                                boxShadow: '0 0 0 1px rgba(0,0,0,0.08)',
-                            }}
-                        >
-                            {flagEmoji(code)}
-                        </Box>
+                        <FlagIcon localeCode={code} />
                         <Typography variant="body2">{display_name ?? code}</Typography>
                     </MenuItem>
                 ))}

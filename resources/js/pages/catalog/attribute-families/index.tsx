@@ -27,6 +27,7 @@ import {
     Select,
     Stack,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
@@ -94,6 +95,8 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteFamilyId, setDeleteFamilyId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [duplicateFamilyId, setDuplicateFamilyId] = useState<number | null>(null);
+    const [duplicating, setDuplicating] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -148,9 +151,15 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                             <EditIcon fontSize="small" />
                         </IconButton>
                     )}
-                    <IconButton size="small" sx={fioriIconButtonSx}>
-                        <ContentCopyIcon fontSize="small" />
-                    </IconButton>
+                    {canCreate && (
+                        <Tooltip title={t('rowActions.duplicate')}>
+                            <span>
+                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDuplicateFamilyId(row.id)}>
+                                    <ContentCopyIcon fontSize="small" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                    )}
                     {canDelete && (
                         <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteFamilyId(row.id)}>
                             <DeleteIcon fontSize="small" />
@@ -307,6 +316,38 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         sx={{ textTransform: 'none', borderRadius: '8px' }}
                     >
                         {t('delete')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ไดอะล็อกยืนยันการทำสำเนา */}
+            <Dialog open={duplicateFamilyId !== null} onClose={() => setDuplicateFamilyId(null)}>
+                <DialogTitle>{tCatalog('confirmDuplication')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {tCatalog('confirmDuplicateAttributeFamilyMessage')}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDuplicateFamilyId(null)} color="inherit" disabled={duplicating} sx={{ textTransform: 'none' }}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            if (duplicateFamilyId !== null) {
+                                setDuplicating(true);
+                                router.post(`/catalog/attributeFamilies/${duplicateFamilyId}/duplicate`, {}, {
+                                    onSuccess: () => setDuplicateFamilyId(null),
+                                    onFinish: () => setDuplicating(false),
+                                });
+                            }
+                        }}
+                        variant="contained"
+                        disabled={duplicating}
+                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={{ ...fioriEmphasizedSx, textTransform: 'none', borderRadius: '8px' }}
+                    >
+                        {t('rowActions.duplicate')}
                     </Button>
                 </DialogActions>
             </Dialog>

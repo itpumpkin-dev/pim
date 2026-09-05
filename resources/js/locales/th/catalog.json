@@ -308,6 +308,7 @@
     "moveFamilyDown": "เลื่อนลง",
     "removeFamily": "เอาออก",
     "confirmDeleteAttributeFamilyMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบตระกูลแอตทริบิวต์นี้?",
+    "confirmDuplicateAttributeFamilyMessage": "คุณแน่ใจหรือไม่ว่าต้องการทำสำเนาตระกูลแอตทริบิวต์นี้? ระบบจะสร้างตระกูลแอตทริบิวต์ใหม่เป็นสำเนา",
     "attributeGroupsPanelSubtitle": "จัดการกลุ่มแอตทริบิวต์ของตระกูลสินค้า",
     "deleteGroup": "ลบกลุ่ม",
     "assignAttributeGroup": "กำหนดกลุ่มแอตทริบิวต์",

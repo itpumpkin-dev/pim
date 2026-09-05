@@ -308,6 +308,7 @@
     "moveFamilyDown": "Move down",
     "removeFamily": "Remove",
     "confirmDeleteAttributeFamilyMessage": "Are you sure you want to delete this attribute family?",
+    "confirmDuplicateAttributeFamilyMessage": "Are you sure you want to duplicate this attribute family? A new attribute family will be created as a copy.",
     "attributeGroupsPanelSubtitle": "Manage attribute family groups",
     "deleteGroup": "Delete Group",
     "assignAttributeGroup": "Assign Attribute Group",

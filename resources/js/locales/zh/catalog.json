@@ -133,6 +133,7 @@
     "moveFamilyDown": "下移",
     "removeFamily": "移除",
     "confirmDeleteAttributeFamilyMessage": "您确定要删除这个属性家族吗 ?",
+    "confirmDuplicateAttributeFamilyMessage": "确定要复制此属性家族吗？将创建一个副本作为新属性家族。",
     "attributeGroupsPanelSubtitle": "管理属性家族组",
     "deleteGroup": "删除组",
     "assignAttributeGroup": "指定属性组",
