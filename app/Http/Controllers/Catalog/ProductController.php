@@ -3208,6 +3208,53 @@ class ProductController extends Controller
     }
 
     /**
+     * ปุ่ม "Publish" ใน toolbar ของหน้า Edit — ยุบขั้นตอนที่ปกติต้องทำแยกกัน
+     * หลายคลิก (ติ๊ก Sales Channel → กด Save แผงนั้น (updateChannels() ด้านบน)
+     * → ไล่กด Push ทีละร้าน) ให้เหลือคลิกเดียว: ตั้ง enabled=true, sync
+     * published_shop_ids เต็มรูปแบบตามที่ติ๊กไว้ตอนนี้ในหน้า (เหมือน
+     * updateChannels() ทุกอย่าง รวมถึง detach ร้านที่ไม่ได้ติ๊กด้วย — ต่างจาก
+     * pushBulk() ของหน้า list ที่ syncWithoutDetaching เพราะที่นั่นไม่มี
+     * checkbox ให้ untick ต่อสินค้าอยู่แล้ว) แล้ว queue push job ให้ทุกร้าน
+     * ที่ติ๊กไว้ในคราวเดียว (เหมือน pushBulk() แต่ขอบเขตแค่สินค้าตัวเดียว)
+     */
+    public function publish(Request $request, Product $product): RedirectResponse
+    {
+        $validated = $request->validate([
+            'published_shop_ids' => ['nullable', 'array'],
+            'published_shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+        ]);
+
+        $shopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        DB::transaction(function () use ($request, $product, $shopIds) {
+            $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
+
+            if (! $product->enabled) {
+                $product->update(['enabled' => true, 'updated_by' => $request->user()?->id]);
+            }
+
+            $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            $product->platformShops()->sync($shopIds);
+
+            if ($oldShopIds !== $shopIds) {
+                AuditLog::record('published_shops_updated', $product, ['shop_ids' => $oldShopIds], ['shop_ids' => $shopIds]);
+                $product->touch();
+            }
+        });
+
+        if (empty($shopIds)) {
+            return back()->with('success', 'Product enabled. Tick at least one sales channel to push it live.');
+        }
+
+        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $shopIds)->get();
+        foreach ($shops as $shop) {
+            $this->dispatchMarketplaceSyncJob($product, $shop, $shop->platform->code, 'push');
+        }
+
+        return back()->with('success', "Product enabled and push queued to {$shops->count()} channel(s).");
+    }
+
+    /**
      * Per-panel save: หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า (pcatname/psubcatname/
      * productgroupname — self::MASTER_CATEGORY_ATTRIBUTE_CODES) มีปุ่ม Save
      * แยกของตัวเอง (ตามที่ user ขอ) เหมือน updateChannels() ด้านบน — ทำงาน

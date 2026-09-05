@@ -17,6 +17,7 @@ import {
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriNegativeSx,
+    fioriPositiveSx,
     fioriSwitchSx,
     fioriTabsSx,
     fioriToggleButtonGroupSx,
@@ -31,6 +32,7 @@ import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -59,6 +61,7 @@ import {
     Grid,
     IconButton,
     InputAdornment,
+    Menu,
     MenuItem,
     Paper,
     Select,
@@ -290,6 +293,11 @@ export default function ProductEdit({
     // แก้ไขนิยามของ attribute เต็มรูปแบบ แค่มีสิทธิ์เพิ่ม option ทีละตัวจากหน้า
     // สินค้าก็พอ
     const canAddAttributeOptions = auth.permissions.includes('attributes.quick_add_options');
+    // สิทธิ์ของแอ็กชันต่างๆ ใน dropdown ปุ่ม "More" ของ toolbar — คนละสิทธิ์กับ
+    // products.edit_products ทั่วไป (ดูแพทเทิร์นเดียวกันในหน้า list: index.tsx)
+    const canDuplicateProduct = auth.permissions.includes('products.create_products');
+    const canDeleteProduct = auth.permissions.includes('products.delete_products');
+    const canQueueTranslations = auth.permissions.includes('product_translations.edit_product_translations');
     const [tabIndex, setTabIndex] = useState(0);
     // แท็บย่อยภายในแท็บหลัก "General" ใช้จัดกลุ่มเนื้อหาฟอร์มฝั่งคอลัมน์ซ้าย —
     // ลำดับอ้างอิงตาม layout ต้นแบบ: General info -> Attributes -> Details ->
@@ -1280,6 +1288,95 @@ export default function ProductEdit({
         );
     };
 
+    // เมนู "More" ของ toolbar — รวมแอ็กชันระดับสินค้าตัวนี้ทั้งตัวที่ไม่อยากโชว์
+    // เป็นปุ่มถาวรข้าง Save (Duplicate/Delete เพราะเสี่ยงกว่า) กับที่แต่ก่อนต้อง
+    // ไปทำจากหน้า list เท่านั้น (Duplicate/Delete) หรือหน้า missing-translations
+    // เท่านั้น (Queue Missing Translations) — ตอนนี้เรียกจากหน้า Edit ได้ตรงๆ
+    const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null);
+    const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
+    const [duplicating, setDuplicating] = useState(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
+    const [queuingTranslations, setQueuingTranslations] = useState(false);
+
+    const duplicateProduct = () => {
+        setDuplicating(true);
+        router.post(
+            `/catalog/products/${product.id}/duplicate`,
+            {},
+            {
+                // สำเร็จแล้ว backend redirect ไปหน้า Edit ของสำเนาใหม่เลย (ดู
+                // ProductController::duplicate()) เลยไม่ต้อง setDuplicateConfirmOpen(false)
+                // เอง — หน้าจะเปลี่ยนไปทั้งหน้าอยู่แล้ว
+                onFinish: () => setDuplicating(false),
+            },
+        );
+    };
+
+    const deleteProduct = () => {
+        setDeleting(true);
+        // สำเร็จแล้ว backend redirect กลับไปหน้า list เลย (ดู ProductController::destroy())
+        router.delete(`/catalog/products/${product.id}`, {
+            onFinish: () => setDeleting(false),
+        });
+    };
+
+    // ต่างจาก duplicate/delete ตรงที่ไม่ทำลายอะไร (แค่ queue job แปลภาษา) เลยไม่ต้อง
+    // confirm dialog ก่อน ยิงตรงจากเมนูได้เลย — ตามแพทเทิร์นเดียวกับ translateOne()
+    // ในหน้า missing-translations.tsx
+    const queueMissingTranslations = () => {
+        setMoreMenuAnchor(null);
+        setQueuingTranslations(true);
+        router.post(
+            `/catalog/products/${product.id}/queue-missing-translations`,
+            {},
+            { preserveScroll: true, onFinish: () => setQueuingTranslations(false) },
+        );
+    };
+
+    // ปุ่ม "Publish" — ยุบขั้นตอนที่ปกติต้องทำแยกกันหลายคลิก (ติ๊ก Sales
+    // Channel → กด Save แผงนั้น → ไล่กด Push ทีละร้าน) ให้เหลือคลิกเดียว:
+    // เปิดใช้งานสินค้า + sync/push ทุกร้านที่ติ๊กไว้ *ตอนนี้* ในหน้า (ดู
+    // ProductController::publish()) — ใช้ data.published_shop_ids ตรงๆ ไม่ใช่
+    // publishedShopIds prop (ค่าที่ save ไว้แล้ว) เพราะต้องการให้ยิงตามติ๊ก
+    // ล่าสุดในหน้าจอ แม้ว่าจะยังไม่เคยกด Save แผง Sales Channels มาก่อนเลยก็ตาม
+    const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+    const [publishing, setPublishing] = useState(false);
+
+    // รายชื่อร้านที่ติ๊กไว้ตอนนี้ — ใช้แสดงในกล่องยืนยันก่อน publish เท่านั้น
+    // (backend เป็นคนตัดสินใจจริงว่าจะ push ร้านไหนบ้าง จาก published_shop_ids
+    // ที่ส่งไปพร้อมคำขอ)
+    const tickedShopsForPublish = useMemo(() => {
+        const shopMeta = new Map<number, { name: string; platform: string }>();
+        channelGroups.forEach((group) => {
+            group.channels.forEach((ch) => {
+                if (ch.shop_id != null) shopMeta.set(ch.shop_id, { name: ch.name || ch.code, platform: group.platform });
+            });
+        });
+        return data.published_shop_ids
+            .map((id) => shopMeta.get(id))
+            .filter((meta): meta is { name: string; platform: string } => Boolean(meta));
+    }, [channelGroups, data.published_shop_ids]);
+
+    const publishProduct = () => {
+        setPublishing(true);
+        // อัปเดต Switch "Status" ในเครื่องทันที ไม่ต้องรอ round-trip — เพราะ
+        // useForm() ไม่ resync ค่าที่ setData ไว้เองกับ prop ใหม่หลัง redirect
+        // กลับมา (preserveState ที่ตั้งไว้ใน request นี้คือสาเหตุ) ถ้าไม่ทำตรงนี้
+        // Switch จะยังโชว์ off ค้างอยู่ทั้งที่ backend enabled=true ไปแล้ว
+        setData('enabled', true);
+        router.post(
+            `/catalog/products/${product.id}/publish`,
+            { published_shop_ids: data.published_shop_ids },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setPublishConfirmOpen(false),
+                onFinish: () => setPublishing(false),
+            },
+        );
+    };
+
     const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
         <Button
             size="small"
@@ -1361,9 +1458,56 @@ export default function ProductEdit({
                                 </Select>
                             </Box>
                             {isFieldAreaBusy && <CircularProgress size={18} thickness={5} />}
-                            <Button variant="outlined" size="small" sx={fioriDefaultSx}>
-                                More
-                            </Button>
+                            {(canDuplicateProduct || canQueueTranslations || canDeleteProduct) && (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        sx={fioriDefaultSx}
+                                        onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+                                    >
+                                        {t('more')}
+                                    </Button>
+                                    <Menu anchorEl={moreMenuAnchor} open={Boolean(moreMenuAnchor)} onClose={() => setMoreMenuAnchor(null)}>
+                                        {canDuplicateProduct && (
+                                            <MenuItem
+                                                onClick={() => {
+                                                    setMoreMenuAnchor(null);
+                                                    setDuplicateConfirmOpen(true);
+                                                }}
+                                            >
+                                                <ContentCopyIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                                {t('duplicateProduct')}
+                                            </MenuItem>
+                                        )}
+                                        {canQueueTranslations && (
+                                            <MenuItem disabled={queuingTranslations} onClick={queueMissingTranslations}>
+                                                {queuingTranslations ? (
+                                                    <CircularProgress size={16} sx={{ mr: 1.5 }} />
+                                                ) : (
+                                                    <TranslateIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                                )}
+                                                {t('missingTranslationsTranslateAction')}
+                                            </MenuItem>
+                                        )}
+                                        {canDeleteProduct && (
+                                            <>
+                                                <Divider />
+                                                <MenuItem
+                                                    onClick={() => {
+                                                        setMoreMenuAnchor(null);
+                                                        setDeleteConfirmOpen(true);
+                                                    }}
+                                                    sx={{ color: 'error.main' }}
+                                                >
+                                                    <DeleteForeverIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                                    {t('delete')}
+                                                </MenuItem>
+                                            </>
+                                        )}
+                                    </Menu>
+                                </>
+                            )}
 
                             {/* ลิงก์ไปหน้า products.show ของสินค้าที่ id นี้ตรงๆ (เปิดแท็บใหม่ ไม่
                                 ทับหน้าฟอร์มที่ยังแก้ไขค้างอยู่) — เพราะสินค้าตัวนี้ถูกบันทึกไว้แล้ว
@@ -1380,12 +1524,26 @@ export default function ProductEdit({
                                 startIcon={<VisibilityIcon fontSize="small" />}
                                 sx={{ ...fioriDefaultSx, px: 2.5 }}
                             >
-                                View Product
+                                {t('viewProduct')}
                             </Button>
 
                             <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
-                                Back
+                                {t('back')}
                             </Button>
+                            {/* เปิดใช้งานสินค้า + push ทุกช่องทางขายที่ติ๊กไว้ในคราวเดียว — ดู
+                                publishProduct()/ProductController::publish() ตัดขั้นตอน
+                                ติ๊ก→Save แผง Sales Channels→ไล่กด Push ทีละร้านที่ปกติต้องทำแยก
+                                กันหลายคลิกออกไป กดปุ่มนี้ปุ่มเดียวจบ */}
+                            {canEditSalesChannels && (
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<PublishIcon fontSize="small" />}
+                                    onClick={() => setPublishConfirmOpen(true)}
+                                    sx={{ ...fioriPositiveSx, px: 2.5 }}
+                                >
+                                    {t('publish')}
+                                </Button>
+                            )}
                             {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
                                 เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
                                 ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
@@ -1397,7 +1555,7 @@ export default function ProductEdit({
                                 startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                                 sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                             >
-                                {processing ? 'Saving…' : 'Save Product'}
+                                {processing ? t('saving') : t('saveProduct')}
                             </Button>
                         </Stack>
                     </Stack>
@@ -2273,6 +2431,88 @@ export default function ProductEdit({
                     {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />}
                 </Box>
             </Box>
+
+            {/* Dialog ยืนยันการทำสำเนา (Duplicate) — ยิงจากเมนู "More" */}
+            <Dialog open={duplicateConfirmOpen} onClose={() => setDuplicateConfirmOpen(false)}>
+                <DialogTitle>{t('confirmDuplication')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>{t('confirmDuplicateMessage')}</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDuplicateConfirmOpen(false)} color="inherit" disabled={duplicating}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={duplicateProduct}
+                        variant="contained"
+                        disabled={duplicating}
+                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
+                        sx={fioriEmphasizedSx}
+                    >
+                        {t('duplicateProduct')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog ยืนยันการลบ — ยิงจากเมนู "More" */}
+            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>{t('confirmDeleteMessage')}</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteConfirmOpen(false)} color="inherit" disabled={deleting}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={deleteProduct}
+                        color="error"
+                        variant="contained"
+                        disabled={deleting}
+                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
+                    >
+                        {t('delete')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog ยืนยันก่อน Publish — สรุปให้ชัดว่าจะเปิดใช้งานสินค้า +
+                push ไปร้านไหนบ้าง (หรือไม่ push เลยถ้ายังไม่ได้ติ๊กร้านไหนไว้) */}
+            <Dialog open={publishConfirmOpen} onClose={() => setPublishConfirmOpen(false)}>
+                <DialogTitle>{t('confirmPublish')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {tickedShopsForPublish.length > 0
+                            ? t('confirmPublishMessageWithChannels')
+                            : t('confirmPublishMessageNoChannels')}
+                    </DialogContentText>
+                    {tickedShopsForPublish.length > 0 ? (
+                        <Stack component="ul" spacing={0.5} sx={{ mt: 1, mb: 0, pl: 3 }}>
+                            {tickedShopsForPublish.map((shop) => (
+                                <Typography key={shop.name} component="li" variant="body2">
+                                    {shop.name} <Typography component="span" variant="caption" color="text.secondary">({shop.platform})</Typography>
+                                </Typography>
+                            ))}
+                        </Stack>
+                    ) : (
+                        <DialogContentText sx={{ mt: 1 }}>{t('confirmPublishNoChannelsTicked')}</DialogContentText>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setPublishConfirmOpen(false)} color="inherit" disabled={publishing}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={publishProduct}
+                        variant="contained"
+                        disabled={publishing}
+                        startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <PublishIcon fontSize="small" />}
+                        sx={fioriEmphasizedSx}
+                    >
+                        {t('publish')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Dialog open={pushConfirmShop !== null} onClose={closePushDialog}>
                 <DialogTitle>{t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}</DialogTitle>

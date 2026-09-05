@@ -702,5 +702,12 @@
     "searchCurrencies": "搜索货币",
     "noCurrenciesFound": "未找到货币。",
     "confirmDeleteCurrency": "确定要删除此货币吗？",
-    "currencyInUseWarning": "有 {{channels}} 个渠道和 {{vendors}} 个供应商正在使用 — 删除它会将其从中移除。"
+    "currencyInUseWarning": "有 {{channels}} 个渠道和 {{vendors}} 个供应商正在使用 — 删除它会将其从中移除。",
+    "more": "更多",
+    "viewProduct": "查看产品",
+    "publish": "发布",
+    "confirmPublish": "确认发布",
+    "confirmPublishMessageWithChannels": "这将启用产品，并将推送任务加入队列，推送到：",
+    "confirmPublishMessageNoChannels": "这将启用产品。",
+    "confirmPublishNoChannelsTicked": "尚未勾选任何销售渠道 — 不会推送任何内容。如果也想推送上线，请先在销售渠道中勾选。"
 }

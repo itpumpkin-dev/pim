@@ -174,5 +174,12 @@
     "syncFromTiktok": "Sync from TikTok",
     "syncingTiktok": "Syncing...",
     "noShopsYet": "No shops yet.",
-    "confirmDeleteShop": "Are you sure you want to delete this shop?"
+    "confirmDeleteShop": "Are you sure you want to delete this shop?",
+    "more": "Mais",
+    "viewProduct": "Ver Produto",
+    "publish": "Publicar",
+    "confirmPublish": "Confirmar Publicação",
+    "confirmPublishMessageWithChannels": "Isso irá ativar o produto e enfileirar um envio para:",
+    "confirmPublishMessageNoChannels": "Isso irá ativar o produto.",
+    "confirmPublishNoChannelsTicked": "Nenhum canal de vendas foi marcado ainda — nada será enviado. Marque um em Canais de Vendas primeiro se também quiser publicá-lo."
 }

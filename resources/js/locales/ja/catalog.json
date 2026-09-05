@@ -174,5 +174,12 @@
     "syncFromTiktok": "TikTokから同期",
     "syncingTiktok": "同期中...",
     "noShopsYet": "まだ店舗がありません。",
-    "confirmDeleteShop": "この店舗を削除してもよろしいですか？"
+    "confirmDeleteShop": "この店舗を削除してもよろしいですか？",
+    "more": "その他",
+    "viewProduct": "商品を表示",
+    "publish": "公開",
+    "confirmPublish": "公開の確認",
+    "confirmPublishMessageWithChannels": "この操作で商品を有効化し、次の販売チャネルへのプッシュをキューに追加します：",
+    "confirmPublishMessageNoChannels": "この操作で商品を有効化します。",
+    "confirmPublishNoChannelsTicked": "まだ販売チャネルにチェックが入っていません — プッシュは行われません。公開したい場合は、先に「販売チャネル」でチェックを入れてください。"
 }

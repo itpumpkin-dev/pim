@@ -717,5 +717,12 @@
     "pointPeriod": "ช่วงเวลาที่ใช้งาน",
     "pointStartDate": "วันที่เริ่มต้น",
     "pointEndDate": "วันที่สิ้นสุด",
-    "pointPeriodHelperText": "ช่วงวันที่คะแนนประเภทนี้ใช้งานได้ เว้นว่างด้านใดด้านหนึ่งได้ถ้าไม่จำกัด"
+    "pointPeriodHelperText": "ช่วงวันที่คะแนนประเภทนี้ใช้งานได้ เว้นว่างด้านใดด้านหนึ่งได้ถ้าไม่จำกัด",
+    "more": "เพิ่มเติม",
+    "viewProduct": "ดูสินค้า",
+    "publish": "เผยแพร่",
+    "confirmPublish": "ยืนยันการเผยแพร่",
+    "confirmPublishMessageWithChannels": "การดำเนินการนี้จะเปิดใช้งานสินค้า และคิวการ push ไปยัง:",
+    "confirmPublishMessageNoChannels": "การดำเนินการนี้จะเปิดใช้งานสินค้า",
+    "confirmPublishNoChannelsTicked": "ยังไม่ได้ติ๊กช่องทางขายใดๆ ไว้ — จะไม่มีการ push เกิดขึ้น ติ๊กช่องทางขายในแผง Sales Channels ก่อน ถ้าต้องการให้ push ไปด้วย"
 }

@@ -67,6 +67,13 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // view_sales_channels พอ ส่วนที่ push/deactivate/toggle จริงต้อง
     // edit_sales_channels
     Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:sales_channels,edit_sales_channels');
+    // ปุ่ม "Publish" ของ toolbar หน้า Edit — ตั้ง enabled=true + sync/push
+    // Sales Channels ในคำขอเดียว ใช้สิทธิ์เดียวกับ endpoint อื่นๆ ของแผงนี้
+    // ด้านล่าง (sales_channels,edit_sales_channels) — ส่วน products,edit_products
+    // การันตีอยู่แล้วโดยอัตโนมัติเพราะต้องมีสิทธิ์นั้นถึงจะมาถึงหน้า Edit ได้
+    // ตั้งแต่แรก (เหมือน push-lazada/deactivate-lazada/... ด้านล่างที่ไม่ได้
+    // เช็คซ้ำเหมือนกัน)
+    Route::post('products/{product}/publish', [ProductController::class, 'publish'])->name('products.publish')->middleware('permission:sales_channels,edit_sales_channels');
     // Master Categories panel (edit.tsx) — แยกออกมาเป็นสิทธิ์ของตัวเอง
     // (master_categories) แบบเดียวกับ Sales Channels ด้านบน แทนที่จะพ่วงไปกับ
     // products,edit_products แบบเดิม เพื่อให้จำกัดสิทธิ์แก้ไขหมวดหมู่-หมวดหมู่ย่อย-

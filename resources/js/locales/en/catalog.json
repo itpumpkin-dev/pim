@@ -717,5 +717,12 @@
     "pointPeriod": "Validity Period",
     "pointStartDate": "Start Date",
     "pointEndDate": "End Date",
-    "pointPeriodHelperText": "The date range this point type is usable in. Leave a side blank for no limit."
+    "pointPeriodHelperText": "The date range this point type is usable in. Leave a side blank for no limit.",
+    "more": "More",
+    "viewProduct": "View Product",
+    "publish": "Publish",
+    "confirmPublish": "Confirm Publish",
+    "confirmPublishMessageWithChannels": "This will enable the product and queue a push to:",
+    "confirmPublishMessageNoChannels": "This will enable the product.",
+    "confirmPublishNoChannelsTicked": "No sales channel is ticked yet — nothing will be pushed. Tick one in Sales Channels first if you want it pushed live too."
 }

@@ -174,5 +174,12 @@
     "syncFromTiktok": "Sync from TikTok",
     "syncingTiktok": "Syncing...",
     "noShopsYet": "No shops yet.",
-    "confirmDeleteShop": "Are you sure you want to delete this shop?"
+    "confirmDeleteShop": "Are you sure you want to delete this shop?",
+    "more": "ເພີ່ມເຕີມ",
+    "viewProduct": "ເບິ່ງສິນຄ້າ",
+    "publish": "ເຜີຍແຜ່",
+    "confirmPublish": "ຢືນຢັນການເຜີຍແຜ່",
+    "confirmPublishMessageWithChannels": "ການດຳເນີນການນີ້ຈະເປີດໃຊ້ງານສິນຄ້າ ແລະ ຈັດຄິວການ push ໄປຫາ:",
+    "confirmPublishMessageNoChannels": "ການດຳເນີນການນີ້ຈະເປີດໃຊ້ງານສິນຄ້າ.",
+    "confirmPublishNoChannelsTicked": "ຍັງບໍ່ໄດ້ຕິກຊ່ອງທາງຂາຍໃດໆ — ຈະບໍ່ມີການ push ເກີດຂຶ້ນ. ກະລຸນາຕິກຊ່ອງທາງຂາຍໃນ Sales Channels ກ່ອນ ຖ້າຕ້ອງການໃຫ້ push ໄປນຳ."
 }
