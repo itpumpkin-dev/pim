@@ -16,6 +16,16 @@ use Illuminate\Support\Facades\Cache;
  * global row — see the migration that added them
  * (2026_08_25_013412_add_category_and_mandatory_to_lazada_attributes_table)
  * and LazadaAttributeMappingController::syncLazadaAttributesForCategory().
+ *
+ * `options`/`label_th` columns already exist on this table in every
+ * environment checked (confirmed live via `Schema::getColumnListing()`) but
+ * predate every migration in this codebase's history — nothing here ever
+ * wrote to them until LazadaAttributeMappingController's sync methods were
+ * extended to populate `options` (Lazada's predefined choice list for
+ * singleSelect/multiSelect/enumInput/multiEnumInput attributes, confirmed
+ * live shape: `[{name, en_name, id}]` per choice — `id` is the value Lazada
+ * expects back, `name`/`en_name` are display labels). `label_th` stays
+ * untouched by this app (whatever wrote it originally still owns it).
  */
 class LazadaAttribute extends Model
 {
@@ -34,11 +44,13 @@ class LazadaAttribute extends Model
         'attribute_type',
         'category_id',
         'mandatory',
+        'options',
     ];
 
     protected $casts = [
         'category_id' => 'integer',
         'mandatory' => 'boolean',
+        'options' => 'array',
     ];
 
     private const LIST_VERSION_KEY = 'lazada_attributes:list:version';

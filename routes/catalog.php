@@ -118,6 +118,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('marketplace/attribute-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('marketplace.attributeMapping.export')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/woocommerce/attribute-mapping', [MarketplaceAttributeMappingController::class, 'woocommerce'])->name('marketplace.woocommerce.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/lazada/products', [LazadaAttributeMappingController::class, 'lazadaProducts'])->name('marketplace.lazada.products')->middleware('permission:products,list_products');
     Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
@@ -127,6 +128,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributes/search-pim', [ShopeeAttributeMappingController::class, 'searchPimAttributes'])->name('attributes.searchPim')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/lazada-mapping/options', [LazadaAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveLazadaOptionMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/lazada-mapping/payload-fields', [LazadaAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.lazadaPayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');
@@ -134,6 +137,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('attributes/{attribute}', [AttributeController::class, 'update'])->name('attributes.update')->middleware('permission:attributes,edit_attributes');
     Route::delete('attributes/{attribute}', [AttributeController::class, 'destroy'])->name('attributes.destroy')->middleware('permission:attributes,delete_attributes');
     Route::get('attributes/{attribute}/history', [AttributeController::class, 'history'])->name('attributes.history')->middleware('permission:attributes,view_history');
+    Route::get('attributes/{attribute}/options-list', [AttributeOptionController::class, 'listForMapping'])->name('attributes.options.listForMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/{attribute}/options', [AttributeOptionController::class, 'store'])->name('attributes.options.store')->middleware('permission:attributes,edit_attributes');
     // เส้นทางเดียวกันเป๊ะกับด้านบน (AttributeOptionController::store() ตัวเดิม
     // ไม่ได้แก้อะไรเลย) แค่แยกสิทธิ์ออกมาต่างหาก — ใช้โดย QuickAddOptionDialog

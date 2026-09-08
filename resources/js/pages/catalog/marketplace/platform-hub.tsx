@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
+import InventoryIcon from '@mui/icons-material/Inventory';
 import CategoryIcon from '@mui/icons-material/Category';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SyncAltIcon from '@mui/icons-material/SyncAlt';
@@ -53,6 +54,14 @@ export default function MarketplacePlatformHub({ platform }: Props) {
     ];
 
     const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string }[] = [
+        ...(platform === 'lazada' ? [{
+            key: 'products',
+            icon: InventoryIcon,
+            title: 'สินค้า (Product Mapping)',
+            description: 'ไล่การแมพข้อมูล Category & Attributes ตั้งแต่ตัวสินค้า',
+            url: `/catalog/marketplace/${platform}/products`,
+            permission: 'products.list_products',
+        }] : []),
         {
             key: 'category',
             icon: CategoryIcon,

@@ -25,11 +25,16 @@ export function PimAttributePicker({
     onChange,
     placeholder,
     disabled,
+    typeFilter,
 }: {
     value: PimAttributeOption | null;
     onChange: (next: PimAttributeOption | null) => void;
     placeholder?: string;
     disabled?: boolean;
+    // จำกัดผลค้นหาให้เหลือแค่ PIM attribute type ที่ระบุ (เช่น ['image','file']
+    // สำหรับ Lazada `img`-type attribute — ดู LazadaAttributeMappingController's
+    // update() ที่บังคับเงื่อนไขเดียวกันฝั่ง backend) ไม่ระบุ = ค้นหาได้ทุก type เหมือนเดิม
+    typeFilter?: string[];
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -42,6 +47,9 @@ export function PimAttributePicker({
         setLoading(true);
         const timer = setTimeout(() => {
             const params = new URLSearchParams({ q: query });
+            if (typeFilter && typeFilter.length > 0) {
+                params.set('type', typeFilter.join(','));
+            }
 
             fetch(`/catalog/attributes/search-pim?${params.toString()}`, { headers: { Accept: 'application/json' } })
                 .then((res) => (res.ok ? res.json() : { data: [] }))
@@ -51,7 +59,7 @@ export function PimAttributePicker({
 
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, open]);
+    }, [query, open, typeFilter?.join(',')]);
 
     return (
         <Autocomplete

@@ -2,7 +2,10 @@
 
 namespace App\Services\Lazada;
 
+use App\Models\AttributeOption;
+use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
+use App\Models\LazadaAttributeOptionMapping;
 use App\Models\LazadaBrand;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
@@ -87,33 +90,63 @@ class LazadaProductSyncService
             'package_height' => $this->resolveMappedField($mappings, 'height', $product, $shop->channel_id),
         ];
 
-        // เดิม hardcode 'No Brand' ไว้ตรงๆ (ดูประวัติไฟล์นี้) เพราะตอนนั้น
-        // catalog ของ Lazada (153,482 รายการผ่าน /category/brands/query)
-        // ยังไม่มี local sync ให้ค้นหาด้วยชื่อได้ — ตอนนี้ lazada_brands sync
-        // ไว้ในเครื่องแล้วทั้งชุด (~153,600 แถว) resolveLazadaBrandId() เลย
-        // ค้นหาในนั้นแทนได้จริง — ต้องมีค่าเสมอก่อน push ได้ (ดู
-        // ProductController::hasMarketplaceBrandMapped()) รวมถึงกรณีแอดมิน
-        // ตั้งใจ map ไปที่แถว "No Brand" ของ Lazada เอง ถ้ามีอยู่ในชุดที่ sync มา
+        // Admin-configurable, on top of the fixed fields above — see
+        // LazadaAttributeMappingController. attribute_type decides whether
+        // a mapped value belongs in payload.attributes (normal) or the
+        // SKU-level fields (sku) — same distinction
+        // assertMandatoryFieldsPresent() already checks. Fetched before the
+        // brand resolution below because `brand` needs to check this map
+        // first (its own alternate route — see next comment).
+        $mappedAttributes = $this->resolveMappedAttributes($mappings, $product, $shop->channel_id);
+
+        // Two independent routes to a Lazada brand, either is enough on its
+        // own — the Master Brand page (resolveLazadaBrandId()/lazada_brands,
+        // ~153,600 rows synced locally, searched by name) takes priority
+        // when it resolves anything; falls back to whatever an admin mapped
+        // directly onto Lazada's own `brand` category attribute via this
+        // page's generic Attribute Mapping mechanism otherwise. Was a
+        // straight throw-if-missing before this page could reach `brand` at
+        // all — see LazadaAttributeMappingController's class docblock for
+        // why unioning them was needed instead of one silently overwriting
+        // the other. ProductController::hasMarketplaceBrandMapped() gates
+        // the Push button on this same pair of routes, kept in sync by hand
+        // (no shared helper — that check runs during a page load, this runs
+        // during buildPayload()).
         $lazadaBrandId = $this->resolveLazadaBrandId($product);
+        $masterBrandName = $lazadaBrandId ? LazadaBrand::find($lazadaBrandId)?->name : null;
+        $genericBrandLabel = $mappedAttributes['brand']['label'] ?? null;
+        $genericBrandValue = $mappedAttributes['brand']['value'] ?? null;
+        // Prefer the label captured at mapping time (reliable — doesn't
+        // depend on any shared cache); resolveGenericBrandName() is a legacy
+        // fallback for option-mappings saved before that label existed, kept
+        // only so those don't regress — see that method's own docblock for
+        // the bug this label was added to fix.
+        $brandName = $masterBrandName
+            ?? (is_string($genericBrandLabel) && $genericBrandLabel !== '' ? $genericBrandLabel : null)
+            ?? $this->resolveGenericBrandName(is_string($genericBrandValue) ? $genericBrandValue : null);
+
+        if (!$brandName) {
+            throw new RuntimeException(
+                "Product '{$product->sku}' has no brand mapped to Lazada yet — map it via the Master Brand page, or via this page's 'brand' attribute row."
+            );
+        }
+
+        // Already consumed above — must not also go through the generic
+        // loop below, which would silently overwrite $brandName with
+        // whichever of the two happened to resolve there (defeating the
+        // priority order just decided).
+        unset($mappedAttributes['brand']);
+
         $normalAttributes = [
             'name' => $name,
             'short_description' => $name,
-            // Confirmed live, 2026-08-13: Lazada's `brand` field must match
-            // its own controlled brand catalog exactly by NAME
-            // (CHK_CATPROP_CPV_NOT_ENUM otherwise) — it's a string field, not
-            // an id, so this looks up the resolved brand's name here.
-            'brand' => LazadaBrand::find($lazadaBrandId)?->name ?? 'No Brand',
+            'brand' => $brandName,
         ];
         if ($videoUrl) {
             $normalAttributes['video'] = $videoUrl;
         }
 
-        // Admin-configurable, on top of the fixed fields above — see
-        // LazadaAttributeMappingController. attribute_type decides whether
-        // a mapped value belongs in payload.attributes (normal) or the
-        // SKU-level fields (sku) — same distinction
-        // assertMandatoryFieldsPresent() already checks.
-        foreach ($this->resolveMappedAttributes($mappings, $product, $shop->channel_id) as $lazadaName => $result) {
+        foreach ($mappedAttributes as $lazadaName => $result) {
             if ($result['attribute_type'] === 'sku') {
                 $skuFields[$lazadaName] = $result['value'];
             } else {
@@ -164,8 +197,13 @@ class LazadaProductSyncService
      * (by sort_order) — same semantics as WooCommerceProductSyncService::
      * resolveMappedField() / ShopeeProductSyncService::resolveAttributes().
      *
+     * input_type branches added for singleSelect/multiSelect/enumInput/
+     * multiEnumInput/img (see LazadaAttributeMappingController's class
+     * docblock for the full picture) — `date`/`text`/`numeric`/`richText`
+     * still just take the plain resolved value, unchanged.
+     *
      * @param \Illuminate\Support\Collection<int, LazadaAttributeMapping> $mappings same collection buildPayload() already fetched
-     * @return array<string, array{value: string, attribute_type: ?string}>
+     * @return array<string, array{value: mixed, attribute_type: ?string}>
      */
     private function resolveMappedAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId): array
     {
@@ -181,18 +219,134 @@ class LazadaProductSyncService
                     continue;
                 }
 
-                // A locale-based PIM attribute mapped here without a
-                // matching localeCode would otherwise silently resolve to
-                // null forever, the same bug already found and fixed once
-                // this session for WooCommerceProductSyncService::buildPayload().
-                $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: $localeCode);
-                if ($value !== null && $value !== '') {
+                $inputType = $mapping->lazadaAttribute->input_type ?? null;
+                $label = null;
+
+                if (in_array($inputType, ['multiSelect', 'multiEnumInput'], true)) {
+                    $value = $this->resolveMultiSelectOptionValues($mapping, $product, $channelId);
+                    $isEmpty = $value === [];
+                } else {
+                    // A locale-based PIM attribute mapped here without a
+                    // matching localeCode would otherwise silently resolve to
+                    // null forever, the same bug already found and fixed once
+                    // this session for WooCommerceProductSyncService::buildPayload().
+                    $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: $localeCode);
+
+                    if (in_array($inputType, ['singleSelect', 'enumInput'], true)) {
+                        [$value, $label] = $this->resolveSingleSelectOptionValue($mapping, $value);
+                    }
+
+                    $isEmpty = $value === null || $value === '';
+                }
+
+                if (!$isEmpty) {
                     $resolved[$lazadaName] = [
                         'value' => $value,
+                        // เก็บ label ที่แอดมินเลือกไว้ ณ ตอนจับคู่ตัวเลือกด้วย (มีค่า
+                        // เฉพาะ singleSelect/enumInput ที่ผ่าน resolveSingleSelectOptionValue()
+                        // เท่านั้น) — buildPayload() ใช้ตัวนี้สำหรับ `brand` โดยเฉพาะ
+                        // แทนที่จะพึ่ง lazada_attributes.options ที่ sync ของ category
+                        // อื่นทับได้ตลอดเวลา (ดูบั๊กที่แก้ไปใน resolveGenericBrandName())
+                        'label' => $label,
                         'attribute_type' => $mapping->lazadaAttribute->attribute_type ?? null,
                     ];
                     break;
                 }
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Translates one product's stored AttributeOption code (the same
+     * convention `pbrand` uses — see ResolvesProductAttributeValues::
+     * mappedBrandOptionId()'s docblock) into whatever value Lazada's schema
+     * actually expects for a singleSelect/enumInput attribute, via the
+     * admin-configured LazadaAttributeOptionMapping row for this specific
+     * (attribute -> Lazada attribute) mapping. Returns [null, null] (treated
+     * as "no value", not an error) if the code doesn't resolve to a known
+     * option or that option has no Lazada counterpart chosen yet.
+     *
+     * Returns both the raw `value` (Lazada's own option id — what every
+     * other select-type attribute sends, still unconfirmed live whether
+     * that's really the wire format Lazada wants) and the `label` captured
+     * alongside it at mapping time (added specifically so buildPayload()'s
+     * `brand` resolution doesn't have to fall back to the shared, mutable
+     * lazada_attributes.options cache — see that column's own docblock).
+     *
+     * @return array{0: ?string, 1: ?string} [value, label]
+     */
+    private function resolveSingleSelectOptionValue(LazadaAttributeMapping $mapping, ?string $rawCode): array
+    {
+        if ($rawCode === null || $rawCode === '') {
+            return [null, null];
+        }
+
+        $optionId = AttributeOption::where('attribute_id', $mapping->attribute_id)->where('code', $rawCode)->value('id');
+        if (!$optionId) {
+            return [null, null];
+        }
+
+        $optionMapping = LazadaAttributeOptionMapping::where('lazada_attribute_mapping_id', $mapping->id)
+            ->where('attribute_option_id', $optionId)
+            ->first(['lazada_option_value', 'lazada_option_label']);
+
+        return [$optionMapping?->lazada_option_value, $optionMapping?->lazada_option_label];
+    }
+
+    /**
+     * Same idea as resolveSingleSelectOptionValue() but for multiSelect/
+     * multiEnumInput, which store several option codes at once.
+     *
+     * Reads the raw formatted value directly (not via attributeValue(),
+     * which only ever returns an array-shaped value's first element) —
+     * ProductController::update() json_encode()'s any array-shaped incoming
+     * value generically (not special-cased to `gallery`), and
+     * AttributeValueFormatter only JSON-decodes for attributes of type
+     * `gallery`, passing every other type's raw stored string straight
+     * through — so a multiselect PIM attribute's value arrives here as a
+     * JSON-encoded string of option codes that needs decoding by hand.
+     *
+     * NOT CONFIRMED LIVE: returns a plain PHP array (serialized as a JSON
+     * array in the final payload) — whether Lazada's real API actually wants
+     * an array here, or a comma-separated string instead, has never been
+     * tested against a live multiSelect attribute. See this class's
+     * LazadaAttributeMappingController docblock cross-reference.
+     *
+     * @return array<int, string>
+     */
+    private function resolveMultiSelectOptionValues(LazadaAttributeMapping $mapping, Product $product, ?int $channelId): array
+    {
+        if (!$mapping->attribute) {
+            return [];
+        }
+
+        $raw = $this->resolveFormattedAttributeValue($product, $mapping->attribute->code, $channelId);
+        $codes = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
+
+        if (!is_array($codes) || $codes === []) {
+            return [];
+        }
+
+        $optionIdByCode = AttributeOption::where('attribute_id', $mapping->attribute_id)
+            ->whereIn('code', $codes)
+            ->pluck('id', 'code');
+
+        if ($optionIdByCode->isEmpty()) {
+            return [];
+        }
+
+        $lazadaValueByOptionId = LazadaAttributeOptionMapping::where('lazada_attribute_mapping_id', $mapping->id)
+            ->whereIn('attribute_option_id', $optionIdByCode->values())
+            ->pluck('lazada_option_value', 'attribute_option_id');
+
+        $resolved = [];
+        foreach ($codes as $code) {
+            $optionId = $optionIdByCode->get($code);
+            $value = $optionId ? $lazadaValueByOptionId->get($optionId) : null;
+            if ($value !== null) {
+                $resolved[] = $value;
             }
         }
 
@@ -222,6 +376,7 @@ class LazadaProductSyncService
         // Images first — uploadVideoToLazada() reuses the now-Lazada-hosted
         // main image as the video's required coverUrl.
         $payload = $this->uploadImagesToLazada($payload);
+        $payload = $this->uploadAttributeImagesToLazada($payload);
         $payload = $this->uploadVideoToLazada($payload);
 
         $existing = $this->findProductMatch($product->sku);
@@ -271,6 +426,39 @@ class LazadaProductSyncService
             }
         }
         unset($sku);
+
+        return $payload;
+    }
+
+    /**
+     * Same reasoning as uploadImagesToLazada() above, but for any category
+     * attribute whose input_type is `img` (see
+     * LazadaAttributeMappingController's docblock) — buildPayload() resolves
+     * these to our own public storage URL already (via
+     * AttributeValueFormatter, since the validator restricts this target to
+     * image/file-type PIM attributes), same as the product's own main
+     * images, so the same Lazada-hosting requirement almost certainly
+     * applies here too. NOT CONFIRMED LIVE against a real `img`-type
+     * category attribute — if Lazada actually accepts an external URL for
+     * this particular field, this step is harmless (uploadImage() just
+     * returns the equivalent hosted URL), but if it rejects the field
+     * outright some other way, this is the method to revisit.
+     */
+    private function uploadAttributeImagesToLazada(array $payload): array
+    {
+        if (empty($payload['attributes'])) {
+            return $payload;
+        }
+
+        $imgFieldNames = LazadaAttribute::whereIn('name', array_keys($payload['attributes']))
+            ->where('input_type', 'img')
+            ->pluck('name');
+
+        foreach ($imgFieldNames as $name) {
+            if (!empty($payload['attributes'][$name])) {
+                $payload['attributes'][$name] = $this->client->uploadImage($payload['attributes'][$name]);
+            }
+        }
 
         return $payload;
     }
@@ -497,21 +685,62 @@ class LazadaProductSyncService
      * A product's own `lazada_brand_id` override (set directly from
      * Lazada's synced brand list on the Edit Product page) wins when
      * present; otherwise falls back to whichever marketplace brand this
-     * product's `pbrand` attribute value's AttributeOption is mapped to —
-     * same resolve-then-throw shape as resolveLazadaCategoryId().
+     * product's `pbrand` attribute value's AttributeOption is mapped to.
+     *
+     * Returns null instead of throwing (unlike resolveLazadaCategoryId(),
+     * which still throws — category has no alternate path) — buildPayload()
+     * now accepts a second, alternate route for `brand` specifically (an
+     * admin can map a PIM attribute directly onto Lazada's own `brand`
+     * category attribute via the generic Attribute Mapping page instead of
+     * this Master Brand page), so failing to resolve here is no longer
+     * automatically fatal; buildPayload() decides that after trying both.
      */
-    private function resolveLazadaBrandId(Product $product): int
+    private function resolveLazadaBrandId(Product $product): ?int
     {
         if ($product->lazada_brand_id) {
             return (int) $product->lazada_brand_id;
         }
 
         $mapped = $this->mappedBrandOptionId($product, 'lazada_brand_id');
-        if ($mapped === null) {
-            throw new RuntimeException("Product '{$product->sku}' has no brand mapped to a Lazada brand yet.");
+
+        return $mapped !== null ? (int) $mapped : null;
+    }
+
+    /**
+     * LEGACY FALLBACK ONLY — buildPayload() now prefers the label captured
+     * directly on LazadaAttributeOptionMapping at mapping time (reliable,
+     * see resolveSingleSelectOptionValue()); this method only still runs for
+     * an option-mapping row saved before that label column existed.
+     *
+     * Was the *only* way to resolve `brand`'s name until this fix, and was a
+     * real, confirmed bug: it looks the id up in lazada_attributes.options —
+     * a single row keyed only by attribute `name`, shared across every
+     * Lazada category — which gets silently overwritten every time ANY
+     * category with its own `brand` attribute gets (re-)synced
+     * (syncLazadaAttributesForCategory()/syncLazadaAttributes(), both upsert
+     * on `['name']` alone). A product mapped against one category's option
+     * ids could therefore find no match at all once a different category's
+     * sync ran, and this method would return the raw numeric id string
+     * back to buildPayload() instead of a real name — which very likely
+     * fails Lazada's own CHK_CATPROP_CPV_NOT_ENUM check.
+     */
+    private function resolveGenericBrandName(?string $optionId): ?string
+    {
+        if ($optionId === null || $optionId === '') {
+            return null;
         }
 
-        return (int) $mapped;
+        $options = LazadaAttribute::find('brand')?->options ?? [];
+        foreach ($options as $option) {
+            if (is_array($option) && (string) ($option['id'] ?? null) === $optionId) {
+                return $option['name'] ?? $optionId;
+            }
+        }
+
+        // ไม่เจอใน options ที่ sync ไว้ (เช่น category นี้ `brand` ไม่ใช่ input_type
+        // select เลยไม่มี option ให้เทียบ) — ถือว่าเป็นค่าที่แอดมิน map มาแบบอิสระ
+        // ส่งค่านั้นตรงๆ ตามที่ตั้งค่าไว้ แทนที่จะทิ้งไปเฉยๆ
+        return $optionId;
     }
 
     /**

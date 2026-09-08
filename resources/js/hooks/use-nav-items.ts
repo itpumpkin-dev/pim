@@ -166,6 +166,7 @@ export function useMainNavItems(): NavItem[] {
                                     // ปัญหาเดียวกับที่หน้า "จัดการ" เจอมาก่อน — ดูคอมเมนต์ที่นั่น)
                                     matchUrls: [
                                         `/catalog/categories/${platform}-mapping`,
+                                        `/catalog/marketplace/${platform}/products`,
                                         `/catalog/marketplace/${platform}/attribute-mapping`,
                                         `/catalog/marketplace/connect/${platform}`,
                                     ],

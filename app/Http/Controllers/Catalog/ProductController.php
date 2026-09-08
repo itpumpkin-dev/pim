@@ -16,6 +16,7 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
+use App\Models\LazadaAttributeMapping;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductAssociation;
@@ -2426,6 +2427,15 @@ class ProductController extends Controller
      * ค่า attribute `pbrand` ของสินค้านี้ ชี้ไปที่ AttributeOption ที่มี mapping
      * ของ platform นี้หรือเปล่า — เขียนซ้ำเป็น query ตรงนี้ (ไม่เรียก sync service
      * ตรงๆ) ด้วยเหตุผลเดียวกับ hasMarketplaceCategoryMapped() ด้านบน
+     *
+     * Lazada เท่านั้น: มีอีกเส้นทางหนึ่งที่ทำให้ brand resolve ได้โดยไม่ต้องพึ่งหน้า
+     * Master Brand เลย — แอดมิน map PIM attribute ตรงเข้ากับ Lazada attribute
+     * ชื่อ `brand` ผ่านหน้า Attribute Mapping ทั่วไปแทนได้ (ดู
+     * LazadaProductSyncService::buildPayload()'s $brandName ที่ยอมรับทั้งสอง
+     * เส้นทางแล้ว) เช็คตรงนี้เพิ่มไว้ให้ปุ่ม Push ไม่ถูก disable ทั้งที่ build
+     * payload จริงจะสำเร็จได้ผ่านเส้นทางนี้ — ไม่ได้เรียก sync service ตรงๆ
+     * (ด้วยเหตุผลเดียวกับด้านบน) เลยไม่ได้เช็คว่า option ที่แมปไว้จริงจะ resolve
+     * เป็นชื่อได้ (resolveGenericBrandName()) แค่เช็คว่ามีค่าอะไรสักอย่างตั้งไว้
      */
     private function hasMarketplaceBrandMapped(Product $product, string $platform): bool
     {
@@ -2435,24 +2445,44 @@ class ProductController extends Controller
         }
 
         $pbrandAttributeId = Attribute::idForCode('pbrand');
-        if (! $pbrandAttributeId) {
-            return false;
+        if ($pbrandAttributeId) {
+            $brandCode = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $pbrandAttributeId)
+                ->whereNull('channel_id')
+                ->whereNull('locale_id')
+                ->value('value');
+
+            if ($brandCode && AttributeOption::where('attribute_id', $pbrandAttributeId)->where('code', $brandCode)->whereNotNull($column)->exists()) {
+                return true;
+            }
         }
 
-        $brandCode = ProductValue::where('product_id', $product->id)
-            ->where('attribute_id', $pbrandAttributeId)
-            ->whereNull('channel_id')
-            ->whereNull('locale_id')
-            ->value('value');
+        if ($platform === 'lazada') {
+            // Bug found via code review: ->first() (no ordering) checked only
+            // one arbitrary candidate — LazadaProductSyncService::
+            // resolveMappedAttributes() supports several PIM attributes all
+            // targeting `brand` (first one with a non-empty value wins, by
+            // sort_order), so this could pick the one candidate that happens
+            // to be empty for this product and report "not mapped" even
+            // though push() would succeed via a different one. Checking every
+            // candidate for a non-empty value fixes that — order doesn't
+            // actually matter for existence, only for which value wins.
+            $mappingAttributeIds = LazadaAttributeMapping::where('target_field', 'lazada_attribute')
+                ->where('lazada_attribute_name', 'brand')
+                ->pluck('attribute_id');
 
-        if (! $brandCode) {
-            return false;
+            if ($mappingAttributeIds->isNotEmpty()
+                && ProductValue::where('product_id', $product->id)
+                    ->whereIn('attribute_id', $mappingAttributeIds)
+                    ->whereNotNull('value')
+                    ->where('value', '!=', '')
+                    ->exists()
+            ) {
+                return true;
+            }
         }
 
-        return AttributeOption::where('attribute_id', $pbrandAttributeId)
-            ->where('code', $brandCode)
-            ->whereNotNull($column)
-            ->exists();
+        return false;
     }
 
     /**

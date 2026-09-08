@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -58,6 +59,17 @@ class LazadaAttributeMapping extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Per-option pairing for a select-type target (singleSelect/multiSelect/
+     * enumInput/multiEnumInput) — empty for a free-value target_field, where
+     * this mapping alone is already the whole story. See
+     * LazadaAttributeOptionMapping's docblock.
+     */
+    public function optionMappings(): HasMany
+    {
+        return $this->hasMany(LazadaAttributeOptionMapping::class);
     }
 
     private const LIST_VERSION_KEY = 'lazada_attribute_mappings:list:version';

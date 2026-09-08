@@ -285,6 +285,13 @@ class ShopeeAttributeMappingController extends Controller
     public function searchPimAttributes(Request $request): JsonResponse
     {
         $query = trim((string) $request->query('q', ''));
+        // Comma-separated PIM attribute type allowlist — added for Lazada's
+        // `img`-type category attributes (LazadaAttributeMappingController's
+        // update() only accepts a source of type image/file for those), same
+        // shape PimAttributePicker already passes through for that case.
+        // Optional and additive: every existing caller that never sends
+        // `type` keeps searching across all types, unchanged.
+        $types = array_filter(explode(',', (string) $request->query('type', '')));
 
         $attributes = Attribute::query()
             ->when($query !== '', function ($q) use ($query) {
@@ -293,6 +300,7 @@ class ShopeeAttributeMappingController extends Controller
                         ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
                 });
             })
+            ->when($types !== [], fn ($q) => $q->whereIn('type', $types))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name']);

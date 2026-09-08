@@ -366,6 +366,27 @@ class AttributeOptionController extends Controller
     }
 
     /**
+     * รายการ option ดิบ (id/code/label) ของ attribute หนึ่งตัว แบบอ่านอย่างเดียว
+     * — ไม่เคยมี JSON endpoint แบบนี้มาก่อน (ทุกอันข้างบนเป็น Inertia
+     * redirect ทั้งหมด) เพิ่มไว้ให้ LazadaAttributeOptionMappingDialog ฝั่ง
+     * frontend ใช้สร้างตาราง "จับคู่ตัวเลือก" (PIM option แต่ละตัว <-> ตัวเลือก
+     * ของ Lazada) — ดู LazadaAttributeMappingController::updateOptionMappings()
+     */
+    public function listForMapping(Attribute $attribute): \Illuminate\Http\JsonResponse
+    {
+        $options = $attribute->options()
+            ->orderBy('sort_order')
+            ->get()
+            ->map(fn (AttributeOption $option) => [
+                'id' => $option->id,
+                'code' => $option->code,
+                'label' => $option->admin_label ?: $option->code,
+            ]);
+
+        return response()->json(['data' => $options->values()]);
+    }
+
+    /**
      * เทียบค่าที่กำลังจะเซฟกับค่าปัจจุบันในฐานข้อมูลจริงๆ ก่อนตัดสินใจตั้ง
      * `is_customized` — ต้องเช็คแบบนี้เพราะทั้ง update() (single row) และ
      * batchUpdate() ("Save all" ที่ส่งทุกแถวกลับมาเสมอ ไม่ใช่แค่แถวที่ถูกแก้
