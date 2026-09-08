@@ -32,6 +32,7 @@ interface AttributeGroup {
     id: number;
     code: string;
     name: string;
+    platform?: string | null;
 }
 
 interface Attribute {
@@ -45,8 +46,19 @@ interface CreateRoleProps {
     users: RoleUserOption[];
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
+    platformAttributeGroups: AttributeGroup[];
+    platformAttributes: Attribute[];
 }
 
-export default function RoleCreate({ catalog, users, attributeGroups, attributes }: CreateRoleProps) {
-    return <RoleFormPage catalog={catalog} users={users} attributeGroups={attributeGroups} attributes={attributes} />;
+export default function RoleCreate({ catalog, users, attributeGroups, attributes, platformAttributeGroups, platformAttributes }: CreateRoleProps) {
+    return (
+        <RoleFormPage
+            catalog={catalog}
+            users={users}
+            attributeGroups={attributeGroups}
+            attributes={attributes}
+            platformAttributeGroups={platformAttributeGroups}
+            platformAttributes={platformAttributes}
+        />
+    );
 }

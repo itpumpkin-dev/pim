@@ -8,6 +8,7 @@ use App\Http\Requests\System\UpdateRoleRequest;
 use App\Models\Attribute;
 use App\Models\AttributeGroup;
 use App\Models\AuditLog;
+use App\Models\FamilyAttribute;
 use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\User;
@@ -37,9 +38,36 @@ class RoleController extends Controller
         return Inertia::render('system/role/create', [
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
-            'attributeGroups' => AttributeGroup::orderBy('name')->get(['id', 'code', 'name']),
-            'attributes' => Attribute::orderBy('name')->get(['id', 'code', 'name']),
+            ...$this->attributeAccessProps(),
         ]);
+    }
+
+    /**
+     * ข้อมูลป้อนให้ 2 ส่วนของ "Attribute Access" section บนหน้า role form
+     * (role-form.tsx) — resource/action ("view_attribute_groups"/
+     * "edit_attribute_groups"/"view_attributes"/"edit_attributes") เหมือนเดิม
+     * ทุกประการ (AttributeAccessPolicy ไม่ถูกกระทบเลย) แค่แยกว่า group/attribute
+     * ไหนควรไปโชว์ในตารางไหน (ทั่วไป vs platform) — ดูคอมเมนต์ของคอลัมน์
+     * attribute_groups.platform (migration
+     * 2026_09_08_000006_add_platform_to_attribute_groups_table) ว่าทำไมถึงเป็น
+     * แค่ marker จัดหน้าจอ ไม่ใช่ permission resource ใหม่
+     *
+     * "platform attribute" นับจาก family_attributes — attribute ตัวไหนเคยถูก
+     * ผูกกับ group ที่มี platform ไว้ (ผ่าน family ไหนก็ได้) ถือว่าเป็น platform
+     * attribute ทั้งหมด ไม่ต้องมี column แยกบน attributes เอง
+     */
+    private function attributeAccessProps(): array
+    {
+        $platformAttributeIds = FamilyAttribute::whereHas('attributeGroup', fn ($q) => $q->whereNotNull('platform'))
+            ->pluck('attribute_id')
+            ->unique();
+
+        return [
+            'attributeGroups' => AttributeGroup::whereNull('platform')->orderBy('name')->get(['id', 'code', 'name']),
+            'platformAttributeGroups' => AttributeGroup::whereNotNull('platform')->orderBy('name')->get(['id', 'code', 'name', 'platform']),
+            'attributes' => Attribute::whereNotIn('id', $platformAttributeIds)->orderBy('name')->get(['id', 'code', 'name']),
+            'platformAttributes' => Attribute::whereIn('id', $platformAttributeIds)->orderBy('name')->get(['id', 'code', 'name']),
+        ];
     }
 
     public function store(StoreRoleRequest $request): RedirectResponse
@@ -83,8 +111,7 @@ class RoleController extends Controller
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
             ],
-            'attributeGroups' => AttributeGroup::orderBy('name')->get(['id', 'code', 'name']),
-            'attributes' => Attribute::orderBy('name')->get(['id', 'code', 'name']),
+            ...$this->attributeAccessProps(),
         ]);
     }
 

@@ -5,6 +5,7 @@ import {
     LazadaAttributeOptionMappingDialog,
     type LazadaAttributeOptionMappingInfo,
 } from '@/components/catalog/lazada-attribute-option-mapping-dialog';
+import { TimelinePanel } from '@/components/timeline-panel';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
 import {
@@ -28,6 +29,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import SearchIcon from '@mui/icons-material/Search';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -41,6 +43,7 @@ import {
     FormControlLabel,
     IconButton,
     InputAdornment,
+    Link,
     MenuItem,
     Paper,
     Select,
@@ -174,6 +177,12 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
     const [loadingAttributes, setLoadingAttributes] = useState(false);
     const [savingAttributeName, setSavingAttributeName] = useState<string | null>(null);
     const [syncingAttributes, setSyncingAttributes] = useState(false);
+    // "สร้าง/อัปเดต Attribute Family" — auto-generate ตระกูลแอตทริบิวต์จาก PIM
+    // attribute ที่แมปไว้แล้ว แล้วผูกกับ PIM Category นี้ ให้ฟิลด์โผล่ในหน้า Edit
+    // Product ทันที (ดู LazadaAttributeFamilyGenerator ฝั่ง backend)
+    const [syncingFamily, setSyncingFamily] = useState(false);
+    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(null);
+    const [familySyncError, setFamilySyncError] = useState<string | null>(null);
     // แถวที่กำลังเปิด dialog "จับคู่ตัวเลือก" อยู่ (null = ปิด) — เฉพาะแถวที่เป็น
     // select-type (SELECT_LAZADA_INPUT_TYPES) และมี PIM attribute ผูกไว้แล้ว
     const [optionMappingRow, setOptionMappingRow] = useState<LazadaAttributeRow | null>(null);
@@ -367,6 +376,50 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                 }
             })
             .finally(() => setSyncingAttributes(false));
+    };
+
+    // สร้าง/อัปเดต Attribute Family จาก PIM attribute ที่แมปไว้แล้วทั้งหมดของ
+    // category นี้ — ผูกกับ PIM Category ผ่าน category_attribute_family (backend
+    // เป็นคน sync ให้ ไม่ทับตระกูลอื่นที่ผูกอยู่ก่อนหน้า) แล้วโชว์ลิงก์ให้ไปตรวจสอบ
+    // เอง (ไม่ auto-เชื่อว่าถูกต้อง 100% — เหมือน pattern "duplicate family" เดิม)
+    const syncAttributeFamily = () => {
+        if (!activeProduct?.master_category) return;
+        // เตือนก่อนเสมอ — นอกจากจัดกลุ่ม attribute ที่แมปไว้แล้ว ปุ่มนี้ยัง
+        // auto-create PIM Attribute ใหม่ให้ Lazada attribute ที่ยังไม่มีใครแมป
+        // ด้วย (อาจได้หลายสิบตัวต่อ 1 category) — เป็นการเขียน schema จริง
+        // ถาวรกว่าจัดกลุ่มเฉยๆ เลยให้ยืนยันก่อนทุกครั้ง
+        if (!window.confirm('การกดปุ่มนี้อาจสร้าง PIM Attribute ใหม่หลายตัวสำหรับ Lazada attribute ที่ยังไม่มีใครแมป ต้องการดำเนินการต่อหรือไม่?')) {
+            return;
+        }
+
+        setSyncingFamily(true);
+        setFamilySyncResult(null);
+        setFamilySyncError(null);
+
+        fetch('/catalog/attributes/lazada-mapping/attribute-family', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+            body: JSON.stringify({ category_id: activeProduct.master_category.id }),
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                if (res.ok) {
+                    setFamilySyncResult({
+                        name: body.family.name,
+                        count: body.attribute_count,
+                        newlyCreatedCount: body.newly_created_count,
+                        editUrl: body.edit_url,
+                    });
+                    // มี attribute ใหม่เกิดขึ้นจริง — reload ตารางให้เห็นว่า "mapped" แล้ว
+                    if (body.newly_created_count > 0 && activeProduct.lazada_category) {
+                        loadAttributes(activeProduct.lazada_category.id);
+                    }
+                } else {
+                    setFamilySyncError(body.message || 'เกิดข้อผิดพลาด ไม่สามารถสร้าง/อัปเดต Attribute Family ได้');
+                }
+            })
+            .catch(() => setFamilySyncError('เกิดข้อผิดพลาด ไม่สามารถสร้าง/อัปเดต Attribute Family ได้'))
+            .finally(() => setSyncingFamily(false));
     };
 
     const assignAttribute = (attributeName: string, pimAttribute: PimAttributeOption) => {
@@ -687,6 +740,7 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                 <Tab label="1. Category Mapping" />
                                 <Tab label="2. Attribute Mapping" disabled={!activeProduct.category_mapped} />
                                 <Tab label="3. Payload Lazada" />
+                                <Tab label="4. History" disabled={!activeProduct.master_category} />
                             </Tabs>
                         </Paper>
 
@@ -756,17 +810,44 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                                     lz:{activeProduct.lazada_category.id}
                                                 </Typography>
                                             </Box>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                disabled={syncingAttributes}
-                                                startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                                onClick={syncAttributes}
-                                                sx={fioriDefaultSx}
-                                            >
-                                                Sync Attributes
-                                            </Button>
+                                            <Stack direction="row" spacing={1}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    disabled={syncingFamily || !(lazadaAttributes ?? []).some((a) => a.mapped)}
+                                                    startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                    onClick={syncAttributeFamily}
+                                                    sx={fioriDefaultSx}
+                                                >
+                                                    สร้าง/อัปเดต Attribute Family
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    disabled={syncingAttributes}
+                                                    startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                                    onClick={syncAttributes}
+                                                    sx={fioriDefaultSx}
+                                                >
+                                                    Sync Attributes
+                                                </Button>
+                                            </Stack>
                                         </Stack>
+
+                                        {familySyncResult && (
+                                            <Alert severity="success" onClose={() => setFamilySyncResult(null)}>
+                                                สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count} attributes
+                                                {familySyncResult.newlyCreatedCount > 0 && `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`}) —{' '}
+                                                <Link href={familySyncResult.editUrl} target="_blank" rel="noopener noreferrer">
+                                                    เปิดหน้าตรวจสอบ
+                                                </Link>
+                                            </Alert>
+                                        )}
+                                        {familySyncError && (
+                                            <Alert severity="error" onClose={() => setFamilySyncError(null)}>
+                                                {familySyncError}
+                                            </Alert>
+                                        )}
 
                                         {unmappedMandatoryCount > 0 && (
                                             <Alert severity="error" icon={<WarningAmberIcon />}>
@@ -979,6 +1060,44 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                                 ))}
                                             </Box>
                                         </Box>
+                                    )}
+                                </Stack>
+                            </Paper>
+
+                            {/* Section 4 — History: audit trail รวมของทุกขั้นตอนการแมพ Lazada
+                                ของ master category นี้ (จับคู่ category, จับคู่ attribute,
+                                จับคู่ตัวเลือก, auto-create attribute ใหม่, sync attribute
+                                family) — ดู LazadaMappingTimelineBuilder ฝั่ง backend สำหรับ
+                                ขอบเขต/ที่มาของแต่ละแหล่งข้อมูล, ใช้ TimelinePanel เดียวกับที่
+                                หน้า edit อื่นๆ ในระบบใช้เป็น History tab อยู่แล้ว ไม่ต้องสร้าง
+                                timeline UI ใหม่ */}
+                            <Paper
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[3] = el;
+                                }}
+                                elevation={0}
+                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                            >
+                                <Stack spacing={2.5}>
+                                    <Box>
+                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                            เส้นทางการแมพ Lazada ของ Master Category นี้
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
+                                            รวมทุกการเปลี่ยนแปลงของ Category Mapping (Section 1), Attribute Mapping (Section 2) —
+                                            รวมถึงตัวเลือกที่จับคู่ไว้ และการสร้าง/sync Attribute Family ที่เกี่ยวข้อง เรียงใหม่สุดก่อน
+                                        </Typography>
+                                    </Box>
+
+                                    {!activeProduct.master_category ? (
+                                        <Stack alignItems="center" spacing={1} sx={{ py: 4, color: FIORI.textSecondary }}>
+                                            <LockOutlinedIcon fontSize="small" />
+                                            <Typography variant="body2">สินค้านี้ยังไม่มี Master Category — ไม่มีประวัติให้แสดง</Typography>
+                                        </Stack>
+                                    ) : (
+                                        <TimelinePanel
+                                            timelineUrl={`/catalog/attributes/lazada-mapping/timeline?category_id=${activeProduct.master_category.id}`}
+                                        />
                                     )}
                                 </Stack>
                             </Paper>

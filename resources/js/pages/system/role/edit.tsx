@@ -32,6 +32,7 @@ interface AttributeGroup {
     id: number;
     code: string;
     name: string;
+    platform?: string | null;
 }
 
 interface Attribute {
@@ -52,8 +53,28 @@ interface EditRoleProps {
     };
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
+    platformAttributeGroups: AttributeGroup[];
+    platformAttributes: Attribute[];
 }
 
-export default function RoleEdit({ catalog, users, role, attributeGroups, attributes }: EditRoleProps) {
-    return <RoleFormPage catalog={catalog} users={users} role={role} attributeGroups={attributeGroups} attributes={attributes} />;
+export default function RoleEdit({
+    catalog,
+    users,
+    role,
+    attributeGroups,
+    attributes,
+    platformAttributeGroups,
+    platformAttributes,
+}: EditRoleProps) {
+    return (
+        <RoleFormPage
+            catalog={catalog}
+            users={users}
+            role={role}
+            attributeGroups={attributeGroups}
+            attributes={attributes}
+            platformAttributeGroups={platformAttributeGroups}
+            platformAttributes={platformAttributes}
+        />
+    );
 }

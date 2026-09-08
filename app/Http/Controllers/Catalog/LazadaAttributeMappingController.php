@@ -13,6 +13,9 @@ use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
+use App\Services\Catalog\LazadaAttributeFamilyGenerator;
+use App\Services\Catalog\LazadaMappedAttributeCreator;
+use App\Services\Catalog\LazadaMappingTimelineBuilder;
 use App\Services\Lazada\LazadaClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -452,6 +455,90 @@ class LazadaAttributeMappingController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * "สร้าง/อัปเดต Attribute Family" ที่ section 2 ของ lazada-products.tsx —
+     * auto-generate ตระกูลแอตทริบิวต์จาก PIM attribute ที่แมปไว้แล้วกับ Lazada
+     * attribute ของ category นี้ แล้วผูกเข้ากับ PIM Category ที่ระบุ (ผ่าน
+     * Category::attributeFamilies() ที่มีอยู่แล้ว) ให้ฟิลด์พวกนี้โผล่ในหน้า Edit
+     * Product ของสินค้าที่อยู่ใน category นั้นทันที โดยไม่ต้องแก้อะไรฝั่งนั้นเลย —
+     * ดู LazadaAttributeFamilyGenerator::syncForCategory() สำหรับ logic เต็มๆ
+     */
+    public function syncAttributeFamily(
+        Request $request,
+        LazadaMappedAttributeCreator $attributeCreator,
+        LazadaAttributeFamilyGenerator $familyGenerator,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $category = Category::whereNotNull('lazada_category_id')->find($validated['category_id']);
+        if (!$category) {
+            return response()->json(['message' => 'This category is not mapped to a Lazada category yet.'], 422);
+        }
+
+        try {
+            // เรียกก่อน syncForCategory() เสมอ — attribute ที่เพิ่งสร้าง/แมปใหม่
+            // ตรงนี้จะได้ถูกดึงเข้า Family ในรอบเดียวกันเลย ไม่ต้องกดปุ่มสองรอบ
+            $newlyCreatedCount = $attributeCreator->createMissingForCategory((int) $category->lazada_category_id);
+            $result = $familyGenerator->syncForCategory($category);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'family' => ['id' => $result['family']->id, 'name' => $result['family']->name],
+            'attribute_count' => $result['attribute_count'],
+            'newly_created_count' => $newlyCreatedCount,
+            'edit_url' => "/catalog/attributeFamilies/{$result['family']->id}/edit",
+        ]);
+    }
+
+    /**
+     * แท็บ "History" ของหน้า lazada-products.tsx — รวม audit trail ของทุก
+     * ขั้นตอนการแมพ Lazada ของ category มาสเตอร์ของสินค้าที่กำลังดูอยู่ (จับคู่
+     * category, จับคู่ attribute, จับคู่ตัวเลือก, auto-create attribute ใหม่,
+     * sync attribute family) ให้เป็น timeline เดียว เรียงใหม่สุดก่อน — ดู
+     * LazadaMappingTimelineBuilder สำหรับขอบเขต/ที่มาของแต่ละแหล่งข้อมูล
+     *
+     * Reshape ตาม TimelinePanel ต้องการ ({event, created_at, actor, diff,
+     * subject_type, subject_id}) — มิเรอร์ UserController::history() เป๊ะ
+     * (diff builder เดียวกัน, ตัดสินใจ subject_type/subject_id ด้วยวิธีเดียวกัน
+     * ผ่าน class_basename($log->auditable_type))
+     */
+    public function timeline(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $category = Category::findOrFail($validated['category_id']);
+        $logs = app(LazadaMappingTimelineBuilder::class)->build($category);
+
+        return response()->json([
+            'timeline' => $logs->map(function ($log) {
+                $old = $log->old_values ?? [];
+                $new = $log->new_values ?? [];
+                $keys = array_unique(array_merge(array_keys($old), array_keys($new)));
+
+                $diff = collect($keys)->map(fn ($key) => [
+                    'key' => $key,
+                    'old' => $old[$key] ?? null,
+                    'new' => $new[$key] ?? null,
+                ])->values();
+
+                return [
+                    'event' => $log->event,
+                    'subject_type' => $log->auditable_type ? class_basename($log->auditable_type) : null,
+                    'subject_id' => $log->auditable_id,
+                    'created_at' => $log->created_at?->toIso8601String(),
+                    'actor' => $log->user ? ($log->user->name ?: $log->user->email) : 'System',
+                    'diff' => $diff,
+                ];
+            })->values(),
+        ]);
     }
 
     /**

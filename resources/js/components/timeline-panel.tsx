@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AdminPanelSettingsOutlinedIcon from '@mui/icons-material/AdminPanelSettingsOutlined';
+import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -8,10 +9,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
+import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
 import { Box, Chip, Collapse, IconButton, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 interface TimelineDiffRow {
@@ -64,6 +67,15 @@ const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIc
     // changes already fall under "updated" above via the Auditable trait).
     attribute_values_updated: { label: 'Product details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
     variant_values_updated: { label: 'Variant details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
+    // Lazada category/attribute mapping journey — see
+    // LazadaMappingTimelineBuilder and the AuditLog::record() call sites it
+    // pulls from (CategoryController::bulkMapMarketplaceCategory(),
+    // LazadaAttributeFamilyGenerator, LazadaMappedAttributeCreator).
+    lazada_category_mapped: { label: 'Lazada category mapped', icon: CategoryOutlinedIcon, color: '#ea580c' },
+    lazada_synced: { label: 'Attribute family re-synced', icon: SyncOutlinedIcon, color: '#0891b2' },
+    lazada_family_attributes_synced: { label: 'Attribute family fields updated', icon: EditNoteOutlinedIcon, color: '#0891b2' },
+    lazada_family_attached_to_category: { label: 'Attribute family attached to category', icon: LinkOutlinedIcon, color: '#0891b2' },
+    option_created: { label: 'Option created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
 };
 
 // 'work' entries land on humanize() for their label; keep a distinct icon/tint

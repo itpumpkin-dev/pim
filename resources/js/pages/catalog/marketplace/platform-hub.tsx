@@ -62,22 +62,29 @@ export default function MarketplacePlatformHub({ platform }: Props) {
             url: `/catalog/marketplace/${platform}/products`,
             permission: 'products.list_products',
         }] : []),
-        {
+
+        // Lazada ไปทำงานที่หน้า สินค้า (Product Mapping) แทนแล้ว (การ์ด 'products'
+        // ด้านบน — ไล่แมพ Category & Attributes ตั้งแต่ตัวสินค้าในหน้าเดียว) เลย
+        // ซ่อน 2 การ์ดนี้ไว้เฉพาะ Lazada — Shopee/TikTok/WooCommerce ยังไม่มี flow
+        // แบบนั้น ต้องใช้ 2 การ์ดนี้เป็นทางเข้าเดียวอยู่ (เคยถูก comment ออกไปแบบ
+        // ไม่มีเงื่อนไขมาก่อน ทำให้ 3 platform นั้นเข้าหน้า category/attribute
+        // mapping จาก UI ไม่ได้เลย)
+        ...(platform !== 'lazada' ? [{
             key: 'category',
             icon: CategoryIcon,
             title: tNav('mapCategory'),
             description: t('marketplaceHubCategoryDesc'),
             url: `/catalog/categories/${platform}-mapping`,
             permission: 'categories.edit_categories',
-        },
-        {
+        }] : []),
+        ...(platform !== 'lazada' ? [{
             key: 'push',
             icon: SyncAltIcon,
             title: tNav('mapPushData'),
             description: t('marketplaceHubPushDesc'),
             url: `/catalog/marketplace/${platform}/attribute-mapping`,
             permission: 'attributes.edit_attributes',
-        },
+        }] : []),
         {
             key: 'connect',
             icon: SettingsIcon,

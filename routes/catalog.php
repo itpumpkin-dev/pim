@@ -130,6 +130,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping/options', [LazadaAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveLazadaOptionMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('attributes/lazada-mapping/payload-fields', [LazadaAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.lazadaPayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/lazada-mapping/attribute-family', [LazadaAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.lazadaSyncAttributeFamily')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/lazada-mapping/timeline', [LazadaAttributeMappingController::class, 'timeline'])->name('attributes.lazadaMappingTimeline')->middleware('permission:attributes,view_history');
     Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');

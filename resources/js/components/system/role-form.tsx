@@ -68,6 +68,10 @@ interface AttributeGroup {
     id: number;
     code: string;
     name: string;
+    // Non-null only on a group auto-generated for a marketplace sync (e.g.
+    // "lazada") — purely a display marker, not a different permission axis
+    // (see attribute_groups.platform's own migration docblock).
+    platform?: string | null;
 }
 
 interface Attribute {
@@ -88,6 +92,12 @@ interface RoleFormProps {
     };
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
+    // แยกออกจาก attributeGroups/attributes ด้านบน — เฉพาะ group/attribute ที่มา
+    // จากการ sync marketplace (ดู RoleController::attributeAccessProps()) ใช้
+    // resource/action เดียวกันทุกประการ (view_attribute_groups/
+    // edit_attribute_groups/view_attributes/edit_attributes) แค่แสดงคนละตาราง
+    platformAttributeGroups: AttributeGroup[];
+    platformAttributes: Attribute[];
 }
 
 interface RoleForm {
@@ -100,7 +110,15 @@ interface RoleForm {
 
 const TAB_KEYS = ['roleFormTabGeneral', 'roleFormTabPermissions', 'roleFormTabUsers'];
 
-export default function RoleFormPage({ catalog, users, role, attributeGroups, attributes }: RoleFormProps) {
+export default function RoleFormPage({
+    catalog,
+    users,
+    role,
+    attributeGroups,
+    attributes,
+    platformAttributeGroups,
+    platformAttributes,
+}: RoleFormProps) {
     const { t } = useTranslation('system');
     const isEdit = Boolean(role);
     const [tab, setTab] = useState(0);
@@ -113,6 +131,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
     // แค่ว่าจะ "เห็น" แถวไหนบ้างเท่านั้น ไม่กระทบว่า "เลือกทั้งหมด" จะติ๊กอะไรบ้าง
     const [attrGroupSearch, setAttrGroupSearch] = useState('');
     const [attributeSearch, setAttributeSearch] = useState('');
+    // Section แยกต่างหากสำหรับ group/attribute ที่มาจากการ sync marketplace —
+    // state ชุดเดียวกันแบบขนานกับด้านบน ไม่ผูกกัน (พับ/ค้นหาอิสระจากกัน)
+    const [expandedPlatformGroups, setExpandedPlatformGroups] = useState(true);
+    const [expandedPlatformAttributes, setExpandedPlatformAttributes] = useState(true);
+    const [platformGroupSearch, setPlatformGroupSearch] = useState('');
+    const [platformAttributeSearch, setPlatformAttributeSearch] = useState('');
 
     const allResources = useMemo(() => {
         const res: Record<string, PermissionResource> = {};
@@ -377,7 +401,9 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
     // to be seen and toggled together — popping either one into the detail
     // area beneath the row would split a pair the user needs side by side.
     // All three stay 'always'.
-    const attributeGroupColumns: FioriResponsiveColumn<AttributeGroup>[] = [
+    // Factory แทนที่จะเป็น const array ตรงๆ — reuse กับทั้งตาราง "ทั่วไป" และ
+    // "Platform" (checkbox หัวตาราง "เลือกทั้งหมด" ต้องอิงจาก list ของตัวเองคนละชุด)
+    const makeAttributeGroupColumns = (groups: AttributeGroup[]): FioriResponsiveColumn<AttributeGroup>[] => [
         {
             key: 'name',
             header: t('roleFormAttributeGroupColumn'),
@@ -390,12 +416,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 <>
                     <Checkbox
                         size="small"
-                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
+                        checked={groups.length > 0 && groups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
                         indeterminate={
-                            attributeGroups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) &&
-                            !attributeGroups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))
+                            groups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) &&
+                            !groups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))
                         }
-                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'read', e.target.checked)}
+                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', groups.map((g) => g.code), 'read', e.target.checked)}
                     />
                     {t('roleFormReadColumn')}
                 </>
@@ -417,12 +443,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 <>
                     <Checkbox
                         size="small"
-                        checked={attributeGroups.length > 0 && attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
+                        checked={groups.length > 0 && groups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
                         indeterminate={
-                            attributeGroups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) &&
-                            !attributeGroups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))
+                            groups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) &&
+                            !groups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))
                         }
-                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', attributeGroups.map((g) => g.code), 'edit', e.target.checked)}
+                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', groups.map((g) => g.code), 'edit', e.target.checked)}
                     />
                     {t('roleFormEditColumn')}
                 </>
@@ -440,7 +466,7 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
         },
     ];
 
-    const attributeColumns: FioriResponsiveColumn<Attribute>[] = [
+    const makeAttributeColumns = (attrs: Attribute[]): FioriResponsiveColumn<Attribute>[] => [
         {
             key: 'name',
             header: t('roleFormAttributeColumn'),
@@ -453,12 +479,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 <>
                     <Checkbox
                         size="small"
-                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('view_attributes', 'view', a.code))}
+                        checked={attrs.length > 0 && attrs.every((a) => hasAccess('view_attributes', 'view', a.code))}
                         indeterminate={
-                            attributes.some((a) => hasAccess('view_attributes', 'view', a.code)) &&
-                            !attributes.every((a) => hasAccess('view_attributes', 'view', a.code))
+                            attrs.some((a) => hasAccess('view_attributes', 'view', a.code)) &&
+                            !attrs.every((a) => hasAccess('view_attributes', 'view', a.code))
                         }
-                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'read', e.target.checked)}
+                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attrs.map((a) => a.code), 'read', e.target.checked)}
                     />
                     {t('roleFormReadColumn')}
                 </>
@@ -480,12 +506,12 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                 <>
                     <Checkbox
                         size="small"
-                        checked={attributes.length > 0 && attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
+                        checked={attrs.length > 0 && attrs.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
                         indeterminate={
-                            attributes.some((a) => hasAccess('edit_attributes', 'edit', a.code)) &&
-                            !attributes.every((a) => hasAccess('edit_attributes', 'edit', a.code))
+                            attrs.some((a) => hasAccess('edit_attributes', 'edit', a.code)) &&
+                            !attrs.every((a) => hasAccess('edit_attributes', 'edit', a.code))
                         }
-                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attributes.map((a) => a.code), 'edit', e.target.checked)}
+                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attrs.map((a) => a.code), 'edit', e.target.checked)}
                     />
                     {t('roleFormEditColumn')}
                     <Tooltip title={t('roleFormEditOverrideTooltip')}>
@@ -506,6 +532,11 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
         },
     ];
 
+    const attributeGroupColumns = makeAttributeGroupColumns(attributeGroups);
+    const attributeColumns = makeAttributeColumns(attributes);
+    const platformAttributeGroupColumns = makeAttributeGroupColumns(platformAttributeGroups);
+    const platformAttributeColumns = makeAttributeColumns(platformAttributes);
+
     const filteredAttributeGroups = useMemo(() => {
         const term = attrGroupSearch.trim().toLowerCase();
         if (!term) return attributeGroups;
@@ -517,6 +548,18 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
         if (!term) return attributes;
         return attributes.filter((a) => a.name.toLowerCase().includes(term));
     }, [attributes, attributeSearch]);
+
+    const filteredPlatformAttributeGroups = useMemo(() => {
+        const term = platformGroupSearch.trim().toLowerCase();
+        if (!term) return platformAttributeGroups;
+        return platformAttributeGroups.filter((g) => g.name.toLowerCase().includes(term));
+    }, [platformAttributeGroups, platformGroupSearch]);
+
+    const filteredPlatformAttributes = useMemo(() => {
+        const term = platformAttributeSearch.trim().toLowerCase();
+        if (!term) return platformAttributes;
+        return platformAttributes.filter((a) => a.name.toLowerCase().includes(term));
+    }, [platformAttributes, platformAttributeSearch]);
 
     return (
         <AppLayout
@@ -714,7 +757,8 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
 
                     {/* Attribute Access Section - Only show if user has products permission */}
                     {hasProductsPermission ? (
-                    <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
+                    <>
+                    <Box sx={{ mt: 4, pt: 3, mb: 0, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: FIORI.brand }}>
                             📋 {t('roleFormAttributeAccessTitle')}
                         </Typography>
@@ -831,6 +875,129 @@ export default function RoleFormPage({ catalog, users, role, attributeGroups, at
                             )}
                         </Box>
                     </Box>
+
+                    {/* Platform Attribute Access — group/attribute ที่มาจากการ sync
+                        marketplace (ดู RoleController::attributeAccessProps()) แยกออก
+                        มาเป็น section ของตัวเอง ไม่ปนกับตารางทั่วไปด้านบน — resource/
+                        action ที่ใช้เขียนสิทธิ์เหมือนกันทุกประการ (view_attribute_groups/
+                        edit_attribute_groups/view_attributes/edit_attributes) แค่คนละ
+                        list ที่เอามาแสดง ซ่อน section นี้ไปเลยถ้ายังไม่เคย sync platform
+                        ไหนเลย (ทั้งสอง list ว่างเปล่า) จะได้ไม่โชว์หัวข้อเปล่าๆ */}
+                    {(platformAttributeGroups.length > 0 || platformAttributes.length > 0) && (
+                        <Box sx={{ mt: 2, pt: 3, mb: 10, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: FIORI.brand }}>
+                                🌐 {t('roleFormPlatformAttributeAccessTitle')}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 2 }}>
+                                {t('roleFormPlatformAttributeAccessDescription')}
+                            </Typography>
+
+                            {/* Platform Attribute Groups */}
+                            <Box sx={{ mb: 3 }}>
+                                <Box
+                                    onClick={() => setExpandedPlatformGroups(!expandedPlatformGroups)}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        mb: 2,
+                                        cursor: 'pointer',
+                                        p: 1,
+                                        bgcolor: FIORI.headerBg,
+                                        borderRadius: '8px',
+                                    }}
+                                >
+                                    <IconButton size="small" sx={{ p: 0, mr: 1 }}>
+                                        {expandedPlatformGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                    </IconButton>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
+                                        🏷️ {t('roleFormPlatformAttributeGroupsTitle')}
+                                    </Typography>
+                                </Box>
+
+                                {expandedPlatformGroups && (
+                                    <>
+                                        <TextField
+                                            size="small"
+                                            placeholder={t('searchByName')}
+                                            value={platformGroupSearch}
+                                            onChange={(e) => setPlatformGroupSearch(e.target.value)}
+                                            sx={{ mb: 1.5, width: 280 }}
+                                            slotProps={{
+                                                input: {
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <SearchIcon fontSize="small" />
+                                                        </InputAdornment>
+                                                    ),
+                                                },
+                                            }}
+                                        />
+                                        <FioriResponsiveTable
+                                            columns={platformAttributeGroupColumns}
+                                            rows={filteredPlatformAttributeGroups}
+                                            getRowKey={(group) => group.id}
+                                            rowSx={() => fioriTableRowSx(false)}
+                                            emptyMessage={t('noResultsFound')}
+                                        />
+                                    </>
+                                )}
+                            </Box>
+
+                            {/* Platform Attributes */}
+                            <Box>
+                                <Box
+                                    onClick={() => setExpandedPlatformAttributes(!expandedPlatformAttributes)}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        mb: 2,
+                                        cursor: 'pointer',
+                                        p: 1,
+                                        bgcolor: FIORI.headerBg,
+                                        borderRadius: '8px',
+                                    }}
+                                >
+                                    <IconButton size="small" sx={{ p: 0, mr: 1 }}>
+                                        {expandedPlatformAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                                    </IconButton>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
+                                        ⚙️ {t('roleFormPlatformAttributesTitle')}
+                                    </Typography>
+                                </Box>
+
+                                {expandedPlatformAttributes && (
+                                    <>
+                                        <TextField
+                                            size="small"
+                                            placeholder={t('searchByName')}
+                                            value={platformAttributeSearch}
+                                            onChange={(e) => setPlatformAttributeSearch(e.target.value)}
+                                            sx={{ mb: 1.5, width: 280 }}
+                                            slotProps={{
+                                                input: {
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <SearchIcon fontSize="small" />
+                                                        </InputAdornment>
+                                                    ),
+                                                },
+                                            }}
+                                        />
+                                        <FioriResponsiveTable
+                                            stickyHeader
+                                            maxHeight={500}
+                                            columns={platformAttributeColumns}
+                                            rows={filteredPlatformAttributes}
+                                            getRowKey={(attr) => attr.id}
+                                            rowSx={() => fioriTableRowSx(false)}
+                                            emptyMessage={t('noResultsFound')}
+                                        />
+                                    </>
+                                )}
+                            </Box>
+                        </Box>
+                    )}
+                    </>
                     ) : (
                         <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#FFF4E5', border: `1px solid ${FIORI.warning}`, borderRadius: '8px' }}>
                             <Typography variant="body2" sx={{ color: FIORI.warning }}>

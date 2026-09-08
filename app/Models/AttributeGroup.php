@@ -34,6 +34,14 @@ class AttributeGroup extends Model
     protected $fillable = [
         'code',
         'name',
+        // Non-null only on a group auto-generated for a marketplace sync
+        // (currently just the shared "Lazada" group — see
+        // LazadaAttributeFamilyGenerator::findOrCreateLazadaGroup()). Soft
+        // reference to sales_platforms.code — purely a UI-organization
+        // marker for role-form.tsx's "Platform Attribute Access" section,
+        // not a new permission resource; AttributeAccessPolicy's
+        // view_attribute_groups/edit_attribute_groups checks are unaffected.
+        'platform',
         'created_by',
         'updated_by',
     ];
