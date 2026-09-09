@@ -2,9 +2,11 @@
 
 namespace App\Services\Shopee;
 
+use App\Models\AttributeOption;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\ShopeeAttributeMapping;
+use App\Models\ShopeeAttributeOptionMapping;
 use App\Models\ShopeeBrand;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
@@ -62,16 +64,13 @@ class ShopeeProductSyncService
 
     /**
      * Gathers our own data into Shopee's add_item payload shape. Read-only —
-     * safe to call any time for inspection. Unlike Lazada's buildPayload(),
-     * this does NOT yet validate against the category's live mandatory
-     * attribute_list (get_attribute_tree) — Shopee's attribute schema has
-     * far more shapes (free text, single-select, multi-select, each with its
-     * own input_validation_type) than can responsibly be auto-filled without
-     * live testing against real categories first. Any category-specific
-     * mandatory attribute this doesn't provide will surface as a clear
-     * product_error_attr rejection from push() instead of a pre-emptive
-     * local check — same fallback Lazada's own buildPayload() already
-     * accepts for attributes outside its own SKU_FIELD_SOURCE map.
+     * safe to call any time for inspection. resolveAttributes() below does
+     * check the category's live mandatory attribute_list (get_attribute_tree)
+     * and now auto-fills free-text, single-select, and multi-select attribute
+     * types (see that method's own docblock) — only whatever's still
+     * genuinely unmapped or unresolvable surfaces here as a `missing` entry,
+     * thrown as one clear error before ever attempting a live write, rather
+     * than a raw product_error_attr rejection from Shopee itself.
      */
     public function buildPayload(Product $product, SalesPlatformShop $shop): array
     {
@@ -82,7 +81,7 @@ class ShopeeProductSyncService
         // product_details_features/attribute_6/length_pcs/width_pcs/
         // height_pcs lookups. Fetched once and reused by resolveAttributes()
         // below for the `shopee_attribute` group.
-        $mappings = ShopeeAttributeMapping::with('attribute')->orderBy('sort_order')->get();
+        $mappings = ShopeeAttributeMapping::with(['attribute', 'shopeeAttribute'])->orderBy('sort_order')->get();
 
         $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
         $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
@@ -526,13 +525,20 @@ class ShopeeProductSyncService
      * ShopeeAttributeMappingController — replaces the old hardcoded
      * SHOPEE_ATTRIBUTE_SOURCE const), and collecting the rest (still
      * genuinely unfillable) into one clear error before ever attempting a
-     * live write. Only FREE_TEXT_FILED attributes are supported this way —
-     * select/dropdown attributes need a specific value_id, which
-     * ShopeeAttributeMappingController::update() already refuses to let a
-     * mapping target.
+     * live write.
+     *
+     * FREE_TEXT_FILED (input_type 3) sends a plain `original_value_name`.
+     * Dropdown/combo-box (input_type 1/2/4/5, opened up for mapping — see
+     * ShopeeAttributeMappingController's docblock) sends `value_id` instead,
+     * resolved via ShopeeAttributeOptionMapping — shape confirmed live
+     * 2026-09-08 (see ShopeeAttribute's docblock): `{value_id: int}` per
+     * entry, several entries for a multi-select. Falls through to treating
+     * an unmapped/unresolvable select-type value as simply absent (same as
+     * free text) rather than erroring — a PIM value with no chosen option
+     * mapping isn't this method's problem to solve.
      *
      * @param \Illuminate\Support\Collection<int, ShopeeAttributeMapping> $mappings same collection buildPayload() already fetched
-     * @return array{attribute_list: list<array{attribute_id: int, attribute_value_list: list<array{original_value_name: string}>}>, missing: list<string>}
+     * @return array{attribute_list: list<array{attribute_id: int, attribute_value_list: list<array{original_value_name: string}|array{value_id: int}>}>, missing: list<string>}
      */
     private function resolveAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId, int $categoryId): array
     {
@@ -545,10 +551,40 @@ class ShopeeProductSyncService
         $missing = [];
 
         foreach ($schema as $attr) {
-            $value = null;
+            $attributeValueList = null;
 
             foreach ($mappingsByShopeeAttributeId->get($attr['attribute_id'], collect()) as $mapping) {
                 if (!$mapping->attribute) {
+                    continue;
+                }
+
+                // input_type comes from our own cached ShopeeAttribute row
+                // (kept in sync by syncShopeeAttributes()), not re-parsed
+                // from $attr here — same source
+                // ShopeeAttributeMappingController::update() already
+                // validated the mapped PIM attribute's type against.
+                $inputType = (int) ($mapping->shopeeAttribute->input_type ?? 3);
+
+                if (in_array($inputType, [4, 5], true)) {
+                    // MULTI_DROP_DOWN / MULTI_COMBO_BOX
+                    $values = $this->resolveMultiSelectOptionValues($mapping, $product, $channelId);
+                    if ($values !== []) {
+                        $attributeValueList = array_map(fn ($v) => ['value_id' => (int) $v], $values);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                if (in_array($inputType, [1, 2], true)) {
+                    // SINGLE_DROP_DOWN / SINGLE_COMBO_BOX
+                    $rawCode = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                    $value = $this->resolveSingleSelectOptionValue($mapping, $rawCode);
+                    if ($value !== null) {
+                        $attributeValueList = [['value_id' => (int) $value]];
+                        break;
+                    }
+
                     continue;
                 }
 
@@ -559,18 +595,18 @@ class ShopeeProductSyncService
                 // this session for WooCommerceProductSyncService::buildPayload().
                 $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
                 if ($candidate !== null && $candidate !== '') {
-                    $value = $candidate;
+                    // FREE_TEXT_FILED shape (input_type 3, confirmed live for
+                    // all three TIS fields) — a plain original_value_name, no
+                    // value_id since there's no predefined list to pick from.
+                    $attributeValueList = [['original_value_name' => $candidate]];
                     break;
                 }
             }
 
-            if ($value !== null) {
-                // FREE_TEXT_FILED shape (input_type 3, confirmed live for
-                // all three TIS fields) — a plain original_value_name, no
-                // value_id since there's no predefined list to pick from.
+            if ($attributeValueList !== null) {
                 $attributeList[] = [
                     'attribute_id' => $attr['attribute_id'],
-                    'attribute_value_list' => [['original_value_name' => $value]],
+                    'attribute_value_list' => $attributeValueList,
                 ];
 
                 continue;
@@ -582,5 +618,80 @@ class ShopeeProductSyncService
         }
 
         return ['attribute_list' => $attributeList, 'missing' => $missing];
+    }
+
+    /**
+     * Translates one product's stored AttributeOption code (the same
+     * convention `pbrand` uses — see ResolvesProductAttributeValues::
+     * mappedBrandOptionId()'s docblock) into the value_id Shopee's schema
+     * expects for a SINGLE_DROP_DOWN/SINGLE_COMBO_BOX attribute, via the
+     * admin-configured ShopeeAttributeOptionMapping row for this specific
+     * (attribute -> Shopee attribute) mapping. Returns null (treated as "no
+     * value", not an error) if the code doesn't resolve to a known option or
+     * that option has no Shopee counterpart chosen yet — mirror of
+     * LazadaProductSyncService::resolveSingleSelectOptionValue(), simplified
+     * (no label needed here — unlike Lazada's `brand` field, nothing in this
+     * class's push path reads a select-type attribute's label back out).
+     */
+    private function resolveSingleSelectOptionValue(ShopeeAttributeMapping $mapping, ?string $rawCode): ?string
+    {
+        if ($rawCode === null || $rawCode === '') {
+            return null;
+        }
+
+        $optionId = AttributeOption::where('attribute_id', $mapping->attribute_id)->where('code', $rawCode)->value('id');
+        if (!$optionId) {
+            return null;
+        }
+
+        return ShopeeAttributeOptionMapping::where('shopee_attribute_mapping_id', $mapping->id)
+            ->where('attribute_option_id', $optionId)
+            ->value('shopee_option_value');
+    }
+
+    /**
+     * Same idea as resolveSingleSelectOptionValue() but for MULTI_DROP_DOWN/
+     * MULTI_COMBO_BOX, which store several option codes at once — mirror of
+     * LazadaProductSyncService::resolveMultiSelectOptionValues().
+     *
+     * Reads the raw formatted value directly (not via attributeValue(),
+     * which only ever returns an array-shaped value's first element) —
+     * a multiselect PIM attribute's stored value is a JSON array of codes.
+     */
+    private function resolveMultiSelectOptionValues(ShopeeAttributeMapping $mapping, Product $product, ?int $channelId): array
+    {
+        if (!$mapping->attribute) {
+            return [];
+        }
+
+        $raw = $this->resolveFormattedAttributeValue($product, $mapping->attribute->code, $channelId);
+        $codes = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
+
+        if (!is_array($codes) || $codes === []) {
+            return [];
+        }
+
+        $optionIdByCode = AttributeOption::where('attribute_id', $mapping->attribute_id)
+            ->whereIn('code', $codes)
+            ->pluck('id', 'code');
+
+        if ($optionIdByCode->isEmpty()) {
+            return [];
+        }
+
+        $shopeeValueByOptionId = ShopeeAttributeOptionMapping::where('shopee_attribute_mapping_id', $mapping->id)
+            ->whereIn('attribute_option_id', $optionIdByCode->values())
+            ->pluck('shopee_option_value', 'attribute_option_id');
+
+        $resolved = [];
+        foreach ($codes as $code) {
+            $optionId = $optionIdByCode->get($code);
+            $value = $optionId ? $shopeeValueByOptionId->get($optionId) : null;
+            if ($value !== null) {
+                $resolved[] = $value;
+            }
+        }
+
+        return $resolved;
     }
 }

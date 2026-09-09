@@ -75,6 +75,12 @@ const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIc
     lazada_synced: { label: 'Attribute family re-synced', icon: SyncOutlinedIcon, color: '#0891b2' },
     lazada_family_attributes_synced: { label: 'Attribute family fields updated', icon: EditNoteOutlinedIcon, color: '#0891b2' },
     lazada_family_attached_to_category: { label: 'Attribute family attached to category', icon: LinkOutlinedIcon, color: '#0891b2' },
+    // Shopee mirror ของ 4 event ข้างบน — ดู ShopeeAttributeFamilyGenerator /
+    // CategoryController::bulkMapShopee()
+    shopee_category_mapped: { label: 'Shopee category mapped', icon: CategoryOutlinedIcon, color: '#ea580c' },
+    shopee_synced: { label: 'Attribute family re-synced', icon: SyncOutlinedIcon, color: '#0891b2' },
+    shopee_family_attributes_synced: { label: 'Attribute family fields updated', icon: EditNoteOutlinedIcon, color: '#0891b2' },
+    shopee_family_attached_to_category: { label: 'Attribute family attached to category', icon: LinkOutlinedIcon, color: '#0891b2' },
     option_created: { label: 'Option created', icon: PersonAddAlt1OutlinedIcon, color: '#16a34a' },
 };
 

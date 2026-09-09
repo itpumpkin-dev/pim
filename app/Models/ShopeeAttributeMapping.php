@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -14,9 +15,14 @@ use Illuminate\Support\Facades\Cache;
  * `length`/`width`/`height`/`description`/`video`, first mapped attribute
  * with a value wins — see ShopeeProductSyncService::resolveMappedField())
  * or `shopee_attribute` (feeds one specific `attribute_list` entry,
- * identified by `shopee_attribute_id` — see resolveAttributes()). v1 only
- * supports free-text Shopee attributes (input_type FREE_TEXT_FILED = 3) for
- * the `shopee_attribute` case. `video` is further restricted server-side to
+ * identified by `shopee_attribute_id` — see resolveAttributes()). Mapping a
+ * dropdown/combo-box Shopee attribute (input_type 1/2/4/5) as
+ * `shopee_attribute` is allowed (see
+ * ShopeeAttributeMappingController::MAPPABLE_INPUT_TYPES and
+ * ShopeeAttributeOptionMapping) and is sent on push as `value_id` (resolved
+ * via ShopeeAttributeOptionMapping — see resolveAttributes()'s docblock for
+ * the exact shape and its live-confirmation note). `video` is further
+ * restricted server-side to
  * PIM attributes of type `video` (see ShopeeAttributeMappingController) —
  * same external-URL restriction Lazada/TikTok's video fields have. Managed
  * from the "จับคู่เนื้อหา Shopee" mapping page (ShopeeAttributeMappingController).
@@ -48,6 +54,17 @@ class ShopeeAttributeMapping extends Model
     public function shopeeAttribute(): BelongsTo
     {
         return $this->belongsTo(ShopeeAttribute::class);
+    }
+
+    /**
+     * Per-option pairing for a dropdown/combo-box target (input_type
+     * 1/2/4/5) — empty for a free-text target_field, where this mapping
+     * alone is already the whole story. Mirror of
+     * LazadaAttributeMapping::optionMappings().
+     */
+    public function optionMappings(): HasMany
+    {
+        return $this->hasMany(ShopeeAttributeOptionMapping::class);
     }
 
     public function creator(): BelongsTo

@@ -53,8 +53,16 @@ export default function MarketplacePlatformHub({ platform }: Props) {
         { title: platformLabel, href: '#' },
     ];
 
+    // Platform ที่มีหน้า "สินค้า (Product Mapping)" แบบ Object Page เต็มรูปแบบ
+    // แล้ว (ไล่แมพ Category & Attributes ตั้งแต่ตัวสินค้าในหน้าเดียว) — ตอนนี้มี
+    // Lazada กับ Shopee (ดู LazadaAttributeMappingController::lazadaProducts()/
+    // ShopeeAttributeMappingController::shopeeProducts()) TikTok/WooCommerce ยัง
+    // ไม่มี flow แบบนั้น ต้องพึ่ง 2 การ์ดเดิมด้านล่างเป็นทางเข้าเดียวอยู่
+    const PLATFORMS_WITH_PRODUCT_MAPPING: MarketplacePlatform[] = ['lazada', 'shopee'];
+    const hasProductMappingPage = PLATFORMS_WITH_PRODUCT_MAPPING.includes(platform);
+
     const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string }[] = [
-        ...(platform === 'lazada' ? [{
+        ...(hasProductMappingPage ? [{
             key: 'products',
             icon: InventoryIcon,
             title: 'สินค้า (Product Mapping)',
@@ -63,13 +71,11 @@ export default function MarketplacePlatformHub({ platform }: Props) {
             permission: 'products.list_products',
         }] : []),
 
-        // Lazada ไปทำงานที่หน้า สินค้า (Product Mapping) แทนแล้ว (การ์ด 'products'
-        // ด้านบน — ไล่แมพ Category & Attributes ตั้งแต่ตัวสินค้าในหน้าเดียว) เลย
-        // ซ่อน 2 การ์ดนี้ไว้เฉพาะ Lazada — Shopee/TikTok/WooCommerce ยังไม่มี flow
-        // แบบนั้น ต้องใช้ 2 การ์ดนี้เป็นทางเข้าเดียวอยู่ (เคยถูก comment ออกไปแบบ
-        // ไม่มีเงื่อนไขมาก่อน ทำให้ 3 platform นั้นเข้าหน้า category/attribute
-        // mapping จาก UI ไม่ได้เลย)
-        ...(platform !== 'lazada' ? [{
+        // ซ่อน 2 การ์ดนี้ไว้เฉพาะ platform ที่มีหน้า "สินค้า (Product Mapping)"
+        // แล้ว (เคยถูก comment ออกไปแบบไม่มีเงื่อนไขมาก่อน ทำให้ TikTok/
+        // WooCommerce เข้าหน้า category/attribute mapping จาก UI ไม่ได้เลย —
+        // ดูบั๊กที่เคยแก้ไปแล้วตอน Lazada เป็น platform แรกที่มีหน้านี้)
+        ...(!hasProductMappingPage ? [{
             key: 'category',
             icon: CategoryIcon,
             title: tNav('mapCategory'),
@@ -77,7 +83,7 @@ export default function MarketplacePlatformHub({ platform }: Props) {
             url: `/catalog/categories/${platform}-mapping`,
             permission: 'categories.edit_categories',
         }] : []),
-        ...(platform !== 'lazada' ? [{
+        ...(!hasProductMappingPage ? [{
             key: 'push',
             icon: SyncAltIcon,
             title: tNav('mapPushData'),

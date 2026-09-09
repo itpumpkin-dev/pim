@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Http\Controllers\Concerns\ResolvesMarketplaceMasterCategory;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
 use App\Models\Category;
@@ -62,6 +63,8 @@ use Inertia\Response;
  */
 class LazadaAttributeMappingController extends Controller
 {
+    use ResolvesMarketplaceMasterCategory;
+
     // ใช้แบบ allowlist (ปฏิเสธทุกอย่างที่ยังไม่ได้ยืนยันชัดๆ ว่าปลอดภัย) เป็นค่าเริ่มต้น
     // แบบระมัดระวังแบบเดียวกับที่ใช้ทั่วทั้งแอปในส่วน integration ของ marketplace
     // ฟิลด์ richText (เช่น description/short_description — เช็คจากของจริงแล้วเมื่อ
@@ -223,10 +226,17 @@ class LazadaAttributeMappingController extends Controller
             }
         }
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats) {
-            $masterCat = $product->categories->first();
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats, $allPimCategories) {
+            $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'lazada_category_id');
 
-            $lazadaCatId = $product->lazada_category_id ?? ($masterCat?->lazada_category_id);
+            // $masterCat คือหมวดหมู่ที่ "ลึกที่สุด" สำหรับแสดงผล (path เต็ม) —
+            // ตัวที่ผูก lazada_category_id ไว้จริงอาจเป็นหมวดแม่ของมันแทนก็ได้
+            // (เช่น ผู้ใช้แมป Category ไว้ที่ root ไม่ใช่ product group) เลยต้อง
+            // ไล่หาในทุกหมวดหมู่ของสินค้า ไม่ใช่แค่ $masterCat ตัวเดียว ไม่งั้น
+            // จะเห็น "ยังไม่ได้ map" ผิดๆ ทั้งที่แมปไว้จริงแล้วที่หมวดแม่
+            $mappedCategory = $this->resolveMappedCategory($product, $allPimCategories, 'lazada_category_id') ?? $masterCat;
+
+            $lazadaCatId = $product->lazada_category_id ?? ($mappedCategory?->lazada_category_id);
             $lazadaCat = $lazadaCatId ? $allLazadaCategories->get($lazadaCatId) : null;
 
             $attrStats = $lazadaCatId ? ($lazadaCategoryStats[$lazadaCatId] ?? ['total' => 0, 'mapped' => 0]) : null;

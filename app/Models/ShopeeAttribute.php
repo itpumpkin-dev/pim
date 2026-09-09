@@ -15,6 +15,15 @@ use Illuminate\Support\Facades\Cache;
  * global row — see the migration that added them
  * (2026_08_24_104607_add_category_and_mandatory_to_shopee_attributes_table)
  * and ShopeeAttributeMappingController::syncShopeeAttributesForCategory().
+ *
+ * `options` (added by 2026_09_08_000007_add_options_to_shopee_attributes_table)
+ * mirrors LazadaAttribute::$options — predefined choice list for
+ * dropdown/combo-box input_type (1/2/4/5), populated from get_attribute_tree's
+ * `attribute_value_list`. Shape confirmed live from a real sandbox sync
+ * (2026-09-08): `[{value_id, name, multi_lang}]` — see
+ * ShopeeAttributeMappingController::encodeShopeeOptions()'s docblock. Note
+ * MULTI_COMBO_BOX (5) attributes seen live carried no attribute_value_list
+ * at all — null `options` there is expected, not a sync failure.
  */
 class ShopeeAttribute extends Model
 {
@@ -30,12 +39,14 @@ class ShopeeAttribute extends Model
         'input_type',
         'category_id',
         'mandatory',
+        'options',
     ];
 
     protected $casts = [
         'input_type' => 'integer',
         'category_id' => 'integer',
         'mandatory' => 'boolean',
+        'options' => 'array',
     ];
 
     private const LIST_VERSION_KEY = 'shopee_attributes:list:version';

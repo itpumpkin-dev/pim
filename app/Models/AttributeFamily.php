@@ -37,6 +37,7 @@ class AttributeFamily extends Model
         'code',
         'name',
         'lazada_category_id',
+        'shopee_category_id',
         'created_by',
         'updated_by',
     ];
@@ -50,6 +51,15 @@ class AttributeFamily extends Model
     public function lazadaCategory(): BelongsTo
     {
         return $this->belongsTo(LazadaCategory::class);
+    }
+
+    /**
+     * Mirror ของ lazadaCategory() ด้านบน แต่สำหรับ Family ที่สร้างโดย
+     * ShopeeAttributeFamilyGenerator::syncForCategory()
+     */
+    public function shopeeCategory(): BelongsTo
+    {
+        return $this->belongsTo(ShopeeCategory::class);
     }
 
     public function creator(): BelongsTo
