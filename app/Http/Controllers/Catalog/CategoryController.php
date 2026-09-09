@@ -1059,12 +1059,12 @@ class CategoryController extends Controller
      * จำกัด per_page สูงสุด 100) และจัดเรียงแบบ depth-first ก่อน upsert เหมือน
      * Shopee/TikTok เพราะไม่รับประกันลำดับข้ามหน้าเหมือนกัน
      */
-    public function syncWoocommerceCategories(Request $request): RedirectResponse
+    public function syncWoocommerceCategories(Request $request): RedirectResponse|JsonResponse
     {
         try {
             $client = new WooCommerceClient();
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return $request->wantsJson() ? response()->json(['message' => $e->getMessage()], 422) : back()->with('error', $e->getMessage());
         }
 
         $raw = [];
@@ -1109,6 +1109,13 @@ class CategoryController extends Controller
                 ['id'],
                 ['parent_id', 'name', 'slug', 'description', 'thumbnail_url', 'is_leaf', 'updated_at']
             );
+        }
+
+        // รองรับทั้ง Inertia POST เดิม (หน้า categories/woocommerce-mapping.tsx)
+        // และ fetch ธรรมดา (ปุ่ม "Sync Categories" บน Section 1 ของ
+        // woocommerce-products.tsx Object Page)
+        if ($request->wantsJson()) {
+            return response()->json(['count' => count($ordered)]);
         }
 
         return back()->with('success', 'Synced '.count($ordered).' WooCommerce categories.');

@@ -54,12 +54,14 @@ export default function MarketplacePlatformHub({ platform }: Props) {
     ];
 
     // Platform ที่มีหน้า "สินค้า (Product Mapping)" แบบ Object Page เต็มรูปแบบ
-    // แล้ว (ไล่แมพ Category & Attributes ตั้งแต่ตัวสินค้าในหน้าเดียว) — ตอนนี้มี
-    // Lazada, Shopee, TikTok (ดู LazadaAttributeMappingController::lazadaProducts()/
-    // ShopeeAttributeMappingController::shopeeProducts()/
-    // TikTokAttributeMappingController::tiktokProducts()) — WooCommerce ยังไม่มี
-    // flow แบบนั้น ต้องพึ่ง 2 การ์ดเดิมด้านล่างเป็นทางเข้าเดียวอยู่
-    const PLATFORMS_WITH_PRODUCT_MAPPING: MarketplacePlatform[] = ['lazada', 'shopee', 'tiktok'];
+    // แล้ว (ไล่แมพ Category & Attributes ตั้งแต่ตัวสินค้าในหน้าเดียว) — ครบทั้ง
+    // 4 platform แล้ว: Lazada, Shopee, TikTok (ดู LazadaAttributeMappingController::
+    // lazadaProducts()/ShopeeAttributeMappingController::shopeeProducts()/
+    // TikTokAttributeMappingController::tiktokProducts()) และ WooCommerce (ดู
+    // WooCommerceAttributeMappingController::woocommerceProducts() — Section 2
+    // ของ WooCommerce ต่างจาก 3 platform นี้ตรงที่ attribute เป็น global ไม่ผูก
+    // category เลย ไม่มี Attribute Family/option-mapping concept)
+    const PLATFORMS_WITH_PRODUCT_MAPPING: MarketplacePlatform[] = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
     const hasProductMappingPage = PLATFORMS_WITH_PRODUCT_MAPPING.includes(platform);
 
     const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string }[] = [
@@ -76,7 +78,8 @@ export default function MarketplacePlatformHub({ platform }: Props) {
         // แล้ว (เคยถูก comment ออกไปแบบไม่มีเงื่อนไขมาก่อน ทำให้ทุก platform
         // ที่ไม่ใช่ Lazada เข้าหน้า category/attribute mapping จาก UI ไม่ได้
         // เลย — ดูบั๊กที่เคยแก้ไปแล้วตอน Lazada เป็น platform แรกที่มีหน้านี้
-        // — ตอนนี้เหลือแค่ WooCommerce ที่ยังต้องพึ่ง 2 การ์ดนี้อยู่)
+        // — ตอนนี้ครบทั้ง 4 platform แล้ว เลยไม่มี platform ไหนต้องพึ่ง 2
+        // การ์ดนี้เป็นทางเข้าหลักอีกต่อไป)
         ...(!hasProductMappingPage ? [{
             key: 'category',
             icon: CategoryIcon,

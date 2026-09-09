@@ -117,6 +117,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // เพราะ /catalog/attributes/... ก็ขึ้นต้นด้วย /catalog/attributes เหมือนกัน
     Route::get('marketplace/attribute-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('marketplace.attributeMapping.export')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/woocommerce/attribute-mapping', [MarketplaceAttributeMappingController::class, 'woocommerce'])->name('marketplace.woocommerce.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/woocommerce/products', [WooCommerceAttributeMappingController::class, 'woocommerceProducts'])->name('marketplace.woocommerce.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/lazada/products', [LazadaAttributeMappingController::class, 'lazadaProducts'])->name('marketplace.lazada.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
@@ -125,6 +126,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('marketplace/tiktok/products', [TikTokAttributeMappingController::class, 'tiktokProducts'])->name('marketplace.tiktok.products')->middleware('permission:products,list_products');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/woocommerce-mapping/attributes-list', [WooCommerceAttributeMappingController::class, 'woocommerceAttributesList'])->name('attributes.woocommerceAttributesList')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/woocommerce-mapping/payload-fields', [WooCommerceAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.woocommercePayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/woocommerce-mapping/timeline', [WooCommerceAttributeMappingController::class, 'timeline'])->name('attributes.woocommerceMappingTimeline')->middleware('permission:attributes,view_history');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping/options', [ShopeeAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveShopeeOptionMapping')->middleware('permission:attributes,edit_attributes');
