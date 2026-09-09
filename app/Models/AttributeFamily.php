@@ -38,6 +38,7 @@ class AttributeFamily extends Model
         'name',
         'lazada_category_id',
         'shopee_category_id',
+        'tiktok_category_id',
         'created_by',
         'updated_by',
     ];
@@ -60,6 +61,15 @@ class AttributeFamily extends Model
     public function shopeeCategory(): BelongsTo
     {
         return $this->belongsTo(ShopeeCategory::class);
+    }
+
+    /**
+     * Mirror ของ lazadaCategory()/shopeeCategory() ด้านบน แต่สำหรับ Family
+     * ที่สร้างโดย TikTokAttributeFamilyGenerator::syncForCategory()
+     */
+    public function tiktokCategory(): BelongsTo
+    {
+        return $this->belongsTo(TikTokCategory::class);
     }
 
     public function creator(): BelongsTo

@@ -122,6 +122,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/tiktok/products', [TikTokAttributeMappingController::class, 'tiktokProducts'])->name('marketplace.tiktok.products')->middleware('permission:products,list_products');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
@@ -139,6 +140,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributes/lazada-mapping/timeline', [LazadaAttributeMappingController::class, 'timeline'])->name('attributes.lazadaMappingTimeline')->middleware('permission:attributes,view_history');
     Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/tiktok-mapping/options', [TikTokAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveTikTokOptionMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/tiktok-mapping/payload-fields', [TikTokAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.tiktokPayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
+    Route::post('attributes/tiktok-mapping/attribute-family', [TikTokAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.tiktokSyncAttributeFamily')->middleware('permission:attributes,edit_attributes');
+    Route::get('attributes/tiktok-mapping/timeline', [TikTokAttributeMappingController::class, 'timeline'])->name('attributes.tiktokMappingTimeline')->middleware('permission:attributes,view_history');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/{attribute}/edit', [AttributeController::class, 'edit'])->name('attributes.edit')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}', [AttributeController::class, 'update'])->name('attributes.update')->middleware('permission:attributes,edit_attributes');

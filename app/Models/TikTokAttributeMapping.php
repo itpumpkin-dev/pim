@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -15,12 +16,16 @@ use Illuminate\Support\Facades\Cache;
  * attribute with a value wins — see TikTokProductSyncService::
  * resolveMappedField()) or `tiktok_attribute` (feeds one specific product
  * attribute, identified by `tiktok_attribute_id` — see
- * resolveProductAttributes()). v1 only supports attributes TikTok marks
- * `is_customizable` (free value allowed) for the `tiktok_attribute` case.
- * `video` is further restricted server-side to PIM attributes of type
- * `video` (see TikTokAttributeMappingController) — same external-URL
- * restriction Lazada's own video field has. Managed from the
- * "จับคู่เนื้อหา TikTok" mapping page (TikTokAttributeMappingController).
+ * resolveProductAttributes()). Mapping a non-customizable (select/
+ * multi-select) TikTok attribute as `tiktok_attribute` is allowed (see
+ * TikTokAttributeMappingController::MAPPABLE_INPUT_TYPES-equivalent and
+ * TikTokAttributeOptionMapping) and is sent on push as `{id: value_id}`
+ * (resolved via TikTokAttributeOptionMapping — see
+ * resolveProductAttributes()'s docblock). `video` is further restricted
+ * server-side to PIM attributes of type `video` (see
+ * TikTokAttributeMappingController) — same external-URL restriction
+ * Lazada's own video field has. Managed from the "จับคู่เนื้อหา TikTok"
+ * mapping page (TikTokAttributeMappingController).
  */
 class TikTokAttributeMapping extends Model
 {
@@ -49,6 +54,17 @@ class TikTokAttributeMapping extends Model
     public function tiktokAttribute(): BelongsTo
     {
         return $this->belongsTo(TikTokAttribute::class, 'tiktok_attribute_id', 'id');
+    }
+
+    /**
+     * Per-option pairing for a non-customizable target (select/
+     * multi-select) — empty for a free-value target_field, where this
+     * mapping alone is already the whole story. Mirror of
+     * ShopeeAttributeMapping::optionMappings().
+     */
+    public function optionMappings(): HasMany
+    {
+        return $this->hasMany(TikTokAttributeOptionMapping::class);
     }
 
     public function creator(): BelongsTo

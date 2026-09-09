@@ -63,8 +63,9 @@ class ShopeeMappedAttributeCreator
         return DB::transaction(function () use ($unmapped) {
             $created = 0;
             foreach ($unmapped as $shopeeAttribute) {
-                $this->createAndMapOne($shopeeAttribute);
-                $created++;
+                if ($this->createAndMapOne($shopeeAttribute)) {
+                    $created++;
+                }
             }
 
             Attribute::bumpCodeMapVersion();
@@ -74,7 +75,17 @@ class ShopeeMappedAttributeCreator
         });
     }
 
-    private function createAndMapOne(ShopeeAttribute $shopeeAttribute): void
+    /**
+     * @return bool จริงก็ต่อเมื่อ mapping ใหม่ถูกสร้างจริง (ใช้ตัดสิน
+     *              $created ใน createMissingForCategory() ด้านบน) — บั๊กจริง
+     *              ที่เจอจาก code review: เดิม caller นับ $created++ ทุกครั้ง
+     *              ไม่ว่า method นี้จะ early-return เพราะ code ชนกับ
+     *              attribute ที่ถูกแมปเข้า target_field อื่นไปแล้วหรือไม่ —
+     *              ทำให้ตัวเลข "สร้างใหม่ N attribute" ที่โชว์ในหน้า UI นับ
+     *              เกินจริง แถมไม่มีการแจ้งเตือนเลยว่า attribute ตัวนี้ไม่มี
+     *              วันแมปได้จริง (ถูก "ลองใหม่" เงียบๆ ทุกครั้งที่ sync)
+     */
+    private function createAndMapOne(ShopeeAttribute $shopeeAttribute): bool
     {
         $pimType = self::TYPE_MAP[$shopeeAttribute->input_type];
         $attribute = $this->findOrCreateAttribute($shopeeAttribute, $pimType);
@@ -84,7 +95,7 @@ class ShopeeMappedAttributeCreator
         // มี target_field อื่นอยู่ก่อนแล้ว (เช่นแมปไว้เป็น 'name'/'price' ผ่านหน้า
         // Payload Shopee) — ปล่อยของเดิมไว้ ไม่เขียนทับความตั้งใจเดิมของแอดมิน
         if ($mapping->exists) {
-            return;
+            return false;
         }
         $mapping->target_field = 'shopee_attribute';
         $mapping->shopee_attribute_id = $shopeeAttribute->id;
@@ -94,6 +105,8 @@ class ShopeeMappedAttributeCreator
         if (in_array($pimType, self::SELECT_TYPES, true)) {
             $this->createOptionsAndMappings($shopeeAttribute, $attribute, $mapping);
         }
+
+        return true;
     }
 
     /**
@@ -151,7 +164,17 @@ class ShopeeMappedAttributeCreator
         $code = preg_replace('/_+/', '_', $code) ?? '';
 
         if ($code === '' || !preg_match('/^[a-z]/', $code)) {
-            $code = 'sp_'.$code;
+            // บั๊กจริงที่เจอจากการทดสอบ TikTokMappedAttributeCreator กับ
+            // category จริงที่มี attribute ชื่อภาษาไทยล้วน — เดิม fallback
+            // เป็นค่าคงที่ 'sp_' เฉยๆ ทำให้ attribute ต้นทางคนละตัวที่ชื่อ
+            // ไม่เหลือ a-z เลย (เช่นชื่อไทยล้วน) sanitize ไปเป็นโค้ดเดียวกัน
+            // หมด แล้วถูก reuse ทับกันเป็น "attribute เดียวกัน" ผิดๆ — ผูก
+            // fallback เข้ากับ hash ของชื่อต้นทางแทนค่าคงที่ (เหมือนที่แก้ให้
+            // TikTokMappedAttributeCreator แล้ว) ให้แต่ละชื่อที่ต่างกันได้
+            // โค้ดที่ต่างกัน — ยืนยันแล้วว่า Shopee ยังไม่เคยเจอ attribute
+            // ชื่อไม่ใช่ภาษาอังกฤษจริง (ไม่มีข้อมูลเก่าที่ต้องแก้ไข) แต่แก้ไว้
+            // กันเผื่ออนาคต
+            $code = 'sp_'.substr(md5($rawName), 0, 10);
         }
 
         return mb_substr($code, 0, 100);

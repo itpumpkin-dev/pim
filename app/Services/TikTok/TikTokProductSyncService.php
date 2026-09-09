@@ -2,9 +2,11 @@
 
 namespace App\Services\TikTok;
 
+use App\Models\AttributeOption;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\TikTokAttributeMapping;
+use App\Models\TikTokAttributeOptionMapping;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -93,7 +95,7 @@ class TikTokProductSyncService
         // product_details_features/attribute_6/DIMENSION_FIELD_SOURCE
         // lookups. Fetched once and reused by resolveProductAttributes()
         // below for the `tiktok_attribute` group.
-        $mappings = TikTokAttributeMapping::with('attribute')->orderBy('sort_order')->get();
+        $mappings = TikTokAttributeMapping::with(['attribute', 'tiktokAttribute'])->orderBy('sort_order')->get();
 
         $name = $this->resolveMappedField($mappings, 'name', $product, $shop->channel_id, localeCode: 'th');
         $price = $this->resolveMappedField($mappings, 'price', $product, $shop->channel_id);
@@ -442,8 +444,17 @@ class TikTokProductSyncService
      * attribute with a value wins per tiktok_attribute_id (by sort_order),
      * same semantics as Lazada/Shopee's own resolvers.
      *
+     * `is_customizable=true` attributes send a plain `{name: value}` (free
+     * value, as before). `is_customizable=false` attributes (select/
+     * multi-select, opened up for mapping — see
+     * TikTokAttributeMappingController's docblock) send `{id: value_id}`
+     * instead, resolved via TikTokAttributeOptionMapping — shape confirmed
+     * live before this feature existed (see TikTokAttribute's docblock):
+     * `values[]` is `[{id, name}]`, so the outgoing shape mirrors the
+     * incoming one (send back the chosen value's own `id`).
+     *
      * @param \Illuminate\Support\Collection<int, TikTokAttributeMapping> $mappings same collection buildPayload() already fetched
-     * @return array{product_attributes: list<array{id: string, values: list<array{name: string}>}>, missing: list<string>}
+     * @return array{product_attributes: list<array{id: string, values: list<array{name: string}|array{id: string}>}>, missing: list<string>}
      */
     private function resolveProductAttributes(\Illuminate\Support\Collection $mappings, Product $product, ?int $channelId, string $categoryId): array
     {
@@ -460,10 +471,31 @@ class TikTokProductSyncService
                 continue;
             }
 
-            $value = null;
+            $values = null;
 
             foreach ($mappingsByTikTokAttributeId->get($attr['id'], collect()) as $mapping) {
                 if (!$mapping->attribute) {
+                    continue;
+                }
+
+                $isCustomizable = (bool) ($mapping->tiktokAttribute->is_customizable ?? true);
+
+                if (!$isCustomizable) {
+                    if ($mapping->tiktokAttribute?->is_multiple_selection) {
+                        $ids = $this->resolveMultiSelectOptionValues($mapping, $product, $channelId);
+                        if ($ids !== []) {
+                            $values = array_map(fn ($id) => ['id' => (string) $id], $ids);
+                            break;
+                        }
+                    } else {
+                        $rawCode = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+                        $id = $this->resolveSingleSelectOptionValue($mapping, $rawCode);
+                        if ($id !== null) {
+                            $values = [['id' => (string) $id]];
+                            break;
+                        }
+                    }
+
                     continue;
                 }
 
@@ -474,15 +506,15 @@ class TikTokProductSyncService
                 // this session for the WooCommerce/Shopee/Lazada equivalents.
                 $candidate = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
                 if ($candidate !== null && $candidate !== '') {
-                    $value = $candidate;
+                    $values = [['name' => $candidate]];
                     break;
                 }
             }
 
-            if ($value !== null) {
+            if ($values !== null) {
                 $productAttributes[] = [
                     'id' => $attr['id'],
-                    'values' => [['name' => $value]],
+                    'values' => $values,
                 ];
 
                 continue;
@@ -494,5 +526,84 @@ class TikTokProductSyncService
         }
 
         return ['product_attributes' => $productAttributes, 'missing' => $missing];
+    }
+
+    /**
+     * Translates one product's stored AttributeOption code into the value
+     * id TikTok's schema expects for a single-select (`is_customizable=false`,
+     * `is_multiple_selection=false`) attribute, via the admin-configured
+     * TikTokAttributeOptionMapping row for this specific (attribute ->
+     * TikTok attribute) mapping. Returns null (treated as "no value", not
+     * an error) if the code doesn't resolve to a known option or that
+     * option has no TikTok counterpart chosen yet — mirror of
+     * ShopeeProductSyncService::resolveSingleSelectOptionValue().
+     */
+    private function resolveSingleSelectOptionValue(TikTokAttributeMapping $mapping, ?string $rawCode): ?string
+    {
+        if ($rawCode === null || $rawCode === '') {
+            return null;
+        }
+
+        $optionId = AttributeOption::where('attribute_id', $mapping->attribute_id)->where('code', $rawCode)->value('id');
+        if (!$optionId) {
+            return null;
+        }
+
+        return TikTokAttributeOptionMapping::where('tiktok_attribute_mapping_id', $mapping->id)
+            ->where('attribute_option_id', $optionId)
+            ->value('tiktok_option_value');
+    }
+
+    /**
+     * Same idea as resolveSingleSelectOptionValue() but for
+     * `is_multiple_selection=true`, which store several option codes at
+     * once — mirror of ShopeeProductSyncService::resolveMultiSelectOptionValues().
+     *
+     * Reads the raw formatted value directly (not via attributeValue(),
+     * which only ever returns an array-shaped value's first element) —
+     * a multiselect PIM attribute's stored value is a JSON array of codes.
+     */
+    private function resolveMultiSelectOptionValues(TikTokAttributeMapping $mapping, Product $product, ?int $channelId): array
+    {
+        if (!$mapping->attribute) {
+            return [];
+        }
+
+        // localeCode: 'th' matches every other value lookup in this class —
+        // บั๊กจริงที่เจอจาก code review: เดิมไม่ส่ง localeCode เลยตรงนี้ (ต่าง
+        // จาก resolveSingleSelectOptionValue()'s caller ไม่กี่บรรทัดก่อนหน้าที่
+        // ส่งถูกต้อง) resolveFormattedAttributeValue() จะ resolve locale_id
+        // เป็น null เสมอถ้าไม่ส่ง localeCode มา ทำให้ PIM multiselect attribute
+        // ที่เป็น locale-based ไม่มีวัน match แถวที่เก็บไว้จริง (locale_id ไม่
+        // null) — ค่าจะดูเหมือน "ไม่มีค่า" เสมอทั้งที่สินค้ามีข้อมูลจริง
+        $raw = $this->resolveFormattedAttributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
+        $codes = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
+
+        if (!is_array($codes) || $codes === []) {
+            return [];
+        }
+
+        $optionIdByCode = AttributeOption::where('attribute_id', $mapping->attribute_id)
+            ->whereIn('code', $codes)
+            ->pluck('id', 'code');
+
+        if ($optionIdByCode->isEmpty()) {
+            return [];
+        }
+
+        $tiktokValueByOptionId = TikTokAttributeOptionMapping::where('tiktok_attribute_mapping_id', $mapping->id)
+            ->whereIn('attribute_option_id', $optionIdByCode->values())
+            ->pluck('tiktok_option_value', 'attribute_option_id');
+
+        $resolved = [];
+        foreach ($codes as $code) {
+            $optionId = $optionIdByCode->get($code);
+            $value = $optionId ? $tiktokValueByOptionId->get($optionId) : null;
+            if ($value !== null) {
+                $resolved[] = $value;
+            }
+        }
+
+        return $resolved;
     }
 }

@@ -664,7 +664,14 @@ class ShopeeProductSyncService
             return [];
         }
 
-        $raw = $this->resolveFormattedAttributeValue($product, $mapping->attribute->code, $channelId);
+        // localeCode: 'th' matches every other value lookup in this class —
+        // บั๊กจริงที่เจอจาก code review: เดิมไม่ส่ง localeCode เลยตรงนี้ (ต่าง
+        // จาก resolveSingleSelectOptionValue()'s caller ไม่กี่บรรทัดก่อนหน้าที่
+        // ส่งถูกต้อง) resolveFormattedAttributeValue() จะ resolve locale_id
+        // เป็น null เสมอถ้าไม่ส่ง localeCode มา ทำให้ PIM multiselect attribute
+        // ที่เป็น locale-based ไม่มีวัน match แถวที่เก็บไว้จริง (locale_id ไม่
+        // null) — ค่าจะดูเหมือน "ไม่มีค่า" เสมอทั้งที่สินค้ามีข้อมูลจริง
+        $raw = $this->resolveFormattedAttributeValue($product, $mapping->attribute->code, $channelId, localeCode: 'th');
         $codes = is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []);
 
         if (!is_array($codes) || $codes === []) {

@@ -17,6 +17,17 @@ use Illuminate\Support\Facades\Cache;
  * global row — see the migration that added them
  * (2026_08_25_043816_add_category_and_mandatory_to_tiktok_attributes_table)
  * and TikTokAttributeMappingController::syncTikTokAttributesForCategory().
+ *
+ * `options` (added by 2026_09_09_000001_add_options_to_tiktok_attributes_table)
+ * — predefined choice list for `is_customizable=false` attributes, populated
+ * from get_attributes' `values[]`. Shape confirmed live before this feature
+ * existed (see TikTokClient::getAttributes()'s docblock, 2026-08-17):
+ * `[{id, name}]` — `id` is the value TikTok expects back on push, `name` is
+ * the display label. Unlike Lazada/Shopee there is no `input_type` column —
+ * `is_customizable`/`is_multiple_selection` already fully classify an
+ * attribute (customizable = free text; not customizable +
+ * is_multiple_selection = multi-select from `options`; not customizable,
+ * not multiple = single-select from `options`).
  */
 class TikTokAttribute extends Model
 {
@@ -33,6 +44,7 @@ class TikTokAttribute extends Model
         'is_multiple_selection',
         'category_id',
         'mandatory',
+        'options',
     ];
 
     protected $casts = [
@@ -40,6 +52,7 @@ class TikTokAttribute extends Model
         'is_multiple_selection' => 'boolean',
         'category_id' => 'integer',
         'mandatory' => 'boolean',
+        'options' => 'array',
     ];
 
     private const LIST_VERSION_KEY = 'tiktok_attributes:list:version';
