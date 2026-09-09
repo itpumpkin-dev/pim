@@ -172,6 +172,15 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
     // Category mapping section state
     const [selectedTikTokCatId, setSelectedTikTokCatId] = useState<number | null>(null);
     const [savingCatMap, setSavingCatMap] = useState(false);
+    // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก TikTok จริงมา refresh
+    // แคช tiktok_categories (คนละอย่างกับ saveCategoryMapping ด้านล่าง ซึ่งแค่
+    // "เลือก" จากที่ sync ไว้แล้ว) — เดิมปุ่มนี้อยู่ที่หน้า
+    // categories/tiktok-mapping.tsx เท่านั้น ตอนนี้การ์ด "จับคู่หมวดหมู่" ที่
+    // ลิงก์ไปหน้านั้นถูกซ่อนออกจาก platform-hub.tsx แล้ว (TikTok ใช้การ์ด
+    // "สินค้า" นี้เป็นทางเข้าเดียว) เลยต้องมีปุ่มนี้ในหน้านี้ด้วย ไม่งั้นไม่มีทางเข้าถึง
+    // การ sync ต้นไม้หมวดหมู่ได้เลยจาก UI (บั๊กที่เจอจากคำถามผู้ใช้)
+    const [syncingCategoryTree, setSyncingCategoryTree] = useState(false);
+    const [categorySyncMessage, setCategorySyncMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     // Attribute mapping section state
     const [tiktokAttributes, setTikTokAttributes] = useState<TikTokAttributeRow[] | null>(null);
@@ -277,6 +286,7 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
         setFamilySyncResult(null);
         setFamilySyncError(null);
         setOptionMappingRow(null);
+        setCategorySyncMessage(null);
 
         if (product.category_mapped && product.tiktok_category) {
             loadAttributes(product.tiktok_category.id);
@@ -357,6 +367,26 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                 onError: () => setSavingCatMap(false),
             },
         );
+    };
+
+    const syncCategoryTree = () => {
+        setSyncingCategoryTree(true);
+        setCategorySyncMessage(null);
+
+        fetch('/catalog/categories/sync-tiktok', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                setCategorySyncMessage(
+                    res.ok
+                        ? { text: `ซิงค์หมวดหมู่ TikTok สำเร็จ ${body.count} หมวดหมู่`, isError: false }
+                        : { text: body.message || 'เกิดข้อผิดพลาด ไม่สามารถซิงค์หมวดหมู่ได้', isError: true },
+                );
+            })
+            .catch(() => setCategorySyncMessage({ text: 'เกิดข้อผิดพลาด ไม่สามารถซิงค์หมวดหมู่ได้', isError: true }))
+            .finally(() => setSyncingCategoryTree(false));
     };
 
     const syncAttributes = () => {
@@ -733,14 +763,32 @@ export default function TikTokProductsMapping({ products, stats, filters }: Prop
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
                             >
                                 <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            เลือก TikTok Category ปลายทางสำหรับ Master Category นี้
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
-                                        </Typography>
-                                    </Box>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                                        <Box>
+                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                เลือก TikTok Category ปลายทางสำหรับ Master Category นี้
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
+                                                การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
+                                            </Typography>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={syncingCategoryTree}
+                                            startIcon={syncingCategoryTree ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                            onClick={syncCategoryTree}
+                                            sx={{ ...fioriDefaultSx, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                        >
+                                            Sync Categories จาก TikTok
+                                        </Button>
+                                    </Stack>
+
+                                    {categorySyncMessage && (
+                                        <Alert severity={categorySyncMessage.isError ? 'error' : 'success'} onClose={() => setCategorySyncMessage(null)}>
+                                            {categorySyncMessage.text}
+                                        </Alert>
+                                    )}
 
                                     <Box sx={{ maxWidth: 420 }}>
                                         <MarketplaceCategoryPicker

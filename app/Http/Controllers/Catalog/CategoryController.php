@@ -834,11 +834,13 @@ class CategoryController extends Controller
      * ตัวเลือก mapping ต้องเรียก API ของเขาทุกครั้งที่โหลดหน้า account ผู้ขายที่
      * active ตัวไหนก็ authenticate ตรงนี้ได้ — ต้นไม้เองไม่ได้ผูกกับร้านใดร้านหนึ่ง
      */
-    public function syncLazadaCategories(Request $request): RedirectResponse
+    public function syncLazadaCategories(Request $request): RedirectResponse|JsonResponse
     {
         $account = LazadaSellerAccount::active()->first();
         if (! $account) {
-            return back()->with('error', 'No active Lazada seller account found to authenticate the sync.');
+            $message = 'No active Lazada seller account found to authenticate the sync.';
+
+            return $request->wantsJson() ? response()->json(['message' => $message], 422) : back()->with('error', $message);
         }
 
         $tree = (new LazadaClient($account))->getCategoryTree();
@@ -853,6 +855,14 @@ class CategoryController extends Controller
                 ['id'],
                 ['parent_id', 'name', 'is_leaf', 'updated_at']
             );
+        }
+
+        // รองรับทั้ง Inertia POST เดิม (หน้า categories/lazada-mapping.tsx) และ
+        // fetch ธรรมดา (ปุ่ม "Sync Categories" บน Section 1 ของ
+        // lazada-products.tsx Object Page — ดูเหตุผลเดียวกันที่
+        // ShopeeAttributeMappingController::update() ใช้)
+        if ($request->wantsJson()) {
+            return response()->json(['count' => count($rows)]);
         }
 
         return back()->with('success', 'Synced '.count($rows).' Lazada categories.');
@@ -887,11 +897,13 @@ class CategoryController extends Controller
      * คอลัมน์ is_active ให้กรอง account ได้ เลยใช้ shop ที่เชื่อมต่อไว้ตัวไหนก็ได้
      * มา authenticate ตรงนี้
      */
-    public function syncShopeeCategories(Request $request): RedirectResponse
+    public function syncShopeeCategories(Request $request): RedirectResponse|JsonResponse
     {
         $account = ShopeeSellerAccount::first();
         if (! $account) {
-            return back()->with('error', 'No Shopee seller account found to authenticate the sync.');
+            $message = 'No Shopee seller account found to authenticate the sync.';
+
+            return $request->wantsJson() ? response()->json(['message' => $message], 422) : back()->with('error', $message);
         }
 
         $client = new ShopeeClient($account);
@@ -947,6 +959,13 @@ class CategoryController extends Controller
             );
         }
 
+        // รองรับทั้ง Inertia POST เดิม (หน้า categories/shopee-mapping.tsx) และ
+        // fetch ธรรมดา (ปุ่ม "Sync Categories" บน Section 1 ของ
+        // shopee-products.tsx Object Page)
+        if ($request->wantsJson()) {
+            return response()->json(['count' => count($ordered)]);
+        }
+
         return back()->with('success', 'Synced '.count($ordered).' Shopee categories.');
     }
 
@@ -960,11 +979,13 @@ class CategoryController extends Controller
      * เรียกจริง (ดู docblock ของ class นั้น) การ sync นี้จะยัง fail อยู่จนกว่าจะตั้งค่า
      * TIKTOK_APP_KEY/TIKTOK_APP_SECRET เป็นค่าจริงและได้ยืนยันแล้ว
      */
-    public function syncTikTokCategories(Request $request): RedirectResponse
+    public function syncTikTokCategories(Request $request): RedirectResponse|JsonResponse
     {
         $account = TikTokSellerAccount::first();
         if (! $account) {
-            return back()->with('error', 'No TikTok seller account found to authenticate the sync.');
+            $message = 'No TikTok seller account found to authenticate the sync.';
+
+            return $request->wantsJson() ? response()->json(['message' => $message], 422) : back()->with('error', $message);
         }
 
         $client = new TikTokClient($account);
@@ -1014,6 +1035,13 @@ class CategoryController extends Controller
                 ['id'],
                 ['parent_id', 'name', 'name_th', 'is_leaf', 'updated_at']
             );
+        }
+
+        // รองรับทั้ง Inertia POST เดิม (หน้า categories/tiktok-mapping.tsx) และ
+        // fetch ธรรมดา (ปุ่ม "Sync Categories" บน Section 1 ของ
+        // tiktok-products.tsx Object Page)
+        if ($request->wantsJson()) {
+            return response()->json(['count' => count($ordered)]);
         }
 
         return back()->with('success', 'Synced '.count($ordered).' TikTok categories.');

@@ -171,6 +171,15 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
     // Category mapping section state
     const [selectedLazadaCatId, setSelectedLazadaCatId] = useState<number | null>(null);
     const [savingCatMap, setSavingCatMap] = useState(false);
+    // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก Lazada จริงมา refresh
+    // แคช lazada_categories (คนละอย่างกับ saveCategoryMapping ด้านล่าง ซึ่งแค่
+    // "เลือก" จากที่ sync ไว้แล้ว) — เดิมปุ่มนี้อยู่ที่หน้า
+    // categories/lazada-mapping.tsx เท่านั้น ตอนนี้การ์ด "จับคู่หมวดหมู่" ที่
+    // ลิงก์ไปหน้านั้นถูกซ่อนออกจาก platform-hub.tsx แล้ว (Lazada ใช้การ์ด
+    // "สินค้า" นี้เป็นทางเข้าเดียว) เลยต้องมีปุ่มนี้ในหน้านี้ด้วย ไม่งั้นไม่มีทางเข้าถึง
+    // การ sync ต้นไม้หมวดหมู่ได้เลยจาก UI (บั๊กที่เจอจากคำถามผู้ใช้)
+    const [syncingCategoryTree, setSyncingCategoryTree] = useState(false);
+    const [categorySyncMessage, setCategorySyncMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
     // Attribute mapping section state
     const [lazadaAttributes, setLazadaAttributes] = useState<LazadaAttributeRow[] | null>(null);
@@ -273,6 +282,13 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
         setActiveProduct(product);
         setSectionIndex(0);
         setSelectedLazadaCatId(product.lazada_category?.id ?? null);
+        // ล้าง state ค้างจากสินค้าตัวก่อนหน้าด้วย — ไม่งั้นเปิดสินค้าตัวใหม่จะ
+        // ยังเห็น alert/dialog ของสินค้าตัวเก่าค้างอยู่ (บั๊กที่เจอจาก code
+        // review รอบ Shopee — แก้ให้ Lazada ด้วยตอนนี้เลย)
+        setFamilySyncResult(null);
+        setFamilySyncError(null);
+        setOptionMappingRow(null);
+        setCategorySyncMessage(null);
 
         if (product.category_mapped && product.lazada_category) {
             loadAttributes(product.lazada_category.id);
@@ -359,6 +375,26 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                 onError: () => setSavingCatMap(false),
             },
         );
+    };
+
+    const syncCategoryTree = () => {
+        setSyncingCategoryTree(true);
+        setCategorySyncMessage(null);
+
+        fetch('/catalog/categories/sync-lazada', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                setCategorySyncMessage(
+                    res.ok
+                        ? { text: `ซิงค์หมวดหมู่ Lazada สำเร็จ ${body.count} หมวดหมู่`, isError: false }
+                        : { text: body.message || 'เกิดข้อผิดพลาด ไม่สามารถซิงค์หมวดหมู่ได้', isError: true },
+                );
+            })
+            .catch(() => setCategorySyncMessage({ text: 'เกิดข้อผิดพลาด ไม่สามารถซิงค์หมวดหมู่ได้', isError: true }))
+            .finally(() => setSyncingCategoryTree(false));
     };
 
     const syncAttributes = () => {
@@ -754,14 +790,32 @@ export default function LazadaProductsMapping({ products, stats, filters }: Prop
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
                             >
                                 <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            เลือก Lazada Category ปลายทางสำหรับ Master Category นี้
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
-                                        </Typography>
-                                    </Box>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+                                        <Box>
+                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                เลือก Lazada Category ปลายทางสำหรับ Master Category นี้
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
+                                                การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
+                                            </Typography>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={syncingCategoryTree}
+                                            startIcon={syncingCategoryTree ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                            onClick={syncCategoryTree}
+                                            sx={{ ...fioriDefaultSx, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                        >
+                                            Sync Categories จาก Lazada
+                                        </Button>
+                                    </Stack>
+
+                                    {categorySyncMessage && (
+                                        <Alert severity={categorySyncMessage.isError ? 'error' : 'success'} onClose={() => setCategorySyncMessage(null)}>
+                                            {categorySyncMessage.text}
+                                        </Alert>
+                                    )}
 
                                     <Box sx={{ maxWidth: 420 }}>
                                         <MarketplaceCategoryPicker
