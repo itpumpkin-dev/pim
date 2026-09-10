@@ -353,6 +353,7 @@ class LazadaAttributeMappingController extends Controller
             'label' => 'ชื่อสินค้า',
             'mandatory' => true,
             'value' => $resolvedName,
+            'type' => 'text',
         ];
 
         // ฟิลด์ที่มี target_field ตายตัวอยู่แล้ว (ไม่ใช่ custom category
@@ -390,6 +391,10 @@ class LazadaAttributeMappingController extends Controller
                     'label' => $lzAttr->label ?: $lzAttr->name,
                     'mandatory' => (bool) ($mandatoryByName[$lzAttr->name] ?? false),
                     'value' => $value,
+                    // Lazada's own raw input_type (text/numeric/richText/date/
+                    // img/singleSelect/multiSelect/enumInput/multiEnumInput —
+                    // see LazadaAttributeMappingController's class docblock)
+                    'type' => $lzAttr->input_type,
                 ];
             }
         }
@@ -430,20 +435,20 @@ class LazadaAttributeMappingController extends Controller
         $channelId = $publishedLazadaShops->count() === 1 ? $publishedLazadaShops->first()->channel_id : null;
 
         $platformFields = [
-            ['label' => 'Seller SKU', 'value' => $product->sku],
+            ['label' => 'Seller SKU', 'value' => $product->sku, 'type' => 'text'],
             // buildPayload() ตั้ง short_description ให้เท่ากับ name ตายตัวเสมอ
             // (ไม่มี target_field แยกให้ map เอง) — ไม่ใช่ค่าจริงจาก PIM attribute
             // ไหนต่างหาก แค่ mirror ชื่อสินค้าไปอีกฟิลด์หนึ่งของ Lazada
-            ['label' => 'รายละเอียดสั้น (Short Description)', 'value' => $resolvedName],
-            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId)],
-            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId)],
-            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId)],
-            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId)],
-            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId)],
-            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId)],
+            ['label' => 'รายละเอียดสั้น (Short Description)', 'value' => $resolvedName, 'type' => 'text'],
+            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId), 'type' => 'numeric'],
             // ไม่บังคับ (ไม่มีสินค้าไหนต้องมีวิดีโอ) — โชว์ไว้เผื่อ debug ว่าทำไม
             // ไม่มีวิดีโอขึ้นจริงบน listing ทั้งที่คิดว่า map ไว้แล้ว
-            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId)],
+            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId), 'type' => 'video'],
         ];
 
         $platformImages = $this->resolveProductImageUrls($product, $channelId);

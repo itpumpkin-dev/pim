@@ -241,6 +241,7 @@ class TikTokAttributeMappingController extends Controller
             'label' => 'ชื่อสินค้า',
             'mandatory' => true,
             'value' => $resolvedName,
+            'type' => 'text',
         ];
 
         if ($tiktokCategoryId) {
@@ -264,6 +265,7 @@ class TikTokAttributeMappingController extends Controller
                     'label' => $ttAttr->name,
                     'mandatory' => (bool) ($mandatoryById[$ttAttr->id] ?? false),
                     'value' => $value,
+                    'type' => $this->tiktokInputTypeLabel($ttAttr),
                 ];
             }
         }
@@ -303,23 +305,23 @@ class TikTokAttributeMappingController extends Controller
         $channelId = $publishedTikTokShops->count() === 1 ? $publishedTikTokShops->first()->channel_id : null;
 
         $platformFields = [
-            ['label' => 'Seller SKU', 'value' => $product->sku],
+            ['label' => 'Seller SKU', 'value' => $product->sku, 'type' => 'text'],
             // buildPayload() fallback ค่า description เป็น $name ตายตัวถ้าไม่มี
             // attribute แมปไว้ — mirror ลำดับเดียวกัน
-            ['label' => 'รายละเอียดสินค้า (Description)', 'value' => $this->resolveMappedField($mappings, 'description', $product, $channelId, localeCode: 'th') ?: $resolvedName],
-            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId)],
-            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId)],
-            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId)],
-            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId)],
-            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId)],
-            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId)],
+            ['label' => 'รายละเอียดสินค้า (Description)', 'value' => $this->resolveMappedField($mappings, 'description', $product, $channelId, localeCode: 'th') ?: $resolvedName, 'type' => 'text'],
+            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId), 'type' => 'numeric'],
             // TikTok ต้องการ brand เสมอตอน push จริง (resolveTikTokBrandId()
             // throw ถ้าไม่มี) — ต่างจาก Lazada ตรงที่ไม่ได้มาจาก category
             // attribute schema เลย เป็นฟิลด์ตายตัวแยกต่างหาก (ดู docblock ของ
             // method นี้)
-            ['label' => 'แบรนด์ (Brand)', 'value' => $this->resolveBrandDisplayValue($product)],
+            ['label' => 'แบรนด์ (Brand)', 'value' => $this->resolveBrandDisplayValue($product), 'type' => 'select'],
             // ไม่บังคับ (ไม่มีสินค้าไหนต้องมีวิดีโอ) — โชว์ไว้เผื่อ debug
-            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId)],
+            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId), 'type' => 'video'],
         ];
 
         $platformImages = $this->resolveProductImageUrls($product, $channelId);
@@ -418,6 +420,21 @@ class TikTokAttributeMappingController extends Controller
         }
 
         return TikTokBrand::find($tiktokBrandId)?->name;
+    }
+
+    /**
+     * TikTok ไม่มี input_type แบบตัวเดียวจบอย่าง Lazada/Shopee — ต้องประกอบจาก
+     * is_customizable/is_multiple_selection สองตัว (ดู TikTokAttribute's
+     * docblock) ให้เป็น label เดียวสำหรับ "Type" ที่โชว์ใน productDetail()'s
+     * Attribute tab
+     */
+    private function tiktokInputTypeLabel(TikTokAttribute $attribute): string
+    {
+        if ($attribute->is_customizable) {
+            return 'text';
+        }
+
+        return $attribute->is_multiple_selection ? 'multiSelect' : 'singleSelect';
     }
 
     /**

@@ -461,6 +461,7 @@ class ShopeeAttributeMappingController extends Controller
             'label' => 'ชื่อสินค้า',
             'mandatory' => true,
             'value' => $resolvedName,
+            'type' => 'text',
         ];
 
         // แบรนด์ของ Shopee ไม่ได้มาจาก get_attribute_tree เลย (คนละ API กัน —
@@ -474,6 +475,7 @@ class ShopeeAttributeMappingController extends Controller
             'label' => 'แบรนด์ (Brand)',
             'mandatory' => true,
             'value' => $this->resolveBrandDisplayValue($product),
+            'type' => 'select',
         ];
 
         if ($shopeeCategoryId) {
@@ -496,6 +498,7 @@ class ShopeeAttributeMappingController extends Controller
                     'label' => $spAttr->name,
                     'mandatory' => (bool) ($mandatoryById[$spAttr->id] ?? false),
                     'value' => $value,
+                    'type' => $this->shopeeInputTypeLabel($spAttr->input_type),
                 ];
             }
         }
@@ -540,17 +543,17 @@ class ShopeeAttributeMappingController extends Controller
         $resolvedDescription = $this->resolveMappedField($mappings, 'description', $product, $channelId, localeCode: 'th') ?: $resolvedName;
 
         $platformFields = [
-            ['label' => 'Seller SKU (Item SKU)', 'value' => $product->sku],
-            ['label' => 'รายละเอียดสินค้า (Description)', 'value' => $resolvedDescription],
-            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId)],
-            ['label' => 'จำนวนคงเหลือ (Stock)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId)],
-            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId)],
-            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId)],
-            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId)],
-            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId)],
+            ['label' => 'Seller SKU (Item SKU)', 'value' => $product->sku, 'type' => 'text'],
+            ['label' => 'รายละเอียดสินค้า (Description)', 'value' => $resolvedDescription, 'type' => 'text'],
+            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'จำนวนคงเหลือ (Stock)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId), 'type' => 'numeric'],
+            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId), 'type' => 'numeric'],
             // ไม่บังคับ (ไม่มีสินค้าไหนต้องมีวิดีโอ) — โชว์ไว้เผื่อ debug ว่าทำไม
             // ไม่มีวิดีโอขึ้นจริงบน listing ทั้งที่คิดว่า map ไว้แล้ว
-            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId)],
+            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId), 'type' => 'video'],
         ];
 
         $platformImages = $this->resolveProductImageUrls($product, $channelId);
@@ -651,6 +654,25 @@ class ShopeeAttributeMappingController extends Controller
         $shopeeBrandId = $product->shopee_brand_id ?: $this->mappedBrandOptionId($product, 'shopee_brand_id');
 
         return $shopeeBrandId ? ShopeeBrand::find($shopeeBrandId)?->name : null;
+    }
+
+    /**
+     * Shopee's numeric input_type code → a human-readable type label for the
+     * "Type" shown next to each field in productDetail()'s Attribute tab —
+     * see MAPPABLE_INPUT_TYPES's docblock above for where these numbers come
+     * from (Shopee's own get_attribute_tree schema, not something this app
+     * invented).
+     */
+    private function shopeeInputTypeLabel(?int $inputType): ?string
+    {
+        return match ($inputType) {
+            1 => 'singleSelect',
+            2 => 'singleSelect (combo box)',
+            3 => 'text',
+            4 => 'multiSelect',
+            5 => 'multiSelect (combo box)',
+            default => null,
+        };
     }
 
     /**

@@ -107,6 +107,8 @@ interface ProductDetailAttributeRow {
     mandatory: boolean;
     /** null = ยังไม่มีค่า (ไม่ว่าจะเพราะยังไม่ได้ผูก PIM attribute เลย หรือผูกแล้วแต่ค่าว่าง — ทั้งสองแบบแปลว่า push ไม่ผ่านเหมือนกัน เลยแสดงผลรวมเป็นแบบเดียวกัน) */
     value: string | null;
+    /** Shopee's input_type แปลเป็น label อ่านง่ายแล้ว (text/singleSelect/multiSelect/...) — null ถ้าไม่รู้ */
+    type?: string | null;
 }
 
 interface ProductDetailSyncHistoryRow {
@@ -126,6 +128,7 @@ interface ProductDetailPlatformField {
     label: string;
     /** null = ยังไม่มีค่าให้ส่ง (attribute ยังไม่ได้ map หรือ map แล้วแต่ค่าว่าง) */
     value: string | null;
+    type?: string | null;
 }
 
 /** ผลลัพธ์จาก ShopeeAttributeMappingController::productDetail() — sidebar ด้านขวา (quick view) เท่านั้น คนละอย่างกับ Object Page เต็มหน้าที่ activeProduct เปิด */
@@ -1726,14 +1729,21 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                                             spacing={2}
                                             sx={{ py: 1 }}
                                         >
-                                            <Typography variant="body2" sx={{ color: FIORI.textPrimary, flexShrink: 0 }}>
-                                                {attr.label}{' '}
-                                                {attr.mandatory && (
-                                                    <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
-                                                        จำเป็น
+                                            <Box sx={{ flexShrink: 0 }}>
+                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                                                    {attr.label}{' '}
+                                                    {attr.mandatory && (
+                                                        <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
+                                                            จำเป็น
+                                                        </Typography>
+                                                    )}
+                                                </Typography>
+                                                {attr.type && (
+                                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
+                                                        {attr.type}
                                                     </Typography>
                                                 )}
-                                            </Typography>
+                                            </Box>
                                             <Typography
                                                 variant="body2"
                                                 sx={{
@@ -1764,9 +1774,16 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                                                 spacing={2}
                                                 sx={{ py: 1 }}
                                             >
-                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary, flexShrink: 0 }}>
-                                                    {field.label}
-                                                </Typography>
+                                                <Box sx={{ flexShrink: 0 }}>
+                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                                                        {field.label}
+                                                    </Typography>
+                                                    {field.type && (
+                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
+                                                            {field.type}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
                                                 <Typography
                                                     variant="body2"
                                                     sx={{
