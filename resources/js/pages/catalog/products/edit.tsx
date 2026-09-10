@@ -534,6 +534,54 @@ export default function ProductEdit({
         })),
     });
 
+    // หมวดหมู่ย่อย/กลุ่มสินค้า (188 / 888 ตัวรวมทั้งระบบ) ไม่ได้ส่งมาเต็มต้นไม้จาก
+    // backend อีกต่อไป (ดู ProductController::masterCategoryOptions()) — แนบมา
+    // แค่ตัวที่สินค้านี้เลือกอยู่ตอนนี้ (ถ้ามี) เพื่อให้ dropdown โชว์ label ของ
+    // ค่าปัจจุบันได้ทันที ส่วนตัวเลือกทั้งหมดของแต่ละระดับ (ลูกของ parent ที่เลือก
+    // อยู่) ค่อยดึงตอนนี้แบบ on-demand แคชไว้ด้วย key `${code}:${parentCode}` กัน
+    // fetch ซ้ำเวลาผู้ใช้สลับกลับไปมาระหว่าง parent เดิม
+    const [masterCategoryChildOptions, setMasterCategoryChildOptions] = useState<Record<string, AttributeOption[]>>({});
+
+    useEffect(() => {
+        const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
+        const categoryCode = selectedMasterCategoryCode(categoryAttr);
+        const subcatCode = selectedMasterCategoryCode(subcatAttr);
+
+        const toFetch: { code: string; parent: string }[] = [];
+        if (subcatAttr && categoryCode && !(`psubcatname:${categoryCode}` in masterCategoryChildOptions)) {
+            toFetch.push({ code: 'psubcatname', parent: categoryCode });
+        }
+        if (groupAttr && subcatCode && !(`productgroupname:${subcatCode}` in masterCategoryChildOptions)) {
+            toFetch.push({ code: 'productgroupname', parent: subcatCode });
+        }
+        if (toFetch.length === 0) return;
+
+        let cancelled = false;
+        Promise.all(
+            toFetch.map(({ code, parent }) =>
+                fetch(`/catalog/products/master-category-options?code=${code}&parent_code=${encodeURIComponent(parent)}`, {
+                    headers: { Accept: 'application/json' },
+                })
+                    .then((res) => (res.ok ? res.json() : { options: [] }))
+                    .then((body: { options: AttributeOption[] }) => ({ key: `${code}:${parent}`, options: body.options })),
+            ),
+        ).then((results) => {
+            if (cancelled) return;
+            setMasterCategoryChildOptions((prev) => {
+                const next = { ...prev };
+                results.forEach(({ key, options }) => {
+                    next[key] = options;
+                });
+                return next;
+            });
+        });
+
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [masterCategoryAttributes, data.values, activeChannelId, activeLocaleId]);
+
     const cascadedMasterCategoryAttributes = useMemo(() => {
         const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
         const categoryCode = selectedMasterCategoryCode(categoryAttr);
@@ -545,7 +593,7 @@ export default function ProductEdit({
             visible.push(
                 withCodePrefixedLabels({
                     ...subcatAttr,
-                    options: (subcatAttr.options || []).filter((opt) => (opt.code || '').startsWith(categoryCode)),
+                    options: masterCategoryChildOptions[`psubcatname:${categoryCode}`] ?? subcatAttr.options ?? [],
                 }),
             );
         }
@@ -553,13 +601,13 @@ export default function ProductEdit({
             visible.push(
                 withCodePrefixedLabels({
                     ...groupAttr,
-                    options: (groupAttr.options || []).filter((opt) => (opt.code || '').startsWith(subcatCode)),
+                    options: masterCategoryChildOptions[`productgroupname:${subcatCode}`] ?? groupAttr.options ?? [],
                 }),
             );
         }
         return visible;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [masterCategoryAttributes, data.values, activeChannelId, activeLocaleId]);
+    }, [masterCategoryAttributes, masterCategoryChildOptions, data.values, activeChannelId, activeLocaleId]);
 
     // เปลี่ยนหมวดหมู่/หมวดหมู่ย่อยแล้ว ต้องล้างค่าของฟิลด์ถัดไปทิ้งด้วย เพราะอาจไม่
     // ตรงกับสายใหม่แล้ว (เช่น เปลี่ยนหมวดหมู่ แต่หมวดหมู่ย่อยเดิมที่เลือกไว้เป็นของ

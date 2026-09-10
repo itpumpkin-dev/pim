@@ -7,17 +7,33 @@ import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefr
 import { getCategoryIcon } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
 import { trackEvent } from '@/lib/track-event';
+import { getFioriShell } from '@/theme';
 import { type SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ConstructionIcon from '@mui/icons-material/Construction';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
 import LoginIcon from '@mui/icons-material/Login';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
-import { alpha, AppBar, Box, Button, Chip, IconButton, InputAdornment, Paper, Stack, TextField, Toolbar, Typography } from '@mui/material';
+import {
+    alpha,
+    Box,
+    Button,
+    Chip,
+    IconButton,
+    InputAdornment,
+    Paper,
+    Stack,
+    TextField,
+    Tooltip,
+    Typography,
+    useMediaQuery,
+    useTheme,
+} from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -191,6 +207,12 @@ export default function Home({
 }) {
     const { t } = useTranslation('home');
     const { auth } = usePage<SharedData>().props;
+    const theme = useTheme();
+    const shell = getFioriShell(theme.palette.mode);
+    // Below `sm` the shell bar has no room for a full-width wordmark + button
+    // label — collapse the wordmark and swap the CTA for an icon-only button
+    // (same "shrink to icon" convention as ShellSearch/AppSidebarHeader).
+    const isCompact = useMediaQuery(theme.breakpoints.down('sm'));
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -263,49 +285,87 @@ export default function Home({
     };
 
     const actions = !auth.user ? (
-        <Button
-            component={Link}
-            href={route('login')}
-            variant="contained"
-            startIcon={<LoginIcon />}
-            sx={{
-                borderRadius: '50px',
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 2,
-                py: 1,
-                color: '#fff',
-                background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                // boxShadow: '0 4px 14px 0 rgba(234, 88, 12, 0.39)',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                    transform: 'translateY(-2px)',
-                    // boxShadow: '0 6px 20px rgba(234, 88, 12, 0.5)',
+        isCompact ? (
+            <Tooltip title={t('signIn')}>
+                <IconButton
+                    component={Link}
+                    href={route('login')}
+                    aria-label={t('signIn')}
+                    sx={{
+                        width: 36,
+                        height: 36,
+                        color: '#fff',
+                        background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
+                        '&:hover': { background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)' },
+                    }}
+                >
+                    <LoginIcon fontSize="small" />
+                </IconButton>
+            </Tooltip>
+        ) : (
+            <Button
+                component={Link}
+                href={route('login')}
+                variant="contained"
+                startIcon={<LoginIcon />}
+                sx={{
+                    borderRadius: '50px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 2,
+                    py: 1,
+                    color: '#fff',
                     background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                },
-            }}
-        >
-            {t('signIn')}
-        </Button>
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                        transform: 'translateY(-2px)',
+                        background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
+                    },
+                }}
+            >
+                {t('signIn')}
+            </Button>
+        )
+    ) : isCompact ? (
+        <Tooltip title={t('goToDashboard')}>
+            <IconButton
+                component={Link}
+                href={route('dashboard')}
+                aria-label={t('goToDashboard')}
+                sx={{
+                    width: 36,
+                    height: 36,
+                    color: shell.interactiveColor,
+                    border: `1px solid ${shell.interactiveColor}`,
+                    '&:hover': { bgcolor: shell.hoverBg },
+                }}
+            >
+                <DashboardOutlinedIcon fontSize="small" />
+            </IconButton>
+        </Tooltip>
     ) : (
+        // Shell-bar CTA styled from the same getFioriShell() tokens as the
+        // rest of the bar (interactiveColor / hoverBg / borderRadius) instead
+        // of MUI's generic outlined-primary — so it reads as part of the
+        // shell rather than an unrelated page button, matching the compact
+        // icon variant's colors above.
         <Button
             component={Link}
             href={route('dashboard')}
             variant="outlined"
+            startIcon={<DashboardOutlinedIcon fontSize="small" />}
             sx={{
-                borderRadius: '50px',
+                borderRadius: `${shell.borderRadius}px`,
                 textTransform: 'none',
                 fontWeight: 600,
-                px: 3,
-                py: 1,
-                borderWidth: 2,
-                color: '',
-                borderColor: '',
+                px: 2,
+                py: 0.75,
+                color: shell.interactiveColor,
+                borderColor: shell.interactiveColor,
                 transition: 'all 0.2s ease-in-out',
                 '&:hover': {
-                    borderWidth: 2,
-                    borderColor: '',
-                    // bgcolor: alpha('', 0.08),
+                    borderColor: shell.interactiveColor,
+                    bgcolor: shell.hoverBg,
                     transform: 'translateY(-2px)',
                 },
             }}
@@ -318,25 +378,52 @@ export default function Home({
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
             <Head title="Home" />
             {showSplash && <SplashScreen exiting={splashExiting} />}
-            <AppBar position="sticky" color="inherit" elevation={1}>
-                <Toolbar sx={{ justifyContent: 'space-between' }}>
-                    <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
-                        <Box sx={{ color: 'primary.main', display: 'flex' }}>
-                            <AppLogoIcon style={{ width: 46, height: 46, fill: 'currentColor' }} />
-                        </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            PIM{' '}
-                            <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                                Pumpkin
-                            </Box>
-                        </Typography>
+            {/* Fiori Horizon shell bar — same getFioriShell() tokens as
+                <AppSidebarHeader>, so the storefront header and the admin
+                header read as one design system rather than two. */}
+            <Box
+                component="header"
+                sx={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: (t) => t.zIndex.appBar,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    height: shell.height,
+                    minHeight: shell.height,
+                    px: { xs: 1.5, sm: 2.5, md: 4 },
+                    bgcolor: shell.color,
+                    color: shell.textColor,
+                    boxShadow: shell.shadow,
+                }}
+            >
+                <Box
+                    component={Link}
+                    href="/"
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit', minWidth: 0, flexShrink: 0 }}
+                >
+                    <Box sx={{ color: 'primary.main', display: 'flex', flexShrink: 0 }}>
+                        <AppLogoIcon style={{ width: 40, height: 40, fill: 'currentColor' }} />
                     </Box>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                        <LocaleDropdown />
-                        {actions}
-                    </Stack>
-                </Toolbar>
-            </AppBar>
+                    {/* Wordmark collapses below `sm` — the logo mark alone carries
+                        the brand there, freeing room for the language switcher +
+                        CTA so they don't overlap on a phone-width shell bar. */}
+                    <Typography variant="h6" noWrap sx={{ fontWeight: 700, display: { xs: 'none', sm: 'block' } }}>
+                        PIM{' '}
+                        <Box component="span" sx={{ fontWeight: 800, color: '#FF7F50' }}>
+                            Pumpkin
+                        </Box>
+                    </Typography>
+                </Box>
+
+                <Box sx={{ flex: 1 }} />
+
+                <Stack direction="row" spacing={{ xs: 0.75, sm: 1.5 }} alignItems="center" sx={{ flexShrink: 0 }}>
+                    <LocaleDropdown />
+                    {actions}
+                </Stack>
+            </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
                 <HeroCarousel />

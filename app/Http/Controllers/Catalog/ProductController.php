@@ -1613,6 +1613,45 @@ class ProductController extends Controller
     }
 
     /**
+     * Cascading lookup ของแผง "Master Categories" (หมวดหมู่ > หมวดหมู่ย่อย >
+     * กลุ่มสินค้า) — คืน option เฉพาะ "ลูก" ของ parent_code ที่ระบุเท่านั้น
+     * (code ของแต่ละระดับต่อกันเป็นสาย เช่น 'a025' -> 'a025001' ดู
+     * ProductCategoryLinker) แทนที่จะให้ buildProductFormProps() ส่ง option
+     * ทั้งต้นไม้ (psubcatname 188 ตัว, productgroupname 888 ตัว) มาให้ตั้งแต่
+     * โหลดหน้า Edit ครั้งแรกทั้งที่ผู้ใช้เห็น/เลือกได้แค่ลูกของหมวดที่เลือกไว้
+     * ตอนนั้นจริงๆ (ดู cascadedMasterCategoryAttributes ใน edit.tsx ที่เดิม
+     * กรอง options ชุดใหญ่นี้ด้วย code prefix ฝั่ง client — ย้าย filter เดียวกัน
+     * มาทำฝั่ง server แทน ผลลัพธ์เหมือนกันทุกประการ แค่ไม่ต้องขนมาทั้งก้อนก่อน)
+     * ไม่รองรับ pcatname (ระดับบนสุด) เพราะมีแค่ 19 ตัว ส่งมาเต็มๆ ได้เลยตั้งแต่
+     * buildProductFormProps() โดยไม่ต้องมี endpoint แยก
+     */
+    public function masterCategoryOptions(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', Rule::in(['psubcatname', 'productgroupname'])],
+            'parent_code' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9_-]+$/'],
+        ]);
+
+        $attribute = Attribute::where('code', $validated['code'])->first();
+        if (! $attribute) {
+            return response()->json(['options' => []]);
+        }
+
+        $user = auth()->user();
+        if ($user && ! $this->canUserViewAttribute($user, $attribute)) {
+            abort(403);
+        }
+
+        $options = AttributeOption::where('attribute_id', $attribute->id)
+            ->where('code', 'like', $validated['parent_code'].'%')
+            ->orderBy('sort_order')
+            ->orderBy('code')
+            ->get(['id', 'code', 'admin_label', 'is_active']);
+
+        return response()->json(['options' => $options]);
+    }
+
+    /**
      * อัปโหลดรูปเดี่ยวสำหรับฝังลงในเนื้อหา HTML ของ attribute แบบ rich-text
      * (textarea) โดยตรง — เช่นตอนกดปุ่มรูปภาพในตัวแก้ไขรายละเอียดสินค้า (ดู
      * resources/js/components/rich-text-editor.tsx) คนละกรณีกับไฟล์ของ
@@ -1721,14 +1760,23 @@ class ProductController extends Controller
         // มากกว่าหนึ่งตระกูล ให้ตัวจากตระกูลที่มาก่อนชนะ (unique('attribute_id')
         // เก็บตัวที่เจอก่อนไว้)
         $effectiveFamilyIds = $this->effectiveFamilyIds($product);
+        // รวมเป็น query เดียวแล้ว groupBy family_id แทนที่จะยิง
+        // FamilyAttribute::where('family_id', ...)->get() แยกทีละ family ในลูป
+        // ข้างล่าง — เดิมทำแบบนั้นจะกลายเป็น N+1 query (family ละ ~7 query จาก
+        // eager load ของ attribute/options/translations/group) สำหรับสินค้าที่
+        // effective family หลายตัว เหมือน pattern เดียวกับที่ variants loop
+        // ด้านล่างเลี่ยงไว้แล้ว orderBy('sort_order') ก่อน groupBy() ยังคงลำดับ
+        // sort_order ภายในแต่ละ family ไว้เหมือนเดิม ส่วนลำดับความสำคัญของ
+        // family (family ไหนมาก่อนใน $effectiveFamilyIds ชนะตอน unique() ด้านล่าง)
+        // มาจากการวน merge ตามลำดับ $effectiveFamilyIds เอง
+        $familyAttributesByFamily = FamilyAttribute::with(['attribute.options', 'attributeGroup'])
+            ->whereIn('family_id', $effectiveFamilyIds)
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('family_id');
         $familyAttributes = collect();
         foreach ($effectiveFamilyIds as $familyId) {
-            $familyAttributes = $familyAttributes->merge(
-                FamilyAttribute::with(['attribute.options', 'attributeGroup'])
-                    ->where('family_id', $familyId)
-                    ->orderBy('sort_order')
-                    ->get()
-            );
+            $familyAttributes = $familyAttributes->merge($familyAttributesByFamily->get($familyId, collect()));
         }
         $familyAttributes = $familyAttributes->unique('attribute_id')->values();
 
@@ -1985,16 +2033,39 @@ class ProductController extends Controller
         // เรียงตามลำดับ self::MASTER_CATEGORY_ATTRIBUTE_CODES เป๊ะๆ (หมวดหมู่ >
         // หมวดหมู่ย่อย > กลุ่มสินค้า) — whereIn() ของ Eloquent ไม่การันตีลำดับผลลัพธ์
         // ตาม array ที่ส่งเข้าไป ต้อง sortBy เอาเอง
-        $masterCategoryAttributes = Attribute::with('options')
-            ->whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
+        //
+        // หมวดหมู่ย่อย/กลุ่มสินค้า (188 / 888 ตัวรวมทั้งระบบ) ไม่ eager-load
+        // ทั้งต้นไม้ options มาด้วยอีกต่อไป — edit.tsx ดึงเฉพาะลูกของ parent ที่
+        // เลือกอยู่แบบ on-demand ผ่าน masterCategoryOptions() แทน (ดูคอมเมนต์ที่
+        // เมธอดนั้น) ที่นี่แนบแค่ option ตัวที่สินค้านี้เลือกอยู่ตอนนี้ (ถ้ามี) ไว้
+        // ตัวเดียว พอสำหรับให้ dropdown ของ Edit โชว์ label ค่าปัจจุบันได้ทันทีโดย
+        // ไม่ต้องรอ fetch และพอสำหรับหน้า Read (show.tsx, RenderAttributeValue)
+        // ที่ไม่มี cascading UI เลยต้องการแค่ label ของค่าปัจจุบันเท่านั้นอยู่แล้ว
+        // "หมวดหมู่" (ระดับบนสุด) มีแค่ 19 ตัว ยังส่งเต็มเหมือนเดิม ไม่ต้องมี
+        // endpoint แยกให้
+        $masterCategoryAttributes = Attribute::whereIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
             ->get()
             ->sortBy(fn (Attribute $attr) => array_search($attr->code, self::MASTER_CATEGORY_ATTRIBUTE_CODES))
             ->values();
         if ($user) {
             $masterCategoryAttributes = $masterCategoryAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr))->values();
         }
-        $masterCategoryAttributes->each(function ($attr) use ($user) {
+        $masterCategoryAttributes->each(function (Attribute $attr) use ($user, $values) {
             $attr->editable = $this->canUserEditAttribute($user, $attr);
+
+            if ($attr->code === self::MASTER_CATEGORY_ATTRIBUTE_CODES[0]) {
+                $attr->load('options');
+
+                return;
+            }
+
+            $currentCode = collect($values[$attr->id] ?? [])
+                ->flatMap(fn ($byLocale) => $byLocale)
+                ->first(fn ($v) => is_string($v) && $v !== '');
+            $attr->setRelation(
+                'options',
+                $currentCode ? AttributeOption::where('attribute_id', $attr->id)->where('code', $currentCode)->get() : collect(),
+            );
         });
 
         return [
@@ -2026,7 +2097,13 @@ class ProductController extends Controller
             'productTypeAttribute' => $this->productTypeAttributeFor($user),
             'productValues' => $values,
             'variants' => $variantsData,
-            'configurableAttributes' => $this->configurableAttributeOptions(),
+            // มีค่าเฉพาะสินค้า configurable เท่านั้น — payload นี้หนักเป็นพิเศษ
+            // (attribute ทุกตัวที่มี options ทั้งระบบ ~1.8MB, ดูคอมเมนต์ที่
+            // configurableAttributeOptions()) และหน้า Edit ไม่มีช่องให้สลับ
+            // Simple ⇄ Configurable แล้ว (ดูคอมเมนต์ "เดิมมีช่อง Product Type"
+            // ใน edit.tsx) เลยไม่มีทางที่สินค้า simple จะต้องใช้ตัวเลือกนี้ระหว่าง
+            // อยู่ในหน้าเดียวกันโดยไม่รีโหลด
+            'configurableAttributes' => strtolower($product->type) === 'configurable' ? $this->configurableAttributeOptions() : [],
             'channels' => $channels,
             'channelGroups' => $channelGroups,
             'categoryIds' => $categoryIds,

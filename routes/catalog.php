@@ -40,6 +40,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
     Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
+    // Cascading lookup for the "Master Categories" panel's หมวดหมู่ย่อย/กลุ่มสินค้า
+    // fields (edit.tsx) — fetches just the children of a given parent code
+    // on demand instead of shipping all ~1,100 options up front on every
+    // Edit Product load. See ProductController::masterCategoryOptions().
+    Route::get('products/master-category-options', [ProductController::class, 'masterCategoryOptions'])->name('products.masterCategoryOptions')->middleware('permission:products,edit_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
     Route::post('products/push-bulk', [ProductController::class, 'pushBulk'])->name('products.pushBulk')->middleware('permission:products,edit_products');
     Route::post('products/deactivate-bulk', [ProductController::class, 'deactivateBulk'])->name('products.deactivateBulk')->middleware('permission:products,edit_products');
