@@ -6,9 +6,9 @@ use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AuditLog;
 use App\Models\Category;
-use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
+use App\Models\LazadaCategoryAttribute;
 use Illuminate\Support\Collection;
 
 /**
@@ -138,7 +138,9 @@ class LazadaMappingTimelineBuilder
      */
     private function resolveMappedAttributeIds(int $lazadaCategoryId): array
     {
-        $lazadaAttributeNames = LazadaAttribute::where('category_id', $lazadaCategoryId)->pluck('name');
+        // ดึงจาก lazada_category_attributes ไม่ใช่ lazada_attributes.category_id
+        // ที่ deprecated แล้ว (ดู LazadaCategoryAttribute's docblock)
+        $lazadaAttributeNames = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)->pluck('lazada_attribute_name');
         if ($lazadaAttributeNames->isEmpty()) {
             return [];
         }

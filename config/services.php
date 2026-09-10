@@ -39,6 +39,15 @@ return [
         'key' => env('ECOMMERCE_API_KEY'),
     ],
 
+    // Off switch for QueueAutoMarketplaceSync — when enabled, every product
+    // edit auto-queues a debounced push/deactivate to every shop that
+    // product is already published on, instead of requiring a manual "Push"
+    // click. Defaults to off so this ships dark; flip on with one env var,
+    // no redeploy needed either way.
+    'marketplace_sync' => [
+        'auto_enabled' => env('MARKETPLACE_AUTO_SYNC', false),
+    ],
+
     'lazada' => [
         'base_url' => env('LAZADA_API_BASE_URL', 'https://api.lazada.co.th/rest'),
     ],

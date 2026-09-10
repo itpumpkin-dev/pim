@@ -7,16 +7,33 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * Local cache of TikTok's category attribute schema (id, name,
- * is_customizable, is_multiple_selection), deduped globally by `id` across
- * every category synced — see TikTokAttributeMappingController::
+ * is_customizable, is_multiple_selection, options), deduped globally by
+ * `id` across every category synced — see TikTokAttributeMappingController::
  * syncTikTokAttributes(). `id` is a string (TikTok's own attribute id) —
  * see the creating migration's docblock for the cross-category-uniqueness
- * caveat.
+ * caveat (TikTok attribute ids are documented in this codebase's own prior
+ * investigation as possibly category-specific rather than global, unlike
+ * Shopee's — never confirmed either way; this dedup-by-`id` choice mirrors
+ * ShopeeAttribute's anyway and hasn't caused an observed problem).
  *
- * `category_id`/`mandatory` are per-category context layered on top of that
- * global row — see the migration that added them
- * (2026_08_25_043816_add_category_and_mandatory_to_tiktok_attributes_table)
- * and TikTokAttributeMappingController::syncTikTokAttributesForCategory().
+ * `category_id`/`mandatory` DEPRECATED — no longer read or written by this
+ * app. They used to layer "is this field mandatory, and which category was
+ * it last seen under" directly onto this same globally-deduped row (added
+ * by 2026_08_25_043816_add_category_and_mandatory_to_tiktok_attributes_table),
+ * which was a confirmed real bug: TikTokAttributeMappingController::
+ * syncTikTokAttributesForCategory() upserted with `uniqueBy(['id'])` alone,
+ * so if the same attribute `id` were ever seen under more than one
+ * category, re-syncing any other category would silently overwrite this
+ * category's mandatory answer — the same class of bug already found and
+ * fixed for Lazada/Shopee's equivalent columns (see LazadaAttribute's
+ * docblock). Superseded by `TikTokCategoryAttribute`
+ * (`tiktok_category_attributes`, PK `(category_id, tiktok_attribute_id)`)
+ * — see that model's docblock, including the nuance about `id`'s
+ * cross-category stability not actually mattering for that table's
+ * correctness. The two columns still physically exist on this table (left
+ * alone rather than dropped, to avoid a riskier migration for no benefit)
+ * but hold stale/partial historical data only; nothing in this codebase
+ * should read them going forward.
  *
  * `options` (added by 2026_09_09_000001_add_options_to_tiktok_attributes_table)
  * — predefined choice list for `is_customizable=false` attributes, populated
@@ -42,16 +59,12 @@ class TikTokAttribute extends Model
         'name',
         'is_customizable',
         'is_multiple_selection',
-        'category_id',
-        'mandatory',
         'options',
     ];
 
     protected $casts = [
         'is_customizable' => 'boolean',
         'is_multiple_selection' => 'boolean',
-        'category_id' => 'integer',
-        'mandatory' => 'boolean',
         'options' => 'array',
     ];
 

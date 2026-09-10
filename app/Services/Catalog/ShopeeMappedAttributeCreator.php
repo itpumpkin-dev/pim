@@ -10,6 +10,7 @@ use App\Models\Locale;
 use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeAttributeOptionMapping;
+use App\Models\ShopeeCategoryAttribute;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -51,7 +52,12 @@ class ShopeeMappedAttributeCreator
             ->whereHas('attribute')
             ->pluck('shopee_attribute_id');
 
-        $unmapped = ShopeeAttribute::where('category_id', $shopeeCategoryId)
+        // "attribute ไหนอยู่ในหมวดหมู่นี้บ้าง" มาจาก shopee_category_attributes
+        // เสมอตอนนี้ (ไม่ใช่ shopee_attributes.category_id ที่ deprecated แล้ว
+        // — ดู ShopeeCategoryAttribute's docblock)
+        $attributeIdsInCategory = ShopeeCategoryAttribute::where('category_id', $shopeeCategoryId)->pluck('shopee_attribute_id');
+
+        $unmapped = ShopeeAttribute::whereIn('id', $attributeIdsInCategory)
             ->whereNotIn('id', $alreadyMappedIds)
             ->whereIn('input_type', array_keys(self::TYPE_MAP))
             ->get();

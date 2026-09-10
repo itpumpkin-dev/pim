@@ -5,22 +5,28 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Concerns\ResolvesMarketplaceMasterCategory;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
+use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
 use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
+use App\Models\TikTokBrand;
 use App\Models\TikTokCategory;
+use App\Models\TikTokCategoryAttribute;
 use App\Models\TikTokSellerAccount;
 use App\Services\Catalog\TikTokAttributeFamilyGenerator;
 use App\Services\Catalog\TikTokMappedAttributeCreator;
 use App\Services\Catalog\TikTokMappingTimelineBuilder;
+use App\Services\Marketplace\ResolvesProductAttributeValues;
 use App\Services\TikTok\TikTokClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -57,6 +63,11 @@ use Inertia\Response;
 class TikTokAttributeMappingController extends Controller
 {
     use ResolvesMarketplaceMasterCategory;
+    // resolveMappedField()/resolveProductImageUrls() ด้านล่าง (ใช้ใน
+    // productDetail()'s "ข้อมูลสินค้า (Platform)" tab) — ตัวเดียวกันเป๊ะกับที่
+    // TikTokProductSyncService::buildPayload() ใช้ resolve ค่าจริงตอน push ไม่ใช่
+    // เขียน logic ซ้ำเอง กันไม่ให้ preview กับของจริงเพี้ยนไปคนละทาง
+    use ResolvesProductAttributeValues;
 
     private const TARGET_FIELDS = [
         'name', 'price', 'qty', 'weight', 'length', 'width', 'height', 'description', 'video',
@@ -181,6 +192,260 @@ class TikTokAttributeMappingController extends Controller
     }
 
     /**
+     * รายละเอียดของสินค้าหนึ่งตัวสำหรับ sidebar ด้านขวาของหน้ารายการสินค้า
+     * (tiktok-products.tsx) — mirror ของ LazadaAttributeMappingController::
+     * productDetail() เป๊ะเกือบทั้งหมด ต่างกันตรงจุดที่ schema ของ TikTok เอง
+     * ต่างจาก Lazada จริงๆ:
+     *
+     *  - ไม่มี skip-list ของ raw attribute name (เช่น 'price'/'qty'/
+     *    'SellerSku' ที่ Lazada ต้องกรองออกจาก attribute list) เพราะ
+     *    getAttributes() ของ TikTok คืนเฉพาะ category-specific custom
+     *    attribute (PRODUCT_PROPERTY) เท่านั้น — ไม่เคยมีฟิลด์โครงสร้างตายตัว
+     *    อย่าง price/qty/weight ปนมาในลิสต์นี้แบบที่ Lazada's
+     *    /category/attributes/get คืนมาเลย
+     *  - ไม่มีการ special-case 'brand' ใน attribute loop เหมือน Lazada
+     *    เพราะ brand ของ TikTok ไม่ได้เป็นส่วนหนึ่งของ category attribute
+     *    schema เลย (ดู TikTokProductSyncService::buildPayload()'s
+     *    `'brand' => ['id' => ...]` — เป็นฟิลด์ตายตัวแยกต่างหาก resolve ผ่าน
+     *    resolveTikTokBrandId() เท่านั้น) เลยย้ายไปโชว์ใน platform_fields
+     *    tab แทน (ดู resolveBrandDisplayValue() ด้านล่าง) ไม่ใช่ attributes tab
+     */
+    public function productDetail(Product $product): JsonResponse
+    {
+        $product->load(['variants:id,parent_id']);
+
+        $tiktokCategoryId = $product->tiktok_category_id
+            ?: $product->categories()->whereNotNull('tiktok_category_id')->value('tiktok_category_id');
+
+        $nameAttrId = Attribute::idForCode('pname');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        $pname = null;
+        if ($nameAttrId) {
+            $pname = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $nameAttrId)
+                ->whereNull('channel_id')
+                ->where(function ($q) use ($activeLocaleId) {
+                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
+                })
+                ->orderByRaw('locale_id IS NULL') // ตัวที่ตรง locale ปัจจุบันมาก่อน ตัว global (locale_id null) เป็น fallback
+                ->value('value');
+        }
+
+        $mappings = TikTokAttributeMapping::with('attribute')->get();
+
+        $attributeRows = [];
+
+        $nameMapping = $mappings->first(fn ($m) => $m->target_field === 'name' && $m->attribute);
+        $resolvedName = $nameMapping ? $this->resolveAttributeDisplayValue($product, $nameMapping->attribute, $activeLocaleId) : $pname;
+        $attributeRows[] = [
+            'label' => 'ชื่อสินค้า',
+            'mandatory' => true,
+            'value' => $resolvedName,
+        ];
+
+        if ($tiktokCategoryId) {
+            // "attribute ไหนอยู่ในหมวดหมู่นี้บ้าง + บังคับหรือเปล่า" มาจาก
+            // tiktok_category_attributes เสมอตอนนี้ — ดู TikTokCategoryAttribute's
+            // docblock (แก้บั๊ก attribute id เดียวกันในหลายหมวดหมู่ทับ category_id/
+            // mandatory กันเองที่เคยเจอ) ไม่มี skip-list เหมือน Lazada — ดู
+            // docblock ของ method นี้ด้านบน
+            $mandatoryById = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)
+                ->pluck('mandatory', 'tiktok_attribute_id');
+
+            $tiktokAttrs = TikTokAttribute::whereIn('id', $mandatoryById->keys())
+                ->orderBy('name')
+                ->get();
+
+            foreach ($tiktokAttrs as $ttAttr) {
+                $mapping = $mappings->first(fn ($m) => $m->target_field === 'tiktok_attribute' && $m->tiktok_attribute_id === $ttAttr->id);
+                $value = $mapping ? $this->resolveAttributeDisplayValue($product, $mapping->attribute, $activeLocaleId) : null;
+
+                $attributeRows[] = [
+                    'label' => $ttAttr->name,
+                    'mandatory' => (bool) ($mandatoryById[$ttAttr->id] ?? false),
+                    'value' => $value,
+                ];
+            }
+        }
+
+        $syncHistory = ProductMarketplaceSyncJob::where('product_id', $product->id)
+            ->where('platform', 'tiktok')
+            ->with('shop:id,name')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->map(fn ($job) => [
+                'action' => $job->action,
+                'status' => $job->status,
+                'message' => $job->message,
+                'shop_name' => $job->shop->name ?? null,
+                'created_at' => $job->created_at,
+            ]);
+
+        $publishedTikTokShops = $product->platformShops()
+            ->whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
+            ->get(['sales_platform_shops.id', 'sales_platform_shops.name', 'sales_platform_shops.channel_id']);
+
+        // "ข้อมูลสินค้า (Platform)" tab — ต่างจาก $attributeRows ด้านบน (custom
+        // category attribute เฉพาะหมวดหมู่นี้) ตรงที่กลุ่มนี้คือฟิลด์ตายตัวที่
+        // TikTok ทุกหมวดหมู่ต้องมี (ราคา/สต็อก/น้ำหนัก-ขนาด/รายละเอียด/แบรนด์/
+        // รูปภาพ/วิดีโอ) — ใช้ resolveMappedField()/resolveProductImageUrls()
+        // จาก ResolvesProductAttributeValues trait ตัวเดียวกับที่
+        // TikTokProductSyncService::buildPayload() ใช้จริงตอน push (ไม่เขียน
+        // logic รีโซลฟ์ค่าซ้ำเอง) — ต่างจาก buildPayload() ตรงที่ตัวนี้ไม่เรียก
+        // resolveProductAttributes() (ซึ่งยิง live API ไป TikTok เพื่อเช็ค
+        // schema) เลย ไม่งั้นทุกครั้งที่เปิด tab นี้จะยิง API จริงโดยไม่จำเป็น
+        // แค่ต้องการพรีวิวจากข้อมูลที่มีอยู่ในเครื่องเท่านั้น
+        //
+        // ใช้ channel ของร้านที่ published อยู่ตัวเดียว (ถ้ามีพอดี 1 ร้าน) เพื่อให้
+        // ราคา/ค่าที่ผูกกับ channel ตรงกับร้านนั้นจริงๆ — ถ้าไม่มีหรือมีหลายร้าน
+        // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels)
+        $channelId = $publishedTikTokShops->count() === 1 ? $publishedTikTokShops->first()->channel_id : null;
+
+        $platformFields = [
+            ['label' => 'Seller SKU', 'value' => $product->sku],
+            // buildPayload() fallback ค่า description เป็น $name ตายตัวถ้าไม่มี
+            // attribute แมปไว้ — mirror ลำดับเดียวกัน
+            ['label' => 'รายละเอียดสินค้า (Description)', 'value' => $this->resolveMappedField($mappings, 'description', $product, $channelId, localeCode: 'th') ?: $resolvedName],
+            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId)],
+            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId)],
+            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId)],
+            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId)],
+            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId)],
+            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId)],
+            // TikTok ต้องการ brand เสมอตอน push จริง (resolveTikTokBrandId()
+            // throw ถ้าไม่มี) — ต่างจาก Lazada ตรงที่ไม่ได้มาจาก category
+            // attribute schema เลย เป็นฟิลด์ตายตัวแยกต่างหาก (ดู docblock ของ
+            // method นี้)
+            ['label' => 'แบรนด์ (Brand)', 'value' => $this->resolveBrandDisplayValue($product)],
+            // ไม่บังคับ (ไม่มีสินค้าไหนต้องมีวิดีโอ) — โชว์ไว้เผื่อ debug
+            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId)],
+        ];
+
+        $platformImages = $this->resolveProductImageUrls($product, $channelId);
+
+        return response()->json([
+            'id' => $product->id,
+            'sku' => $product->sku,
+            'name' => $pname ?: $product->sku,
+            'variants_count' => $product->variants->count(),
+            'enabled' => $product->enabled,
+            'tiktok_category_path' => $this->tiktokCategoryPathFor($tiktokCategoryId),
+            'attributes' => $attributeRows,
+            'platform_fields' => $platformFields,
+            'platform_images' => $platformImages,
+            'sync_history' => $syncHistory,
+            'published_tiktok_shops' => $publishedTikTokShops,
+        ]);
+    }
+
+    /**
+     * ค่า display ของ attribute หนึ่งตัวสำหรับสินค้าหนึ่งชิ้น ใช้โดย
+     * productDetail() ด้านบนเท่านั้น — mirror ของ
+     * LazadaAttributeMappingController::resolveAttributeDisplayValue() เป๊ะ
+     * (ไม่ผูกกับ marketplace ไหนเป็นการเฉพาะอยู่แล้ว แค่ไม่มี shared trait
+     * กลาง — Lazada เองก็ประกาศแยกไว้ในไฟล์ของตัวเองเช่นกัน)
+     */
+    private function resolveAttributeDisplayValue(Product $product, ?Attribute $attribute, ?int $activeLocaleId): ?string
+    {
+        if (! $attribute) {
+            return null;
+        }
+
+        $localeId = $attribute->is_locale_based ? $activeLocaleId : null;
+        $scopeToLocale = function ($query) use ($localeId) {
+            return $query->where(function ($q) use ($localeId) {
+                $q->where('locale_id', $localeId)->orWhereNull('locale_id');
+            })->orderByRaw('locale_id IS NULL'); // ตรง locale ปัจจุบันก่อน ตัว global (locale_id null) เป็น fallback
+        };
+
+        $isVariantDefining = in_array($attribute->id, $product->configurable_attributes ?? [], true);
+
+        if ($isVariantDefining && $product->variants->isNotEmpty()) {
+            $codes = $product->variants->map(function ($variant) use ($attribute, $scopeToLocale) {
+                return $scopeToLocale(
+                    ProductValue::where('product_id', $variant->id)
+                        ->where('attribute_id', $attribute->id)
+                        ->whereNull('channel_id')
+                )->value('value');
+            });
+        } else {
+            $own = $scopeToLocale(
+                ProductValue::where('product_id', $product->id)
+                    ->where('attribute_id', $attribute->id)
+                    ->whereNull('channel_id')
+            )->value('value');
+            $codes = collect($own !== null && $own !== '' ? [$own] : []);
+        }
+
+        $codes = $codes->filter(fn ($c) => $c !== null && $c !== '')->unique()->values();
+        if ($codes->isEmpty()) {
+            return null;
+        }
+
+        if (in_array($attribute->type, ['select', 'multiselect'], true)) {
+            $labelByCode = AttributeOption::where('attribute_id', $attribute->id)
+                ->whereIn('code', $codes)
+                ->get()
+                ->keyBy('code');
+
+            return $codes->map(fn ($code) => $labelByCode->get($code)?->admin_label ?? $code)->implode(', ');
+        }
+
+        return $codes->implode(', ');
+    }
+
+    /**
+     * ชื่อแบรนด์ที่จะส่งไป TikTok จริง — mirror ลำดับความสำคัญเดียวกับ
+     * TikTokProductSyncService::resolveTikTokBrandId() เป๊ะๆ:
+     *
+     *   1. override เฉพาะสินค้า (products.tiktok_brand_id) ถ้ามี
+     *   2. ไม่งั้นดูค่า attribute `pbrand` ของสินค้า → Brand.tiktok_brand_id
+     *      ("Master Brand" — ตาราง tiktok_brands ที่ sync มาจาก TikTok จริง)
+     *
+     * ต่างจาก resolveBrandDisplayValue() ฝั่ง Lazada ตรงที่ไม่มีทาง fallback
+     * ที่ 3 ผ่าน LazadaAttributeMapping ทั่วไป — TikTok ไม่เคย map brand
+     * ผ่าน TikTokAttributeMapping เลย (ไม่ใช่ category attribute แบบ Lazada's
+     * 'brand' — ดู docblock ของ productDetail() ด้านบน) resolveTikTokBrandId()
+     * เองก็ throw ถ้าไม่มีทั้งสองทางนี้ ตรงนี้แค่คืน null แทน (เป็น preview
+     * ไม่ใช่ path ที่ใช้ push จริง)
+     */
+    private function resolveBrandDisplayValue(Product $product): ?string
+    {
+        $tiktokBrandId = $product->tiktok_brand_id ?: $this->mappedBrandOptionId($product, 'tiktok_brand_id');
+        if (! $tiktokBrandId) {
+            return null;
+        }
+
+        return TikTokBrand::find($tiktokBrandId)?->name;
+    }
+
+    /**
+     * เดินขึ้นสายพ่อแม่ของ TikTokCategory ทีละชั้นจนถึงราก — mirror ของ
+     * LazadaAttributeMappingController::lazadaCategoryPathFor() เป๊ะ เรียก
+     * ครั้งเดียวต่อ request นี้ (สินค้าเดียว) เลยไม่ต้อง preload ทั้งต้นไม้
+     */
+    private function tiktokCategoryPathFor(?int $categoryId): ?string
+    {
+        if (! $categoryId) {
+            return null;
+        }
+
+        $names = [];
+        $id = $categoryId;
+        while ($id) {
+            $cat = TikTokCategory::find($id, ['id', 'parent_id', 'name']);
+            if (! $cat) {
+                break;
+            }
+            array_unshift($names, $cat->name);
+            $id = $cat->parent_id;
+        }
+
+        return $names ? implode(' > ', $names) : null;
+    }
+
+    /**
      * UI สำหรับการไล่ดูและจัดการ Mapping ข้อมูลของสินค้าใน TikTok — mirror ของ
      * ShopeeAttributeMappingController::shopeeProducts() เป๊ะ ใช้
      * ResolvesMarketplaceMasterCategory trait ตัวเดียวกัน (ไม่ต้อง duplicate
@@ -277,17 +542,40 @@ class TikTokAttributeMappingController extends Controller
         $mappedAttrIds = TikTokAttributeMapping::whereNotNull('tiktok_attribute_id')->pluck('tiktok_attribute_id')->unique()->all();
         $tiktokCategoryStats = [];
 
-        $ttAttrGroup = TikTokAttribute::get(['id', 'category_id', 'mandatory'])->groupBy('category_id');
-        foreach ($ttAttrGroup as $ttCatId => $attrs) {
+        // "N/M attr แมปแล้ว" ต่อหมวดหมู่ — มาจาก tiktok_category_attributes
+        // เสมอตอนนี้ (ไม่ใช่ tiktok_attributes.category_id ที่ deprecated แล้ว
+        // ดู TikTokCategoryAttribute's docblock) แต่ละหมวดหมู่มีชุด attribute
+        // เป็นของตัวเองจริงๆ ไม่ทับกันข้ามหมวดหมู่อีกต่อไป
+        $catAttrGroup = TikTokCategoryAttribute::get(['category_id', 'tiktok_attribute_id'])->groupBy('category_id');
+        foreach ($catAttrGroup as $ttCatId => $attrs) {
             $totalAttr = $attrs->count();
-            $mappedCount = $attrs->filter(fn ($a) => in_array($a->id, $mappedAttrIds, true))->count();
+            $mappedCount = $attrs->filter(fn ($a) => in_array($a->tiktok_attribute_id, $mappedAttrIds, true))->count();
             $tiktokCategoryStats[$ttCatId] = [
                 'total' => $totalAttr,
                 'mapped' => $mappedCount,
             ];
         }
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allTikTokCategories, $tiktokCategoryPathOf, $tiktokCategoryStats, $allPimCategories) {
+        // สถานะ "sync ไป TikTok แล้วหรือยัง" ต่อสินค้า — คนละเรื่องกับ
+        // category_mapped/attribute_stats ด้านบน (นั่นคือ "ตั้งค่า mapping ไว้
+        // ครบหรือยัง" ส่วนนี้คือ "เคย push แล้วยืนยันว่า live จริงบน TikTok
+        // หรือยัง") mirror ของ LazadaAttributeMappingController::
+        // lazadaProducts()'s $lazadaShopSyncByProduct เป๊ะ
+        $tiktokShopSyncByProduct = DB::table('product_platform_shops')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->where('sales_platforms.code', 'tiktok')
+            ->where('product_platform_shops.status', 'live')
+            ->whereIn('product_platform_shops.product_id', $pageProductIds)
+            ->orderBy('sales_platform_shops.name')
+            ->get([
+                'product_platform_shops.product_id',
+                'sales_platform_shops.name as shop_name',
+                'product_platform_shops.last_synced_at',
+            ])
+            ->groupBy('product_id');
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allTikTokCategories, $tiktokCategoryPathOf, $tiktokCategoryStats, $allPimCategories, $tiktokShopSyncByProduct) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'tiktok_category_id');
 
             // เหตุผลเดียวกับ ShopeeAttributeMappingController — $masterCat คือ
@@ -319,6 +607,12 @@ class TikTokAttributeMappingController extends Controller
                 ] : null,
                 'category_mapped' => (bool) $tiktokCatId,
                 'attribute_stats' => $attrStats,
+                'tiktok_sync' => [
+                    'synced' => $tiktokShopSyncByProduct->has($product->id),
+                    'shops' => $tiktokShopSyncByProduct->get($product->id, collect())
+                        ->map(fn ($row) => ['name' => $row->shop_name, 'last_synced_at' => $row->last_synced_at])
+                        ->values()->all(),
+                ],
             ];
         });
 
@@ -508,6 +802,14 @@ class TikTokAttributeMappingController extends Controller
 
         $client = new TikTokClient($account);
         $rowsById = [];
+        // (category_id, tiktok_attribute_id) => is_mandatory — เก็บแยกจาก
+        // $rowsById ด้านบน (ซึ่งจงใจ dedupe ข้าม category เพราะ name/
+        // is_customizable/is_multiple_selection/options เสถียรพอจะ key ด้วย
+        // `id` เฉยๆ ได้จริง) เพราะ mandatory ต่างจากนั้น — เปลี่ยนไปตาม
+        // category จริง เก็บรวมแถวเดียวแบบ $rowsById ไม่ได้ ไม่งั้นจะเจอบั๊ก
+        // เดิมที่ tiktok_attributes.category_id/.mandatory เคยเป็น (ดู
+        // TikTokCategoryAttribute's docblock)
+        $categoryAttrRows = [];
 
         foreach ($categoryIds as $index => $categoryId) {
             $response = $client->getAttributes((string) $categoryId);
@@ -524,6 +826,14 @@ class TikTokAttributeMappingController extends Controller
                     'is_multiple_selection' => (bool) ($attr['is_multiple_selection'] ?? false),
                     'options' => $this->encodeTikTokOptions($attr),
                 ];
+
+                // 'is_requried' — TikTok's own typo, not ours (see
+                // TikTokClient::getAttributes()'s docblock).
+                $categoryAttrRows[] = [
+                    'category_id' => (int) $categoryId,
+                    'tiktok_attribute_id' => $attr['id'],
+                    'mandatory' => (bool) ($attr['is_requried'] ?? false),
+                ];
             }
 
             if ($index < count($categoryIds) - 1) {
@@ -537,6 +847,14 @@ class TikTokAttributeMappingController extends Controller
                 array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
                 ['id'],
                 ['name', 'is_customizable', 'is_multiple_selection', 'options', 'updated_at']
+            );
+        }
+
+        foreach (array_chunk($categoryAttrRows, 500) as $chunk) {
+            TikTokCategoryAttribute::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['category_id', 'tiktok_attribute_id'],
+                ['mandatory', 'updated_at']
             );
         }
 
@@ -582,16 +900,28 @@ class TikTokAttributeMappingController extends Controller
                 'name' => $attr['name'],
                 'is_customizable' => (bool) ($attr['is_customizable'] ?? false),
                 'is_multiple_selection' => (bool) ($attr['is_multiple_selection'] ?? false),
-                'category_id' => $categoryId,
-                'mandatory' => (bool) ($attr['is_requried'] ?? false),
                 'options' => $this->encodeTikTokOptions($attr),
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
         }
 
+        // แยกเขียนคนละตาราง: name/is_customizable/is_multiple_selection/
+        // options ยังคงไป tiktok_attributes เหมือนเดิม (เสถียรพอจะ dedupe ข้าม
+        // category ได้จริง) ส่วน mandatory ซึ่งเปลี่ยนไปตาม category ไปที่
+        // tiktok_category_attributes แทน — ไม่ใช้แถวเดียวกันซ้อนกันแบบเดิมอีก
+        // ต่อไป (บั๊กที่แก้ไปแล้ว ดู TikTokCategoryAttribute's docblock)
         if ($rows !== []) {
-            TikTokAttribute::upsert($rows, ['id'], ['name', 'is_customizable', 'is_multiple_selection', 'category_id', 'mandatory', 'options', 'updated_at']);
+            TikTokAttribute::upsert($rows, ['id'], ['name', 'is_customizable', 'is_multiple_selection', 'options', 'updated_at']);
+
+            $categoryAttrRows = array_map(fn (array $attr) => [
+                'category_id' => $categoryId,
+                'tiktok_attribute_id' => $attr['id'],
+                'mandatory' => (bool) ($attr['is_requried'] ?? false),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], array_values(array_filter($schema, fn ($attr) => ($attr['type'] ?? null) === 'PRODUCT_PROPERTY')));
+            TikTokCategoryAttribute::upsert($categoryAttrRows, ['category_id', 'tiktok_attribute_id'], ['mandatory', 'updated_at']);
         }
 
         TikTokAttribute::bumpListVersion();
@@ -629,17 +959,27 @@ class TikTokAttributeMappingController extends Controller
      * เพิ่ม `options`/`tiktok_attribute_mapping_id`/`option_mappings` เข้ามา
      * (mirror ของ ShopeeAttributeMappingController::shopeeAttributesForCategory())
      * ให้หน้า tiktok-products.tsx เปิด dialog "จับคู่ตัวเลือก" ได้
+     *
+     * "attribute ไหนอยู่ในหมวดหมู่นี้บ้าง + บังคับหรือเปล่า" มาจาก
+     * tiktok_category_attributes เสมอตอนนี้ (ไม่ใช่ tiktok_attributes.
+     * category_id/.mandatory ที่ deprecated แล้ว — ดู TikTokCategoryAttribute
+     * กับ TikTokAttribute's docblock) ส่วน name/is_customizable/
+     * is_multiple_selection/options ยังมาจาก tiktok_attributes เหมือนเดิม
+     * (ข้อมูลที่เสถียรพอจะ key ด้วย `id` เฉยๆ ได้จริง)
      */
     public function tiktokAttributesForCategory(int $tiktokCategoryId): JsonResponse
     {
-        $attributes = TikTokAttribute::where('category_id', $tiktokCategoryId)->orderBy('name')->get();
+        $mandatoryById = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)
+            ->pluck('mandatory', 'tiktok_attribute_id');
+
+        $attributes = TikTokAttribute::whereIn('id', $mandatoryById->keys())->orderBy('name')->get();
 
         $mappedByTikTokAttributeId = TikTokAttributeMapping::whereIn('tiktok_attribute_id', $attributes->pluck('id'))
             ->with(['attribute:id,name', 'optionMappings'])
             ->get()
             ->keyBy('tiktok_attribute_id');
 
-        $data = $attributes->map(function (TikTokAttribute $attribute) use ($mappedByTikTokAttributeId) {
+        $data = $attributes->map(function (TikTokAttribute $attribute) use ($mappedByTikTokAttributeId, $mandatoryById) {
             $mapping = $mappedByTikTokAttributeId->get($attribute->id);
             $isSelectType = !$attribute->is_customizable;
 
@@ -648,7 +988,7 @@ class TikTokAttributeMappingController extends Controller
                 'name' => $attribute->name,
                 'is_customizable' => (bool) $attribute->is_customizable,
                 'is_multiple_selection' => (bool) $attribute->is_multiple_selection,
-                'mandatory' => (bool) $attribute->mandatory,
+                'mandatory' => (bool) ($mandatoryById[$attribute->id] ?? false),
                 'mapped' => $mapping ? ['id' => $mapping->attribute->id, 'name' => $mapping->attribute->name] : null,
                 // `options` cast เป็น array แล้ว (ดู TikTokAttribute::$casts)
                 'options' => $isSelectType

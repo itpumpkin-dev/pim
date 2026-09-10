@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Events\ProductDataChanged;
 use App\Listeners\AuditAuthEventSubscriber;
+use App\Listeners\QueueAutoMarketplaceSync;
 use App\Models\BaseUnit;
 use App\Models\BaseUnitTranslation;
 use App\Models\Brand;
@@ -50,6 +52,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::subscribe(AuditAuthEventSubscriber::class);
+
+        // Gap-closer vs. the old "someone has to click Push" flow — auto-queues
+        // a marketplace sync whenever a product changes in a way that already
+        // mattered enough to fire this event. See QueueAutoMarketplaceSync for
+        // the debounce mechanics and the MARKETPLACE_AUTO_SYNC on/off switch.
+        Event::listen(ProductDataChanged::class, QueueAutoMarketplaceSync::class);
 
         // A `select` attribute with a `master_source` mirrors that master's
         // rows as its options (see MasterAttributeOptionSync). Any write to a

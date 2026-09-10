@@ -6,9 +6,9 @@ use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AuditLog;
 use App\Models\Category;
-use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
+use App\Models\TikTokCategoryAttribute;
 use Illuminate\Support\Collection;
 
 /**
@@ -102,7 +102,9 @@ class TikTokMappingTimelineBuilder
      */
     private function resolveMappedAttributeIds(int $tiktokCategoryId): array
     {
-        $tiktokAttributeIds = TikTokAttribute::where('category_id', $tiktokCategoryId)->pluck('id');
+        // มาจาก tiktok_category_attributes เสมอตอนนี้ (ไม่ใช่ tiktok_attributes.
+        // category_id ที่ deprecated แล้ว — ดู TikTokCategoryAttribute's docblock)
+        $tiktokAttributeIds = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)->pluck('tiktok_attribute_id');
         if ($tiktokAttributeIds->isEmpty()) {
             return [];
         }

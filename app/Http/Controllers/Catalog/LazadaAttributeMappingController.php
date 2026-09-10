@@ -5,23 +5,28 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Concerns\ResolvesMarketplaceMasterCategory;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AttributeOption;
 use App\Models\Category;
 use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
+use App\Models\LazadaBrand;
 use App\Models\LazadaCategory;
+use App\Models\LazadaCategoryAttribute;
 use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\Product;
+use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
 use App\Services\Catalog\LazadaAttributeFamilyGenerator;
 use App\Services\Catalog\LazadaMappedAttributeCreator;
 use App\Services\Catalog\LazadaMappingTimelineBuilder;
 use App\Services\Lazada\LazadaClient;
+use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -64,6 +69,11 @@ use Inertia\Response;
 class LazadaAttributeMappingController extends Controller
 {
     use ResolvesMarketplaceMasterCategory;
+    // resolveMappedField()/resolveProductImageUrls() ด้านล่าง (ใช้ใน
+    // productDetail()'s "ข้อมูลสินค้า (Platform)" tab) — ตัวเดียวกันเป๊ะกับที่
+    // LazadaProductSyncService::buildPayload() ใช้ resolve ค่าจริงตอน push ไม่ใช่
+    // เขียน logic ซ้ำเอง กันไม่ให้ preview กับของจริงเพี้ยนไปคนละทางกัน
+    use ResolvesProductAttributeValues;
 
     // ใช้แบบ allowlist (ปฏิเสธทุกอย่างที่ยังไม่ได้ยืนยันชัดๆ ว่าปลอดภัย) เป็นค่าเริ่มต้น
     // แบบระมัดระวังแบบเดียวกับที่ใช้ทั่วทั้งแอปในส่วน integration ของ marketplace
@@ -195,38 +205,47 @@ class LazadaAttributeMappingController extends Controller
             }
         }
 
-        $hasCategoryCol = Schema::hasColumn('lazada_attributes', 'category_id');
-        $hasMandatoryCol = Schema::hasColumn('lazada_attributes', 'mandatory');
-
         $mappedAttrNames = LazadaAttributeMapping::whereNotNull('lazada_attribute_name')->pluck('lazada_attribute_name')->unique()->all();
         $lazadaCategoryStats = [];
 
-        if ($hasCategoryCol) {
-            $selectCols = ['name', 'category_id'];
-            if ($hasMandatoryCol) {
-                $selectCols[] = 'mandatory';
-            }
-            $lzAttrGroup = LazadaAttribute::get($selectCols)->groupBy('category_id');
-            foreach ($lzAttrGroup as $lzCatId => $attrs) {
-                $totalAttr = $attrs->count();
-                $mappedCount = $attrs->filter(fn ($a) => in_array($a->name, $mappedAttrNames, true))->count();
-                $lazadaCategoryStats[$lzCatId] = [
-                    'total' => $totalAttr,
-                    'mapped' => $mappedCount,
-                ];
-            }
-        } else {
-            $totalAttr = LazadaAttribute::count();
-            $mappedCount = count($mappedAttrNames);
-            foreach ($allLazadaCategories as $lzCatId => $lzCat) {
-                $lazadaCategoryStats[$lzCatId] = [
-                    'total' => $totalAttr,
-                    'mapped' => $mappedCount,
-                ];
-            }
+        // "N/M attr แมปแล้ว" ต่อหมวดหมู่ — มาจาก lazada_category_attributes
+        // เสมอตอนนี้ (ไม่ใช่ lazada_attributes.category_id ที่ deprecated แล้ว
+        // ดู LazadaCategoryAttribute's docblock) แต่ละหมวดหมู่มีชุด field เป็น
+        // ของตัวเองจริงๆ ไม่ทับกันข้ามหมวดหมู่อีกต่อไป
+        $catAttrGroup = LazadaCategoryAttribute::get(['category_id', 'lazada_attribute_name'])->groupBy('category_id');
+        foreach ($catAttrGroup as $lzCatId => $attrs) {
+            $totalAttr = $attrs->count();
+            $mappedCount = $attrs->filter(fn ($a) => in_array($a->lazada_attribute_name, $mappedAttrNames, true))->count();
+            $lazadaCategoryStats[$lzCatId] = [
+                'total' => $totalAttr,
+                'mapped' => $mappedCount,
+            ];
         }
 
-        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats, $allPimCategories) {
+        // สถานะ "sync ไป Lazada แล้วหรือยัง" ต่อสินค้า — คนละเรื่องกับ
+        // category_mapped/attribute_stats ด้านบน (นั่นคือ "ตั้งค่า mapping
+        // ไว้ครบหรือยัง" ส่วนนี้คือ "เคย push แล้วยืนยันว่า live จริงบน Lazada
+        // หรือยัง") อ่านจาก product_platform_shops.status ตัวเดียวกับที่
+        // Sales Channels panel ของหน้า Edit Product ใช้โชว์ badge "Live"
+        // (เขียนโดย LazadaProductSyncService::checkLiveStatus() ตอนเปิด
+        // dialog Push/Deactivate หรือ syncLiveStatus() แบบ bulk) — ไม่ได้
+        // เขียนโดย push() เอง (ดูคอมเมนต์ที่ push()) เลยอาจไม่ทันสมัยเป๊ะๆ
+        // ถ้ายังไม่มีใครเปิด dialog เช็คสถานะของสินค้านั้นเลยหลัง push ล่าสุด
+        $lazadaShopSyncByProduct = DB::table('product_platform_shops')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'product_platform_shops.sales_platform_shop_id')
+            ->join('sales_platforms', 'sales_platforms.id', '=', 'sales_platform_shops.sales_platform_id')
+            ->where('sales_platforms.code', 'lazada')
+            ->where('product_platform_shops.status', 'live')
+            ->whereIn('product_platform_shops.product_id', $pageProductIds)
+            ->orderBy('sales_platform_shops.name')
+            ->get([
+                'product_platform_shops.product_id',
+                'sales_platform_shops.name as shop_name',
+                'product_platform_shops.last_synced_at',
+            ])
+            ->groupBy('product_id');
+
+        $rows = $paginated->getCollection()->map(function (Product $product) use ($pnames, $pimCategoryPathOf, $allLazadaCategories, $lazadaCategoryPathOf, $lazadaCategoryStats, $allPimCategories, $lazadaShopSyncByProduct) {
             $masterCat = $this->resolveMasterCategory($product, $allPimCategories, 'lazada_category_id');
 
             // $masterCat คือหมวดหมู่ที่ "ลึกที่สุด" สำหรับแสดงผล (path เต็ม) —
@@ -259,6 +278,12 @@ class LazadaAttributeMappingController extends Controller
                 ] : null,
                 'category_mapped' => (bool) $lazadaCatId,
                 'attribute_stats' => $attrStats,
+                'lazada_sync' => [
+                    'synced' => $lazadaShopSyncByProduct->has($product->id),
+                    'shops' => $lazadaShopSyncByProduct->get($product->id, collect())
+                        ->map(fn ($row) => ['name' => $row->shop_name, 'last_synced_at' => $row->last_synced_at])
+                        ->values()->all(),
+                ],
             ];
         });
 
@@ -283,6 +308,291 @@ class LazadaAttributeMappingController extends Controller
                 'per_page' => $perPage,
             ],
         ]);
+    }
+
+    /**
+     * รายละเอียดของสินค้าหนึ่งตัวสำหรับ sidebar ด้านขวาของหน้ารายการสินค้า
+     * (lazada-products.tsx) — เบากว่า lazadaProducts() ด้านบนมาก เพราะดึงแค่
+     * สินค้าเดียวตอนผู้ใช้กด arrow เปิดดู ไม่ต้อง preload ทั้งหน้า
+     *
+     * โชว์เฉพาะฟิลด์ "name" กับ custom category attribute ทุกตัว (ไม่ว่าจะ
+     * บังคับหรือไม่) — ข้าม price/qty/weight/dimensions/SellerSku ออกไปตาม
+     * requirement (ราคา/สต็อกดูที่หน้า Edit Product แทน) รายชื่อ raw name ที่
+     * ข้ามนี้คือฟิลด์ที่มาจาก target_field ตายตัว (name/price/qty/weight/
+     * length/width/height) ไม่ใช่ `lazada_attribute` ทั่วไป — ตรงกับที่
+     * ProductController::lazadaMandatoryAttributeIds() ใช้แยกสองกลุ่มนี้เช่นกัน
+     */
+    public function productDetail(Product $product): JsonResponse
+    {
+        $product->load(['variants:id,parent_id']);
+
+        $lazadaCategoryId = $product->lazada_category_id
+            ?: $product->categories()->whereNotNull('lazada_category_id')->value('lazada_category_id');
+
+        $nameAttrId = Attribute::idForCode('pname');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        $pname = null;
+        if ($nameAttrId) {
+            $pname = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $nameAttrId)
+                ->whereNull('channel_id')
+                ->where(function ($q) use ($activeLocaleId) {
+                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
+                })
+                ->orderByRaw('locale_id IS NULL') // ตัวที่ตรง locale ปัจจุบันมาก่อน ตัว global (locale_id null) เป็น fallback
+                ->value('value');
+        }
+
+        $mappings = LazadaAttributeMapping::with('attribute')->get();
+
+        $attributeRows = [];
+
+        $nameMapping = $mappings->first(fn ($m) => $m->target_field === 'name' && $m->attribute);
+        $resolvedName = $nameMapping ? $this->resolveAttributeDisplayValue($product, $nameMapping->attribute, $activeLocaleId) : $pname;
+        $attributeRows[] = [
+            'label' => 'ชื่อสินค้า',
+            'mandatory' => true,
+            'value' => $resolvedName,
+        ];
+
+        // ฟิลด์ที่มี target_field ตายตัวอยู่แล้ว (ไม่ใช่ custom category
+        // attribute) — ไม่โชว์ในลิสต์นี้ (price/stock ไม่ต้องเอามาแสดงตามที่
+        // ขอ ส่วน SellerSku ก็ไม่ใช่ PIM attribute ให้โชว์ค่าอยู่แล้ว)
+        $skipRawNames = ['SellerSku', 'price', 'qty', 'quantity', 'package_weight', 'package_length', 'package_width', 'package_height'];
+
+        if ($lazadaCategoryId) {
+            // "field ไหนอยู่ในหมวดหมู่นี้บ้าง + บังคับหรือเปล่า" มาจาก
+            // lazada_category_attributes เสมอตอนนี้ — ดู LazadaCategoryAttribute's
+            // docblock (แก้บั๊ก field ชื่อเดียวกันในหลายหมวดหมู่ทับ category_id/
+            // mandatory กันเองที่เคยเจอ)
+            $mandatoryByName = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)
+                ->whereNotIn('lazada_attribute_name', $skipRawNames)
+                ->pluck('mandatory', 'lazada_attribute_name');
+
+            $lazadaAttrs = LazadaAttribute::whereIn('name', $mandatoryByName->keys())
+                ->orderBy('name')
+                ->get();
+
+            foreach ($lazadaAttrs as $lzAttr) {
+                if ($lzAttr->name === 'brand') {
+                    // 'brand' ตอน push จริงไม่ได้ผ่าน LazadaAttributeMapping
+                    // ธรรมดา — buildPayload() ให้ "Master Brand" (lazada_brand_id)
+                    // ชนะก่อนเสมอ ถ้ามี ค่อย fallback ไปทาง mapping ทั่วไป (ดู
+                    // resolveBrandDisplayValue() ด้านล่าง ซึ่ง mirror ลำดับ
+                    // เดียวกับ LazadaProductSyncService::resolveLazadaBrandId())
+                    $value = $this->resolveBrandDisplayValue($product);
+                } else {
+                    $mapping = $mappings->first(fn ($m) => $m->target_field === 'lazada_attribute' && $m->lazada_attribute_name === $lzAttr->name);
+                    $value = $mapping ? $this->resolveAttributeDisplayValue($product, $mapping->attribute, $activeLocaleId) : null;
+                }
+
+                $attributeRows[] = [
+                    'label' => $lzAttr->label ?: $lzAttr->name,
+                    'mandatory' => (bool) ($mandatoryByName[$lzAttr->name] ?? false),
+                    'value' => $value,
+                ];
+            }
+        }
+
+        $syncHistory = ProductMarketplaceSyncJob::where('product_id', $product->id)
+            ->where('platform', 'lazada')
+            ->with('shop:id,name')
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->map(fn ($job) => [
+                'action' => $job->action,
+                'status' => $job->status,
+                'message' => $job->message,
+                'shop_name' => $job->shop->name ?? null,
+                'created_at' => $job->created_at,
+            ]);
+
+        $publishedLazadaShops = $product->platformShops()
+            ->whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
+            ->get(['sales_platform_shops.id', 'sales_platform_shops.name', 'sales_platform_shops.channel_id']);
+
+        // "ข้อมูลสินค้า (Platform)" tab — ต่างจาก $attributeRows ด้านบน (custom
+        // category attribute เฉพาะหมวดหมู่นี้) ตรงที่กลุ่มนี้คือฟิลด์ตายตัวที่
+        // Lazada ทุกหมวดหมู่ต้องมี (ราคา/สต็อก/น้ำหนัก-ขนาด/รูปภาพ) — พวกนี้คือสิ่ง
+        // ที่หน้า listing จริงบน Lazada เอาไปแสดงให้ลูกค้าเห็น ใช้
+        // resolveMappedField()/resolveProductImageUrls() จาก
+        // ResolvesProductAttributeValues trait ตัวเดียวกับที่
+        // LazadaProductSyncService::buildPayload() ใช้จริงตอน push (ไม่เขียน
+        // logic รีโซลฟ์ค่าซ้ำเอง) — ต่างจาก buildPayload() ตรงที่ตัวนี้ไม่เรียก
+        // assertMandatoryFieldsPresent() (ซึ่งยิง live API ไป Lazada) เลย ไม่งั้น
+        // ทุกครั้งที่เปิด tab นี้จะยิง API จริงโดยไม่จำเป็น แค่ต้องการพรีวิวจากข้อมูล
+        // ที่มีอยู่ในเครื่องเท่านั้น
+        //
+        // ใช้ channel ของร้านที่ published อยู่ตัวเดียว (ถ้ามีพอดี 1 ร้าน) เพื่อให้
+        // ราคา/ค่าที่ผูกกับ channel ตรงกับร้านนั้นจริงๆ — ถ้าไม่มีหรือมีหลายร้าน
+        // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels)
+        $channelId = $publishedLazadaShops->count() === 1 ? $publishedLazadaShops->first()->channel_id : null;
+
+        $platformFields = [
+            ['label' => 'Seller SKU', 'value' => $product->sku],
+            // buildPayload() ตั้ง short_description ให้เท่ากับ name ตายตัวเสมอ
+            // (ไม่มี target_field แยกให้ map เอง) — ไม่ใช่ค่าจริงจาก PIM attribute
+            // ไหนต่างหาก แค่ mirror ชื่อสินค้าไปอีกฟิลด์หนึ่งของ Lazada
+            ['label' => 'รายละเอียดสั้น (Short Description)', 'value' => $resolvedName],
+            ['label' => 'ราคา (Price)', 'value' => $this->resolveMappedField($mappings, 'price', $product, $channelId)],
+            ['label' => 'จำนวนคงเหลือ (Qty)', 'value' => $this->resolveMappedField($mappings, 'qty', $product, $channelId)],
+            ['label' => 'น้ำหนักบรรจุภัณฑ์ (kg)', 'value' => $this->resolveMappedField($mappings, 'weight', $product, $channelId)],
+            ['label' => 'ความยาวบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'length', $product, $channelId)],
+            ['label' => 'ความกว้างบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'width', $product, $channelId)],
+            ['label' => 'ความสูงบรรจุภัณฑ์ (cm)', 'value' => $this->resolveMappedField($mappings, 'height', $product, $channelId)],
+            // ไม่บังคับ (ไม่มีสินค้าไหนต้องมีวิดีโอ) — โชว์ไว้เผื่อ debug ว่าทำไม
+            // ไม่มีวิดีโอขึ้นจริงบน listing ทั้งที่คิดว่า map ไว้แล้ว
+            ['label' => 'วิดีโอสินค้า (Video)', 'value' => $this->resolveMappedField($mappings, 'video', $product, $channelId)],
+        ];
+
+        $platformImages = $this->resolveProductImageUrls($product, $channelId);
+
+        return response()->json([
+            'id' => $product->id,
+            'sku' => $product->sku,
+            'name' => $pname ?: $product->sku,
+            'variants_count' => $product->variants->count(),
+            'enabled' => $product->enabled,
+            'lazada_category_path' => $this->lazadaCategoryPathFor($lazadaCategoryId),
+            'attributes' => $attributeRows,
+            'platform_fields' => $platformFields,
+            'platform_images' => $platformImages,
+            'sync_history' => $syncHistory,
+            'published_lazada_shops' => $publishedLazadaShops,
+        ]);
+    }
+
+    /**
+     * ค่า display ของ attribute หนึ่งตัวสำหรับสินค้าหนึ่งชิ้น ใช้โดย
+     * productDetail() ด้านบนเท่านั้น — ต่างจาก ResolvesProductAttributeValues
+     * trait (ที่ sync service ใช้ตอน build payload จริง) ตรงที่ตัวนี้ resolve
+     * select/multiselect option code กลับเป็น label ที่คนอ่านได้ (เพื่อโชว์ใน
+     * sidebar) แทนที่จะปล่อยเป็น code ดิบไว้แบบที่ AttributeValueFormatter ทำ
+     *
+     * ถ้า $attribute เป็นหนึ่งใน configurable_attributes ของสินค้า (คือเป็น
+     * แกน variant เช่น Size/Color) ค่าของ "ตัวแม่" เองมักจะว่างเปล่า (ค่าจริง
+     * อยู่ที่ variant ลูกแต่ละตัวแยกกัน) เลย aggregate ค่าที่ต่างกันของ
+     * variant ทุกตัวมารวมเป็นชุดแทน (เช่น "S, M, L, XL, XXL")
+     */
+    private function resolveAttributeDisplayValue(Product $product, ?Attribute $attribute, ?int $activeLocaleId): ?string
+    {
+        if (! $attribute) {
+            return null;
+        }
+
+        // Attribute แบบ locale-based (เช่น pname) เก็บค่าไว้แยกแถวต่อ locale —
+        // ต้องขอ locale ปัจจุบันโดยเฉพาะ ไม่งั้น whereNull('locale_id') เพียว
+        // ด้านล่างจะหาไม่เจอเลย ทั้งที่ค่าจริงมีอยู่ (บั๊กที่เจอจากการทดสอบจริง:
+        // ชื่อสินค้าที่ map ผ่าน target_field='name' ขึ้น "ยังไม่ได้กรอก" ทั้งที่
+        // สินค้ามีชื่ออยู่แล้ว) — attribute ที่ไม่ใช่ locale-based ยังคง query
+        // ด้วย locale_id ตายตัวเป็น null เหมือนเดิม (ค่า global เดียวเท่านั้น)
+        $localeId = $attribute->is_locale_based ? $activeLocaleId : null;
+        $scopeToLocale = function ($query) use ($localeId) {
+            return $query->where(function ($q) use ($localeId) {
+                $q->where('locale_id', $localeId)->orWhereNull('locale_id');
+            })->orderByRaw('locale_id IS NULL'); // ตรง locale ปัจจุบันก่อน ตัว global (locale_id null) เป็น fallback
+        };
+
+        $isVariantDefining = in_array($attribute->id, $product->configurable_attributes ?? [], true);
+
+        if ($isVariantDefining && $product->variants->isNotEmpty()) {
+            // ค่าของแต่ละ variant เอง (ไม่ใช่ query เดียวรวมทุก variant) เพราะ
+            // fallback ต่อ locale ต้องคำนวณแยกต่อสินค้าแต่ละตัว ไม่ใช่ทั้งกลุ่ม
+            $codes = $product->variants->map(function ($variant) use ($attribute, $scopeToLocale) {
+                return $scopeToLocale(
+                    ProductValue::where('product_id', $variant->id)
+                        ->where('attribute_id', $attribute->id)
+                        ->whereNull('channel_id')
+                )->value('value');
+            });
+        } else {
+            $own = $scopeToLocale(
+                ProductValue::where('product_id', $product->id)
+                    ->where('attribute_id', $attribute->id)
+                    ->whereNull('channel_id')
+            )->value('value');
+            $codes = collect($own !== null && $own !== '' ? [$own] : []);
+        }
+
+        $codes = $codes->filter(fn ($c) => $c !== null && $c !== '')->unique()->values();
+        if ($codes->isEmpty()) {
+            return null;
+        }
+
+        if (in_array($attribute->type, ['select', 'multiselect'], true)) {
+            $labelByCode = AttributeOption::where('attribute_id', $attribute->id)
+                ->whereIn('code', $codes)
+                ->get()
+                ->keyBy('code');
+
+            return $codes->map(fn ($code) => $labelByCode->get($code)?->admin_label ?? $code)->implode(', ');
+        }
+
+        return $codes->implode(', ');
+    }
+
+    /**
+     * ชื่อแบรนด์ที่จะส่งไป Lazada จริง — mirror ลำดับความสำคัญเดียวกับ
+     * LazadaProductSyncService::resolveLazadaBrandId()/buildPayload() เป๊ะๆ
+     * (ต่างจาก field อื่นในลิสต์นี้ตรงที่ brand ไม่ได้ resolve ผ่าน
+     * LazadaAttributeMapping ธรรมดาเป็นหลัก):
+     *
+     *   1. override เฉพาะสินค้า (products.lazada_brand_id) ถ้ามี
+     *   2. ไม่งั้นดูค่า attribute `pbrand` ของสินค้า → Brand.lazada_brand_id
+     *      ("Master Brand" — ตาราง lazada_brands ที่ sync มาจาก Lazada จริง
+     *      ยืนยันตัวตนด้วย id ไม่ใช่ชื่อ ผ่าน mappedBrandOptionId() ใน
+     *      ResolvesProductAttributeValues trait)
+     *   3. ถ้ายังไม่มีทั้งสองทาง fallback ไปดู mapping ทั่วไปที่ผูก PIM
+     *      attribute เข้ากับ Lazada category attribute ชื่อ `brand` ตรงๆ แทน
+     *
+     * ไม่ครอบคลุม resolveGenericBrandName()'s legacy option-id fallback (ดู
+     * docblock ของมันเอง — เป็น fallback สำหรับ option-mapping ที่บันทึกไว้
+     * ก่อนมี label column เท่านั้น) เพราะ productDetail() นี้เป็นแค่ preview
+     * ไม่ใช่ path ที่ใช้ push จริง ถ้าพลาดกรณีเก่ามากๆ นั้นไป push ตัวจริงจะยัง
+     * resolve ถูกอยู่ดี แค่ preview อาจไม่ตรงในเคสหายากนี้เท่านั้น
+     */
+    private function resolveBrandDisplayValue(Product $product): ?string
+    {
+        $lazadaBrandId = $product->lazada_brand_id ?: $this->mappedBrandOptionId($product, 'lazada_brand_id');
+        if ($lazadaBrandId) {
+            $name = LazadaBrand::find($lazadaBrandId)?->name;
+            if ($name) {
+                return $name;
+            }
+        }
+
+        $mapping = LazadaAttributeMapping::with('attribute')
+            ->where('target_field', 'lazada_attribute')
+            ->where('lazada_attribute_name', 'brand')
+            ->first();
+
+        return $mapping ? $this->resolveAttributeDisplayValue($product, $mapping->attribute, null) : null;
+    }
+
+    /**
+     * เดินขึ้นสายพ่อแม่ของ LazadaCategory ทีละชั้นจนถึงราก — เรียกครั้งเดียวต่อ
+     * request นี้ (สินค้าเดียว) เลยไม่ต้อง preload ทั้งต้นไม้เหมือน
+     * lazadaProducts()'s $lazadaCategoryPathOf closure ด้านบน
+     */
+    private function lazadaCategoryPathFor(?int $categoryId): ?string
+    {
+        if (! $categoryId) {
+            return null;
+        }
+
+        $names = [];
+        $id = $categoryId;
+        while ($id) {
+            $cat = LazadaCategory::find($id, ['id', 'parent_id', 'name']);
+            if (! $cat) {
+                break;
+            }
+            array_unshift($names, $cat->name);
+            $id = $cat->parent_id;
+        }
+
+        return $names ? implode(' > ', $names) : null;
     }
 
     public function update(Request $request): RedirectResponse|JsonResponse
@@ -613,6 +923,13 @@ class LazadaAttributeMappingController extends Controller
 
         $client = new LazadaClient($account);
         $rowsByName = [];
+        // (category_id, name) => is_mandatory — เก็บแยกจาก $rowsByName ด้านบน
+        // (ซึ่งจงใจ dedupe ข้ามหมวดหมู่ เพราะ label/input_type/attribute_type/
+        // options เสถียรพอจะ key ด้วยชื่อ field เฉยๆ) เพราะ mandatory ต่างจากนั้น —
+        // เปลี่ยนไปตามหมวดหมู่จริง เก็บรวมแถวเดียวแบบ $rowsByName ไม่ได้ ไม่งั้นจะ
+        // เจอบั๊กเดิมที่ lazada_attributes.category_id/.mandatory เคยเป็น (ดู
+        // LazadaCategoryAttribute's docblock)
+        $categoryAttrRows = [];
 
         foreach ($categoryIds as $index => $categoryId) {
             $response = $client->getCategoryAttributes((int) $categoryId);
@@ -624,6 +941,12 @@ class LazadaAttributeMappingController extends Controller
                     'input_type' => $attr['input_type'] ?? null,
                     'attribute_type' => $attr['attribute_type'] ?? null,
                     'options' => $this->encodeLazadaOptions($attr),
+                ];
+
+                $categoryAttrRows[] = [
+                    'category_id' => (int) $categoryId,
+                    'lazada_attribute_name' => $attr['name'],
+                    'mandatory' => (bool) ($attr['is_mandatory'] ?? false),
                 ];
             }
 
@@ -638,6 +961,14 @@ class LazadaAttributeMappingController extends Controller
                 array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
                 ['name'],
                 ['label', 'input_type', 'attribute_type', 'options', 'updated_at']
+            );
+        }
+
+        foreach (array_chunk($categoryAttrRows, 500) as $chunk) {
+            LazadaCategoryAttribute::upsert(
+                array_map(fn ($row) => [...$row, 'created_at' => $now, 'updated_at' => $now], $chunk),
+                ['category_id', 'lazada_attribute_name'],
+                ['mandatory', 'updated_at']
             );
         }
 
@@ -697,15 +1028,27 @@ class LazadaAttributeMappingController extends Controller
             'label' => $attr['label'] ?? $attr['name'],
             'input_type' => $attr['input_type'] ?? null,
             'attribute_type' => $attr['attribute_type'] ?? null,
-            'category_id' => $categoryId,
-            'mandatory' => (bool) ($attr['is_mandatory'] ?? false),
             'options' => $this->encodeLazadaOptions($attr),
             'created_at' => $now,
             'updated_at' => $now,
         ], $schema);
 
+        // แยกเขียนคนละตาราง: label/input_type/attribute_type/options ยังคงไป
+        // lazada_attributes เหมือนเดิม (เสถียรพอจะ dedupe ข้ามหมวดหมู่ได้จริง)
+        // ส่วน mandatory ซึ่งเปลี่ยนไปตามหมวดหมู่ ไปที่ lazada_category_attributes
+        // แทน — ไม่ใช้แถวเดียวกันซ้อนกันแบบเดิมอีกต่อไป (บั๊กที่แก้ไปแล้ว ดู
+        // LazadaCategoryAttribute's docblock)
         if ($rows !== []) {
-            LazadaAttribute::upsert($rows, ['name'], ['label', 'input_type', 'attribute_type', 'category_id', 'mandatory', 'options', 'updated_at']);
+            LazadaAttribute::upsert($rows, ['name'], ['label', 'input_type', 'attribute_type', 'options', 'updated_at']);
+
+            $categoryAttrRows = array_map(fn (array $attr) => [
+                'category_id' => $categoryId,
+                'lazada_attribute_name' => $attr['name'],
+                'mandatory' => (bool) ($attr['is_mandatory'] ?? false),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $schema);
+            LazadaCategoryAttribute::upsert($categoryAttrRows, ['category_id', 'lazada_attribute_name'], ['mandatory', 'updated_at']);
         }
 
         LazadaAttribute::bumpListVersion();
@@ -725,19 +1068,24 @@ class LazadaAttributeMappingController extends Controller
      */
     public function lazadaAttributesForCategory(int $lazadaCategoryId): JsonResponse
     {
-        $query = LazadaAttribute::query();
-        if (Schema::hasColumn('lazada_attributes', 'category_id')) {
-            $query->where('category_id', $lazadaCategoryId);
-        }
-        $attributes = $query->orderBy('label')->get();
-        $hasMandatory = Schema::hasColumn('lazada_attributes', 'mandatory');
+        // "field ไหนอยู่ในหมวดหมู่นี้บ้าง + บังคับหรือเปล่า" มาจาก
+        // lazada_category_attributes เสมอตอนนี้ (ไม่ใช่ lazada_attributes.
+        // category_id/.mandatory ที่ deprecated แล้ว — ดู LazadaCategoryAttribute
+        // กับ LazadaAttribute's docblock) ส่วน label/input_type/options ยังมาจาก
+        // lazada_attributes เหมือนเดิม (ข้อมูลที่เสถียรพอจะ key ด้วยชื่อ field เฉยๆ)
+        $mandatoryByName = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)
+            ->pluck('mandatory', 'lazada_attribute_name');
+
+        $attributes = LazadaAttribute::whereIn('name', $mandatoryByName->keys())
+            ->orderBy('label')
+            ->get();
 
         $mappedByLazadaAttributeName = LazadaAttributeMapping::whereIn('lazada_attribute_name', $attributes->pluck('name'))
             ->with(['attribute:id,name', 'optionMappings'])
             ->get()
             ->keyBy('lazada_attribute_name');
 
-        $data = $attributes->map(function (LazadaAttribute $attribute) use ($mappedByLazadaAttributeName, $hasMandatory) {
+        $data = $attributes->map(function (LazadaAttribute $attribute) use ($mappedByLazadaAttributeName, $mandatoryByName) {
             $mapping = $mappedByLazadaAttributeName->get($attribute->name);
             $isSelectType = in_array($attribute->input_type, self::SELECT_INPUT_TYPES, true);
 
@@ -745,7 +1093,7 @@ class LazadaAttributeMappingController extends Controller
                 'name' => $attribute->name,
                 'label' => $attribute->label,
                 'input_type' => $attribute->input_type,
-                'mandatory' => $hasMandatory ? (bool) $attribute->mandatory : false,
+                'mandatory' => (bool) ($mandatoryByName[$attribute->name] ?? false),
                 'mapped' => $mapping ? ['id' => $mapping->attribute->id, 'name' => $mapping->attribute->name] : null,
                 // `options` cast เป็น array แล้ว (ดู LazadaAttribute::$casts) —
                 // แต่ละตัวเลือกจริงเป็น {name, en_name, id}: id คือค่าที่ต้องส่งกลับ

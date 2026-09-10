@@ -6,9 +6,9 @@ use App\Models\Attribute;
 use App\Models\AttributeFamily;
 use App\Models\AuditLog;
 use App\Models\Category;
-use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeAttributeOptionMapping;
+use App\Models\ShopeeCategoryAttribute;
 use Illuminate\Support\Collection;
 
 /**
@@ -106,7 +106,10 @@ class ShopeeMappingTimelineBuilder
      */
     private function resolveMappedAttributeIds(int $shopeeCategoryId): array
     {
-        $shopeeAttributeIds = ShopeeAttribute::where('category_id', $shopeeCategoryId)->pluck('id');
+        // ดู ShopeeCategoryAttribute's docblock — attribute ไหนอยู่ในหมวดหมู่นี้
+        // บ้าง มาจากตารางนี้เสมอตอนนี้ ไม่ใช่ shopee_attributes.category_id
+        // ที่ deprecated แล้ว
+        $shopeeAttributeIds = ShopeeCategoryAttribute::where('category_id', $shopeeCategoryId)->pluck('shopee_attribute_id');
         if ($shopeeAttributeIds->isEmpty()) {
             return [];
         }

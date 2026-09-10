@@ -9,8 +9,8 @@ use App\Models\AttributeGroupTranslation;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\FamilyAttribute;
-use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
+use App\Models\LazadaCategoryAttribute;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -79,7 +79,9 @@ class LazadaAttributeFamilyGenerator
      */
     private function resolveMappedAttributeIds(int $lazadaCategoryId): array
     {
-        $lazadaAttributeNames = LazadaAttribute::where('category_id', $lazadaCategoryId)->pluck('name');
+        // ดึงจาก lazada_category_attributes ไม่ใช่ lazada_attributes.category_id
+        // ที่ deprecated แล้ว (ดู LazadaCategoryAttribute's docblock)
+        $lazadaAttributeNames = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)->pluck('lazada_attribute_name');
         if ($lazadaAttributeNames->isEmpty()) {
             return [];
         }

@@ -10,8 +10,8 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
-use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
+use App\Models\ShopeeCategoryAttribute;
 use App\Services\CodeGenerator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +68,10 @@ class ShopeeAttributeFamilyGenerator
      */
     private function resolveMappedAttributeIds(int $shopeeCategoryId): array
     {
-        $shopeeAttributeIds = ShopeeAttribute::where('category_id', $shopeeCategoryId)->pluck('id');
+        // ดู ShopeeCategoryAttribute's docblock — attribute ไหนอยู่ในหมวดหมู่นี้
+        // บ้าง มาจากตารางนี้เสมอตอนนี้ ไม่ใช่ shopee_attributes.category_id
+        // ที่ deprecated แล้ว
+        $shopeeAttributeIds = ShopeeCategoryAttribute::where('category_id', $shopeeCategoryId)->pluck('shopee_attribute_id');
         if ($shopeeAttributeIds->isEmpty()) {
             return [];
         }

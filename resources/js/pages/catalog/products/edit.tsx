@@ -101,6 +101,12 @@ interface AttributeItem {
     type: string;
     is_required?: boolean;
     is_unique?: boolean;
+    /** true เมื่อ attribute นี้เป็น field ที่ Lazada บังคับต้องมีค่า สำหรับ Lazada category ที่สินค้านี้ผูกอยู่ (ดู ProductController::lazadaMandatoryAttributeIds()) — คนละเรื่องกับ is_required ด้านบน (นั่นเป็น flag ตายตัวของ attribute เอง ไม่ผูกกับ marketplace/category ไหนเป็นการเฉพาะ) */
+    lazada_mandatory?: boolean;
+    /** เหมือน lazada_mandatory ด้านบนแต่ฝั่ง Shopee (ดู ProductController::shopeeMandatoryAttributeIds()) — คนละ flag กัน สินค้าเดียวกัน attribute เดียวกันอาจถูกทั้งสอง platform บังคับพร้อมกันหรือไม่พร้อมกันก็ได้ */
+    shopee_mandatory?: boolean;
+    /** เหมือน lazada_mandatory/shopee_mandatory ด้านบนแต่ฝั่ง TikTok (ดู ProductController::tiktokMandatoryAttributeIds()) — คนละ flag กัน สินค้าเดียวกัน attribute เดียวกันอาจถูกหลาย platform บังคับพร้อมกันหรือไม่พร้อมกันก็ได้ */
+    tiktok_mandatory?: boolean;
     is_locale_based?: boolean;
     is_channel_based?: boolean;
     swatch_type?: string | null;
@@ -1011,6 +1017,29 @@ export default function ProductEdit({
         poll();
     };
 
+    // เดิม "Live" badge กับปุ่ม Deactivate ใน Sales Channels panel (ดูเงื่อนไข
+    // ch.is_live ด้านล่าง) จะไม่โผล่ขึ้นมาทันทีหลัง push/deactivate/delete
+    // สำเร็จ — ผู้ใช้ต้องกด reload หน้าเองถึงจะเห็น เหตุผลมีสองชั้น: (1)
+    // push()/deactivate() เอง "ไม่เขียน" product_platform_shops.status เลย
+    // (ดูคอมเมนต์ที่ LazadaProductSyncService::push() — คืนแค่ผล API กลับมา
+    // เฉยๆ) มีแต่ checkLiveStatus() เท่านั้นที่เขียน และ (2) ต่อให้เขียนแล้ว
+    // channelGroups ก็เป็น prop ที่โหลดมาตอนเปิดหน้าเพจครั้งเดียว ไม่มีอะไรไป
+    // สั่ง refetch ให้เอง ฟังก์ชันนี้ปิดทั้งสองช่องว่าง: เรียก status-check
+    // endpoint เดียวกับที่ checkPlatformStatus() ใช้ตอนเปิด dialog ก่อน (บังคับ
+    // backend เช็คสดจากแพลตฟอร์มจริงแล้วเขียน status ให้ทันใหม่) แล้วค่อย
+    // partial-reload เฉพาะ channelGroups (ไม่ reload ทั้งหน้า เพื่อไม่ให้ฟอร์มที่
+    // กำลังแก้ค้างอยู่ เช่น attribute values ที่ยังไม่ได้ save หายไปด้วย) —
+    // เรียกหลัง job จบทุกครั้งไม่ว่าผลจะสำเร็จหรือ error ก็ตาม ไม่มีผลเสีย แค่ได้
+    // ข้อมูลสดล่าสุดกลับมาเฉยๆ
+    const refreshChannelLiveStatus = (shopId: number, platform: string) => {
+        const routes = PLATFORM_ROUTES[platform.toLowerCase()];
+        if (!routes) return;
+
+        fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, { headers: { Accept: 'application/json' } })
+            .catch(() => {})
+            .finally(() => router.reload({ only: ['channelGroups'] }));
+    };
+
     const confirmPush = () => {
         if (!pushConfirmShop) return;
         const { id: shopId, platform } = pushConfirmShop;
@@ -1049,6 +1078,7 @@ export default function ProductEdit({
                     setPushResult(result);
                     setPushing(false);
                     closePushDialog();
+                    refreshChannelLiveStatus(shopId, platform);
                 });
             })
             .catch(() => {
@@ -1099,6 +1129,7 @@ export default function ProductEdit({
                     setPushResult(result);
                     setDeactivating(false);
                     setDeactivateConfirmShop(null);
+                    refreshChannelLiveStatus(shopId, platform);
                 });
             })
             .catch(() => {
@@ -1156,6 +1187,7 @@ export default function ProductEdit({
                     setPushResult(result);
                     setDeletingListing(false);
                     closeDeleteListingDialog();
+                    refreshChannelLiveStatus(shopId, platform);
                 });
             })
             .catch(() => {
@@ -3144,6 +3176,60 @@ function RenderAttributeInput({
                                 color: FIORI.brand,
                                 fontWeight: 600,
                                 '& .MuiChip-icon': { ml: '4px' },
+                            }}
+                        />
+                    </Tooltip>
+                )}
+                {attr.lazada_mandatory && (
+                    <Tooltip
+                        title="Lazada บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ Lazada ที่สินค้านี้ผูกอยู่ — ถ้าปล่อยว่าง การ push/sync ไป Lazada จะถูกปฏิเสธ"
+                        arrow
+                    >
+                        <Chip
+                            label="Lazada required"
+                            size="small"
+                            sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                bgcolor: FIORI.warningBg,
+                                color: FIORI.warning,
+                                fontWeight: 700,
+                            }}
+                        />
+                    </Tooltip>
+                )}
+                {attr.shopee_mandatory && (
+                    <Tooltip
+                        title="Shopee บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ Shopee ที่สินค้านี้ผูกอยู่ (หรือเป็นแบรนด์ ซึ่ง Shopee บังคับเสมอ) — ถ้าปล่อยว่าง การ push/sync ไป Shopee จะถูกปฏิเสธ"
+                        arrow
+                    >
+                        <Chip
+                            label="Shopee required"
+                            size="small"
+                            sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                bgcolor: FIORI.brandBg,
+                                color: FIORI.brand,
+                                fontWeight: 700,
+                            }}
+                        />
+                    </Tooltip>
+                )}
+                {attr.tiktok_mandatory && (
+                    <Tooltip
+                        title="TikTok บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ TikTok ที่สินค้านี้ผูกอยู่ (หรือเป็นแบรนด์ ซึ่ง TikTok บังคับเสมอ) — ถ้าปล่อยว่าง การ push/sync ไป TikTok จะถูกปฏิเสธ"
+                        arrow
+                    >
+                        <Chip
+                            label="TikTok required"
+                            size="small"
+                            sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                bgcolor: FIORI.successBg,
+                                color: FIORI.success,
+                                fontWeight: 700,
                             }}
                         />
                     </Tooltip>

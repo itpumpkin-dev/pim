@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
+use App\Models\LazadaCategoryAttribute;
 use App\Models\Locale;
 use Illuminate\Support\Facades\DB;
 
@@ -60,7 +61,14 @@ class LazadaMappedAttributeCreator
             ->whereHas('attribute')
             ->pluck('lazada_attribute_name');
 
-        $unmapped = LazadaAttribute::where('category_id', $lazadaCategoryId)
+        // "field ไหนอยู่ในหมวดหมู่นี้บ้าง" มาจาก lazada_category_attributes
+        // เสมอตอนนี้ (ไม่ใช่ lazada_attributes.category_id ที่ deprecated แล้ว
+        // ไม่มีใครเขียนอีกต่อไป — ดู LazadaCategoryAttribute's docblock กับ
+        // LazadaAttributeMappingController's sync methods)
+        $categoryAttributeNames = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)
+            ->pluck('lazada_attribute_name');
+
+        $unmapped = LazadaAttribute::whereIn('name', $categoryAttributeNames)
             ->whereNotIn('name', $alreadyMappedNames)
             ->whereIn('input_type', array_keys(self::TYPE_MAP))
             ->get();

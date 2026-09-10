@@ -5,7 +5,7 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Box, IconButton, Paper, Typography, type SxProps, type Theme } from '@mui/material';
-import { type ReactNode } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 
 /**
  * SAP Fiori "Form" + "Form Field Validation" primitives.
@@ -362,12 +362,25 @@ interface FioriMessageStripProps {
  * match `FioriValueState`).
  * ref: sap.com/design-system/fiori-design-web → UI elements → Message Strip
  */
-export function FioriMessageStrip({ severity = 'information', onClose, icon, children, sx }: FioriMessageStripProps) {
+// forwardRef: ต้องมี เพราะตอนนี้ถูกใช้เป็น direct child ของ MUI <Snackbar>
+// (ดู products/edit.tsx's push-result snackbar) — Snackbar ต้องใช้ ref ไปหา DOM
+// node จริงของลูกตัวเองเพื่อผูก transition (Grow/Fade) ด้วย ถ้าไม่ forward ref
+// ให้ ref ที่ Snackbar cloneElement ใส่มาจะ resolve เป็น null (function component
+// เฉยๆ รับ ref ไม่ได้) แล้วพอ transition พยายาม reflow (อ่าน node.scrollTop เพื่อ
+// บังคับ reflow ก่อนเริ่ม animation — เทคนิคมาตรฐานของ react-transition-group)
+// จะเจอ "Cannot read properties of null (reading 'scrollTop')" ทำ React tree
+// ทั้งหน้าล่มเป็นจอขาวทันที (ไม่มี error boundary ดักไว้) — เกิดขึ้นทุกครั้งที่
+// snackbar นี้เปิด (พอ push/deactivate เสร็จ) ไม่ว่าผลจะสำเร็จหรือ error ก็ตาม
+export const FioriMessageStrip = forwardRef<HTMLDivElement, FioriMessageStripProps>(function FioriMessageStrip(
+    { severity = 'information', onClose, icon, children, sx },
+    ref,
+) {
     const { fg, bg } = STATE_COLOR[severity];
     const Icon = MESSAGE_STRIP_ICON[severity];
 
     return (
         <Box
+            ref={ref}
             role="alert"
             sx={{
                 display: 'flex',
@@ -395,7 +408,7 @@ export function FioriMessageStrip({ severity = 'information', onClose, icon, chi
             )}
         </Box>
     );
-}
+});
 
 interface FioriFormErrorSummaryProps {
     /** the Inertia `errors` object; the strip only renders when it has keys */

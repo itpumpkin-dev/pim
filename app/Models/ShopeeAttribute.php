@@ -11,10 +11,23 @@ use Illuminate\Support\Facades\Cache;
  * ShopeeAttributeMappingController::syncShopeeAttributes(). Mirrors
  * WooCommerceAttribute's shape (external, non-incrementing PK).
  *
- * `category_id`/`mandatory` are per-category context layered on top of that
- * global row — see the migration that added them
- * (2026_08_24_104607_add_category_and_mandatory_to_shopee_attributes_table)
- * and ShopeeAttributeMappingController::syncShopeeAttributesForCategory().
+ * `category_id`/`mandatory` DEPRECATED — no longer read or written by this
+ * app. They used to layer "is this attribute_id mandatory, and which
+ * category was it last seen under" directly onto this same globally-deduped
+ * row (see 2026_08_24_104607_add_category_and_mandatory_to_shopee_attributes_table,
+ * whose own docblock already flagged `category_id` as "informational, not a
+ * real FK" — it only tracked the last category an attribute_id was synced
+ * under). This was a confirmed real bug: an attribute_id shared by several
+ * Shopee categories only ever had ONE `category_id`/`mandatory` pair, so
+ * re-syncing any other category silently overwrote it — a product in
+ * category A would report "this field isn't mandatory here" right after
+ * someone synced category B, even though nothing about category A's real
+ * Shopee schema changed. Superseded by `ShopeeCategoryAttribute`
+ * (`shopee_category_attributes`, PK `(category_id, shopee_attribute_id)`) —
+ * see that model's docblock. The two columns still physically exist on this
+ * table (left alone rather than dropped, to avoid a riskier migration for no
+ * benefit) but hold stale/partial historical data only; nothing in this
+ * codebase should read them going forward.
  *
  * `options` (added by 2026_09_08_000007_add_options_to_shopee_attributes_table)
  * mirrors LazadaAttribute::$options — predefined choice list for
@@ -37,15 +50,11 @@ class ShopeeAttribute extends Model
         'id',
         'name',
         'input_type',
-        'category_id',
-        'mandatory',
         'options',
     ];
 
     protected $casts = [
         'input_type' => 'integer',
-        'category_id' => 'integer',
-        'mandatory' => 'boolean',
         'options' => 'array',
     ];
 

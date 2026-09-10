@@ -10,8 +10,8 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
-use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
+use App\Models\TikTokCategoryAttribute;
 use App\Services\CodeGenerator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -66,7 +66,9 @@ class TikTokAttributeFamilyGenerator
      */
     private function resolveMappedAttributeIds(int $tiktokCategoryId): array
     {
-        $tiktokAttributeIds = TikTokAttribute::where('category_id', $tiktokCategoryId)->pluck('id');
+        // มาจาก tiktok_category_attributes เสมอตอนนี้ (ไม่ใช่ tiktok_attributes.
+        // category_id ที่ deprecated แล้ว — ดู TikTokCategoryAttribute's docblock)
+        $tiktokAttributeIds = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)->pluck('tiktok_attribute_id');
         if ($tiktokAttributeIds->isEmpty()) {
             return [];
         }

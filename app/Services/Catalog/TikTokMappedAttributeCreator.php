@@ -10,6 +10,7 @@ use App\Models\Locale;
 use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
+use App\Models\TikTokCategoryAttribute;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,7 +36,12 @@ class TikTokMappedAttributeCreator
             ->whereHas('attribute')
             ->pluck('tiktok_attribute_id');
 
-        $unmapped = TikTokAttribute::where('category_id', $tiktokCategoryId)
+        // "attribute ไหนอยู่ในหมวดหมู่นี้บ้าง" มาจาก tiktok_category_attributes
+        // เสมอตอนนี้ (ไม่ใช่ tiktok_attributes.category_id ที่ deprecated แล้ว
+        // — ดู TikTokCategoryAttribute's docblock)
+        $tiktokAttributeIds = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)->pluck('tiktok_attribute_id');
+
+        $unmapped = TikTokAttribute::whereIn('id', $tiktokAttributeIds)
             ->whereNotIn('id', $alreadyMappedIds)
             ->get();
 

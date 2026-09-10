@@ -17,12 +17,17 @@ use App\Models\Category;
 use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\LazadaAttributeMapping;
+use App\Models\LazadaCategoryAttribute;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductAssociation;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
+use App\Models\ShopeeAttributeMapping;
+use App\Models\ShopeeCategoryAttribute;
+use App\Models\TikTokAttributeMapping;
+use App\Models\TikTokCategoryAttribute;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\Catalog\MasterAttributeOptionSync;
@@ -32,6 +37,8 @@ use App\Services\GridManager;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
+use App\Services\Marketplace\MarketplaceSyncDispatcher;
+use App\Services\Marketplace\MarketplaceSyncGate;
 use App\Services\Shopee\ShopeeProductSyncService;
 use App\Services\TikTok\TikTokProductSyncService;
 use App\Services\WooCommerce\WooCommerceProductSyncService;
@@ -1743,6 +1750,236 @@ class ProductController extends Controller
     }
 
     /**
+     * PIM attribute ids that Lazada's category schema marks mandatory for
+     * $product's resolved Lazada category — surfaced on the Edit Product
+     * form as a "Required by Lazada" chip (see RenderAttributeInput's
+     * renderChips() in edit.tsx) so a gap like "missing Input Voltage" shows
+     * up before a save queues a doomed push, not only after it fails (see
+     * AutoSyncProductToMarketplaceJob / LazadaProductSyncService::
+     * assertMandatoryFieldsPresent(), which is the thing that actually
+     * enforces this at push time).
+     *
+     * Reads only the locally cached `lazada_category_attributes` table (kept
+     * in sync by LazadaAttributeMappingController's two sync actions, one
+     * row per (category_id, field name) — see LazadaCategoryAttribute's
+     * docblock), the same source LazadaAttributeMappingController::
+     * lazadaAttributesForCategory() already trusts for the attribute-mapping
+     * page — not a live Lazada API call on every Edit Product page load.
+     * Previously read `lazada_attributes.category_id`/`.mandatory` directly,
+     * which had a confirmed bug: those columns held one shared value per
+     * field *name* across every category, so re-syncing any other category
+     * that happened to share a field name (e.g. "brand") silently overwrote
+     * this category's answer. Fixed by moving to
+     * `lazada_category_attributes`, which keys mandatory-ness by
+     * (category_id, name) instead — no longer goes stale this way.
+     */
+    private function lazadaMandatoryAttributeIds(Product $product): array
+    {
+        $lazadaCategoryId = $product->lazada_category_id
+            ?: $product->categories()->whereNotNull('lazada_category_id')->value('lazada_category_id');
+
+        if (! $lazadaCategoryId) {
+            return [];
+        }
+
+        $mandatoryNames = LazadaCategoryAttribute::where('category_id', $lazadaCategoryId)
+            ->where('mandatory', true)
+            ->pluck('lazada_attribute_name');
+
+        if ($mandatoryNames->isEmpty()) {
+            return [];
+        }
+
+        // Raw Lazada schema names fed by a *fixed* target_field rather than
+        // the admin-configurable `lazada_attribute` group — same translation
+        // LazadaProductSyncService::buildPayload() hardcodes into its
+        // $skuFields array. 'SellerSku' is deliberately not here: it's
+        // always $product->sku directly, no PIM attribute involved, so
+        // there's no field on this form to flag for it.
+        $fixedFieldByRawName = [
+            'name' => 'name',
+            'price' => 'price',
+            'qty' => 'qty',
+            'quantity' => 'qty',
+            'package_weight' => 'weight',
+            'package_length' => 'length',
+            'package_width' => 'width',
+            'package_height' => 'height',
+        ];
+
+        $targetFields = [];
+        $customNames = [];
+        foreach ($mandatoryNames as $rawName) {
+            if ($rawName === 'SellerSku') {
+                continue;
+            }
+            if (isset($fixedFieldByRawName[$rawName])) {
+                $targetFields[] = $fixedFieldByRawName[$rawName];
+            } else {
+                $customNames[] = $rawName; // เช่น 'brand', 'input_voltage'
+            }
+        }
+
+        $attributeIds = [];
+
+        if (! empty($targetFields)) {
+            $attributeIds = array_merge(
+                $attributeIds,
+                LazadaAttributeMapping::whereIn('target_field', $targetFields)->pluck('attribute_id')->all()
+            );
+        }
+
+        if (! empty($customNames)) {
+            $attributeIds = array_merge(
+                $attributeIds,
+                LazadaAttributeMapping::where('target_field', 'lazada_attribute')
+                    ->whereIn('lazada_attribute_name', $customNames)
+                    ->pluck('attribute_id')->all()
+            );
+
+            // 'brand' has a second, more common resolution path that never
+            // goes through LazadaAttributeMapping at all — the product's own
+            // `pbrand` attribute, whose selected AttributeOption carries the
+            // Lazada brand mapping (see MarketplaceSyncGate::brandMapped()'s
+            // pbrand branch, which this mirrors).
+            if (in_array('brand', $customNames, true) && ($pbrandId = Attribute::idForCode('pbrand'))) {
+                $attributeIds[] = $pbrandId;
+            }
+        }
+
+        return array_values(array_unique($attributeIds));
+    }
+
+    /**
+     * PIM attribute ids that Shopee's category schema marks mandatory for
+     * $product's resolved Shopee category — surfaced on the Edit Product
+     * form as a "Shopee required" chip (see RenderAttributeInput's
+     * renderChips() in edit.tsx), mirroring lazadaMandatoryAttributeIds()
+     * above. See AutoSyncProductToMarketplaceJob /
+     * ShopeeProductSyncService::buildPayload(), which is what actually
+     * enforces this at push time.
+     *
+     * Reads only the locally cached `shopee_category_attributes` table
+     * (kept in sync by ShopeeAttributeMappingController's two sync actions,
+     * one row per (category_id, shopee_attribute_id) — see
+     * ShopeeCategoryAttribute's docblock), the same source
+     * ShopeeAttributeMappingController::shopeeAttributesForCategory()
+     * already trusts for the attribute-mapping page — not a live Shopee API
+     * call on every Edit Product page load.
+     *
+     * Unlike Lazada, Shopee's per-category attribute schema (from
+     * get_attribute_tree, cached here) is a wholly separate concept from
+     * its fixed structural payload fields (name/price/qty/weight/length/
+     * width/height/description/video) — the category schema never overlaps
+     * with those (no "package_weight" raw-name trick to translate the way
+     * lazadaMandatoryAttributeIds()'s $fixedFieldByRawName does), so this
+     * method only ever needs to walk the `shopee_attribute` target_field
+     * group.
+     *
+     * `pbrand` is added unconditionally whenever the product has *any*
+     * resolved Shopee category — ShopeeProductSyncService::
+     * resolveShopeeBrandId() throws on every push with no brand resolved,
+     * regardless of category (brand isn't part of get_attribute_tree's
+     * schema at all; it comes from a wholly separate API, get_brand_list),
+     * so there is no per-category "is brand mandatory here" flag to read
+     * the way Lazada's `brand` custom attribute has one — mirrors
+     * MarketplaceSyncGate::brandMapped()'s pbrand branch.
+     */
+    private function shopeeMandatoryAttributeIds(Product $product): array
+    {
+        $shopeeCategoryId = $product->shopee_category_id
+            ?: $product->categories()->whereNotNull('shopee_category_id')->value('shopee_category_id');
+
+        if (! $shopeeCategoryId) {
+            return [];
+        }
+
+        $mandatoryShopeeAttributeIds = ShopeeCategoryAttribute::where('category_id', $shopeeCategoryId)
+            ->where('mandatory', true)
+            ->pluck('shopee_attribute_id');
+
+        $attributeIds = [];
+
+        if ($mandatoryShopeeAttributeIds->isNotEmpty()) {
+            $attributeIds = ShopeeAttributeMapping::where('target_field', 'shopee_attribute')
+                ->whereIn('shopee_attribute_id', $mandatoryShopeeAttributeIds)
+                ->pluck('attribute_id')->all();
+        }
+
+        if ($pbrandId = Attribute::idForCode('pbrand')) {
+            $attributeIds[] = $pbrandId;
+        }
+
+        return array_values(array_unique($attributeIds));
+    }
+
+    /**
+     * PIM attribute ids that TikTok's category schema marks mandatory for
+     * $product's resolved TikTok category — surfaced on the Edit Product
+     * form as a "TikTok required" chip (see RenderAttributeInput's
+     * renderChips() in edit.tsx), mirroring shopeeMandatoryAttributeIds()
+     * above almost exactly. See AutoSyncProductToMarketplaceJob /
+     * TikTokProductSyncService::resolveProductAttributes(), which is what
+     * actually enforces this at push time (against a live re-fetched
+     * schema, not this cache — see that method's docblock).
+     *
+     * Reads only the locally cached `tiktok_category_attributes` table
+     * (kept in sync by TikTokAttributeMappingController's two sync actions,
+     * one row per (category_id, tiktok_attribute_id) — see
+     * TikTokCategoryAttribute's docblock), the same source
+     * TikTokAttributeMappingController::tiktokAttributesForCategory()
+     * already trusts for the attribute-mapping page — not a live TikTok API
+     * call on every Edit Product page load.
+     *
+     * Like Shopee (and unlike Lazada), TikTok's per-category attribute
+     * schema (from getAttributes(), cached here) is a wholly separate
+     * concept from its fixed structural payload fields (name/price/qty/
+     * weight/length/width/height/description/video) — getAttributes() only
+     * ever returns PRODUCT_PROPERTY-type custom attributes, never those
+     * structural fields, so there's no raw-name-to-target_field translation
+     * needed the way lazadaMandatoryAttributeIds()'s $fixedFieldByRawName
+     * has. This method only ever needs to walk the `tiktok_attribute`
+     * target_field group.
+     *
+     * `pbrand` is added unconditionally whenever the product has *any*
+     * resolved TikTok category — TikTokProductSyncService::
+     * resolveTikTokBrandId() throws on every push with no brand resolved,
+     * regardless of category (brand isn't part of getAttributes()'s schema
+     * at all; buildPayload() sends it as a wholly separate fixed `brand.id`
+     * field), so there is no per-category "is brand mandatory here" flag to
+     * read the way Lazada's `brand` custom attribute has one — mirrors
+     * shopeeMandatoryAttributeIds()'s identical pbrand handling and
+     * MarketplaceSyncGate::brandMapped()'s pbrand branch.
+     */
+    private function tiktokMandatoryAttributeIds(Product $product): array
+    {
+        $tiktokCategoryId = $product->tiktok_category_id
+            ?: $product->categories()->whereNotNull('tiktok_category_id')->value('tiktok_category_id');
+
+        if (! $tiktokCategoryId) {
+            return [];
+        }
+
+        $mandatoryTikTokAttributeIds = TikTokCategoryAttribute::where('category_id', $tiktokCategoryId)
+            ->where('mandatory', true)
+            ->pluck('tiktok_attribute_id');
+
+        $attributeIds = [];
+
+        if ($mandatoryTikTokAttributeIds->isNotEmpty()) {
+            $attributeIds = TikTokAttributeMapping::where('target_field', 'tiktok_attribute')
+                ->whereIn('tiktok_attribute_id', $mandatoryTikTokAttributeIds)
+                ->pluck('attribute_id')->all();
+        }
+
+        if ($pbrandId = Attribute::idForCode('pbrand')) {
+            $attributeIds[] = $pbrandId;
+        }
+
+        return array_values(array_unique($attributeIds));
+    }
+
+    /**
      * Everything the Edit/Read product pages need — split out from edit()
      * (which used to build this inline) purely so show() can render the
      * exact same data read-only instead of maintaining a second, parallel
@@ -1781,6 +2018,9 @@ class ProductController extends Controller
         $familyAttributes = $familyAttributes->unique('attribute_id')->values();
 
         $user = auth()->user();
+        $lazadaMandatoryAttributeIds = $this->lazadaMandatoryAttributeIds($product);
+        $shopeeMandatoryAttributeIds = $this->shopeeMandatoryAttributeIds($product);
+        $tiktokMandatoryAttributeIds = $this->tiktokMandatoryAttributeIds($product);
 
         // จัดกลุ่ม attribute แบบไดนามิกตาม attributeGroup
         $groupsData = [];
@@ -1823,6 +2063,9 @@ class ProductController extends Controller
                 ];
             }
             $attr->editable = $this->canUserEditAttributeGroup($user, $group) && $this->canUserEditAttribute($user, $attr);
+            $attr->lazada_mandatory = in_array($attr->id, $lazadaMandatoryAttributeIds, true);
+            $attr->shopee_mandatory = in_array($attr->id, $shopeeMandatoryAttributeIds, true);
+            $attr->tiktok_mandatory = in_array($attr->id, $tiktokMandatoryAttributeIds, true);
             $this->decorateOptionsWithMappedPlatforms($attr);
             $groupsData[$groupId]['attributes'][] = $attr;
         }
@@ -1854,8 +2097,11 @@ class ProductController extends Controller
                 $allAttributes = $allAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
 
-            $allAttributes->each(function ($attr) use ($user) {
+            $allAttributes->each(function ($attr) use ($user, $lazadaMandatoryAttributeIds, $shopeeMandatoryAttributeIds, $tiktokMandatoryAttributeIds) {
                 $attr->editable = $this->canUserEditAttribute($user, $attr);
+                $attr->lazada_mandatory = in_array($attr->id, $lazadaMandatoryAttributeIds, true);
+                $attr->shopee_mandatory = in_array($attr->id, $shopeeMandatoryAttributeIds, true);
+                $attr->tiktok_mandatory = in_array($attr->id, $tiktokMandatoryAttributeIds, true);
                 $this->decorateOptionsWithMappedPlatforms($attr);
             });
 
@@ -2479,87 +2725,23 @@ class ProductController extends Controller
     }
 
     /**
-     * เช็คแบบเดียวกับที่ Shopee/Lazada/TikTok/WooCommerceProductSyncService::
-     * resolve*CategoryId() ใช้จริงตอน build payload: ใช้ค่า override เฉพาะสินค้า
-     * (products.{platform}_category_id) ถ้ามี ไม่งั้น fallback ไปดูว่า
-     * PIM category ที่สินค้าผูกอยู่ มี mapping ของ platform นี้หรือเปล่า —
-     * เขียนซ้ำเป็น query ตรงนี้ (ไม่เรียก sync service ตรงๆ) เพราะ sync
-     * service ต้อง instantiate ด้วย shop/account credentials จริง ส่วนตรงนี้
-     * แค่ต้องการเช็คแบบ synchronous เบาๆ ก่อน dispatch job เท่านั้น
+     * เช็คแบบ synchronous เบาๆ ก่อน dispatch job เท่านั้น (fail fast แทนที่จะ
+     * ปล่อยให้ job ไปพังทีหลัง) — logic จริงย้ายไปอยู่ที่ MarketplaceSyncGate
+     * แล้ว เพราะ AutoSyncProductToMarketplaceJob (auto-sync path) ต้องเช็ค
+     * เงื่อนไขเดียวกันเป๊ะๆ โดยไม่มี HTTP request ให้ return 422
      */
     private function hasMarketplaceCategoryMapped(Product $product, string $platform): bool
     {
-        $column = "{$platform}_category_id";
-        if ($product->{$column}) {
-            return true;
-        }
-
-        return $product->categories()->whereNotNull($column)->exists();
+        return (new MarketplaceSyncGate)->categoryMapped($product, $platform);
     }
 
     /**
-     * เช็คแบบเดียวกับที่ mappedBrandOptionId() (ResolvesProductAttributeValues
-     * trait ที่ sync service ทุกตัวใช้ตอน build payload จริง) ใช้: ค่า override
-     * เฉพาะสินค้า (products.{platform}_brand_id) ถ้ามี ไม่งั้น fallback ไปดูว่า
-     * ค่า attribute `pbrand` ของสินค้านี้ ชี้ไปที่ AttributeOption ที่มี mapping
-     * ของ platform นี้หรือเปล่า — เขียนซ้ำเป็น query ตรงนี้ (ไม่เรียก sync service
-     * ตรงๆ) ด้วยเหตุผลเดียวกับ hasMarketplaceCategoryMapped() ด้านบน
-     *
-     * Lazada เท่านั้น: มีอีกเส้นทางหนึ่งที่ทำให้ brand resolve ได้โดยไม่ต้องพึ่งหน้า
-     * Master Brand เลย — แอดมิน map PIM attribute ตรงเข้ากับ Lazada attribute
-     * ชื่อ `brand` ผ่านหน้า Attribute Mapping ทั่วไปแทนได้ (ดู
-     * LazadaProductSyncService::buildPayload()'s $brandName ที่ยอมรับทั้งสอง
-     * เส้นทางแล้ว) เช็คตรงนี้เพิ่มไว้ให้ปุ่ม Push ไม่ถูก disable ทั้งที่ build
-     * payload จริงจะสำเร็จได้ผ่านเส้นทางนี้ — ไม่ได้เรียก sync service ตรงๆ
-     * (ด้วยเหตุผลเดียวกับด้านบน) เลยไม่ได้เช็คว่า option ที่แมปไว้จริงจะ resolve
-     * เป็นชื่อได้ (resolveGenericBrandName()) แค่เช็คว่ามีค่าอะไรสักอย่างตั้งไว้
+     * ดูหมายเหตุที่ hasMarketplaceCategoryMapped() ด้านบน — logic ย้ายไปอยู่ที่
+     * MarketplaceSyncGate เช่นกัน
      */
     private function hasMarketplaceBrandMapped(Product $product, string $platform): bool
     {
-        $column = "{$platform}_brand_id";
-        if ($product->{$column}) {
-            return true;
-        }
-
-        $pbrandAttributeId = Attribute::idForCode('pbrand');
-        if ($pbrandAttributeId) {
-            $brandCode = ProductValue::where('product_id', $product->id)
-                ->where('attribute_id', $pbrandAttributeId)
-                ->whereNull('channel_id')
-                ->whereNull('locale_id')
-                ->value('value');
-
-            if ($brandCode && AttributeOption::where('attribute_id', $pbrandAttributeId)->where('code', $brandCode)->whereNotNull($column)->exists()) {
-                return true;
-            }
-        }
-
-        if ($platform === 'lazada') {
-            // Bug found via code review: ->first() (no ordering) checked only
-            // one arbitrary candidate — LazadaProductSyncService::
-            // resolveMappedAttributes() supports several PIM attributes all
-            // targeting `brand` (first one with a non-empty value wins, by
-            // sort_order), so this could pick the one candidate that happens
-            // to be empty for this product and report "not mapped" even
-            // though push() would succeed via a different one. Checking every
-            // candidate for a non-empty value fixes that — order doesn't
-            // actually matter for existence, only for which value wins.
-            $mappingAttributeIds = LazadaAttributeMapping::where('target_field', 'lazada_attribute')
-                ->where('lazada_attribute_name', 'brand')
-                ->pluck('attribute_id');
-
-            if ($mappingAttributeIds->isNotEmpty()
-                && ProductValue::where('product_id', $product->id)
-                    ->whereIn('attribute_id', $mappingAttributeIds)
-                    ->whereNotNull('value')
-                    ->where('value', '!=', '')
-                    ->exists()
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        return (new MarketplaceSyncGate)->brandMapped($product, $platform);
     }
 
     /**
@@ -2570,21 +2752,15 @@ class ProductController extends Controller
      * ส่วนการ validate required-attribute ที่ทั้งสองฝั่งพึ่งพาอยู่นั้นอยู่ใน
      * SyncProductToMarketplaceJob → {Platform}ProductSyncService ไม่ได้
      * ถูกกระทบจากการแยกฟังก์ชันนี้แต่อย่างใด
+     *
+     * ตัวสร้าง record + dispatch job จริงๆ ย้ายไปอยู่ที่
+     * MarketplaceSyncDispatcher แล้ว เพราะ auto-sync path (ดู
+     * AutoSyncProductToMarketplaceJob) ต้องการทำแบบเดียวกันเป๊ะๆ โดยไม่มี
+     * auth()->id() ให้เรียก (ไม่มี request อยู่เบื้องหลัง)
      */
     private function dispatchMarketplaceSyncJob(Product $product, SalesPlatformShop $shop, string $platform, string $action): ProductMarketplaceSyncJob
     {
-        $syncJob = ProductMarketplaceSyncJob::create([
-            'product_id' => $product->id,
-            'sales_platform_shop_id' => $shop->id,
-            'platform' => $platform,
-            'action' => $action,
-            'status' => 'queued',
-            'user_id' => auth()->id(),
-        ]);
-
-        SyncProductToMarketplaceJob::dispatch($syncJob->id, auth()->id());
-
-        return $syncJob;
+        return (new MarketplaceSyncDispatcher)->queue($product, $shop, $platform, $action, auth()->id());
     }
 
     /**
