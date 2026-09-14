@@ -181,6 +181,8 @@
     "grantedViaGroupRole": "Group: {{group}} → Role: {{role}}",
     "newPassword": "New password",
     "newPasswordRepeat": "New password (repeat)",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "uiLocale": "UI locale",
     "timezoneRequired": "Timezone (required)"
 }

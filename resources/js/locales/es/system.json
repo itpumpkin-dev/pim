@@ -80,6 +80,8 @@
     "grantedViaGroupRole": "Grupo: {{group}} → Rol: {{role}}",
     "newPassword": "Nueva contraseña",
     "newPasswordRepeat": "Nueva contraseña (repetir)",
+    "showPassword": "Mostrar contraseña",
+    "hidePassword": "Ocultar contraseña",
     "uiLocale": "Idioma de la interfaz",
     "timezoneRequired": "Zona horaria (obligatorio)"
 }

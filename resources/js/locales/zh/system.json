@@ -100,6 +100,8 @@
     "grantedViaGroupRole": "用户组：{{group}} → 角色：{{role}}",
     "newPassword": "新密码",
     "newPasswordRepeat": "新密码（重复）",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
     "uiLocale": "界面语言",
     "timezoneRequired": "时区（必填）",
     "saving": "保存中...",

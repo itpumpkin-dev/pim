@@ -80,6 +80,8 @@
     "grantedViaGroupRole": "ກຸ່ມ: {{group}} → ບົດບາດ: {{role}}",
     "newPassword": "ລະຫັດຜ່ານໃໝ່",
     "newPasswordRepeat": "ລະຫັດຜ່ານໃໝ່ (ຢືນຢັນ)",
+    "showPassword": "ສະແດງລະຫັດຜ່ານ",
+    "hidePassword": "ເຊື່ອງລະຫັດຜ່ານ",
     "uiLocale": "ພາສາທີ່ໃຊ້ງານ",
     "timezoneRequired": "ເຂດເວລາ (ຈຳເປັນ)"
 }

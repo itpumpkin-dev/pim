@@ -1,0 +1,30 @@
+meta {
+  name: List Products
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/products?per_page=50
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 50
+  ~updated_since: 2026-01-01T00:00:00Z
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Paginated list of enabled, simple-type products.
+
+  - per_page: max 200 (default 50)
+  - updated_since: optional ISO 8601 filter, uncheck to omit
+
+  Requires the X-API-Key header — set the `apiKey` secret var on the
+  Local environment to the value of ECOMMERCE_API_KEY from .env.
+}

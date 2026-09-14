@@ -1,0 +1,18 @@
+meta {
+  name: Show Product
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/products/{{sku}}
+  body: none
+  auth: none
+}
+
+docs {
+  Single product lookup by SKU. Public endpoint — no API key required,
+  since the caller must already know the exact SKU.
+
+  Set the `sku` var on the Local environment to a real SKU in your DB.
+}

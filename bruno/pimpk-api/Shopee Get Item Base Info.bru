@@ -1,0 +1,27 @@
+meta {
+  name: Shopee Get Item Base Info
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/shopee/get_item_base_info?item_id_list=1,2,3
+  body: none
+  auth: none
+}
+
+params:query {
+  item_id_list: 1,2,3
+  ~channel_id:
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Shopee GetItem-shaped read-only endpoint. item_id here is our own
+  products.id (comma-separated, max 50), not a real Shopee item_id.
+
+  Requires the X-API-Key header.
+}

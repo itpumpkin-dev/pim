@@ -80,6 +80,8 @@
     "grantedViaGroupRole": "グループ: {{group}} → ロール: {{role}}",
     "newPassword": "新しいパスワード",
     "newPasswordRepeat": "新しいパスワード（再入力）",
+    "showPassword": "パスワードの表示",
+    "hidePassword": "パスワードの非表示",
     "uiLocale": "UI言語",
     "timezoneRequired": "タイムゾーン（必須）"
 }

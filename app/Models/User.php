@@ -268,6 +268,21 @@ class User extends Authenticatable
         return in_array("{$resource}.{$action}", $this->getAllPermissions(), true);
     }
 
+    /**
+     * Whether this user holds the built-in "Administrator" role, directly or
+     * through a group. Only Administrators may set/change a password on the
+     * user edit form — a regular user can't edit their own or anyone else's
+     * from there (see UserController::update()).
+     */
+    public function isAdministrator(): bool
+    {
+        if ($this->roles->contains('label', 'Administrator')) {
+            return true;
+        }
+
+        return $this->groups()->whereHas('roles', fn ($q) => $q->where('label', 'Administrator'))->exists();
+    }
+
     public function hasAnyPermissionForResource(string $resource): bool
     {
         $prefix = "{$resource}.";

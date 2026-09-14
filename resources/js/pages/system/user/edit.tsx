@@ -5,6 +5,8 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import CloseIcon from '@mui/icons-material/Close';
 import ImageIcon from '@mui/icons-material/Image';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import {
     Alert,
     Autocomplete,
@@ -18,6 +20,7 @@ import {
     FormControl,
     FormControlLabel,
     IconButton,
+    InputAdornment,
     MenuItem,
     Select,
     Tab,
@@ -119,6 +122,7 @@ interface EditUserProps {
     /** effective "resource.action" list per candidate manager, for the excess-permission warning */
     managerPermissionsById: Record<number, string[]>;
     canManageAccess: boolean;
+    canEditPassword: boolean;
     permissions: UserPermissions;
 }
 
@@ -181,6 +185,7 @@ export default function UserEdit({
     managerOptions,
     managerPermissionsById,
     canManageAccess,
+    canEditPassword,
     permissions,
 }: EditUserProps) {
     const { t } = useTranslation('system');
@@ -209,7 +214,11 @@ export default function UserEdit({
         password: t('tabPassword'),
         interfaces: t('tabInterfaces'),
     };
-    const tabs = canManageAccess ? TAB_KEYS : TAB_KEYS.filter((key) => key !== 'groupsAndRoles');
+    const tabs = TAB_KEYS.filter((key) => {
+        if (key === 'groupsAndRoles') return canManageAccess;
+        if (key === 'password') return canEditPassword;
+        return true;
+    });
     const [tab, setTab] = useState<TabKey>(tabs[0]);
 
     const formatDateTime = (value: string | null) => {
@@ -328,6 +337,9 @@ export default function UserEdit({
     }, [data.manager_id, managerPermissionsById, permissions.effective_permissions]);
 
     const [copyingAccess, setCopyingAccess] = useState(false);
+
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
     // "Give the manager these too": mirror this user's groups + directly-
     // assigned roles onto the selected manager right away (separate PUT).
@@ -759,11 +771,27 @@ export default function UserEdit({
                                 id="user-password"
                                 fullWidth
                                 size="small"
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 autoComplete="new-password"
                                 value={data.password}
                                 onChange={(e) => update('password', e.target.value)}
                                 sx={fioriFieldStateSx(valueStateOf(errors.password))}
+                                slotProps={{
+                                    input: {
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                                                    onClick={() => setShowPassword((prev) => !prev)}
+                                                    edge="end"
+                                                    tabIndex={-1}
+                                                >
+                                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
                             />
                         </FioriField>
                         <FioriField label={t('newPasswordRepeat')} htmlFor="user-password-confirm">
@@ -771,11 +799,27 @@ export default function UserEdit({
                                 id="user-password-confirm"
                                 fullWidth
                                 size="small"
-                                type="password"
+                                type={showPasswordConfirm ? 'text' : 'password'}
                                 autoComplete="new-password"
                                 value={data.password_confirmation}
                                 onChange={(e) => update('password_confirmation', e.target.value)}
                                 sx={fioriFieldStateSx('none')}
+                                slotProps={{
+                                    input: {
+                                        endAdornment: (
+                                            <InputAdornment position="end">
+                                                <IconButton
+                                                    aria-label={showPasswordConfirm ? t('hidePassword') : t('showPassword')}
+                                                    onClick={() => setShowPasswordConfirm((prev) => !prev)}
+                                                    edge="end"
+                                                    tabIndex={-1}
+                                                >
+                                                    {showPasswordConfirm ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                                </IconButton>
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
                             />
                         </FioriField>
                     </FioriFormGroup>

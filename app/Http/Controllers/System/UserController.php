@@ -203,6 +203,7 @@ class UserController extends Controller
             'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'canManageAccess' => $request->user()->hasPermission('users', 'edit_users'),
+            'canEditPassword' => $request->user()->isAdministrator(),
             'permissions' => $this->permissionsPayload($user),
             ...$this->managerPickerProps($user),
         ]);
@@ -369,7 +370,10 @@ class UserController extends Controller
             $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
         }
 
-        $passwordChanged = $request->filled('password');
+        // Only Administrators may set/change a password from this form — a
+        // regular user can't edit their own or anyone else's here, admin or
+        // not the account being edited (see User::isAdministrator()).
+        $passwordChanged = $request->user()->isAdministrator() && $request->filled('password');
         if ($passwordChanged) {
             $data['password_hash'] = $request->password;
         }
