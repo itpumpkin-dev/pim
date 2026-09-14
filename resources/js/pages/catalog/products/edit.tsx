@@ -133,6 +133,10 @@ interface GroupWithAttributes {
     name: string;
     translations?: Translation[];
     attributes: AttributeItem[];
+    /** ตระกูลแอตทริบิวต์ที่เป็นต้นตอของฟิลด์ในกลุ่มนี้ (อาจมีมากกว่า 1 ตัว — group
+     * เดียวรับฟิลด์จากหลายตระกูลได้ เช่นแท็บ "Lazada" ที่ทุกตระกูลที่มาจาก Lazada
+     * ใช้ AttributeGroup row เดียวกันร่วมกันหมด ดู ProductController::buildProductFormProps()) */
+    families?: AttributeFamily[];
 }
 
 interface AttributeFamily {
@@ -480,6 +484,46 @@ export default function ProductEdit({
         },
     });
 
+    // useForm() ไม่ได้การันตีว่า setData จะมี identity คงที่ทุก render เลยเก็บมันไว้
+    // ใน ref แทนที่จะเป็น dep ของ useCallback — ตัว handler ที่สร้างจาก ref นี้ (เช่น
+    // setAttributeValue, handleAddBlankVariant, handleRemoveVariant ด้านล่าง) จะมี
+    // identity คงที่ตลอด ไม่ว่า identity ของ setData จะเปลี่ยนหรือไม่ก็ตาม — สำคัญ
+    // ตรงที่การส่ง handler เหล่านี้ลงไปเป็น prop ของ component ที่ memo ไว้
+    // (RenderAttributeInput, SelectControl, RichTextControl, variantColumns) จะได้
+    // ไม่ทำให้ memo bail-out พังเพราะ prop เปลี่ยน reference เฉยๆ ทั้งที่พฤติกรรม
+    // เหมือนเดิม
+    const setDataRef = useRef(setData);
+    setDataRef.current = setData;
+
+    // identity คงที่ตลอด (deps ว่างเปล่า) ไม่ว่า identity ของ setData จะเปลี่ยน
+    // หรือไม่ก็ตาม ความคงที่นี่แหละคือจุดสำคัญ: การส่งฟังก์ชันนี้ลงไปเป็น onChange
+    // ของฟิลด์ที่ memo ไว้ ไม่ควรทำให้ฟิลด์นั้น re-render เองโดยไม่จำเป็น — เช่นตอน
+    // สลับแค่ locale เฉยๆ ที่ channelKey/localeKey/value ของฟิลด์ส่วนใหญ่ไม่ได้
+    // เปลี่ยนเลย ถึงแม้ฟอร์มรอบๆ จะ re-render ก็ตาม ใช้ channelKey/localeKey ที่
+    // resolve มาแล้วโดยตรง แทนที่จะไปคำนวณใหม่ผ่าน getValueKeys() เลยไม่ต้องพึ่ง
+    // attr เลย (และไม่โดน invalidate เพราะ attr ด้วย) ประกาศไว้ตรงนี้ (ใกล้
+    // setDataRef ให้มากที่สุด) แทนที่จะไว้ใกล้จุดใช้งานจริงด้านล่าง เพราะ
+    // handleMasterCategoryChange ที่อยู่ก่อนหน้านี้ในไฟล์ต้องใช้ตัวนี้เป็น
+    // dependency ของ useCallback ตัวเอง — ต้อง declare ก่อนถึงจะไม่ชน TDZ
+    const setAttributeValue = useCallback((attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
+        setDataRef.current((prev) => {
+            const attrValues = prev.values[attributeId] || {};
+            return {
+                ...prev,
+                values: {
+                    ...prev.values,
+                    [attributeId]: {
+                        ...attrValues,
+                        [channelKey]: {
+                            ...(attrValues[channelKey] || {}),
+                            [localeKey]: val,
+                        },
+                    },
+                },
+            };
+        });
+    }, []);
+
     const toggleShopPublished = (shopId: number) => {
         const current = data.published_shop_ids;
         setData('published_shop_ids', current.includes(shopId) ? current.filter((id) => id !== shopId) : [...current, shopId]);
@@ -617,42 +661,57 @@ export default function ProductEdit({
 
     // เปลี่ยนหมวดหมู่/หมวดหมู่ย่อยแล้ว ต้องล้างค่าของฟิลด์ถัดไปทิ้งด้วย เพราะอาจไม่
     // ตรงกับสายใหม่แล้ว (เช่น เปลี่ยนหมวดหมู่ แต่หมวดหมู่ย่อยเดิมที่เลือกไว้เป็นของ
-    // หมวดหมู่เก่า) ไม่งั้นจะมีค่าตกค้างที่ไม่สัมพันธ์กันเป็นสายอยู่
-    const handleMasterCategoryChange = (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
-        setAttributeValue(attributeId, channelKey, localeKey, val);
+    // หมวดหมู่เก่า) ไม่งั้นจะมีค่าตกค้างที่ไม่สัมพันธ์กันเป็นสายอยู่ — wrap ด้วย
+    // useCallback (แทนฟังก์ชันเปล่าๆ) ให้ identity คงที่เหมือน setAttributeValue
+    // เอง เพราะถูกส่งเป็น onValueChange ให้ RenderAttributeInput ที่ memo ไว้ด้วย
+    // (masterCategoryAttributes เป็น prop ไม่ใช่ state เลย identity คงที่อยู่แล้ว)
+    const handleMasterCategoryChange = useCallback(
+        (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
+            setAttributeValue(attributeId, channelKey, localeKey, val);
 
-        const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
-        const clear = (attr?: AttributeItem) => {
-            if (!attr) return;
-            const keys = getValueKeys(attr);
-            setAttributeValue(attr.id, keys.channelKey, keys.localeKey, '');
-        };
-        if (attributeId === categoryAttr?.id) {
-            clear(subcatAttr);
-            clear(groupAttr);
-        } else if (attributeId === subcatAttr?.id) {
-            clear(groupAttr);
-        }
-    };
+            const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
+            const clear = (attr?: AttributeItem) => {
+                if (!attr) return;
+                const keys = getValueKeys(attr);
+                setAttributeValue(attr.id, keys.channelKey, keys.localeKey, '');
+            };
+            if (attributeId === categoryAttr?.id) {
+                clear(subcatAttr);
+                clear(groupAttr);
+            } else if (attributeId === subcatAttr?.id) {
+                clear(groupAttr);
+            }
+        },
+        [setAttributeValue, masterCategoryAttributes],
+    );
 
-    const optionLabelFor = (attributeId: number, code: string): string => {
-        const attr = configurableAttributes.find((a) => a.id === attributeId);
-        const opt = attr?.options?.find((o) => (o.code || o.admin_label || String(o.id)) === code);
-        return opt?.admin_label || opt?.code || code;
-    };
+    // wrap ด้วย useCallback (deps ที่แคบลง) แทนฟังก์ชันเปล่าๆ — เพื่อให้ variantColumns
+    // ด้านล่าง (ที่ memo ไว้ด้วย useMemo) มี dependency ที่ไม่เปลี่ยนพร่ำเพรื่อ
+    // (configurableAttributes เป็น prop ไม่ใช่ state เลย identity คงที่อยู่แล้วปกติ)
+    const optionLabelFor = useCallback(
+        (attributeId: number, code: string): string => {
+            const attr = configurableAttributes.find((a) => a.id === attributeId);
+            const opt = attr?.options?.find((o) => (o.code || o.admin_label || String(o.id)) === code);
+            return opt?.admin_label || opt?.code || code;
+        },
+        [configurableAttributes],
+    );
 
     // variant ที่มีอยู่แล้วจะมีชุดค่าผสม attribute จริงก็ต่อเมื่อถูก generate มาจาก
     // picker นี้ (หรือของหน้า Create) เท่านั้น ส่วนแถวที่เพิ่มเองด้วยมือ หรือแถวที่มี
     // มาก่อนฟีเจอร์นี้จะเกิด ก็จะ fallback ไปเดา label จากส่วนท้ายของ SKU แทน
-    const variantLabel = (v: VariantItem): string => {
-        const attrs = v.attributes || {};
-        const keys = Object.keys(attrs);
-        if (keys.length === 0) {
-            const suffix = v.sku.replace(data.sku + '-', '');
-            return suffix || v.sku;
-        }
-        return keys.map((k) => optionLabelFor(Number(k), attrs[Number(k)])).join(' / ');
-    };
+    const variantLabel = useCallback(
+        (v: VariantItem): string => {
+            const attrs = v.attributes || {};
+            const keys = Object.keys(attrs);
+            if (keys.length === 0) {
+                const suffix = v.sku.replace(data.sku + '-', '');
+                return suffix || v.sku;
+            }
+            return keys.map((k) => optionLabelFor(Number(k), attrs[Number(k)])).join(' / ');
+        },
+        [data.sku, optionLabelFor],
+    );
 
     // Configurable products are turned off for new/simple products (the variant
     // matrix can explode on this catalog's option-heavy attributes). A product
@@ -732,16 +791,18 @@ export default function ProductEdit({
         setVariantDialogOpen(false);
     };
 
-    const handleAddBlankVariant = () => {
-        setData('variants', [...data.variants, { sku: '', price: '', qty: '', attributes: {} }]);
-    };
+    // ใช้ setDataRef + functional update แทน setData('variants', ...) ตรงๆ — ทำให้
+    // identity ของ handler สองตัวนี้คงที่ (deps ว่างเปล่า) ไม่ต้องผูกกับ
+    // data.variants ที่เปลี่ยนทุกครั้งที่แก้ variant คนละแถว handleRemoveVariant
+    // เอาไปใช้ใน variantColumns ด้านล่างซึ่ง memo ไว้ — ถ้า identity เปลี่ยนทุก
+    // render จะทำให้ต้องสร้างคอลัมน์ใหม่ทั้งชุดทุกครั้งโดยไม่จำเป็น
+    const handleAddBlankVariant = useCallback(() => {
+        setDataRef.current((prev) => ({ ...prev, variants: [...prev.variants, { sku: '', price: '', qty: '', attributes: {} }] }));
+    }, []);
 
-    const handleRemoveVariant = (index: number) => {
-        setData(
-            'variants',
-            data.variants.filter((_, i) => i !== index),
-        );
-    };
+    const handleRemoveVariant = useCallback((index: number) => {
+        setDataRef.current((prev) => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }));
+    }, []);
 
     // ลำดับการซ่อน/แสดงคอลัมน์เมื่อจอเล็กลง (ตามสไตล์ SAP Fiori responsive table):
     // label ของ variant เป็นตัวระบุแถว ส่วน SKU เป็นช่องที่ผู้ใช้ต้องกรอกเอง เลยให้
@@ -749,82 +810,107 @@ export default function ProductEdit({
     // ให้ label ก่อน) ส่วน price/qty เป็นฟิลด์แก้ไขรอง เลยซ่อนก่อนเพื่อน ส่วน action
     // ลบก็ปักหมุดไว้เหมือนคอลัมน์ตัวระบุแถว
     type VariantRow = { v: VariantItem; index: number };
-    const variantColumns: FioriResponsiveColumn<VariantRow>[] = [
-        {
-            key: 'option',
-            header: 'ตัวเลือก',
-            priority: 'always',
-            render: ({ v }) => (
-                <Typography component="span" fontWeight={600}>
-                    {variantLabel(v)}
-                </Typography>
-            ),
-        },
-        {
-            key: 'sku',
-            header: 'SKU *',
-            priority: 'high',
-            render: ({ v, index }) => (
-                <TextField
-                    size="small"
-                    required
-                    value={v.sku}
-                    onChange={(e) => {
-                        const updated = [...data.variants];
-                        updated[index] = { ...v, sku: e.target.value };
-                        setData('variants', updated);
-                    }}
-                />
-            ),
-        },
-        {
-            key: 'price',
-            header: 'ราคา',
-            priority: 'medium',
-            render: ({ v, index }) => (
-                <TextField
-                    size="small"
-                    type="number"
-                    value={v.price}
-                    onChange={(e) => {
-                        const updated = [...data.variants];
-                        updated[index] = { ...v, price: e.target.value };
-                        setData('variants', updated);
-                    }}
-                    placeholder="ราคา"
-                />
-            ),
-        },
-        {
-            key: 'qty',
-            header: 'จำนวนสต๊อก (Qty)',
-            priority: 'medium',
-            render: ({ v, index }) => (
-                <TextField
-                    size="small"
-                    type="number"
-                    value={v.qty}
-                    onChange={(e) => {
-                        const updated = [...data.variants];
-                        updated[index] = { ...v, qty: e.target.value };
-                        setData('variants', updated);
-                    }}
-                    placeholder="สต๊อก"
-                />
-            ),
-        },
-        {
-            key: 'actions',
-            header: 'ลบ',
-            priority: 'always',
-            align: 'right',
-            render: ({ index }) => (
-                <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
-                    <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-            ),
-        },
-    ];
+    // memo ไว้ด้วย useMemo — render callback ของแต่ละคอลัมน์ใช้ setDataRef.current
+    // (functional update, อ่าน prev.variants สดๆ ตอนกด) แทนการปิด scope ทับ
+    // data.variants/setData ตรงๆ เพื่อไม่ให้ต้องพึ่ง identity ของ setData ที่ไม่คงที่
+    // ทุก render (ดูคอมเมนต์ setDataRef ด้านบน) ผลคือ variantColumns ทั้งชุดนี้จะไม่
+    // ถูกสร้างใหม่ (reference คงที่) ตอนพิมพ์ในฟิลด์ attribute อื่นๆ ที่ไม่เกี่ยวกับ
+    // variants เลย — สำคัญเพราะตารางนี้อาจมีได้ถึง 200 แถว (MAX_VARIANT_COMBINATIONS)
+    // ถ้า columns เปลี่ยน reference ทุก render ตารางทั้งก้อนจะ re-render ใหม่หมดด้วย
+    const variantColumns: FioriResponsiveColumn<VariantRow>[] = useMemo(
+        () => [
+            {
+                key: 'option',
+                header: 'ตัวเลือก',
+                priority: 'always',
+                render: ({ v }: VariantRow) => (
+                    <Typography component="span" fontWeight={600}>
+                        {variantLabel(v)}
+                    </Typography>
+                ),
+            },
+            {
+                key: 'sku',
+                header: 'SKU *',
+                priority: 'high',
+                render: ({ v, index }: VariantRow) => (
+                    <TextField
+                        size="small"
+                        required
+                        value={v.sku}
+                        onChange={(e) => {
+                            const newSku = e.target.value;
+                            setDataRef.current((prev) => {
+                                const updated = [...prev.variants];
+                                updated[index] = { ...updated[index], sku: newSku };
+                                return { ...prev, variants: updated };
+                            });
+                        }}
+                    />
+                ),
+            },
+            {
+                key: 'price',
+                header: 'ราคา',
+                priority: 'medium',
+                render: ({ v, index }: VariantRow) => (
+                    <TextField
+                        size="small"
+                        type="number"
+                        value={v.price}
+                        onChange={(e) => {
+                            const newPrice = e.target.value;
+                            setDataRef.current((prev) => {
+                                const updated = [...prev.variants];
+                                updated[index] = { ...updated[index], price: newPrice };
+                                return { ...prev, variants: updated };
+                            });
+                        }}
+                        placeholder="ราคา"
+                    />
+                ),
+            },
+            {
+                key: 'qty',
+                header: 'จำนวนสต๊อก (Qty)',
+                priority: 'medium',
+                render: ({ v, index }: VariantRow) => (
+                    <TextField
+                        size="small"
+                        type="number"
+                        value={v.qty}
+                        onChange={(e) => {
+                            const newQty = e.target.value;
+                            setDataRef.current((prev) => {
+                                const updated = [...prev.variants];
+                                updated[index] = { ...updated[index], qty: newQty };
+                                return { ...prev, variants: updated };
+                            });
+                        }}
+                        placeholder="สต๊อก"
+                    />
+                ),
+            },
+            {
+                key: 'actions',
+                header: 'ลบ',
+                priority: 'always',
+                align: 'right',
+                render: ({ index }: VariantRow) => (
+                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
+                        <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                ),
+            },
+        ],
+        [variantLabel, handleRemoveVariant],
+    );
+
+    // rows/getRowKey ก็ memo เหมือนกัน — rows ต้อง recompute เฉพาะตอน data.variants
+    // เปลี่ยนจริงๆ (ไม่ใช่ทุก render) ส่วน getRowKey ไม่ได้ปิด scope ทับอะไรเลยเลย
+    // ให้ identity คงที่ตลอดไปด้วย useCallback deps ว่างเปล่า
+    const variantRows: VariantRow[] = useMemo(() => data.variants.map((v, index) => ({ v, index })), [data.variants]);
+    const getVariantRowKey = useCallback((row: VariantRow) => row.v.id ?? `new-${row.index}`, []);
 
     // ถ้าเปลี่ยนประเภทออกจาก Configurable จะลบ variant ลูกทั้งหมดตอน Save
     // (ดู ProductController::update()) เลยต้องให้ confirm ก่อน เพราะย้อนกลับไม่ได้
@@ -1204,36 +1290,6 @@ export default function ProductEdit({
     const deactivateStatusCheck = statusCheck && deactivateConfirmShop && statusCheck.shopId === deactivateConfirmShop.id ? statusCheck : null;
     const deleteListingStatusCheck =
         statusCheck && deleteListingConfirmShop && statusCheck.shopId === deleteListingConfirmShop.id ? statusCheck : null;
-
-    // useForm() ไม่ได้การันตีว่า setData จะมี identity คงที่ทุก render เลยเก็บมันไว้
-    // ใน ref แทนที่จะเป็น dep ของ useCallback — วิธีนี้ทำให้ identity ของ
-    // setAttributeValue เองคงที่ตลอด (deps ว่างเปล่า) ไม่ว่า identity ของ setData
-    // จะเปลี่ยนหรือไม่ก็ตาม ความคงที่นี่แหละคือจุดสำคัญ: การส่งฟังก์ชันนี้ลงไปเป็น
-    // onChange ของฟิลด์ที่ memo ไว้ ไม่ควรทำให้ฟิลด์นั้น re-render เองโดยไม่จำเป็น —
-    // เช่นตอนสลับแค่ locale เฉยๆ ที่ channelKey/localeKey/value ของฟิลด์ส่วนใหญ่
-    // ไม่ได้เปลี่ยนเลย ถึงแม้ฟอร์มรอบๆ จะ re-render ก็ตาม ใช้ channelKey/localeKey
-    // ที่ resolve มาแล้วโดยตรง แทนที่จะไปคำนวณใหม่ผ่าน getValueKeys() เลยไม่ต้อง
-    // พึ่ง attr เลย (และไม่โดน invalidate เพราะ attr ด้วย)
-    const setDataRef = useRef(setData);
-    setDataRef.current = setData;
-    const setAttributeValue = useCallback((attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
-        setDataRef.current((prev) => {
-            const attrValues = prev.values[attributeId] || {};
-            return {
-                ...prev,
-                values: {
-                    ...prev.values,
-                    [attributeId]: {
-                        ...attrValues,
-                        [channelKey]: {
-                            ...(attrValues[channelKey] || {}),
-                            [localeKey]: val,
-                        },
-                    },
-                },
-            };
-        });
-    }, []);
 
     // ตอนสลับ scope จะ re-fetch แค่ฟิลด์ที่เป็น channel/locale-based เท่านั้น
     // ฟิลด์ที่ scope ไม่ได้จะอยู่ใต้ key คงที่ 'global'/'default' เสมอ ไม่มีวันเปลี่ยน
@@ -1779,22 +1835,62 @@ export default function ProductEdit({
                                                     <Stack
                                                         direction="row"
                                                         alignItems="center"
-                                                        spacing={0.5}
+                                                        justifyContent="space-between"
+                                                        spacing={1}
                                                         onClick={() => toggleGroupCollapse(group.id)}
                                                         sx={{ mb: isGroupCollapsed ? 0 : 2.5, cursor: 'pointer', userSelect: 'none' }}
                                                     >
-                                                        <IconButton size="small" sx={{ p: 0.5 }}>
-                                                            {isGroupCollapsed ? (
-                                                                <ChevronRightIcon fontSize="small" />
-                                                            ) : (
-                                                                <ExpandMoreIcon fontSize="small" />
-                                                            )}
-                                                        </IconButton>
-                                                        <Typography variant="h6" fontWeight={700} color="text.primary">
-                                                            {localizedLabel(group, activeLocaleId)}
-                                                        </Typography>
+                                                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                            <IconButton size="small" sx={{ p: 0.5 }}>
+                                                                {isGroupCollapsed ? (
+                                                                    <ChevronRightIcon fontSize="small" />
+                                                                ) : (
+                                                                    <ExpandMoreIcon fontSize="small" />
+                                                                )}
+                                                            </IconButton>
+                                                            <Typography variant="h6" fontWeight={700} color="text.primary">
+                                                                {localizedLabel(group, activeLocaleId)}
+                                                            </Typography>
+                                                        </Stack>
+                                                        {/* ทำให้เห็นว่าฟิลด์ในกลุ่มนี้มาจากตระกูลแอตทริบิวต์ไหนบ้าง — group
+                                                        เดียวรับฟิลด์จากได้หลายตระกูล (เช่นแท็บ "Lazada" ที่ทุกตระกูล
+                                                        Lazada ใช้ AttributeGroup row เดียวกันร่วมกันหมด ดู
+                                                        LazadaAttributeFamilyGenerator::GROUP_CODE) ไม่งั้นจะไม่มีทาง
+                                                        รู้เลยว่าต้องไปแก้ที่หน้า Attribute Family ตัวไหน กดที่ chip
+                                                        เพื่อไปหน้าแก้ไขตระกูลนั้นได้เลย — วางไว้ฝั่งขวาสุดของแถบหัวข้อ
+                                                        แยกจากชื่อกลุ่มชัดเจน */}
+                                                        {(group.families?.length ?? 0) > 0 && (
+                                                            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+                                                                {(group.families ?? []).map((family) => (
+                                                                    <Tooltip key={family.id} title={`ไปที่ตระกูลแอตทริบิวต์ "${family.name ?? family.code}"`}>
+                                                                        <Chip
+                                                                            size="small"
+                                                                            variant="outlined"
+                                                                            label={family.name ?? family.code}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                router.visit(`/catalog/attributeFamilies/${family.id}/edit`);
+                                                                            }}
+                                                                            sx={{ bgcolor: FIORI.brandBg, color: FIORI.brand, fontWeight: 600, cursor: 'pointer' }}
+                                                                        />
+                                                                    </Tooltip>
+                                                                ))}
+                                                            </Stack>
+                                                        )}
                                                     </Stack>
-                                                    <Collapse in={!isGroupCollapsed}>
+                                                    {/* unmountOnExit — พอ collapse ค้างไว้แล้ว ฟิลด์หนักๆ ในกลุ่มนี้ (โดยเฉพาะ
+                                                    RichTextEditor/TinyMCE ที่ mount ทุกตัวไว้ตลอดปกติ ดูคอมเมนต์ setDataRef
+                                                    ด้านบนของไฟล์) จะถูกถอดออกจาก DOM จริงๆ ไม่ใช่แค่ซ่อนด้วย height:0 — ลด
+                                                    จำนวน editor/ResizeObserver ที่ยังทำงานอยู่พร้อมกันทั้งหน้า ซึ่งเป็นตัวที่
+                                                    ทำให้จังหวะพับ/กางกลุ่มอื่นๆ กระตุกไปด้วย (reflow สะสมจากของที่ซ่อนอยู่
+                                                    เยอะเกินจำเป็น) ข้อแลกเปลี่ยน: กางกลุ่มที่มี rich-text กลับมาอีกครั้งจะ
+                                                    ต้อง mount TinyMCE ใหม่ทุกครั้ง (มีดีเลย์โหลดสั้นๆ ให้เห็น ไม่ใช่ค้างค่าที่
+                                                    เคยพิมพ์ไว้หาย เพราะ value อ่านจาก data ของฟอร์มเสมอ ไม่ใช่จาก DOM)
+                                                    timeout สั้นและคงที่แทน 'auto' (ดีฟอลต์ของ MUI) — 'auto' คำนวณ
+                                                    ระยะเวลาจาก scrollHeight ของเนื้อหาจริง กลุ่มที่มี attribute เยอะๆ เลย
+                                                    ได้ duration ยาวกว่ากลุ่มเล็กๆ แบบไม่เท่ากันเอง ให้ค่าคงที่แทนจะได้รู้สึก
+                                                    accurate/สม่ำเสมอทุกกลุ่ม */}
+                                                    <Collapse in={!isGroupCollapsed} timeout={200} unmountOnExit mountOnEnter>
                                                         <Stack spacing={2.5}>
                                                             {isGeneral && (
                                                                 <Box>
@@ -1923,8 +2019,8 @@ export default function ProductEdit({
                                                                             variant="plain"
                                                                             size="small"
                                                                             columns={variantColumns}
-                                                                            rows={data.variants.map((v, index) => ({ v, index }))}
-                                                                            getRowKey={(row) => row.v.id ?? `new-${row.index}`}
+                                                                            rows={variantRows}
+                                                                            getRowKey={getVariantRowKey}
                                                                         />
                                                                     )}
                                                                 </Box>
@@ -3065,7 +3161,15 @@ const RichTextControl = memo(function RichTextControl({
     );
 });
 
-function RenderAttributeInput({
+// memo() ไว้เพื่อลด blast radius ของการ re-render ทั้งฟอร์ม (ดูคอมเมนต์ setDataRef
+// ด้านบน) — ก่อนหน้านี้ component ตัวนี้ (ตัวหนักที่สุดของทุก attribute field เพราะ
+// สร้าง chip หลายตัว + ห่อ SelectControl/RichTextControl ที่ memo ไว้แล้วก็ตาม)
+// ถูกเรียกใหม่ทุกครั้งที่พิมพ์ตรงไหนก็ได้ในฟอร์ม เพราะ parent (ProductEdit ทั้งหน้า)
+// re-render ทั้งก้อนเสมอ ตอนนี้ props ทุกตัวที่ส่งเข้ามา (attr, value, channelKey,
+// localeKey, onValueChange, masterSources, ...) มี identity คงที่แล้วยกเว้นตอนที่
+// attribute ตัวนั้นๆ เปลี่ยนค่าจริงๆ — memo() เลยทำให้ field อื่นๆ ที่ไม่เกี่ยวข้อง
+// ข้าม re-render ไปได้จริง แทนที่จะ evaluate ทั้ง function body ใหม่ทุกครั้ง
+const RenderAttributeInput = memo(function RenderAttributeInput({
     attr,
     value,
     channelKey,
@@ -3148,11 +3252,16 @@ function RenderAttributeInput({
                         </Tooltip>
                     </>
                 ) : (
-                    <Chip
-                        label="DEFAULT"
-                        size="small"
-                        sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.200', color: 'text.primary', fontWeight: 600 }}
-                    />
+                    <>
+                        <Chip
+                            label="DEFAULT"
+                            size="small"
+                            sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.200', color: 'text.primary', fontWeight: 600 }}
+                        />
+                        <Tooltip title={t('defaultFieldChipTooltip')} arrow>
+                            <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
+                        </Tooltip>
+                    </>
                 )}
                 {isReadOnly && (
                     <Chip
@@ -3725,4 +3834,4 @@ function RenderAttributeInput({
             />
         </Box>
     );
-}
+});

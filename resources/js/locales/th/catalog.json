@@ -114,6 +114,7 @@
     "masterSourceBrands": "แบรนด์",
     "masterSourceProductGrades": "เกรดสินค้า",
     "masterSourceChipTooltip": "ตัวเลือกของฟิลด์นี้ถูกดึงมาจากแหล่งข้อมูลมาสเตอร์",
+    "defaultFieldChipTooltip": "ฟิลด์นี้มีค่าเดียวสำหรับสินค้าทั้งชิ้น ไม่แยกตามภาษาหรือช่องทางการขาย — ต่างจากฟิลด์ที่มี chip แสดงชื่อภาษาหรือชื่อ sales channel ซึ่งแก้ค่าแยกกันได้ต่อภาษา/ต่อร้าน",
     "createAttribute": "สร้างแอตทริบิวต์",
     "searchAttributes": "ค้นหาแอตทริบิวต์",
     "noAttributesFound": "ไม่พบแอตทริบิวต์",

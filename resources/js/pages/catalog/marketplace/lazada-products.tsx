@@ -38,6 +38,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import {
     Alert,
     Box,
@@ -489,6 +490,7 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
     // Category mapping section state
     const [selectedLazadaCatId, setSelectedLazadaCatId] = useState<number | null>(null);
     const [savingCatMap, setSavingCatMap] = useState(false);
+    const [clearingCatMap, setClearingCatMap] = useState(false);
     // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก Lazada จริงมา refresh
     // แคช lazada_categories (คนละอย่างกับ saveCategoryMapping ด้านล่าง ซึ่งแค่
     // "เลือก" จากที่ sync ไว้แล้ว) — เดิมปุ่มนี้อยู่ที่หน้า
@@ -719,6 +721,51 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                     scrollToSection(1);
                 },
                 onError: () => setSavingCatMap(false),
+            },
+        );
+    };
+
+    // ล้าง Category Mapping ทิ้ง — ยิง lazada_category_id: null ไปที่ endpoint
+    // เดียวกับตอนบันทึก (bulkMapMarketplaceCategory ฝั่ง backend รองรับ null
+    // อยู่แล้ว ดู CategoryController.php) เพราะ mapping ผูกกับ Master Category
+    // ไม่ใช่ตัวสินค้า การล้างจึงมีผลกับสินค้าทุกตัวในหมวดเดียวกัน และทำให้
+    // push ไป Lazada ไม่ได้จนกว่าจะแมปใหม่ (LazadaProductSyncService::
+    // resolveLazadaCategoryId() throw ถ้าไม่มี mapping เลย) — เตือนก่อนเสมอ
+    // เหมือน syncAttributeFamily() ด้านล่าง
+    const clearCategoryMapping = () => {
+        if (!activeProduct || !activeProduct.master_category) return;
+
+        if (
+            !window.confirm(
+                'การล้าง Category Mapping นี้จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกัน และจะทำให้สินค้ากลุ่มนี้ Push ไป Lazada ไม่ได้จนกว่าจะแมปใหม่ ต้องการดำเนินการต่อหรือไม่?',
+            )
+        ) {
+            return;
+        }
+
+        setClearingCatMap(true);
+        const categoryId = activeProduct.master_category.id;
+
+        router.post(
+            '/catalog/categories/lazada-mapping',
+            { mappings: [{ category_id: categoryId, lazada_category_id: null }] },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setClearingCatMap(false);
+                    setSelectedLazadaCatId(null);
+                    setLazadaAttributes(null);
+                    setActiveProduct((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  category_mapped: false,
+                                  lazada_category: null,
+                              }
+                            : prev,
+                    );
+                },
+                onError: () => setClearingCatMap(false),
             },
         );
     };
@@ -1280,17 +1327,30 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                         )}
                                     </Box>
 
-                                    <Box>
+                                    <Stack direction="row" spacing={1.5}>
                                         <Button
                                             variant="contained"
-                                            disabled={!selectedLazadaCatId || savingCatMap}
+                                            disabled={!selectedLazadaCatId || savingCatMap || clearingCatMap}
                                             onClick={saveCategoryMapping}
                                             startIcon={savingCatMap ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon fontSize="small" />}
                                             sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                                         >
                                             บันทึก Category Mapping & ดำเนินการต่อ
                                         </Button>
-                                    </Box>
+
+                                        {activeProduct.category_mapped && (
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                disabled={savingCatMap || clearingCatMap}
+                                                onClick={clearCategoryMapping}
+                                                startIcon={clearingCatMap ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon fontSize="small" />}
+                                                sx={fioriDefaultSx}
+                                            >
+                                                ล้าง Category Mapping
+                                            </Button>
+                                        )}
+                                    </Stack>
                                 </Stack>
                             </Paper>
 

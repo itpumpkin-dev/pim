@@ -2060,7 +2060,13 @@ class ProductController extends Controller
                     // เพื่อ resolve `name` ข้างบนใหม่ทุกครั้งที่เปลี่ยนภาษา
                     'translations' => $group->translations,
                     'attributes' => [],
+                    // เก็บลำดับ family_id ที่เจอครั้งแรกไว้เฉยๆ ก่อน — จะแปลงเป็น
+                    // 'families' (id/code/name) ตอนท้าย ดูคอมเมนต์ที่จุดแปลงด้านล่าง
+                    '_family_ids' => [],
                 ];
+            }
+            if (! in_array($fa->family_id, $groupsData[$groupId]['_family_ids'], true)) {
+                $groupsData[$groupId]['_family_ids'][] = $fa->family_id;
             }
             $attr->editable = $this->canUserEditAttributeGroup($user, $group) && $this->canUserEditAttribute($user, $attr);
             $attr->lazada_mandatory = in_array($attr->id, $lazadaMandatoryAttributeIds, true);
@@ -2072,6 +2078,26 @@ class ProductController extends Controller
 
         // เอากลุ่มที่ว่างเปล่าออก (กลุ่มที่ไม่มี attribute ที่มองเห็นได้เลย)
         $groupsData = array_filter($groupsData, fn ($group) => ! empty($group['attributes']));
+
+        // แปลง '_family_ids' ที่เก็บไว้ตอนวนลูปด้านบนเป็น 'families' (id/code/name
+        // เต็มๆ จาก $families ที่โหลดไว้ตอนต้นเมธอด) — มีไว้ให้ frontend โชว์ว่า
+        // แท็บ/panel นี้ (โดยเฉพาะแท็บ "Lazada" ที่ใช้ AttributeGroup row เดียวกัน
+        // ทุกตระกูล ดู LazadaAttributeFamilyGenerator::GROUP_CODE) จริงๆ แล้วฟิลด์
+        // มาจากตระกูลไหนบ้าง เพราะ group เดียวรับ field จากได้หลายตระกูลพร้อมกัน
+        // (เช่น หมวดหมู่เดียวผูกทั้ง lazada_family_2 และ lazada_family_3) — ไม่งั้น
+        // ผู้ใช้จะไม่มีทางรู้เลยว่าต้องไปแก้ฟิลด์ที่หน้า Attribute Family ตัวไหน
+        $familiesById = $families->keyBy('id');
+        $groupsData = array_map(function ($group) use ($familiesById) {
+            $group['families'] = collect($group['_family_ids'])
+                ->map(fn ($familyId) => $familiesById->get($familyId))
+                ->filter()
+                ->map(fn ($family) => ['id' => $family->id, 'code' => $family->code, 'name' => $family->name])
+                ->values()
+                ->all();
+            unset($group['_family_ids']);
+
+            return $group;
+        }, $groupsData);
 
         // ถ้า family ของสินค้ายังไม่มี family attributes ที่ผูกไว้เลย ให้โชว์ system attribute ทั้งหมดไว้ในกลุ่ม General แทน
         // หมายเหตุ: ตรงนี้ต้องเช็คจาก attribute assignments ดิบๆ ของ family เอง ไม่ใช่เช็คจาก $groupsData

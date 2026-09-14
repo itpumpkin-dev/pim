@@ -620,6 +620,7 @@
     "masterSourceBrands": "品牌",
     "masterSourceProductGrades": "产品等级",
     "masterSourceChipTooltip": "此字段的选项来自主数据（Master）画面的镜像 — 请到那里编辑，不要在这里逐个修改选项。",
+    "defaultFieldChipTooltip": "此字段对整个产品只有一个值，不按语言或销售渠道区分 — 不同于显示语言或渠道名称 chip 的字段，那些字段可以按语言/渠道分别设值。",
     "masterSourceOptionsCustomizable": "选项以「{{source}}」主数据为起点自动生成 — 如需新增请到该主数据画面。在此可以关闭（Active）不想在产品页面显示的选项，或自定义标签；自定义过的选项即使主数据更新也不会被覆盖，直到你重置为止。",
     "quickAddOptionTitle": "添加选项 — {{attribute}}",
     "quickAddOptionMasterNotice": "此操作会在 <strong>{{source}}</strong> 主数据画面新增一条记录，不只是绑定到此属性。",

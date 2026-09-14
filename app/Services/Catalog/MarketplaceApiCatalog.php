@@ -43,6 +43,7 @@ class MarketplaceApiCatalog
                         'operations' => [
                             ['method' => 'GET', 'endpoint' => '/api/v2/product/get_category', 'purpose' => 'Sync Shopee\'s category tree', 'source' => 'ShopeeClient::getCategoryTree() → CategoryController::syncShopeeCategories()', 'write' => false],
                             ['method' => 'GET', 'endpoint' => '/api/v2/product/get_attribute_tree', 'purpose' => 'Sync mandatory/optional attribute schema per category', 'source' => 'ShopeeClient::getAttributeTree() → ShopeeAttributeMappingController::syncShopeeAttributes()', 'write' => false],
+                            ['method' => 'GET', 'endpoint' => '/api/v2/product/category_recommend', 'purpose' => 'Recommend leaf category ids for a product from its item name ("แนะนำหมวดหมู่จาก Shopee" button)', 'source' => 'ShopeeClient::getCategoryRecommend() → ShopeeAttributeMappingController::categorySuggestions()', 'write' => false],
                         ],
                     ],
                     [
@@ -83,6 +84,7 @@ class MarketplaceApiCatalog
                         'operations' => [
                             ['method' => 'GET', 'endpoint' => '/category/tree/get', 'purpose' => 'Sync Lazada\'s category tree (no-auth "system tools" endpoint)', 'source' => 'LazadaClient::getCategoryTree() → CategoryController::syncLazadaCategories()', 'write' => false],
                             ['method' => 'GET', 'endpoint' => '/category/attributes/get', 'purpose' => 'Sync category attribute schema', 'source' => 'LazadaClient::getCategoryAttributes() → LazadaAttributeMappingController::syncLazadaAttributes()', 'write' => false],
+                            ['method' => 'GET', 'endpoint' => '/product/category/suggestion/get', 'purpose' => 'Suggest leaf categories for a product from its name + a product image URL (image_url mandatory, confirmed live) — "แนะนำหมวดหมู่จาก Lazada" button', 'source' => 'LazadaClient::getCategorySuggestion() → LazadaAttributeMappingController::categorySuggestions()', 'write' => false],
                         ],
                     ],
                     [
@@ -122,6 +124,7 @@ class MarketplaceApiCatalog
                             ['method' => 'GET', 'endpoint' => '/product/{v}/categories', 'purpose' => 'Sync TikTok Shop\'s category tree', 'source' => 'TikTokClient::getCategoryTree() → CategoryController::syncTikTokCategories()', 'write' => false],
                             ['method' => 'GET', 'endpoint' => '/product/{v}/categories/{id}/attributes', 'purpose' => 'Sync sales/product-property attribute schema per category', 'source' => 'TikTokClient::getAttributes() → TikTokAttributeMappingController::syncTikTokAttributes()', 'write' => false],
                             ['method' => 'GET', 'endpoint' => '/product/{v}/categories/{id}/rules', 'purpose' => 'Category compliance/certification requirements (available, not yet wired into the push flow)', 'source' => 'TikTokClient::getCategoryRules()', 'write' => false],
+                            ['method' => 'POST', 'endpoint' => '/product/{v}/categories/recommend', 'purpose' => 'Recommend leaf category ids for a product from its title, 25-255 chars ("แนะนำหมวดหมู่จาก TikTok" button; not yet confirmed live)', 'source' => 'TikTokClient::getRecommendedCategories() → TikTokAttributeMappingController::categorySuggestions()', 'write' => false],
                         ],
                     ],
                     [

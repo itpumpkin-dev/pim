@@ -13,7 +13,7 @@ import {
     type SxProps,
     type Theme,
 } from '@mui/material';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, memo, type ReactNode } from 'react';
 import { FIORI, fioriCardSx } from '@/lib/fiori-style';
 
 /**
@@ -110,7 +110,7 @@ const headCellSx = {
  * across every catalog admin list/mapping table instead of each page
  * hand-rolling its own `<TableContainer>` breakpoint logic.
  */
-export function FioriResponsiveTable<Row>({
+function FioriResponsiveTableInner<Row>({
     columns,
     rows,
     getRowKey,
@@ -216,3 +216,12 @@ export function FioriResponsiveTable<Row>({
         </TableContainer>
     );
 }
+
+// memo() ไว้เพราะตารางนี้ถูกใช้ทั่วแอป บางหน้า (เช่น products/edit.tsx variants
+// table) ตอนนี้ส่ง columns/rows/getRowKey เป็น reference คงที่แล้ว (useMemo/
+// useCallback) — memo ตรงนี้เลยช่วยให้ตารางข้ามการ re-render ทั้งก้อนได้จริง
+// เวลามีอย่างอื่นในหน้า re-render โดยไม่เกี่ยวกับตารางเลย ส่วนหน้าที่ยังส่ง prop
+// เป็น literal ใหม่ทุก render (เช่น array/ฟังก์ชัน inline) จะไม่ได้ประโยชน์ตรงนี้
+// แต่ก็ไม่เสียอะไร — พฤติกรรมเหมือนเดิมทุกอย่าง แค่ไม่ได้ bail out เฉยๆ
+// ต้อง cast กลับเป็น typeof ฟังก์ชันเดิมเพราะ memo() ทำให้ generic <Row> หายไป
+export const FioriResponsiveTable = memo(FioriResponsiveTableInner) as typeof FioriResponsiveTableInner;

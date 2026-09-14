@@ -114,6 +114,7 @@
     "masterSourceBrands": "Brands",
     "masterSourceProductGrades": "Product Grades",
     "masterSourceChipTooltip": "This field's options are mirrored from a Master data screen — edit them there, not option-by-option here.",
+    "defaultFieldChipTooltip": "This field has a single value for the whole product — not split per locale or per sales channel, unlike fields showing a language or channel-name chip that can hold a different value per locale/channel.",
     "createAttribute": "Create Attribute",
     "searchAttributes": "Search attributes",
     "noAttributesFound": "No attributes found.",
