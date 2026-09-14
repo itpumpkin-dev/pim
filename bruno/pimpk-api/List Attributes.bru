@@ -1,0 +1,24 @@
+meta {
+  name: List Attributes
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/attributes?per_page=50
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 50
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Paginated list of attribute definitions (just an options_count, not the
+  full option list — see Show Attribute for that).
+}

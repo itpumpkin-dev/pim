@@ -1,0 +1,24 @@
+meta {
+  name: List Brands
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/brands?per_page=50
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 50
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Paginated list of active brands (the `pbrand` attribute's master — see
+  Brand model).
+}

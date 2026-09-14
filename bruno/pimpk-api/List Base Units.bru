@@ -1,0 +1,24 @@
+meta {
+  name: List Base Units
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/api/base-units?per_page=50
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 50
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Paginated list of active base units (the `pbaseunit` attribute's master
+  — see BaseUnit model).
+}

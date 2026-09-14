@@ -1,0 +1,29 @@
+meta {
+  name: List Categories
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/categories?per_page=50
+  body: none
+  auth: none
+}
+
+params:query {
+  per_page: 50
+  ~parent_code: {{categoryCode}}
+  ~roots_only: true
+}
+
+headers {
+  X-API-Key: {{apiKey}}
+}
+
+docs {
+  Paginated list of active categories (root / subcategory / product group
+  all live in the same tree — see Category model). Optional filters:
+
+  - parent_code: only direct children of that category
+  - roots_only: only top-level categories
+}

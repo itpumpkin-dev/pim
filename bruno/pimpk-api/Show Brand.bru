@@ -1,0 +1,15 @@
+meta {
+  name: Show Brand
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/brands/{{brandCode}}
+  body: none
+  auth: none
+}
+
+docs {
+  Single brand lookup by code. Public endpoint — no API key required.
+}

@@ -1,0 +1,17 @@
+meta {
+  name: Show Attribute
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/attributes/{{attributeCode}}
+  body: none
+  auth: none
+}
+
+docs {
+  Single attribute lookup by code, including its full (active) option
+  list — what a select/multiselect ProductValue's stored code decodes to.
+  Public endpoint — no API key required.
+}

@@ -1,0 +1,16 @@
+meta {
+  name: Show Category
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/categories/{{categoryCode}}
+  body: none
+  auth: none
+}
+
+docs {
+  Single category lookup by code, including its direct children. Public
+  endpoint — no API key required.
+}

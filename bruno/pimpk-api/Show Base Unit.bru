@@ -1,0 +1,15 @@
+meta {
+  name: Show Base Unit
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/base-units/{{baseUnitCode}}
+  body: none
+  auth: none
+}
+
+docs {
+  Single base unit lookup by code. Public endpoint — no API key required.
+}
