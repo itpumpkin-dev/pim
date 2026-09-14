@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\JobTracker;
 use App\Services\Catalog\AttributeAccessPolicy;
 use Illuminate\Http\JsonResponse;
@@ -91,6 +92,17 @@ class JobTrackerController extends Controller
 
         if (!$jobTracker->cancel_requested_at) {
             $jobTracker->update(['cancel_requested_at' => now()]);
+
+            // JobTracker isn't Auditable — deliberately so, since
+            // ProcessImportJob/ProcessExportJob's own frequent progress
+            // ticks (see this method's docblock) would otherwise flood
+            // audit_logs. This one human-initiated action is worth a
+            // record on its own, though.
+            AuditLog::record('job_cancelled', $jobTracker, null, [
+                'status' => $jobTracker->status,
+                'job_type' => $jobTracker->job_type,
+                'entity_type' => $jobTracker->entity_type,
+            ]);
         }
 
         return back()->with('success', 'Cancellation requested — the job will stop shortly.');

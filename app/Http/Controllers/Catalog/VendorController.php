@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Models\Vendor;
@@ -115,6 +116,10 @@ class VendorController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $vendor->code, $vendor->name, $vendor->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('vendor_created', $attribute, null, $this->auditFields($vendor));
+        }
+
         return to_route('catalog.vendors.index')->with('success', 'Vendor added successfully.');
     }
 
@@ -146,6 +151,8 @@ class VendorController extends Controller
         $translations = $validated['translations'];
         unset($validated['translations']);
 
+        $oldFields = $this->auditFields($vendor);
+
         $vendor->update(['name' => $this->resolveName($translations) ?? $vendor->name] + $validated);
 
         $this->syncTranslations($vendor, $translations);
@@ -153,14 +160,28 @@ class VendorController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $oldCode, $vendor->code, $vendor->name, $vendor->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($vendor->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('vendor_updated', $attribute, $oldFields, $newFields);
+            }
+        }
+
         return to_route('catalog.vendors.index')->with('success', 'Vendor updated successfully.');
     }
 
     public function destroy(Vendor $vendor): RedirectResponse
     {
+        $oldFields = $this->auditFields($vendor);
+        $attribute = $this->auditAttribute();
+
         $vendor->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $vendor->code);
+
+        if ($attribute) {
+            AuditLog::record('vendor_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.vendors.index')->with('success', 'Vendor deleted successfully.');
     }
@@ -317,5 +338,41 @@ class VendorController extends Controller
                 ['label' => $label]
             );
         }
+    }
+
+    /**
+     * The `vendor` attribute this master mirrors into — see
+     * BusinessTypeController::auditAttribute()'s docblock for why events are
+     * logged onto it instead of Vendor (which has no History tab).
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields() — prefixed vendor#{id}.*
+     * snapshot covering every column on the edit form, translations included.
+     */
+    private function auditFields(Vendor $vendor): array
+    {
+        $prefix = "vendor#{$vendor->id}";
+
+        $fields = collect($vendor->only([
+            'code', 'name', 'short_name', 'vendor_group', 'tax_id', 'branch',
+            'tax_invoice_address_1', 'tax_invoice_address_2', 'tax_invoice_address_3', 'tax_invoice_address_4',
+            'currency_id', 'payment_terms', 'default_price_term', 'remark',
+            'contact_name', 'contact_position', 'contact_phone', 'contact_fax', 'contact_email',
+            'contact_address_1', 'contact_address_2', 'contact_address_3', 'contact_address_4', 'contact_country',
+            'credit_term_days', 'is_active',
+        ]))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+
+        $fields["{$prefix}.translations"] = $vendor->translations
+            ->mapWithKeys(fn (VendorTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 }

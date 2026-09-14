@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessExportJob;
+use App\Models\AuditLog;
 use App\Models\ExportConfig;
 use App\Models\JobTracker;
 use App\Services\CodeGenerator;
@@ -104,6 +105,13 @@ class ExportConfigController extends Controller
         ]);
 
         ProcessExportJob::dispatch($tracker->id);
+
+        // Mirrors ImportConfigController::dispatchImportJob()'s 'import_run'
+        // event — records who ran which export config, with what job.
+        AuditLog::record('export_run', $exportConfig, null, [
+            'job_tracker_id' => $tracker->id,
+            'type' => $exportConfig->type,
+        ]);
 
         return to_route('importExport.jobs.show', $tracker->id)->with('success', 'Export job queued.');
     }

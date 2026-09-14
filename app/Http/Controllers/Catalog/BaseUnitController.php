@@ -243,14 +243,24 @@ class BaseUnitController extends Controller
      * base_unit#{id}.* เพื่อให้ไปโชว์ในแท็บ History ของ Attribute แม่ (pbaseunit)
      * แยกจาก option#{id}.* เดิมของยุค AttributeOption (ก่อน migration ย้ายมาที่นี่)
      * ชัดเจน ไม่ปนกัน
+     *
+     * รวม translations เข้ามาด้วย (locale_id => label) — ไม่งั้นการแก้ label
+     * ของ locale อื่นที่ไม่ใช่ locale เริ่มต้นของแอปแต่เพียงอย่างเดียวจะไม่ถูก
+     * บันทึกเลย เพราะ `name` คอลัมน์เดียวสะท้อนแค่ locale เริ่มต้นเท่านั้น
      */
     private function auditFields(BaseUnit $unit): array
     {
         $prefix = "base_unit#{$unit->id}";
 
-        return collect($unit->only(['code', 'name', 'slug', 'description', 'sort_order', 'is_active']))
+        $fields = collect($unit->only(['code', 'name', 'slug', 'description', 'sort_order', 'is_active']))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
             ->all();
+
+        $fields["{$prefix}.translations"] = $unit->translations
+            ->mapWithKeys(fn (BaseUnitTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 
     /**

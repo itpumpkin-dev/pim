@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\CommissionGroup;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -67,6 +69,10 @@ class CommissionGroupController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $group->code, $group->p_group_name ?? $group->code, $group->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('commission_group_created', $attribute, null, $this->auditFields($group));
+        }
+
         return to_route('catalog.commissionGroups.index')->with('success', 'Commission group added successfully.');
     }
 
@@ -94,19 +100,34 @@ class CommissionGroupController extends Controller
     public function update(Request $request, CommissionGroup $commissionGroup): RedirectResponse
     {
         $oldCode = $commissionGroup->code;
+        $oldFields = $this->auditFields($commissionGroup);
 
         $commissionGroup->update($this->validatePayload($request, $commissionGroup));
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $oldCode, $commissionGroup->code, $commissionGroup->p_group_name ?? $commissionGroup->code, $commissionGroup->is_active);
+
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($commissionGroup->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('commission_group_updated', $attribute, $oldFields, $newFields);
+            }
+        }
 
         return to_route('catalog.commissionGroups.index')->with('success', 'Commission group updated successfully.');
     }
 
     public function destroy(CommissionGroup $commissionGroup): RedirectResponse
     {
+        $oldFields = $this->auditFields($commissionGroup);
+        $attribute = $this->auditAttribute();
+
         $commissionGroup->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $commissionGroup->code);
+
+        if ($attribute) {
+            AuditLog::record('commission_group_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.commissionGroups.index')->with('success', 'Commission group deleted successfully.');
     }
@@ -139,5 +160,39 @@ class CommissionGroupController extends Controller
         $validated['is_active'] = $request->boolean('is_active', true);
 
         return $validated;
+    }
+
+    /**
+     * The `commission_group` attribute this master mirrors into — see
+     * BusinessTypeController::auditAttribute()'s docblock for why events are
+     * logged onto it instead of CommissionGroup (which has no History tab).
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields() — prefixed
+     * commission_group#{id}.* snapshot. No translations relation on this
+     * model (single p_group_name column, unlike Brand/BaseUnit/BusinessType).
+     * start_date/end_date formatted to plain strings, not left as the Carbon
+     * instances `only()` would return under the model's `date:Y-m-d` cast —
+     * see ProductGradeController::auditFields()'s docblock for why that
+     * matters for the $oldFields !== $newFields diff below.
+     */
+    private function auditFields(CommissionGroup $commissionGroup): array
+    {
+        $prefix = "commission_group#{$commissionGroup->id}";
+
+        $fields = collect($commissionGroup->only([
+            'code', 'p_group_name', 'divisor_start', 'divisor_secondary', 'is_active', 'remark',
+        ]))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+        $fields["{$prefix}.start_date"] = $commissionGroup->start_date?->format('Y-m-d');
+        $fields["{$prefix}.end_date"] = $commissionGroup->end_date?->format('Y-m-d');
+
+        return $fields;
     }
 }

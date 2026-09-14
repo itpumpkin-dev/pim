@@ -227,18 +227,30 @@ class LocaleTranslationService
      *
      * @param array<string, string> $values dot-path => new value
      */
-    public function updateNamespaceEntries(string $localeCode, string $namespace, array $values): void
+    /**
+     * @return array<string, ?string> the value each submitted path held
+     *                                 before this call, keyed the same as
+     *                                 $values — for LocaleTranslationController::update()'s
+     *                                 audit log, since this manual per-string
+     *                                 edit has no other trail
+     *                                 (LocaleTranslationFile isn't Auditable).
+     */
+    public function updateNamespaceEntries(string $localeCode, string $namespace, array $values): array
     {
         $filename = $namespace . '.json';
         $content = LocaleTranslationFile::where('locale_code', $localeCode)
             ->where('namespace', $namespace)
             ->value('content') ?? $this->readSourceFiles()[$filename] ?? [];
 
+        $oldValues = [];
         foreach ($values as $path => $value) {
+            $oldValues[$path] = $this->getNested($content, explode('.', $path));
             $this->setNested($content, explode('.', $path), $value);
         }
 
         $this->writeTargetStrings($localeCode, [$filename => $content]);
+
+        return $oldValues;
     }
 
     /**

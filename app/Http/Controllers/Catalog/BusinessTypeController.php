@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\BusinessType;
 use App\Models\BusinessTypeTranslation;
 use App\Models\Locale;
@@ -107,6 +108,10 @@ class BusinessTypeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $businessType->code, $businessType->name, $businessType->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('business_type_created', $attribute, null, $this->auditFields($businessType));
+        }
+
         return to_route('catalog.businessTypes.index')->with('success', 'Business type added successfully.');
     }
 
@@ -132,6 +137,8 @@ class BusinessTypeController extends Controller
         $validated = $this->validatePayload($request, $businessType);
         $translations = $validated['translations'];
 
+        $oldFields = $this->auditFields($businessType);
+
         $businessType->update([
             'name' => $validated['name'],
             'description' => $validated['description'],
@@ -143,14 +150,28 @@ class BusinessTypeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $businessType->code, $businessType->code, $businessType->name, $businessType->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($businessType->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('business_type_updated', $attribute, $oldFields, $newFields);
+            }
+        }
+
         return to_route('catalog.businessTypes.index')->with('success', 'Business type updated successfully.');
     }
 
     public function destroy(BusinessType $businessType): RedirectResponse
     {
+        $oldFields = $this->auditFields($businessType);
+        $attribute = $this->auditAttribute();
+
         $businessType->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $businessType->code);
+
+        if ($attribute) {
+            AuditLog::record('business_type_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.businessTypes.index')->with('success', 'Business type deleted successfully.');
     }
@@ -281,5 +302,39 @@ class BusinessTypeController extends Controller
                 ['label' => $label]
             );
         }
+    }
+
+    /**
+     * The `business_type` attribute this master mirrors into — logging audit
+     * events onto it (rather than BusinessType, which has no History tab of
+     * its own) surfaces business-type create/update/delete right on that
+     * attribute's existing History tab, same as Brand/BaseUnit do for
+     * `pbrand`/`pbaseunit` (see BrandController::auditFields()'s docblock).
+     * Nullable defensively (matches autoTranslate()'s own lookup above) —
+     * skips logging rather than fatal if the attribute is ever missing.
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields()/BaseUnitController::auditFields()
+     * — prefixed business_type#{id}.* snapshot, translations included so an
+     * edit to a non-default-locale label alone still registers as a change.
+     */
+    private function auditFields(BusinessType $businessType): array
+    {
+        $prefix = "business_type#{$businessType->id}";
+
+        $fields = collect($businessType->only(['code', 'name', 'description', 'is_active']))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+
+        $fields["{$prefix}.translations"] = $businessType->translations
+            ->mapWithKeys(fn (BusinessTypeTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 }

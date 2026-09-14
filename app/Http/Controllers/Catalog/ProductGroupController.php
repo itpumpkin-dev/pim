@@ -280,12 +280,25 @@ class ProductGroupController extends Controller
      */
     private function syncAttributeFamilies(Category $category, array $familyIds): void
     {
+        // ->sync() on a pivot never fires Category's own model events, so the
+        // order/membership change here would otherwise leave no trail at all
+        // (unlike the translations diff logged as 'labels_updated' right
+        // after this call in update()) — order matters (see this method's
+        // own docblock on sort_order/"default" family), so log the full
+        // ordered list, not just a membership diff.
+        $oldFamilyIds = $category->attributeFamilies()->pluck('attribute_families.id')->all();
+
         $pivotData = [];
         foreach (array_values($familyIds) as $index => $familyId) {
             $pivotData[$familyId] = ['sort_order' => $index];
         }
 
         $category->attributeFamilies()->sync($pivotData);
+
+        $newFamilyIds = array_values($familyIds);
+        if ($oldFamilyIds !== $newFamilyIds) {
+            AuditLog::record('attribute_families_updated', $category, ['family_ids' => $oldFamilyIds], ['family_ids' => $newFamilyIds]);
+        }
     }
 
     public function destroy(Category $category): RedirectResponse

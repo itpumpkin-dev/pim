@@ -941,17 +941,27 @@ class BrandController extends Controller
      * ทำงานเหมือนกับ BaseUnitController::auditFields() — ใช้ prefix
      * brand#{id}.* ขยายเพิ่มด้วยคอลัมน์แบรนด์เฉพาะทาง เพื่อให้ไปโชว์ในแท็บ
      * History ของ Attribute แม่ด้วย
+     *
+     * รวม translations เข้ามาด้วย (locale_id => label) — ไม่งั้นการแก้ label
+     * ของ locale อื่นที่ไม่ใช่ locale เริ่มต้นของแอปแต่เพียงอย่างเดียวจะไม่ถูก
+     * บันทึกเลย เพราะ `name` คอลัมน์เดียวสะท้อนแค่ locale เริ่มต้นเท่านั้น
      */
     private function auditFields(Brand $brand): array
     {
         $prefix = "brand#{$brand->id}";
 
-        return collect($brand->only([
+        $fields = collect($brand->only([
             'code', 'name', 'slug', 'description', 'thumbnail', 'parent_id',
             'shopee_brand_id', 'lazada_brand_id', 'tiktok_brand_id', 'woocommerce_brand_id',
         ]))
             ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
             ->all();
+
+        $fields["{$prefix}.translations"] = $brand->translations
+            ->mapWithKeys(fn (BrandTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 
     /**

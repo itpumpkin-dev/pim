@@ -69,10 +69,11 @@ class WooCommerceConverter
         $emitDescription = $options['emit_description'] ?? true;
         $stripHtml = $options['strip_html'] ?? true;
         $overrides = $this->loadCategoryAliases();
+        $categoryAliasesSavedCount = 0;
         if (isset($options['category_map_path'])) {
             $uploaded = $this->loadCategoryMapOverride($options['category_map_path']);
             $overrides = array_merge($overrides, $uploaded);
-            $this->rememberCategoryAliases($uploaded);
+            $categoryAliasesSavedCount = $this->rememberCategoryAliases($uploaded);
         }
 
         $this->loadBrandLookup();
@@ -245,6 +246,7 @@ class WooCommerceConverter
                 'brand_new_count' => count($this->newBrandNames),
                 'brand_new_names' => array_slice($this->newBrandNames, 0, 50),
                 'brand_new_names_total' => count($this->newBrandNames),
+                'category_aliases_saved_count' => $categoryAliasesSavedCount,
             ],
         ];
     }
@@ -585,9 +587,17 @@ class WooCommerceConverter
      * automatically — this is what makes an uploaded mapping "permanent".
      *
      * @param  array<string,array{pcatname:string,psubcatname:string,productgroupname:string}>  $overrides
+     * @return int number of aliases created/updated — surfaced in convert()'s
+     *             summary (category_aliases_saved_count) so
+     *             WooCommerceConversionController::convert() can fold it into
+     *             the 'conversion_run' audit event; updateOrCreate() here
+     *             never fires a WooCategoryAlias "created"/"updated" event of
+     *             its own (the model isn't Auditable), so this count is the
+     *             only trail these writes get.
      */
-    private function rememberCategoryAliases(array $overrides): void
+    private function rememberCategoryAliases(array $overrides): int
     {
+        $saved = 0;
         foreach ($overrides as $matchKey => $codes) {
             if ($codes['pcatname'] === '' && $codes['psubcatname'] === '' && $codes['productgroupname'] === '') {
                 continue;
@@ -602,7 +612,10 @@ class WooCommerceConverter
                     'created_by' => auth()->check() ? auth()->id() : null,
                 ]
             );
+            $saved++;
         }
+
+        return $saved;
     }
 
     /** @return array<string,array{pcatname:string,psubcatname:string,productgroupname:string}> */

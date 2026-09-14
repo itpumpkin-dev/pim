@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Models\ProductType;
 use App\Models\ProductTypeTranslation;
@@ -114,6 +115,10 @@ class ProductTypeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $productType->code, $productType->name, $productType->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('product_type_created', $attribute, null, $this->auditFields($productType));
+        }
+
         return to_route('catalog.productTypes.index')->with('success', 'Product type added successfully.');
     }
 
@@ -139,6 +144,8 @@ class ProductTypeController extends Controller
         $validated = $this->validatePayload($request, $productType);
         $translations = $validated['translations'];
 
+        $oldFields = $this->auditFields($productType);
+
         $productType->update([
             'name' => $validated['name'],
             'description' => $validated['description'],
@@ -150,14 +157,28 @@ class ProductTypeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $productType->code, $productType->code, $productType->name, $productType->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($productType->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('product_type_updated', $attribute, $oldFields, $newFields);
+            }
+        }
+
         return to_route('catalog.productTypes.index')->with('success', 'Product type updated successfully.');
     }
 
     public function destroy(ProductType $productType): RedirectResponse
     {
+        $oldFields = $this->auditFields($productType);
+        $attribute = $this->auditAttribute();
+
         $productType->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $productType->code);
+
+        if ($attribute) {
+            AuditLog::record('product_type_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.productTypes.index')->with('success', 'Product type deleted successfully.');
     }
@@ -288,5 +309,34 @@ class ProductTypeController extends Controller
                 ['label' => $label]
             );
         }
+    }
+
+    /**
+     * The `producttype` attribute this master mirrors into — see
+     * BusinessTypeController::auditAttribute()'s docblock for why events are
+     * logged onto it instead of ProductType (which has no History tab).
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields() — prefixed
+     * product_type#{id}.* snapshot, translations included.
+     */
+    private function auditFields(ProductType $productType): array
+    {
+        $prefix = "product_type#{$productType->id}";
+
+        $fields = collect($productType->only(['code', 'name', 'description', 'is_active']))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+
+        $fields["{$prefix}.translations"] = $productType->translations
+            ->mapWithKeys(fn (ProductTypeTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 }

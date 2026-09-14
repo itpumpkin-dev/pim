@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\Locale;
 use App\Models\Product;
@@ -174,13 +175,29 @@ class BomController extends Controller
         // request ตรงๆ ข้ามหน้าจอ) จะชน unique constraint (product_bom_id,
         // component_product_id) กลายเป็น QueryException ดิบๆ (500) แทนที่จะ
         // เซฟสำเร็จตามที่ควรเป็น
+        $oldComponentIds = $bom->components()->orderBy('sort_order')->pluck('component_product_id')->all();
+        $newComponentIds = array_values(array_unique($validated['component_ids']));
+
         $bom->components()->delete();
-        foreach (array_values(array_unique($validated['component_ids'])) as $index => $componentId) {
+        foreach ($newComponentIds as $index => $componentId) {
             ProductBomComponent::create([
                 'product_bom_id' => $bom->id,
                 'component_product_id' => $componentId,
                 'sort_order' => $index,
             ]);
+        }
+
+        // Delete+recreate above never fires ProductBom's own model events
+        // (only ProductBomComponent rows change), so log the swap explicitly
+        // — same reasoning as ProductController::syncAssociations() ought to
+        // (see its own docblock).
+        if ($oldComponentIds !== $newComponentIds) {
+            AuditLog::record(
+                'components_updated',
+                $bom,
+                ['component_ids' => $oldComponentIds],
+                ['component_ids' => $newComponentIds],
+            );
         }
 
         return back()->with('success', 'BOM updated successfully.');

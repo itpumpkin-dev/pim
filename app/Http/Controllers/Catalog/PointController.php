@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
+use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Point;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +67,10 @@ class PointController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, $point->point_type, $point->point_type, $point->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('point_created', $attribute, null, $this->auditFields($point));
+        }
+
         return to_route('catalog.points.index')->with('success', 'Point added successfully.');
     }
 
@@ -91,19 +97,34 @@ class PointController extends Controller
     public function update(Request $request, Point $point): RedirectResponse
     {
         $oldCode = $point->point_type;
+        $oldFields = $this->auditFields($point);
 
         $point->update($this->validatePayload($request, $point));
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $oldCode, $point->point_type, $point->point_type, $point->is_active);
+
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($point->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('point_updated', $attribute, $oldFields, $newFields);
+            }
+        }
 
         return to_route('catalog.points.index')->with('success', 'Point updated successfully.');
     }
 
     public function destroy(Point $point): RedirectResponse
     {
+        $oldFields = $this->auditFields($point);
+        $attribute = $this->auditAttribute();
+
         $point->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $point->point_type);
+
+        if ($attribute) {
+            AuditLog::record('point_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.points.index')->with('success', 'Point deleted successfully.');
     }
@@ -133,5 +154,34 @@ class PointController extends Controller
         $validated['remark'] = $request->input('remark');
 
         return $validated;
+    }
+
+    /**
+     * The `pointtype` attribute this master mirrors into — see
+     * BusinessTypeController::auditAttribute()'s docblock for why events are
+     * logged onto it instead of Point (which has no History tab).
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields() — prefixed point#{id}.*
+     * snapshot. No translations relation on this model (single point_type
+     * column). start_date/end_date formatted to plain strings — see
+     * ProductGradeController::auditFields()'s docblock for why that matters.
+     */
+    private function auditFields(Point $point): array
+    {
+        $prefix = "point#{$point->id}";
+
+        $fields = collect($point->only(['point_type', 'point_ratio', 'is_active', 'remark']))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+        $fields["{$prefix}.start_date"] = $point->start_date?->format('Y-m-d');
+        $fields["{$prefix}.end_date"] = $point->end_date?->format('Y-m-d');
+
+        return $fields;
     }
 }

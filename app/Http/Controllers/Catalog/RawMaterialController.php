@@ -79,7 +79,14 @@ class RawMaterialController extends Controller
             'product_ids.*' => ['integer', 'exists:products,id'],
         ]);
 
-        Product::whereIn('id', $validated['product_ids'])->update(['is_raw_material' => true]);
+        // Product::whereIn(...)->update() would be a query-builder mass
+        // update — it never fires Eloquent model events, so this flag flip
+        // would go completely unaudited despite Product using the Auditable
+        // trait. Update each row individually instead, same as destroy()
+        // below, so it's captured like any other product edit.
+        Product::whereIn('id', $validated['product_ids'])
+            ->get()
+            ->each(fn (Product $product) => $product->update(['is_raw_material' => true]));
 
         return back()->with('success', 'Marked as raw material.');
     }

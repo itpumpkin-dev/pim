@@ -509,12 +509,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
 
     Route::middleware('permission:products,list_products')->group(function () use ($stub) {
 
-        Route::get('marketplace/connect/{platform}', fn (string $platform) => Inertia::render('catalog/placeholder', [
-            'titleKey' => 'marketplaceConnect',
-            // ucfirst() เดิมให้ 'Tiktok'/'Woocommerce' ผิดหลักตัวพิมพ์ที่ใช้กันทั่ว
-            // ทั้งแอป (เทียบ PLATFORM_LABEL ใน platform-hub.tsx) — map ตรงๆ แทน
-            'subtitle' => ['shopee' => 'Shopee', 'lazada' => 'Lazada', 'tiktok' => 'TikTok', 'woocommerce' => 'WooCommerce'][$platform],
-        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.connect');
+        // เดิมเป็นแค่ placeholder ("under construction") — ตอนนี้เป็นขั้นแรกจริง
+        // (ตารางร้านค้าของแพลตฟอร์มนี้) ดู SalesPlatformController::connectionSettings()
+        Route::get('marketplace/connect/{platform}', [SalesPlatformController::class, 'connectionSettings'])
+            ->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])
+            ->name('marketplace.connect');
 
         // Hub page ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม]) —
         // grid การ์ด 3 ใบพาไปหน้าจับคู่หมวดหมู่/จับคู่ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ

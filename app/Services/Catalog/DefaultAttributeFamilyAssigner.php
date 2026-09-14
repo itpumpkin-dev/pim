@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Models\AttributeFamily;
+use App\Models\AuditLog;
 use App\Models\Category;
 
 /**
@@ -74,6 +75,14 @@ class DefaultAttributeFamilyAssigner
                 $pivotData[$familyId] = ['sort_order' => $index];
             }
             $group->attributeFamilies()->sync($pivotData);
+
+            // ->sync() never fires Category's own model events, and this one
+            // action can silently overwrite the default family for every
+            // product group in the catalog at once — log each affected group
+            // individually (same event name ProductGroupController::
+            // syncAttributeFamilies() logs for a manual single-group edit),
+            // so it shows up on that group's own History tab too.
+            AuditLog::record('attribute_families_updated', $group, ['family_ids' => $existingIds], ['family_ids' => $orderedIds]);
         }
 
         return ['updated' => $updated, 'skipped' => $skipped];

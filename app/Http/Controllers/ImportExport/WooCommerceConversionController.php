@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ImportExport;
 
 use App\Http\Controllers\Controller;
 use App\Models\AttributeFamily;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\SalesPlatform;
@@ -115,6 +116,18 @@ class WooCommerceConversionController extends Controller
         $conversion->update([
             'converted_file_path' => $convertedPath,
             'unmatched_file_path' => $unmatchedPath,
+        ]);
+
+        // WooConversion isn't Auditable, and the category_map upload writes
+        // WooCategoryAlias rows directly (also not Auditable) — same
+        // reasoning as ImportConfigController's 'import_run' event: this is
+        // the only trail a human-run conversion (and any aliases it saved)
+        // gets.
+        AuditLog::record('conversion_run', $conversion, null, [
+            'original_filename' => $conversion->original_filename,
+            'row_count' => $result['summary']['row_count'] ?? null,
+            'category_aliases_saved_count' => $result['summary']['category_aliases_saved_count'] ?? 0,
+            'has_unmatched' => $conversion->has_unmatched,
         ]);
 
         return to_route('importExport.wooConvert.show', $conversion->id)->with('success', 'Conversion complete.');

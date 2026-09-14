@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\System;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\ContentTranslationCoverageService;
 use App\Services\LocaleTranslationService;
@@ -92,7 +93,28 @@ class LocaleTranslationController extends Controller
             'values.*' => ['nullable', 'string'],
         ]);
 
-        $this->localeTranslationService->updateNamespaceEntries($locale->code, $validated['namespace'], $validated['values']);
+        $oldValues = $this->localeTranslationService->updateNamespaceEntries($locale->code, $validated['namespace'], $validated['values']);
+
+        // LocaleTranslationFile isn't Auditable (it's a single JSON blob per
+        // locale/namespace, not one row per string), so this manual edit has
+        // no other trail — log only the keys that actually changed.
+        $changedOld = [];
+        $changedNew = [];
+        foreach ($validated['values'] as $path => $value) {
+            if (($oldValues[$path] ?? null) !== $value) {
+                $changedOld[$path] = $oldValues[$path] ?? null;
+                $changedNew[$path] = $value;
+            }
+        }
+        if (! empty($changedNew)) {
+            AuditLog::record('translations_updated', $locale, [
+                'namespace' => $validated['namespace'],
+                'values' => $changedOld,
+            ], [
+                'namespace' => $validated['namespace'],
+                'values' => $changedNew,
+            ]);
+        }
 
         return back()->with('success', 'Translations saved.');
     }

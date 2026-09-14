@@ -3037,6 +3037,11 @@ class ProductController extends Controller
 
             if ($categoryChanged) {
                 ProductCategoryLinker::deriveLegacyCodesFromCategories($product, $newCategoryIds);
+
+                // categories()->sync() never fires Product's own model events
+                // (it's a pivot-table change, not a $product->save()) — same
+                // reasoning as the published_shops_updated log right below.
+                AuditLog::record('categories_updated', $product, ['category_ids' => $oldCategoryIds], ['category_ids' => $newCategoryIds]);
             }
 
             $oldShopIds = $product->platformShops()->pluck('sales_platform_shops.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
@@ -3793,20 +3798,35 @@ class ProductController extends Controller
     /**
      * ซิงค์แบบ replace-all-on-save สำหรับ association ทั้ง 3 ประเภท
      * ใช้แพทเทิร์นลบแล้วสร้างใหม่ เหมือนกับที่ใช้กับ variant ด้านบน
+     *
+     * delete()+create() ตรงนี้ไม่ทำให้ event ของ Product เองทำงาน (แถวที่
+     * เปลี่ยนคือ ProductAssociation ไม่ใช่ $product->save()) เลย diff เก็บ
+     * ก่อน/หลังต่อประเภท แล้ว log เป็น 'associations_updated' เอง — เหตุผล
+     * เดียวกับ categories_updated/published_shops_updated ใน update()
      */
     private function syncAssociations(Product $product, array $associations): void
     {
+        $oldByType = [];
+        $newByType = [];
+
         foreach (['related', 'up_sell', 'cross_sell'] as $code) {
             $typeId = AssociationType::where('code', $code)->value('id');
             if (! $typeId) {
                 continue;
             }
 
+            $oldByType[$code] = ProductAssociation::where('owner_product_id', $product->id)
+                ->where('association_type_id', $typeId)
+                ->orderBy('associated_product_id')
+                ->pluck('associated_product_id')
+                ->all();
+
             ProductAssociation::where('owner_product_id', $product->id)
                 ->where('association_type_id', $typeId)
                 ->delete();
 
-            $ids = collect($associations[$code] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+            $ids = collect($associations[$code] ?? [])->map(fn ($id) => (int) $id)->unique()->sort()->values();
+            $newByType[$code] = $ids->all();
 
             foreach ($ids as $associatedProductId) {
                 ProductAssociation::create([
@@ -3815,6 +3835,10 @@ class ProductController extends Controller
                     'association_type_id' => $typeId,
                 ]);
             }
+        }
+
+        if ($oldByType !== $newByType) {
+            AuditLog::record('associations_updated', $product, $oldByType, $newByType);
         }
     }
 

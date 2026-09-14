@@ -33,6 +33,33 @@ class SalesPlatformController extends Controller
     }
 
     /**
+     * "ตั้งค่าการเชื่อมต่อ" ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส >
+     * {แพลตฟอร์ม} > ตั้งค่าการเชื่อมต่อ — การ์ดจาก platform-hub.tsx พามาที่นี่)
+     * เดิม route นี้เป็นแค่ placeholder ("under construction") ตอนนี้เป็น
+     * ขั้นแรกจริง: แสดงตารางร้านค้า (SalesPlatformShop) ที่ผูกกับแพลตฟอร์มนี้อยู่
+     * — ยังไม่มี action เพิ่ม/แก้ไข/ลบในหน้านี้ (ใช้หน้า sales-platforms ที่มีอยู่
+     * แล้วไปก่อนสำหรับ CRUD) รอต่อยอดเป็น flow เชื่อมต่อร้านค้าเต็มรูปแบบทีหลัง
+     *
+     * SalesPlatform อาจยังไม่มีแถวของแพลตฟอร์มนี้เลยก็ได้ (ยังไม่เคยสร้างผ่านหน้า
+     * sales-platforms) — ถือเป็น "ยังไม่มีร้านค้าเชื่อมต่อ" ธรรมดา ไม่ใช่ error
+     */
+    public function connectionSettings(string $platform): Response
+    {
+        $salesPlatform = SalesPlatform::where('code', $platform)->first();
+
+        $shops = $salesPlatform
+            ? $salesPlatform->shops()
+                ->orderBy('name')
+                ->get(['id', 'code', 'name', 'lazada_seller_account_id', 'shopee_seller_account_id', 'tiktok_seller_account_id', 'is_active'])
+            : collect();
+
+        return Inertia::render('catalog/marketplace/connection-settings', [
+            'platform' => $platform,
+            'shops' => $shops,
+        ]);
+    }
+
+    /**
      * แท็บ "API Usage" — หน้าดูอ้างอิงว่าแอปนี้เรียก API อะไรของ marketplace บ้าง
      * (MarketplaceApiCatalog) พร้อมบอกด้วยว่าแต่ละแพลตฟอร์มมี credentials
      * ที่ใช้งานได้อยู่หรือเปล่า ตัวมันเองไม่เคยเรียก API ที่อยู่ในรายการนี้เลย

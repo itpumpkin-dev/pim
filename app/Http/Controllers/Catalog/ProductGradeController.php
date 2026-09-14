@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Catalog\Concerns\SyncsAttributeOptionMirror;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Models\ProductGrade;
 use App\Models\ProductGradeTranslation;
@@ -108,6 +109,10 @@ class ProductGradeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, null, strtolower($productGrade->code), $productGrade->name, $productGrade->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            AuditLog::record('product_grade_created', $attribute, null, $this->auditFields($productGrade));
+        }
+
         return to_route('catalog.productGrades.index')->with('success', 'Product grade added successfully.');
     }
 
@@ -139,6 +144,8 @@ class ProductGradeController extends Controller
         $translations = $validated['translations'];
         unset($validated['translations']);
 
+        $oldFields = $this->auditFields($productGrade);
+
         $productGrade->update(['name' => $this->resolveName($translations) ?? $productGrade->name] + $validated);
 
         $this->syncTranslations($productGrade, $translations);
@@ -146,16 +153,29 @@ class ProductGradeController extends Controller
 
         $this->syncAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $oldCode, strtolower($productGrade->code), $productGrade->name, $productGrade->is_active);
 
+        if ($attribute = $this->auditAttribute()) {
+            $newFields = $this->auditFields($productGrade->fresh());
+            if ($oldFields !== $newFields) {
+                AuditLog::record('product_grade_updated', $attribute, $oldFields, $newFields);
+            }
+        }
+
         return to_route('catalog.productGrades.index')->with('success', 'Product grade updated successfully.');
     }
 
     public function destroy(ProductGrade $productGrade): RedirectResponse
     {
         $code = strtolower($productGrade->code);
+        $oldFields = $this->auditFields($productGrade);
+        $attribute = $this->auditAttribute();
 
         $productGrade->delete();
 
         $this->removeAttributeOptionMirror(self::MIRROR_ATTRIBUTE, $code);
+
+        if ($attribute) {
+            AuditLog::record('product_grade_deleted', $attribute, $oldFields, null);
+        }
 
         return to_route('catalog.productGrades.index')->with('success', 'Product grade deleted successfully.');
     }
@@ -297,5 +317,42 @@ class ProductGradeController extends Controller
                 ['label' => $label]
             );
         }
+    }
+
+    /**
+     * The `grade` attribute this master mirrors into — see
+     * BusinessTypeController::auditAttribute()'s docblock for why events are
+     * logged onto it instead of ProductGrade (which has no History tab).
+     */
+    private function auditAttribute(): ?Attribute
+    {
+        return Attribute::where('code', self::MIRROR_ATTRIBUTE)->first();
+    }
+
+    /**
+     * Same shape as BrandController::auditFields() — prefixed
+     * product_grade#{id}.* snapshot, translations included.
+     */
+    private function auditFields(ProductGrade $productGrade): array
+    {
+        $prefix = "product_grade#{$productGrade->id}";
+
+        // start_date/end_date formatted to plain strings, not left as the
+        // Carbon instances `only()` would return under the model's
+        // `date:Y-m-d` cast — two Carbon instances for the very same date are
+        // never `===`, so comparing $oldFields !== $newFields with raw Carbon
+        // values in the mix would report a change on every save even when
+        // the date didn't move at all.
+        $fields = collect($productGrade->only(['code', 'name', 'description', 'is_active']))
+            ->mapWithKeys(fn ($value, $key) => ["{$prefix}.{$key}" => $value])
+            ->all();
+        $fields["{$prefix}.start_date"] = $productGrade->start_date?->format('Y-m-d');
+        $fields["{$prefix}.end_date"] = $productGrade->end_date?->format('Y-m-d');
+
+        $fields["{$prefix}.translations"] = $productGrade->translations
+            ->mapWithKeys(fn (ProductGradeTranslation $t) => [(string) $t->locale_id => $t->label])
+            ->all();
+
+        return $fields;
     }
 }
