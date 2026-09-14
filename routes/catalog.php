@@ -97,20 +97,20 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/upload-description-image', [ProductController::class, 'uploadDescriptionImage'])->name('products.uploadDescriptionImage')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
     Route::get('products/{product}/timeline', [ProductController::class, 'timeline'])->name('products.timeline')->middleware('permission:products,view_history');
-    Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:sales_channels,view_sales_channels');
-    Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::post('products/{product}/delete-shopee/{shop}', [ProductController::class, 'deleteFromShopee'])->name('products.deleteFromShopee')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:sales_channels,view_sales_channels');
-    Route::post('products/{product}/push-tiktok/{shop}', [ProductController::class, 'pushToTikTok'])->name('products.pushTiktok')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::get('products/{product}/tiktok-status/{shop}', [ProductController::class, 'checkTikTokStatus'])->name('products.checkTiktokStatus')->middleware('permission:sales_channels,view_sales_channels');
-    Route::post('products/{product}/push-woocommerce/{shop}', [ProductController::class, 'pushToWoocommerce'])->name('products.pushWoocommerce')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::post('products/{product}/deactivate-woocommerce/{shop}', [ProductController::class, 'deactivateWoocommerce'])->name('products.deactivateWoocommerce')->middleware('permission:sales_channels,edit_sales_channels');
-    Route::get('products/{product}/woocommerce-status/{shop}', [ProductController::class, 'checkWoocommerceStatus'])->name('products.checkWoocommerceStatus')->middleware('permission:sales_channels,view_sales_channels');
-    Route::post('products/{product}/fill-woocommerce-translations', [ProductController::class, 'fillWoocommerceTranslationsForProduct'])->name('products.fillWoocommerceTranslations')->middleware('permission:sales_channels,edit_sales_channels');
+    Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:marketplace_lazada,push_products_lazada');
+    Route::post('products/{product}/deactivate-lazada/{shop}', [ProductController::class, 'deactivateLazada'])->name('products.deactivateLazada')->middleware('permission:marketplace_lazada,push_products_lazada');
+    Route::get('products/{product}/lazada-status/{shop}', [ProductController::class, 'checkLazadaStatus'])->name('products.checkLazadaStatus')->middleware('permission:marketplace_lazada,push_products_lazada');
+    Route::post('products/{product}/push-shopee/{shop}', [ProductController::class, 'pushToShopee'])->name('products.pushShopee')->middleware('permission:marketplace_shopee,push_products_shopee');
+    Route::post('products/{product}/deactivate-shopee/{shop}', [ProductController::class, 'deactivateShopee'])->name('products.deactivateShopee')->middleware('permission:marketplace_shopee,push_products_shopee');
+    Route::post('products/{product}/delete-shopee/{shop}', [ProductController::class, 'deleteFromShopee'])->name('products.deleteFromShopee')->middleware('permission:marketplace_shopee,push_products_shopee');
+    Route::get('products/{product}/shopee-status/{shop}', [ProductController::class, 'checkShopeeStatus'])->name('products.checkShopeeStatus')->middleware('permission:marketplace_shopee,push_products_shopee');
+    Route::post('products/{product}/push-tiktok/{shop}', [ProductController::class, 'pushToTikTok'])->name('products.pushTiktok')->middleware('permission:marketplace_tiktok,push_products_tiktok');
+    Route::post('products/{product}/deactivate-tiktok/{shop}', [ProductController::class, 'deactivateTikTok'])->name('products.deactivateTiktok')->middleware('permission:marketplace_tiktok,push_products_tiktok');
+    Route::get('products/{product}/tiktok-status/{shop}', [ProductController::class, 'checkTikTokStatus'])->name('products.checkTiktokStatus')->middleware('permission:marketplace_tiktok,push_products_tiktok');
+    Route::post('products/{product}/push-woocommerce/{shop}', [ProductController::class, 'pushToWoocommerce'])->name('products.pushWoocommerce')->middleware('permission:marketplace_woocommerce,push_products_woocommerce');
+    Route::post('products/{product}/deactivate-woocommerce/{shop}', [ProductController::class, 'deactivateWoocommerce'])->name('products.deactivateWoocommerce')->middleware('permission:marketplace_woocommerce,push_products_woocommerce');
+    Route::get('products/{product}/woocommerce-status/{shop}', [ProductController::class, 'checkWoocommerceStatus'])->name('products.checkWoocommerceStatus')->middleware('permission:marketplace_woocommerce,push_products_woocommerce');
+    Route::post('products/{product}/fill-woocommerce-translations', [ProductController::class, 'fillWoocommerceTranslationsForProduct'])->name('products.fillWoocommerceTranslations')->middleware('permission:marketplace_woocommerce,push_products_woocommerce');
     Route::get('products/{product}/sync-jobs/{syncJob}', [ProductController::class, 'marketplaceSyncJobStatus'])->name('products.marketplaceSyncJobStatus')->middleware('permission:sales_channels,view_sales_channels');
     Route::post('products/{product}/check-live-status', [ProductController::class, 'checkLiveStatus'])->name('products.checkLiveStatus')->middleware('permission:sales_channels,view_sales_channels');
 
@@ -125,52 +125,52 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // จะโดนเมนู "แอตทริบิวต์" (url: /catalog/attributes) highlight ผิดไปด้วย
     // เพราะ /catalog/attributes/... ก็ขึ้นต้นด้วย /catalog/attributes เหมือนกัน
     Route::get('marketplace/attribute-mapping/export', [MarketplaceAttributeMappingController::class, 'export'])->name('marketplace.attributeMapping.export')->middleware('permission:attributes,edit_attributes');
-    Route::get('marketplace/woocommerce/attribute-mapping', [MarketplaceAttributeMappingController::class, 'woocommerce'])->name('marketplace.woocommerce.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/woocommerce/attribute-mapping', [MarketplaceAttributeMappingController::class, 'woocommerce'])->name('marketplace.woocommerce.attributeMapping')->middleware('permission:marketplace_woocommerce,edit_attribute_mapping_woocommerce');
     Route::get('marketplace/woocommerce/products', [WooCommerceAttributeMappingController::class, 'woocommerceProducts'])->name('marketplace.woocommerce.products')->middleware('permission:products,list_products');
-    Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
     Route::get('marketplace/lazada/products', [LazadaAttributeMappingController::class, 'lazadaProducts'])->name('marketplace.lazada.products')->middleware('permission:products,list_products');
     Route::get('marketplace/lazada/products/{product}/detail', [LazadaAttributeMappingController::class, 'productDetail'])->name('marketplace.lazada.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก Lazada" ของ Section 1 (Category Mapping) —
     // สิทธิ์เดียวกับที่ใช้บันทึกการแมป (categories,edit_categories) เพราะเป็น
     // ส่วนหนึ่งของ workflow เดียวกัน ไม่ใช่แค่ดูข้อมูล
-    Route::get('marketplace/lazada/products/{product}/category-suggestions', [LazadaAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.lazada.products.categorySuggestions')->middleware('permission:categories,edit_categories');
+    Route::get('marketplace/lazada/products/{product}/category-suggestions', [LazadaAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.lazada.products.categorySuggestions')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก Shopee" ของ Section 1 (Category Mapping) — mirror
     // ของ marketplace.lazada.products.categorySuggestions เป๊ะ เหตุผลสิทธิ์
     // เดียวกัน (เป็นส่วนหนึ่งของ workflow แมปหมวดหมู่ ไม่ใช่แค่ดูข้อมูล)
-    Route::get('marketplace/shopee/products/{product}/category-suggestions', [ShopeeAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.shopee.products.categorySuggestions')->middleware('permission:categories,edit_categories');
-    Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:attributes,edit_attributes');
-    Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:attributes,edit_attributes');
+    Route::get('marketplace/shopee/products/{product}/category-suggestions', [ShopeeAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.shopee.products.categorySuggestions')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
+    Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
     Route::get('marketplace/tiktok/products', [TikTokAttributeMappingController::class, 'tiktokProducts'])->name('marketplace.tiktok.products')->middleware('permission:products,list_products');
     Route::get('marketplace/tiktok/products/{product}/detail', [TikTokAttributeMappingController::class, 'productDetail'])->name('marketplace.tiktok.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก TikTok" ของ Section 1 (Category Mapping) — mirror
     // ของ marketplace.lazada/shopee.products.categorySuggestions เป๊ะ
-    Route::get('marketplace/tiktok/products/{product}/category-suggestions', [TikTokAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.tiktok.products.categorySuggestions')->middleware('permission:categories,edit_categories');
-    Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/woocommerce-mapping/attributes-list', [WooCommerceAttributeMappingController::class, 'woocommerceAttributesList'])->name('attributes.woocommerceAttributesList')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/woocommerce-mapping/payload-fields', [WooCommerceAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.woocommercePayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/woocommerce-mapping/timeline', [WooCommerceAttributeMappingController::class, 'timeline'])->name('attributes.woocommerceMappingTimeline')->middleware('permission:attributes,view_history');
-    Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/shopee-mapping/options', [ShopeeAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveShopeeOptionMapping')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/shopee-mapping/payload-fields', [ShopeeAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.shopeePayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/shopee-mapping/attribute-family', [ShopeeAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.shopeeSyncAttributeFamily')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/shopee-mapping/timeline', [ShopeeAttributeMappingController::class, 'timeline'])->name('attributes.shopeeMappingTimeline')->middleware('permission:attributes,view_history');
+    Route::get('marketplace/tiktok/products/{product}/category-suggestions', [TikTokAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.tiktok.products.categorySuggestions')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
+    Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:marketplace_woocommerce,edit_attribute_mapping_woocommerce');
+    Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:marketplace_woocommerce,edit_attribute_mapping_woocommerce');
+    Route::get('attributes/woocommerce-mapping/attributes-list', [WooCommerceAttributeMappingController::class, 'woocommerceAttributesList'])->name('attributes.woocommerceAttributesList')->middleware('permission:marketplace_woocommerce,edit_attribute_mapping_woocommerce');
+    Route::get('attributes/woocommerce-mapping/payload-fields', [WooCommerceAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.woocommercePayloadFieldMappings')->middleware('permission:marketplace_woocommerce,edit_attribute_mapping_woocommerce');
+    Route::get('attributes/woocommerce-mapping/timeline', [WooCommerceAttributeMappingController::class, 'timeline'])->name('attributes.woocommerceMappingTimeline')->middleware('permission:marketplace_woocommerce,view_attribute_mapping_history_woocommerce');
+    Route::post('attributes/shopee-mapping', [ShopeeAttributeMappingController::class, 'update'])->name('attributes.saveShopeeMapping')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::post('attributes/shopee-mapping/sync', [ShopeeAttributeMappingController::class, 'syncShopeeAttributes'])->name('attributes.syncShopeeAttributes')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::post('attributes/shopee-mapping/options', [ShopeeAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveShopeeOptionMapping')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::get('attributes/shopee-mapping/payload-fields', [ShopeeAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.shopeePayloadFieldMappings')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::post('attributes/shopee-mapping/attribute-family', [ShopeeAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.shopeeSyncAttributeFamily')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::get('attributes/shopee-mapping/timeline', [ShopeeAttributeMappingController::class, 'timeline'])->name('attributes.shopeeMappingTimeline')->middleware('permission:marketplace_shopee,view_attribute_mapping_history_shopee');
     Route::get('attributes/search-pim', [ShopeeAttributeMappingController::class, 'searchPimAttributes'])->name('attributes.searchPim')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/lazada-mapping/options', [LazadaAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveLazadaOptionMapping')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/lazada-mapping/payload-fields', [LazadaAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.lazadaPayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/lazada-mapping/attribute-family', [LazadaAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.lazadaSyncAttributeFamily')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/lazada-mapping/timeline', [LazadaAttributeMappingController::class, 'timeline'])->name('attributes.lazadaMappingTimeline')->middleware('permission:attributes,view_history');
-    Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/tiktok-mapping/options', [TikTokAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveTikTokOptionMapping')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/tiktok-mapping/payload-fields', [TikTokAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.tiktokPayloadFieldMappings')->middleware('permission:attributes,edit_attributes');
-    Route::post('attributes/tiktok-mapping/attribute-family', [TikTokAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.tiktokSyncAttributeFamily')->middleware('permission:attributes,edit_attributes');
-    Route::get('attributes/tiktok-mapping/timeline', [TikTokAttributeMappingController::class, 'timeline'])->name('attributes.tiktokMappingTimeline')->middleware('permission:attributes,view_history');
+    Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::post('attributes/lazada-mapping/options', [LazadaAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveLazadaOptionMapping')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::get('attributes/lazada-mapping/payload-fields', [LazadaAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.lazadaPayloadFieldMappings')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::post('attributes/lazada-mapping/attribute-family', [LazadaAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.lazadaSyncAttributeFamily')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::get('attributes/lazada-mapping/timeline', [LazadaAttributeMappingController::class, 'timeline'])->name('attributes.lazadaMappingTimeline')->middleware('permission:marketplace_lazada,view_attribute_mapping_history_lazada');
+    Route::post('attributes/tiktok-mapping', [TikTokAttributeMappingController::class, 'update'])->name('attributes.saveTiktokMapping')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::post('attributes/tiktok-mapping/sync', [TikTokAttributeMappingController::class, 'syncTikTokAttributes'])->name('attributes.syncTikTokAttributes')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::post('attributes/tiktok-mapping/options', [TikTokAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveTikTokOptionMapping')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::get('attributes/tiktok-mapping/payload-fields', [TikTokAttributeMappingController::class, 'payloadFieldMappings'])->name('attributes.tiktokPayloadFieldMappings')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::post('attributes/tiktok-mapping/attribute-family', [TikTokAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.tiktokSyncAttributeFamily')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::get('attributes/tiktok-mapping/timeline', [TikTokAttributeMappingController::class, 'timeline'])->name('attributes.tiktokMappingTimeline')->middleware('permission:marketplace_tiktok,view_attribute_mapping_history_tiktok');
     Route::post('attributes', [AttributeController::class, 'store'])->name('attributes.store')->middleware('permission:attributes,create_attributes');
     Route::get('attributes/{attribute}/edit', [AttributeController::class, 'edit'])->name('attributes.edit')->middleware('permission:attributes,edit_attributes');
     Route::put('attributes/{attribute}', [AttributeController::class, 'update'])->name('attributes.update')->middleware('permission:attributes,edit_attributes');
@@ -205,7 +205,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // (lastSyncedAt/activeSyncJobs) และทุก action ที่มันลิงก์ไปย้ายไปอยู่ที่
     // categories/marketplace-sync.tsx แล้ว (ดู docblock ของ
     // CategoryController::marketplaceSync())
-    Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-shopee', [BrandController::class, 'syncShopeeBrands'])->name('brands.syncShopee')->middleware('permission:marketplace_shopee,edit_brand_mapping_shopee');
     // ไม่มีหน้า GET brands/shopee-mapping แล้ว — การจับคู่แบรนด์ Shopee ย้ายไป
     // อยู่ที่ categories/shopee-mapping.tsx แทน (เพราะ get_brand_list ผูกกับ
     // category อยู่แล้ว การจับคู่ตรงจุดที่กำลังดู category อยู่พอดีเลยสมเหตุสมผล
@@ -213,27 +213,27 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ยังเหมือนเดิม ยังคงทำหน้าที่บันทึกข้อมูลจริงอยู่ ส่วน endpoint search-pim/
     // shopee-brands-for-category ที่มันทำงานคู่กันด้วยตอนนี้ย้ายไปอยู่ใน
     // กลุ่ม categories/ ด้านล่างแล้ว
-    Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:brands,edit_brands');
+    Route::post('brands/shopee-mapping', [BrandController::class, 'bulkMapShopeeBrand'])->name('brands.bulkMapShopee')->middleware('permission:marketplace_shopee,edit_brand_mapping_shopee');
     Route::get('brands/search-pim', [BrandController::class, 'searchPimBrands'])->name('brands.searchPim')->middleware('permission:brands,edit_brands');
     Route::get('marketplace-brands/{platform}/search', [BrandController::class, 'marketplaceBrandSearch'])->name('marketplaceBrands.search')->middleware('permission:brands,list_brands');
     Route::get('marketplace-brands/{platform}/lookup', [BrandController::class, 'marketplaceBrandLookup'])->name('marketplaceBrands.lookup')->middleware('permission:brands,list_brands');
-    Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:brands,edit_brands');
+    Route::post('brands/sync-woocommerce', [BrandController::class, 'syncWoocommerceBrands'])->name('brands.syncWoocommerce')->middleware('permission:marketplace_woocommerce,edit_brand_mapping_woocommerce');
     // ไม่มีหน้า GET brands/woocommerce-mapping หรือ endpoint
     // brands/search-woocommerce แล้ว — ย้ายแบบเดียวกับของ Lazada ด้านบน
     // การจัดการแบรนด์ WooCommerce ตอนนี้ย้ายไปอยู่ที่ categories/woocommerce-mapping.tsx
-    Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:brands,edit_brands');
-    Route::post('brands/sync-lazada', [BrandController::class, 'syncLazadaBrands'])->name('brands.syncLazada')->middleware('permission:brands,edit_brands');
+    Route::post('brands/woocommerce-mapping', [BrandController::class, 'bulkMapWoocommerceBrand'])->name('brands.bulkMapWoocommerce')->middleware('permission:marketplace_woocommerce,edit_brand_mapping_woocommerce');
+    Route::post('brands/sync-lazada', [BrandController::class, 'syncLazadaBrands'])->name('brands.syncLazada')->middleware('permission:marketplace_lazada,edit_brand_mapping_lazada');
     // ไม่มีหน้า GET brands/lazada-mapping หรือ endpoint brands/search-lazada
     // แล้ว — การจัดการแบรนด์ Lazada ตอนนี้ย้ายไปอยู่ที่ categories/lazada-mapping.tsx
     // โดยจับคู่กันคนละทิศทาง (ดู docblock ของหน้านั้นและของ
     // BrandController::lazadaBrandsList()) route POST ด้านล่างนี้ยังเหมือนเดิม
     // ยังคงทำหน้าที่บันทึกข้อมูลจริงอยู่
-    Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:brands,edit_brands');
-    Route::post('brands/sync-tiktok', [BrandController::class, 'syncTiktokBrands'])->name('brands.syncTiktok')->middleware('permission:brands,edit_brands');
+    Route::post('brands/lazada-mapping', [BrandController::class, 'bulkMapLazadaBrand'])->name('brands.bulkMapLazada')->middleware('permission:marketplace_lazada,edit_brand_mapping_lazada');
+    Route::post('brands/sync-tiktok', [BrandController::class, 'syncTiktokBrands'])->name('brands.syncTiktok')->middleware('permission:marketplace_tiktok,edit_brand_mapping_tiktok');
     // ไม่มีหน้า GET brands/tiktok-mapping หรือ endpoint brands/search-tiktok
     // แล้ว — ย้ายแบบเดียวกับของ Lazada/WooCommerce ด้านบน การจัดการแบรนด์
     // TikTok ตอนนี้ย้ายไปอยู่ที่ categories/tiktok-mapping.tsx
-    Route::post('brands/tiktok-mapping', [BrandController::class, 'bulkMapTiktokBrand'])->name('brands.bulkMapTiktok')->middleware('permission:brands,edit_brands');
+    Route::post('brands/tiktok-mapping', [BrandController::class, 'bulkMapTiktokBrand'])->name('brands.bulkMapTiktok')->middleware('permission:marketplace_tiktok,edit_brand_mapping_tiktok');
     // route สำหรับเช็คสถานะ/ยกเลิก brand-sync job ที่อยู่ใน queue แบบทั่วไป
     // (ใช้ได้ทั้ง Shopee, Lazada, TikTok, ...) — ไม่ได้ผูกกับแพลตฟอร์มไหนโดยเฉพาะ
     // path ของ route เลยตั้งชื่อตามแนวคิด ("sync-jobs") ไม่ใช่ชื่อแพลตฟอร์มใดแพลตฟอร์มหนึ่ง
@@ -410,62 +410,62 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('currencies/{currency}', [CurrencyController::class, 'update'])->name('currencies.update')->middleware('permission:currencies,edit_currencies');
     Route::delete('currencies/{currency}', [CurrencyController::class, 'destroy'])->name('currencies.destroy')->middleware('permission:currencies,edit_currencies');
     Route::get('categories/marketplace-sync', [CategoryController::class, 'marketplaceSync'])->name('categories.marketplaceSync')->middleware('permission:categories,edit_categories');
-    Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:categories,edit_categories');
-    Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:categories,edit_categories');
-    Route::post('categories/sync-tiktok', [CategoryController::class, 'syncTikTokCategories'])->name('categories.syncTiktok')->middleware('permission:categories,edit_categories');
-    Route::get('categories/search-lazada', [CategoryController::class, 'searchLazadaCategories'])->name('categories.searchLazada')->middleware('permission:categories,edit_categories');
+    Route::post('categories/sync-lazada', [CategoryController::class, 'syncLazadaCategories'])->name('categories.syncLazada')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
+    Route::post('categories/sync-shopee', [CategoryController::class, 'syncShopeeCategories'])->name('categories.syncShopee')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
+    Route::post('categories/sync-tiktok', [CategoryController::class, 'syncTikTokCategories'])->name('categories.syncTiktok')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
+    Route::get('categories/search-lazada', [CategoryController::class, 'searchLazadaCategories'])->name('categories.searchLazada')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
     Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
-    Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:categories,edit_categories');
-    Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:categories,edit_categories');
+    Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
+    Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
     // BrandController::lazadaBrandsList()) — เช็คสิทธิ์ด้วย brands,edit_brands
     // แทนที่จะเป็น categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์
     // แม้ว่าจะถูกเรียกจากตาราง categories/lazada-mapping.tsx ก็ตาม ไม่ได้ผูกกับ
     // category (ต่างจากของ Shopee) — แคตตาล็อกแบรนด์ของ Lazada ไม่มีมิติเรื่อง
     // category เลย เลยไม่มี {lazadaCategoryId} ใน path นี้
-    Route::get('categories/lazada-mapping/lazada-brands', [BrandController::class, 'lazadaBrandsList'])->name('categories.lazadaMapping.lazadaBrands')->middleware('permission:brands,edit_brands');
+    Route::get('categories/lazada-mapping/lazada-brands', [BrandController::class, 'lazadaBrandsList'])->name('categories.lazadaMapping.lazadaBrands')->middleware('permission:marketplace_lazada,edit_brand_mapping_lazada');
     // แนวคิดเดียวกัน แต่เป็นฝั่ง attribute แทนฝั่งแบรนด์ — ดู docblock ของ
     // LazadaAttributeMappingController สำหรับสอง route นี้ schema attribute
     // ของ Lazada ผูกกับ category จริงๆ (/category/attributes/get) คู่ route นี้
     // เลยมีรูปแบบเหมือนกับ {shopeeCategoryId} ของ Shopee เป๊ะๆ
-    Route::post('categories/lazada-mapping/sync-attributes', [LazadaAttributeMappingController::class, 'syncLazadaAttributesForCategory'])->name('categories.lazadaMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/{lazadaCategoryId}/lazada-attributes', [LazadaAttributeMappingController::class, 'lazadaAttributesForCategory'])->name('categories.lazadaAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:categories,edit_categories');
-    Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:categories,edit_categories');
-    Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:categories,edit_categories');
+    Route::post('categories/lazada-mapping/sync-attributes', [LazadaAttributeMappingController::class, 'syncLazadaAttributesForCategory'])->name('categories.lazadaMapping.syncAttributes')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::get('categories/{lazadaCategoryId}/lazada-attributes', [LazadaAttributeMappingController::class, 'lazadaAttributesForCategory'])->name('categories.lazadaAttributesForCategory')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
+    Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
+    Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
+    Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ BrandController
     // สำหรับสอง route นี้) — เช็คสิทธิ์ด้วย brands,edit_brands แทนที่จะเป็น
     // categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์ แม้ว่าจะถูกเรียก
     // จากตาราง categories/shopee-mapping.tsx ก็ตาม
-    Route::post('categories/shopee-mapping/sync-brands', [BrandController::class, 'syncShopeeBrandsForCategory'])->name('categories.shopeeMapping.syncBrands')->middleware('permission:brands,edit_brands');
-    Route::get('categories/{shopeeCategoryId}/shopee-brands', [BrandController::class, 'shopeeBrandsForCategory'])->name('categories.shopeeBrandsForCategory')->middleware('permission:brands,edit_brands');
+    Route::post('categories/shopee-mapping/sync-brands', [BrandController::class, 'syncShopeeBrandsForCategory'])->name('categories.shopeeMapping.syncBrands')->middleware('permission:marketplace_shopee,edit_brand_mapping_shopee');
+    Route::get('categories/{shopeeCategoryId}/shopee-brands', [BrandController::class, 'shopeeBrandsForCategory'])->name('categories.shopeeBrandsForCategory')->middleware('permission:marketplace_shopee,edit_brand_mapping_shopee');
     // แนวคิดเดียวกัน แต่เป็นฝั่ง attribute แทนฝั่งแบรนด์ — ดู docblock ของ
     // ShopeeAttributeMappingController สำหรับสอง route นี้
-    Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:categories,edit_categories');
-    Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:categories,edit_categories');
-    Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:categories,edit_categories');
+    Route::post('categories/shopee-mapping/sync-attributes', [ShopeeAttributeMappingController::class, 'syncShopeeAttributesForCategory'])->name('categories.shopeeMapping.syncAttributes')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::get('categories/{shopeeCategoryId}/shopee-attributes', [ShopeeAttributeMappingController::class, 'shopeeAttributesForCategory'])->name('categories.shopeeAttributesForCategory')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
+    Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
+    Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
+    Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
     // BrandController::tiktokBrandsList()) — ไม่ได้ผูกกับ category
     // (เหมือนของ Lazada/WooCommerce ต่างจากของ Shopee) เลยไม่มี
     // {tiktokCategoryId} ใน path นี้
-    Route::get('categories/tiktok-mapping/tiktok-brands', [BrandController::class, 'tiktokBrandsList'])->name('categories.tiktokMapping.tiktokBrands')->middleware('permission:brands,edit_brands');
+    Route::get('categories/tiktok-mapping/tiktok-brands', [BrandController::class, 'tiktokBrandsList'])->name('categories.tiktokMapping.tiktokBrands')->middleware('permission:marketplace_tiktok,edit_brand_mapping_tiktok');
     // ส่วนที่เทียบเท่าฝั่ง attribute — endpoint Get Attributes ของ TikTok
     // ผูกกับ category จริงๆ (เรียกทีละ category_id) คู่ route นี้เลยมีรูปแบบ
     // เหมือนกับ {xCategoryId} ของ Shopee/Lazada
-    Route::post('categories/tiktok-mapping/sync-attributes', [TikTokAttributeMappingController::class, 'syncTikTokAttributesForCategory'])->name('categories.tiktokMapping.syncAttributes')->middleware('permission:attributes,edit_attributes');
-    Route::get('categories/{tiktokCategoryId}/tiktok-attributes', [TikTokAttributeMappingController::class, 'tiktokAttributesForCategory'])->name('categories.tiktokAttributesForCategory')->middleware('permission:attributes,edit_attributes');
-    Route::post('categories/sync-woocommerce', [CategoryController::class, 'syncWoocommerceCategories'])->name('categories.syncWoocommerce')->middleware('permission:categories,edit_categories');
-    Route::get('categories/search-woocommerce', [CategoryController::class, 'searchWoocommerceCategories'])->name('categories.searchWoocommerce')->middleware('permission:categories,edit_categories');
-    Route::get('categories/woocommerce-mapping', [CategoryController::class, 'woocommerceMapping'])->name('categories.woocommerceMapping')->middleware('permission:categories,edit_categories');
-    Route::post('categories/woocommerce-mapping', [CategoryController::class, 'bulkMapWoocommerce'])->name('categories.bulkMapWoocommerce')->middleware('permission:categories,edit_categories');
+    Route::post('categories/tiktok-mapping/sync-attributes', [TikTokAttributeMappingController::class, 'syncTikTokAttributesForCategory'])->name('categories.tiktokMapping.syncAttributes')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::get('categories/{tiktokCategoryId}/tiktok-attributes', [TikTokAttributeMappingController::class, 'tiktokAttributesForCategory'])->name('categories.tiktokAttributesForCategory')->middleware('permission:marketplace_tiktok,edit_attribute_mapping_tiktok');
+    Route::post('categories/sync-woocommerce', [CategoryController::class, 'syncWoocommerceCategories'])->name('categories.syncWoocommerce')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
+    Route::get('categories/search-woocommerce', [CategoryController::class, 'searchWoocommerceCategories'])->name('categories.searchWoocommerce')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
+    Route::get('categories/woocommerce-mapping', [CategoryController::class, 'woocommerceMapping'])->name('categories.woocommerceMapping')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
+    Route::post('categories/woocommerce-mapping', [CategoryController::class, 'bulkMapWoocommerce'])->name('categories.bulkMapWoocommerce')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
     // BrandController::woocommerceBrandsList()) — ไม่ได้ผูกกับ category
     // เหตุผลเดียวกับของ Lazada/TikTok ด้านบน
-    Route::get('categories/woocommerce-mapping/woocommerce-brands', [BrandController::class, 'woocommerceBrandsList'])->name('categories.woocommerceMapping.woocommerceBrands')->middleware('permission:brands,edit_brands');
-    Route::get('categories/export-woocommerce', [CategoryController::class, 'exportWoocommerceCategories'])->name('categories.exportWoocommerce')->middleware('permission:categories,edit_categories');
-    Route::post('categories/import-woocommerce', [CategoryController::class, 'importFromWoocommerce'])->name('categories.importWoocommerce')->middleware('permission:categories,edit_categories');
+    Route::get('categories/woocommerce-mapping/woocommerce-brands', [BrandController::class, 'woocommerceBrandsList'])->name('categories.woocommerceMapping.woocommerceBrands')->middleware('permission:marketplace_woocommerce,edit_brand_mapping_woocommerce');
+    Route::get('categories/export-woocommerce', [CategoryController::class, 'exportWoocommerceCategories'])->name('categories.exportWoocommerce')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
+    Route::post('categories/import-woocommerce', [CategoryController::class, 'importFromWoocommerce'])->name('categories.importWoocommerce')->middleware('permission:marketplace_woocommerce,edit_category_mapping_woocommerce');
 
     Route::get('categoryFields', [CategoryFieldController::class, 'index'])->name('categoryFields.index')->middleware('permission:category_fields,list_category_fields');
     Route::get('categoryFields/create', [CategoryFieldController::class, 'create'])->name('categoryFields.create')->middleware('permission:category_fields,create_category_fields');
@@ -497,38 +497,47 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::put('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'updateShop'])->name('salesPlatforms.shops.update')->middleware('permission:sales_platforms,edit_sales_platforms');
     Route::delete('sales-platforms/shops/{shop}', [SalesPlatformController::class, 'destroyShop'])->name('salesPlatforms.shops.destroy')->middleware('permission:sales_platforms,edit_sales_platforms');
 
-    // ── Master-data screens reserved but not yet built ────────────────────
-    // Each renders the shared catalog/placeholder page with its own nav
-    // title key. They have a sidebar entry now so the intended IA is
-    // visible; when a feature ships for real, repoint its route at a real
-    // controller/page. Gated on products,list_products (an existing
-    // resource) — same rationale as the `management` hub route above: keep
-    // them visible to the Catalog audience without minting a permission
-    // resource per stub.
-    $stub = fn (string $titleKey) => fn () => Inertia::render('catalog/placeholder', ['titleKey' => $titleKey]);
+    // ── มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม} ────────────────────────────
+    // เดิมทั้ง 4 แพลตฟอร์มแชร์สิทธิ์เดียวกัน (products,list_products) ทั้งที่
+    // ไม่เกี่ยวกับ Products โดยตรง — แยกเป็นสิทธิ์ของตัวเองต่อแพลตฟอร์มแทน
+    // (marketplace_shopee/lazada/tiktok/woocommerce) เพื่อให้กำหนด role ที่เห็น
+    // แค่บาง platform ได้ (เช่น ทีมดูแล Shopee อย่างเดียว ไม่ต้องเห็นเมนู Lazada)
+    // — คุมทั้งหน้า hub (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม}) และหน้าตั้งค่า
+    // การเชื่อมต่อ (marketplace/connect/{platform}) ที่ hub นั้นลิงก์ไป ส่วนการ์ด
+    // "จับคู่หมวดหมู่"/"จับคู่ข้อมูลส่ง" ในหน้า hub ยังคุมด้วยสิทธิ์ของตัวเองแยก
+    // ต่างหากเหมือนเดิม (categories,edit_categories / attributes,edit_attributes)
+    // ไม่ผูกกับสิทธิ์ใหม่นี้ — ดู migration backfill_marketplace_platform_permissions
+    // ที่ให้สิทธิ์นี้ย้อนหลังกับทุก role ที่เคยมี products,list_products มาก่อน
+    // (รักษาสิทธิ์เข้าถึงเดิมไว้ ไม่ให้ใครหลุดออกจากเมนูที่เคยเห็นอยู่แล้ว) แล้ว
+    // รัน `php artisan permissions:sync` เพื่อขึ้นทะเบียนสิทธิ์ใหม่นี้ในหน้า Roles
+    // (auto-generate จาก route scan — ดู PermissionCatalog) ให้ Administrator ด้วย
+    foreach (['shopee', 'lazada', 'tiktok', 'woocommerce'] as $platform) {
+        Route::middleware("permission:marketplace_{$platform},list_marketplace_{$platform}")->group(function () use ($platform) {
+            // เดิมเป็นแค่ placeholder ("under construction") — ตอนนี้เป็นขั้นแรกจริง
+            // (ตารางร้านค้าของแพลตฟอร์มนี้) ดู SalesPlatformController::connectionSettings()
+            // — เรียกผ่าน closure แทนที่จะผูก route กับ [Controller::class, 'method']
+            // ตรงๆ เพราะ path ของแต่ละ loop iteration เป็น literal segment
+            // ("marketplace/connect/shopee") ไม่ใช่ {platform} wildcard แล้ว จึงไม่มี
+            // route parameter ให้ Laravel inject เข้า connectionSettings(string
+            // $platform) เองอัตโนมัติ — ส่ง $platform ของ iteration นี้เข้าไปตรงๆ แทน
+            Route::get("marketplace/connect/{$platform}", fn () => app(SalesPlatformController::class)->connectionSettings($platform))
+                ->name("marketplace.connect.{$platform}");
 
-    Route::middleware('permission:products,list_products')->group(function () use ($stub) {
+            // Hub page ของแพลตฟอร์มนี้ (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม}) — grid
+            // การ์ด 3 ใบพาไปหน้าจับคู่หมวดหมู่/จับคู่ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อของ
+            // แพลตฟอร์มนั้น (ดู resources/js/pages/catalog/marketplace/platform-hub.tsx)
+            // เป็นแค่หน้า launcher ไม่มี business logic ของตัวเอง เลย render ตรงนี้
+            // แบบเดียวกับ marketplace/connect/{platform} ด้านบน ไม่ต้องมี controller แยก
+            Route::get("marketplace/{$platform}", fn () => Inertia::render('catalog/marketplace/platform-hub', [
+                'platform' => $platform,
+            ]))->name("marketplace.hub.{$platform}");
+        });
+    }
 
-        // เดิมเป็นแค่ placeholder ("under construction") — ตอนนี้เป็นขั้นแรกจริง
-        // (ตารางร้านค้าของแพลตฟอร์มนี้) ดู SalesPlatformController::connectionSettings()
-        Route::get('marketplace/connect/{platform}', [SalesPlatformController::class, 'connectionSettings'])
-            ->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])
-            ->name('marketplace.connect');
-
-        // Hub page ของแต่ละแพลตฟอร์ม (มาสเตอร์ > มาร์เก็ตเพลส > {แพลตฟอร์ม]) —
-        // grid การ์ด 3 ใบพาไปหน้าจับคู่หมวดหมู่/จับคู่ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ
-        // ของแพลตฟอร์มนั้น (ดู resources/js/pages/catalog/marketplace/
-        // platform-hub.tsx) แทนที่เมนู sidebar แบบซ้อนหลายชั้นเดิม เป็นแค่หน้า
-        // launcher ไม่มี business logic ของตัวเอง เลย render ตรงนี้แบบเดียวกับ
-        // marketplace/connect/{platform} ด้านบน ไม่ต้องมี controller แยก
-        Route::get('marketplace/{platform}', fn (string $platform) => Inertia::render('catalog/marketplace/platform-hub', [
-            'platform' => $platform,
-        ]))->whereIn('platform', ['shopee', 'lazada', 'tiktok', 'woocommerce'])->name('marketplace.hub');
-
-        // "category" (รวม brand-mapping กลับเข้าไปแล้วเหมือนเดิม) reached straight
-        // from the sidebar at its real URL (/catalog/categories/{platform}-mapping),
-        // and "push" (แมปฟิวส่งข้อมูล) now reaches its own real attribute-mapping
-        // page at /catalog/marketplace/{platform}/attribute-mapping — no more
-        // placeholder stub for either of them.
-    });
+    // "category" (รวม brand-mapping กลับเข้าไปแล้วเหมือนเดิม) reached straight
+    // from the sidebar at its real URL (/catalog/categories/{platform}-mapping),
+    // and "push" (แมปฟิวส่งข้อมูล) now reaches its own real attribute-mapping page
+    // at /catalog/marketplace/{platform}/attribute-mapping — neither lives under
+    // this foreach; each keeps its own existing permission (see their route
+    // definitions above).
 });

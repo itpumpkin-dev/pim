@@ -3,17 +3,19 @@ import {
     FioriField,
     FioriFormErrorSummary,
     FioriFormGroup,
+    FioriMessageStrip,
     fioriFieldStateSx,
     fioriMultiInputSx,
     valueStateOf,
 } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { mappedChipSx, solidActionSx, UI_BORDER, UI_BORDER_STRONG } from '@/lib/ui-style';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem, type SharedData } from '@/types';
 import { type FormDataConvertible } from '@inertiajs/core';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -40,7 +42,7 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface AttributeOption {
@@ -274,6 +276,35 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
 
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
+    // Auto-saves unsaved edits to localStorage (see useDraftAutosave's
+    // docblock) — same safety net as the Edit page's: a permission change
+    // mid-form force-logs the user out on their very next request, including
+    // the Save click itself (see EnsureFreshPermissions), losing whatever
+    // wasn't persisted yet — worse here than on Edit, since nothing about a
+    // brand-new product has ever been saved at all until this form submits
+    // successfully. `readDraft()` is called once on mount, not subscribed
+    // reactively, so the restore prompt only ever appears once per page load.
+    // Scoped by user id — localStorage is shared by every account that ever
+    // signs into this browser, and a draft is someone's unsaved edits.
+    const { auth } = usePage<SharedData>().props;
+    const draftKey = `product-draft-new-${auth.user?.id ?? 'anon'}`;
+    const { readDraft, clearDraft } = useDraftAutosave(draftKey, data, isDirty);
+    const [draftPrompt, setDraftPrompt] = useState<{ data: ProductForm; savedAt: number } | null>(null);
+    useEffect(() => {
+        setDraftPrompt(readDraft());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const restoreDraft = () => {
+        if (!draftPrompt) return;
+        setData(draftPrompt.data);
+        clearDraft();
+        setDraftPrompt(null);
+    };
+    const discardDraft = () => {
+        clearDraft();
+        setDraftPrompt(null);
+    };
+
     const handleFormSubmit = (e?: FormEvent) => {
         if (e) e.preventDefault();
         // ฝั่ง server จะ redirect ไปหน้า Edit ทันที (หรือไปหน้า list ถ้า role นั้น
@@ -281,6 +312,7 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
         // อะไรเพิ่มตรงนี้ตอน success
         skipNavigationGuardRef.current = true;
         post('/catalog/products', {
+            onSuccess: () => clearDraft(),
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
@@ -292,6 +324,30 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
             <Head title={t('createProductTitle')} />
             {/* <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 1000, mx: 'auto' }}> */}
             <Box component="form" onSubmit={handleFormSubmit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%', width: '100%', maxWidth: 760 }}>
+                {/* พบร่างที่ useDraftAutosave เก็บไว้ใน localStorage จากรอบก่อน (เช่น
+                    โดน logout กะทันหันตอนสิทธิ์เปลี่ยนกลางคัน ก่อนเคย save สินค้านี้แม้แต่
+                    ครั้งเดียว) — ถามก่อนเสมอ ไม่กู้คืนให้อัตโนมัติ */}
+                {draftPrompt && (
+                    <Box sx={{ mb: 3 }}>
+                        <FioriMessageStrip severity="warning">
+                            <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                {t('autosaveDraftFoundTitle')}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                {t('autosaveDraftFoundMessage', { time: new Date(draftPrompt.savedAt).toLocaleString() })}
+                            </Typography>
+                            <Stack direction="row" spacing={1}>
+                                <Button size="small" variant="contained" color="inherit" onClick={restoreDraft}>
+                                    {t('restoreDraft')}
+                                </Button>
+                                <Button size="small" variant="outlined" color="inherit" onClick={discardDraft}>
+                                    {t('discardDraft')}
+                                </Button>
+                            </Stack>
+                        </FioriMessageStrip>
+                    </Box>
+                )}
+
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                     <Typography variant="h5" fontWeight={700}>
                         {t('createProductTitle')}

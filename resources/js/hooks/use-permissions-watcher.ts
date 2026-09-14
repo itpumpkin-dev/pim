@@ -16,6 +16,18 @@ const LOGOUT_DELAY_MS = 3000;
  * user logged out — EnsureFreshPermissions catches the stale session on that
  * request server-side. This hook only makes it happen immediately (with a
  * heads-up) instead of waiting for the user's next click.
+ *
+ * Also dispatches a plain `window` CustomEvent ('app:permissions-changed')
+ * on the same receipt, ahead of the reload — a page with unsaved work (see
+ * useDraftAutosave) listens for this to flush a draft to localStorage
+ * immediately, rather than waiting on its own debounce and risking losing
+ * whatever was typed since the last save. A DOM event rather than a second
+ * usePermissionsWatcher() call in each page: this hook's cleanup calls
+ * echo.leave(channelName), which tears down the channel subscription
+ * entirely — a second subscriber on the same user.{id} channel from some
+ * other still-mounted component (this one is rendered once, globally, by
+ * PermissionsChangedToast) would silently kill that component's listener
+ * too the moment the second subscriber unmounts.
  */
 export function usePermissionsWatcher() {
     const { auth } = usePage<SharedData>().props;
@@ -32,6 +44,7 @@ export function usePermissionsWatcher() {
 
         channel.listen('.permissions.changed', () => {
             setNoticeVisible(true);
+            window.dispatchEvent(new CustomEvent('app:permissions-changed'));
             window.setTimeout(() => router.reload(), LOGOUT_DELAY_MS);
         });
 

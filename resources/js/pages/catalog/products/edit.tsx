@@ -8,6 +8,7 @@ import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
 import { TimelinePanel } from '@/components/timeline-panel';
 import { useLocale } from '@/hooks/use-locale';
+import { useDraftAutosave } from '@/hooks/use-draft-autosave';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -35,6 +36,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DraftsIcon from '@mui/icons-material/Drafts';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -46,6 +48,7 @@ import {
     Autocomplete,
     Box,
     Button,
+    ButtonGroup,
     Checkbox,
     Chip,
     CircularProgress,
@@ -215,6 +218,8 @@ interface Props {
     /** สิทธิ์แยกต่างหากของแผง Sales Channels — ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) */
     canViewSalesChannels?: boolean;
     canEditSalesChannels?: boolean;
+    /** สิทธิ์ push/deactivate/delete-listing/เช็คสถานะ แยกต่อแพลตฟอร์ม (marketplace_{platform}.push_products_{platform}) — คนละสิทธิ์กับ canEditSalesChannels ด้านบนที่คุมแค่การติ๊ก/บันทึกว่าช่องทางไหน published อยู่ (ดู ProductController::buildProductFormProps()) */
+    canPushProducts?: Record<'lazada' | 'shopee' | 'tiktok' | 'woocommerce', boolean>;
     /** สิทธิ์ "แก้ไข" แยกต่างหากของแผง Master Categories (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) — ไม่ได้พ่วงกับ products.edit_products ทั่วไปอีกต่อไป (ดู routes/catalog.php) ตั้งใจไม่มี view แยก (ต่างจาก Sales Channels) เพราะแผงนี้ไม่มีเหตุผลต้องซ่อนจากการดู */
     canEditMasterCategories?: boolean;
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
@@ -292,6 +297,7 @@ export default function ProductEdit({
     canViewHistory = false,
     canViewSalesChannels = false,
     canEditSalesChannels = false,
+    canPushProducts = { lazada: false, shopee: false, tiktok: false, woocommerce: false },
     canEditMasterCategories = false,
     masterSources = [],
 }: Props) {
@@ -1360,6 +1366,35 @@ export default function ProductEdit({
 
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
+    // Auto-saves unsaved edits to localStorage (see useDraftAutosave's
+    // docblock) — mainly a safety net for the scenario EnsureFreshPermissions
+    // creates: a permission change mid-edit force-logs the user out on their
+    // very next request, including the Save click itself, losing whatever
+    // wasn't persisted yet. `readDraft()` is called once below (not
+    // subscribed reactively) since the prompt should only ever appear once
+    // per page load, right after mount — not re-appear if the user discards
+    // it and then makes the form dirty again themselves.
+    // Scoped by user id, not just product id — localStorage is shared by
+    // every account that ever signs into this browser, and a draft is
+    // someone's unsaved, possibly sensitive edits.
+    const draftKey = `product-draft-${auth.user?.id ?? 'anon'}-${product.id}`;
+    const { readDraft, clearDraft } = useDraftAutosave(draftKey, data, isDirty);
+    const [draftPrompt, setDraftPrompt] = useState<{ data: ProductForm; savedAt: number } | null>(null);
+    useEffect(() => {
+        setDraftPrompt(readDraft());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    const restoreDraft = () => {
+        if (!draftPrompt) return;
+        setData(draftPrompt.data);
+        clearDraft();
+        setDraftPrompt(null);
+    };
+    const discardDraft = () => {
+        clearDraft();
+        setDraftPrompt(null);
+    };
+
     // Optimistic concurrency: ส่ง updated_at ที่ product prop ถืออยู่ ณ ตอนกด
     // save กลับไปด้วยเสมอ — เป็นค่าล่าสุดที่หน้านี้ "เห็น" จริงๆ ไม่ว่าจะมาจาก
     // ตอนโหลดหน้าครั้งแรก หรือจาก panel save (channels/master-categories) ก่อน
@@ -1376,18 +1411,67 @@ export default function ProductEdit({
         if (errors.conflict) setConflictMessage(errors.conflict);
     }, [errors.conflict]);
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    /**
+     * Shared by every "save the full form" variant below (the normal Save
+     * Product button, Save Draft, Save as Template) — only what happens
+     * before/after the save differs between them.
+     *
+     * @param forceDisabled  Save Draft's "always leave it unpublished"
+     *                        behavior — forced in the outgoing payload
+     *                        itself (not just via setData, which wouldn't
+     *                        have flushed to state yet by the time transform()
+     *                        reads it) so the request is correct regardless
+     *                        of React's state-update timing.
+     */
+    const performSave = (options?: { forceDisabled?: boolean; onSuccess?: () => void }) => {
         setConflictMessage(null);
+        if (options?.forceDisabled) setData('enabled', false);
         // PHP ไม่รองรับการ parse body แบบ multipart/form-data สำหรับ request แบบ PUT
         // เลยต้องส่งเป็น POST พร้อมปลอม _method ไว้ เพื่อให้ Laravel route เป็น PUT ให้
-        transform((formData) => ({ ...formData, _method: 'put', expected_updated_at: product.updated_at }));
+        transform((formData) => ({
+            ...formData,
+            ...(options?.forceDisabled ? { enabled: false } : {}),
+            _method: 'put',
+            expected_updated_at: product.updated_at,
+        }));
         skipNavigationGuardRef.current = true;
         post(`/catalog/products/${product.id}`, {
+            onSuccess: () => {
+                // Saved for real now — the auto-saved copy would only ever be
+                // read back as a *stale* draft from here on.
+                clearDraft();
+                options?.onSuccess?.();
+            },
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
         });
+    };
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        performSave();
+    };
+
+    // "Save Draft" — เหมือนปุ่ม Save ปกติทุกอย่าง ต่างแค่บังคับ enabled:false
+    // เสมอ (ระบบนี้ไม่มีสถานะ draft/published แยกจาก `enabled` — ปุ่มนี้ยืมความ
+    // หมายจากคอลัมน์เดิมไปเลย แทนที่จะเพิ่ม schema ใหม่) เรียกจากปุ่มยืนยันใน
+    // dialog เท่านั้น (คลิกที่ MenuItem แค่เปิด dialog ไว้ก่อน)
+    const saveDraft = () => {
+        setSaveDraftConfirmOpen(false);
+        performSave({ forceDisabled: true });
+    };
+
+    // "Save as Template" — บันทึกการแก้ไขปัจจุบันลงสินค้าตัวนี้ก่อน (เหมือน Save
+    // ปกติ ไม่บังคับ enabled) แล้วค่อยทำสำเนาสินค้าที่เพิ่ง save ไปหมาดๆ นั้น
+    // ต่อทันที (ใช้ endpoint duplicate() เดิมที่มีอยู่แล้ว — เสมอ enabled:false
+    // บนสำเนาใหม่ ดู ProductController::duplicate()) แล้วพาไปหน้าแก้ไขสำเนานั้น
+    // ต่อ — ได้ "เทมเพลต" ที่เป็นสินค้าจริงตัวหนึ่งในระบบ พร้อมทำสำเนาต่อได้อีก
+    // เรื่อยๆ โดยไม่ต้องสร้างตาราง/หน้าจอ "Template" แยกต่างหาก เรียกจากปุ่ม
+    // ยืนยันใน dialog เท่านั้น (คลิกที่ MenuItem แค่เปิด dialog ไว้ก่อน)
+    const saveAsTemplate = () => {
+        setSaveAsTemplateConfirmOpen(false);
+        performSave({ onSuccess: () => duplicateProduct() });
     };
 
     // Per-panel Save (Sales Channels / Master Categories): each hits its own
@@ -1429,6 +1513,14 @@ export default function ProductEdit({
     // ไปทำจากหน้า list เท่านั้น (Duplicate/Delete) หรือหน้า missing-translations
     // เท่านั้น (Queue Missing Translations) — ตอนนี้เรียกจากหน้า Edit ได้ตรงๆ
     const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null);
+    // Dropdown ของปุ่ม Save Product (ลูกศรข้างๆ) — Save Draft / Save as Template /
+    // View Page ดู performSave()/saveDraft()/saveAsTemplate() ด้านล่าง
+    const [saveMenuAnchor, setSaveMenuAnchor] = useState<HTMLElement | null>(null);
+    // ทั้งสอง action นี้เปลี่ยนสถานะสินค้า (บังคับ disabled / สร้างสำเนาใหม่) —
+    // ให้มี dialog ถามยืนยันก่อนเสมอ แบบเดียวกับ Publish/Duplicate/Delete ที่มีอยู่
+    // แล้วในหน้านี้ (ต่างจาก View Page ที่แค่เปิดดู ไม่เปลี่ยนอะไร เลยไม่ต้องถาม)
+    const [saveDraftConfirmOpen, setSaveDraftConfirmOpen] = useState(false);
+    const [saveAsTemplateConfirmOpen, setSaveAsTemplateConfirmOpen] = useState(false);
     const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -1647,24 +1739,6 @@ export default function ProductEdit({
                                 </>
                             )}
 
-                            {/* ลิงก์ไปหน้า products.show ของสินค้าที่ id นี้ตรงๆ (เปิดแท็บใหม่ ไม่
-                                ทับหน้าฟอร์มที่ยังแก้ไขค้างอยู่) — เพราะสินค้าตัวนี้ถูกบันทึกไว้แล้ว
-                                (มี id ถึงมาถึงหน้า Edit ได้) ผู้ใช้เลยดูข้อมูลที่บันทึกไว้ล่าสุดได้เลย
-                                โดยไม่ต้องกด Save Product ก่อน (จะเห็นเป็นค่าที่ยังไม่ถูก save ล่าสุดถ้ามี
-                                การแก้ไขค้างอยู่ในฟอร์มนี้ ตามที่คาดหวังไว้)
-                            */}
-                            <Button
-                                component={Link}
-                                href={`/catalog/products/${product.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                variant="outlined"
-                                startIcon={<VisibilityIcon fontSize="small" />}
-                                sx={{ ...fioriDefaultSx, px: 2.5 }}
-                            >
-                                {t('viewProduct')}
-                            </Button>
-
                             <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
                                 {t('back')}
                             </Button>
@@ -1682,19 +1756,77 @@ export default function ProductEdit({
                                     {t('publish')}
                                 </Button>
                             )}
-                            {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
-                                เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
-                                ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
-                                เลย disabled โดยอัตโนมัติจนกว่าจะมีการแก้ไขจริงสักฟิลด์ */}
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                disabled={processing || !isDirty}
-                                startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                            >
-                                {processing ? t('saving') : t('saveProduct')}
-                            </Button>
+                            {/* Save Product เป็น split-button สไตล์ WordPress: ปุ่มหลักยัง submit
+                                ฟอร์มตามปกติ ลูกศรข้างๆ เปิดเมนู Save Draft / Save as Template /
+                                View Page — action ระดับ "วิธี save" ที่ไม่อยากให้ toolbar รกด้วย
+                                ปุ่มแยกอีกสามปุ่ม (View Page ย้ายมาจากปุ่ม "ดูสินค้า" เดิมที่เคยแยก
+                                อยู่ต่างหากตรงนี้) */}
+                            <ButtonGroup variant="contained">
+                                {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
+                                    เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
+                                    ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
+                                    เลย disabled โดยอัตโนมัติจนกว่าจะมีการแก้ไขจริงสักฟิลด์ */}
+                                <Button
+                                    type="submit"
+                                    disabled={processing || !isDirty}
+                                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
+                                    sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                                >
+                                    {processing ? t('saving') : t('saveProduct')}
+                                </Button>
+                                <Button
+                                    size="small"
+                                    disabled={processing}
+                                    onClick={(e) => setSaveMenuAnchor(e.currentTarget)}
+                                    sx={{ ...fioriEmphasizedSx, px: 0.5 }}
+                                >
+                                    <KeyboardArrowDownIcon fontSize="small" />
+                                </Button>
+                            </ButtonGroup>
+                            <Menu anchorEl={saveMenuAnchor} open={Boolean(saveMenuAnchor)} onClose={() => setSaveMenuAnchor(null)}>
+                                <MenuItem
+                                    onClick={() => {
+                                        setSaveMenuAnchor(null);
+                                        setSaveDraftConfirmOpen(true);
+                                    }}
+                                >
+                                    <DraftsIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                    {t('saveDraft')}
+                                </MenuItem>
+                                {/* saveAsTemplate() ลง duplicateProduct() ต่อหลัง save สำเร็จ —
+                                    endpoint นั้นเช็ค products,create_products ฝั่ง server (เหมือน
+                                    "ทำสำเนา" ใน More menu ด้านบนที่ gate ด้วย canDuplicateProduct
+                                    อยู่แล้ว) ไม่ gate ตรงนี้ด้วย จะโชว์ปุ่มให้กดได้ทั้งที่กดแล้วต้อง
+                                    พังแน่ๆ ที่ขั้นตอน duplicate (ซึ่งไม่มี onError โชว์ผลด้วย —
+                                    แก้ไขที่บันทึกไปแล้วในขั้นตอนก่อนหน้าจะดูเหมือนหายเงียบๆ) */}
+                                {canDuplicateProduct && (
+                                    <MenuItem
+                                        onClick={() => {
+                                            setSaveMenuAnchor(null);
+                                            setSaveAsTemplateConfirmOpen(true);
+                                        }}
+                                    >
+                                        <ContentCopyIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                        {t('saveAsTemplate')}
+                                    </MenuItem>
+                                )}
+                                <Divider />
+                                {/* ลิงก์ไปหน้า products.show ของสินค้าที่ id นี้ตรงๆ (เปิดแท็บใหม่
+                                    ไม่ทับหน้าฟอร์มที่ยังแก้ไขค้างอยู่) — เพราะสินค้าตัวนี้ถูกบันทึกไว้
+                                    แล้ว (มี id ถึงมาถึงหน้า Edit ได้) ผู้ใช้เลยดูข้อมูลที่บันทึกไว้
+                                    ล่าสุดได้เลย โดยไม่ต้องกด Save Product ก่อน (จะเห็นเป็นค่าที่ยังไม่
+                                    ถูก save ล่าสุดถ้ามีการแก้ไขค้างอยู่ในฟอร์มนี้ ตามที่คาดหวังไว้) */}
+                                <MenuItem
+                                    component={Link}
+                                    href={`/catalog/products/${product.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setSaveMenuAnchor(null)}
+                                >
+                                    <VisibilityIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                    {t('viewProduct')}
+                                </MenuItem>
+                            </Menu>
                         </Stack>
                     </Stack>
                 </Box>
@@ -1705,6 +1837,30 @@ export default function ProductEdit({
                     เลยโชว์ตลอดโดยไม่ต้องใช้ sticky positioning หรือคำนวณความสูง
                     header ตอน runtime เลย */}
                 <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
+                    {/* พบร่างที่ useDraftAutosave เก็บไว้ใน localStorage จากรอบก่อน (เช่น
+                        โดน logout กะทันหันตอนสิทธิ์เปลี่ยนกลางคัน) — ถามก่อนเสมอ ไม่กู้คืน
+                        ให้อัตโนมัติ เผื่อข้อมูลในระบบเปลี่ยนไปแล้วตั้งแต่ตอนนั้น */}
+                    {draftPrompt && (
+                        <Box sx={{ px: { xs: 2, md: 4 }, mb: 3 }}>
+                            <FioriMessageStrip severity="warning">
+                                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+                                    {t('autosaveDraftFoundTitle')}
+                                </Typography>
+                                <Typography variant="body2" sx={{ mb: 1 }}>
+                                    {t('autosaveDraftFoundMessage', { time: new Date(draftPrompt.savedAt).toLocaleString() })}
+                                </Typography>
+                                <Stack direction="row" spacing={1}>
+                                    <Button size="small" variant="contained" color="inherit" onClick={restoreDraft}>
+                                        {t('restoreDraft')}
+                                    </Button>
+                                    <Button size="small" variant="outlined" color="inherit" onClick={discardDraft}>
+                                        {t('discardDraft')}
+                                    </Button>
+                                </Stack>
+                            </FioriMessageStrip>
+                        </Box>
+                    )}
+
                     {/* Optimistic-concurrency conflict — แยกจากกล่อง error ทั่วไปด้านล่าง
                         เพราะกรณีนี้ "แก้ให้ถูกแล้วกดใหม่" ใช้ไม่ได้ ต้องโหลดหน้าใหม่ก่อน
                         ถึงจะเห็นข้อมูลล่าสุดจริงๆ เลยมีปุ่ม Reload ต่างหากให้ ไม่ใช่แค่ข้อความเฉยๆ */}
@@ -2439,10 +2595,19 @@ export default function ProductEdit({
                                                                         // เท่านั้นถึงจะมี Push/Deactivate — ร้านบน platform ที่ยังไม่ได้
                                                                         // เชื่อมต่อ (หรือจะเชื่อมในอนาคต) ก็ยังตั้ง "published" ได้
                                                                         // (แค่ติ๊ก checkbox) โดยไม่มี API จริงให้ push
+                                                                        // แยกสิทธิ์ push/deactivate ต่อแพลตฟอร์มแล้ว (marketplace_{platform}.
+                                                                        // push_products_{platform} — ดู ProductController::buildProductFormProps())
+                                                                        // คนละสิทธิ์กับ canEditSalesChannels ที่คุมแค่การติ๊ก/บันทึก published
+                                                                        // ข้างบน — role ที่แก้ published_shop_ids ได้ อาจ push ได้แค่บาง
+                                                                        // แพลตฟอร์มเท่านั้นก็ได้
+                                                                        const canPushThisPlatform = Boolean(
+                                                                            canPushProducts[group.platform.toLowerCase() as keyof typeof canPushProducts],
+                                                                        );
                                                                         const canPushOrDeactivate =
                                                                             published &&
                                                                             savedPublished &&
-                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES;
+                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES &&
+                                                                            canPushThisPlatform;
                                                                         // มีแค่ทิศทาง "ติ๊กแล้วแต่ยังไม่ได้ save" เท่านั้นที่ควรมี hint เตือน
                                                                         // — เพราะเป็นเคสเดียวที่ปุ่ม push/deactivate จะดูเหมือนใช้ได้แต่จริงๆ
                                                                         // ยังใช้ไม่ได้ ส่วนทิศทางตรงข้าม (ติ๊กออก) ไม่มี action ไหนถูกบล็อก
@@ -2688,6 +2853,50 @@ export default function ProductEdit({
                         sx={fioriEmphasizedSx}
                     >
                         {t('publish')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog ยืนยันก่อน Save Draft — ดู saveDraft()'s docblock */}
+            <Dialog open={saveDraftConfirmOpen} onClose={() => setSaveDraftConfirmOpen(false)}>
+                <DialogTitle>{t('confirmSaveDraft')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>{t('confirmSaveDraftMessage')}</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSaveDraftConfirmOpen(false)} color="inherit" disabled={processing}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={saveDraft}
+                        variant="contained"
+                        disabled={processing}
+                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <DraftsIcon fontSize="small" />}
+                        sx={fioriEmphasizedSx}
+                    >
+                        {t('saveDraft')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog ยืนยันก่อน Save as Template — ดู saveAsTemplate()'s docblock */}
+            <Dialog open={saveAsTemplateConfirmOpen} onClose={() => setSaveAsTemplateConfirmOpen(false)}>
+                <DialogTitle>{t('confirmSaveAsTemplate')}</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>{t('confirmSaveAsTemplateMessage')}</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSaveAsTemplateConfirmOpen(false)} color="inherit" disabled={processing || duplicating}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        onClick={saveAsTemplate}
+                        variant="contained"
+                        disabled={processing || duplicating}
+                        startIcon={processing || duplicating ? <CircularProgress size={16} color="inherit" /> : <ContentCopyIcon fontSize="small" />}
+                        sx={fioriEmphasizedSx}
+                    >
+                        {t('saveAsTemplate')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -3006,7 +3215,13 @@ export default function ProductEdit({
 // แบบแบนๆ ของ path เดิมที่เก็บไว้ / ไฟล์ที่เพิ่งเลือกใหม่
 function parseGalleryItems(value: AttributeValue): (string | File)[] {
     if (Array.isArray(value)) {
-        return value;
+        // ปกติค่านี้ควรมีแค่ string (path เดิม) กับ File (เพิ่งเลือกใหม่รอ upload)
+        // แต่ draft ที่กู้คืนจาก useDraftAutosave (localStorage) อาจมี null ปนมา
+        // ได้ — File ไม่รอดการ JSON.stringify เลยถูกแทนด้วย null ไว้ก่อนบันทึก
+        // (ดู stripFiles ใน use-draft-autosave.ts) กรองทิ้งตรงนี้ ไม่งั้น null
+        // จะไหลไปถึง .map() ของแกลเลอรีด้านล่าง (พังตอนคำนวณ key จาก item.name)
+        // และ GalleryThumb (พังตอน URL.createObjectURL(null))
+        return value.filter((item): item is string | File => typeof item === 'string' || item instanceof File);
     }
     if (typeof value === 'string' && value) {
         try {

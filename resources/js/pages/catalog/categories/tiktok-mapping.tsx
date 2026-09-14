@@ -108,8 +108,11 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canEditBrands = permissions.includes('brands.edit_brands');
-    const canEditAttributes = permissions.includes('attributes.edit_attributes');
+    // แยกสิทธิ์ต่อแพลตฟอร์มแล้ว (marketplace_tiktok.edit_brand_mapping_tiktok /
+    // edit_attribute_mapping_tiktok) — ไม่ได้พ่วงกับ brands.edit_brands /
+    // attributes.edit_attributes ทั่วไปอีกต่อไป (ดู routes/catalog.php)
+    const canEditBrands = permissions.includes('marketplace_tiktok.edit_brand_mapping_tiktok');
+    const canEditAttributes = permissions.includes('marketplace_tiktok.edit_attribute_mapping_tiktok');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },

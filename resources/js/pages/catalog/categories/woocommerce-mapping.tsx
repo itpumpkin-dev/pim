@@ -98,7 +98,9 @@ export default function WoocommerceCategoryMapping({ categories, stats, lastSync
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canEditBrands = permissions.includes('brands.edit_brands');
+    // แยกสิทธิ์ต่อแพลตฟอร์มแล้ว (marketplace_woocommerce.edit_brand_mapping_woocommerce)
+    // — ไม่ได้พ่วงกับ brands.edit_brands ทั่วไปอีกต่อไป (ดู routes/catalog.php)
+    const canEditBrands = permissions.includes('marketplace_woocommerce.edit_brand_mapping_woocommerce');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },

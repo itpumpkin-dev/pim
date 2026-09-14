@@ -2387,6 +2387,19 @@ class ProductController extends Controller
             // catalog.php ตรง updateChannels()/push-*/deactivate-*/*-status ทุกตัว
             'canViewSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'view_sales_channels') ?? false,
             'canEditSalesChannels' => auth()->user()?->hasPermission('sales_channels', 'edit_sales_channels') ?? false,
+            // Push/Deactivate/Delete-listing/status-check ต่อแพลตฟอร์ม (routes/
+            // catalog.php's push-{platform}/deactivate-{platform}/{platform}-status/
+            // delete-shopee) แยกสิทธิ์ของตัวเองต่อแพลตฟอร์มแล้ว (marketplace_{platform}.
+            // push_products_{platform}) ไม่ได้พ่วงกับ sales_channels,edit_sales_channels
+            // ทั่วไปข้างบนอีกต่อไป — canEditSalesChannels ยังคุมแค่การติ๊ก/บันทึกว่า
+            // ช่องทางไหน "published" อยู่ (ข้ามแพลตฟอร์มในคำขอเดียว แยกไม่ได้) ส่วน flag
+            // ต่อแพลตฟอร์มพวกนี้คุมว่าไอคอน push/deactivate ของแต่ละแพลตฟอร์มกดได้จริงไหม
+            'canPushProducts' => [
+                'lazada' => auth()->user()?->hasPermission('marketplace_lazada', 'push_products_lazada') ?? false,
+                'shopee' => auth()->user()?->hasPermission('marketplace_shopee', 'push_products_shopee') ?? false,
+                'tiktok' => auth()->user()?->hasPermission('marketplace_tiktok', 'push_products_tiktok') ?? false,
+                'woocommerce' => auth()->user()?->hasPermission('marketplace_woocommerce', 'push_products_woocommerce') ?? false,
+            ],
             // แผง "Master Categories" (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) มีสิทธิ์ "แก้ไข"
             // แยกของตัวเอง (resource `master_categories`) ไม่ได้พ่วงกับ
             // products.edit_products ทั่วไปอีกต่อไป — ดู routes/catalog.php ตรง

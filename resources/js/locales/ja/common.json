@@ -1,7 +1,7 @@
 {
     "language": "言語",
     "toggleSidebar": "サイドバーを切り替え",
-    "permissionsChangedLoggingOut": "あなたのアクセス権限が変更されました。少々お待ちください — 次にログインしてください.",
+    "permissionsChangedLoggingOut": "アクセス権限が変更されました。未保存の作業は自動的に下書きとして保存されました。まもなくログアウトされます。再度ログインしてください。",
     "packLabel": "{{qty}} {{unit}}/パック",
     "exportThisProduct": "この商品をエクスポート",
     "settings": "設定",

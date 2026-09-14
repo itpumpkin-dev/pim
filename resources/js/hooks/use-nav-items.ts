@@ -151,14 +151,15 @@ export function useMainNavItems(): NavItem[] {
                                 // platform-hub.tsx) ที่โชว์การ์ดทั้ง 3 อัน (จับคู่หมวดหมู่/จับคู่
                                 // ข้อมูลส่ง/ตั้งค่าการเชื่อมต่อ) พร้อมกันในที่เดียว แทนที่จะต้องไล่
                                 // เปิดเมนูย่อยทีละชั้น — สิทธิ์เข้าถึงแต่ละการ์ดยังเช็คที่หน้า
-                                // ปลายทางเหมือนเดิม (การ์ดจะซ่อนเองถ้าไม่มีสิทธิ์) เข้าหน้า hub เองได้
-                                // เสมอ (ไม่มีสิทธิ์เฉพาะของหน้า hub — เหมือนกับที่ marketplace/
-                                // connect/{platform} เดิมก็ไม่มีสิทธิ์เฉพาะของตัวเองเช่นกัน)
+                                // ปลายทางเหมือนเดิม (การ์ดจะซ่อนเองถ้าไม่มีสิทธิ์) ส่วนตัวลิงก์เมนูนี้
+                                // เอง (และหน้า hub ที่มันพาไป) ตอนนี้มีสิทธิ์ของตัวเองแยกต่อแพลตฟอร์ม
+                                // แล้ว (marketplace_{platform}.list_marketplace_{platform} — ดู
+                                // routes/catalog.php) แทนที่จะแชร์ products.list_products เหมือนเดิม
                                 title: t('marketplace'),
                                 items: (['shopee', 'lazada', 'tiktok', 'woocommerce'] as const).map((platform) => ({
                                     title: platform === 'woocommerce' ? 'WooCommerce' : platform.charAt(0).toUpperCase() + platform.slice(1),
                                     url: `/catalog/marketplace/${platform}`,
-                                    permission: 'products.list_products',
+                                    permission: `marketplace_${platform}.list_marketplace_${platform}`,
                                     // การ์ดบนหน้า hub พาไปหน้าจริงที่ไม่ได้อยู่ใต้
                                     // /catalog/marketplace/{platform}/ ทุกอัน (เช่น หน้าจับคู่
                                     // หมวดหมู่อยู่คนละ path เลย) — ต้องระบุ matchUrls ตรงๆ ไม่งั้น

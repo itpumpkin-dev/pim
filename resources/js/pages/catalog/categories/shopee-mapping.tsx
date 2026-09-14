@@ -105,13 +105,14 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const { t: tGrid } = useTranslation('grid');
 
     // ตาราง Shopee Brands ด้านล่าง (sync + PIM mapping ของหมวดหมู่ที่เลือกอยู่)
-    // เขียนข้อมูลแบรนด์ ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วย brands.edit_brands
-    // เหมือนหน้า brand mapping แยกต่างหากตัวเก่า แม้ตอนนี้ทั้งสองอย่างจะย้ายมาอยู่
-    // ในหน้าเดียวกันที่ gate ด้วย categories.edit_categories แล้วก็ตาม
+    // เขียนข้อมูลแบรนด์ ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วยสิทธิ์แยกของตัวเอง
+    // (marketplace_shopee.edit_brand_mapping_shopee / edit_attribute_mapping_shopee)
+    // ไม่ได้พ่วงกับ brands.edit_brands / attributes.edit_attributes ทั่วไป หรือ
+    // categories.edit_categories ที่ gate ทั้งหน้านี้อีกต่อไป (ดู routes/catalog.php)
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canEditBrands = permissions.includes('brands.edit_brands');
-    const canEditAttributes = permissions.includes('attributes.edit_attributes');
+    const canEditBrands = permissions.includes('marketplace_shopee.edit_brand_mapping_shopee');
+    const canEditAttributes = permissions.includes('marketplace_shopee.edit_attribute_mapping_shopee');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
