@@ -3502,6 +3502,44 @@ class ProductController extends Controller
     }
 
     /**
+     * Toggle-publish สำหรับ "ร้านเดียว" — ต่างจาก updateChannels()/publish()
+     * ด้านบนตรงที่ทั้งคู่ sync() ทั้งชุด (แทนที่รายชื่อร้านที่ publish ไว้ทั้งหมด
+     * ในคำขอเดียว) ซึ่งปลอดภัยก็ต่อเมื่อผู้เรียกรู้จัก published_shop_ids ของทุก
+     * platform พร้อมกัน (แบบที่ edit.tsx's Sales Channels panel ทำ) — endpoint
+     * นี้มีไว้ให้หน้า marketplace hub ของแต่ละ platform (lazada-products.tsx/
+     * shopee-products.tsx/tiktok-products.tsx's quick-view sidebar) ที่รู้จัก
+     * แค่ร้านของ platform เดียวเรียกได้อย่างปลอดภัย — ถ้าเรียก sync() จากตรงนั้น
+     * จะไป detach ร้านของ platform อื่นที่ไม่ได้ส่งมาด้วยโดยไม่ตั้งใจ (เช่น เปิด
+     * หน้า Lazada hub แล้วติ๊ก publish ร้าน Lazada จะเผลอไป unpublish ร้าน Shopee/
+     * TikTok ของสินค้าเดียวกันไปด้วย) ตัวนี้แก้แค่ร้านเดียวที่ระบุ (attach/detach)
+     * ไม่แตะ pivot row ของร้านอื่นเลย
+     */
+    public function toggleShopPublished(Request $request, Product $product, SalesPlatformShop $shop): JsonResponse
+    {
+        $validated = $request->validate([
+            'published' => ['required', 'boolean'],
+        ]);
+
+        $wasPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
+
+        if ($validated['published'] && ! $wasPublished) {
+            $product->platformShops()->attach($shop->id);
+        } elseif (! $validated['published'] && $wasPublished) {
+            $product->platformShops()->detach($shop->id);
+        }
+
+        if ($validated['published'] !== $wasPublished) {
+            AuditLog::record('published_shops_updated', $product, ['shop_id' => $shop->id, 'published' => $wasPublished], ['shop_id' => $shop->id, 'published' => $validated['published']]);
+            // sync()/attach()/detach() แตะแค่ pivot table เฉยๆ ไม่ทำให้
+            // products.updated_at ขยับเอง — ดูเหตุผลเดียวกับ updateChannels()
+            // ด้านบน (OCC check ของฟอร์มใหญ่ต้องรู้ว่ามีการเปลี่ยนแปลงเกิดขึ้น)
+            $product->touch();
+        }
+
+        return response()->json(['published' => $validated['published']]);
+    }
+
+    /**
      * ปุ่ม "Publish" ใน toolbar ของหน้า Edit — ยุบขั้นตอนที่ปกติต้องทำแยกกัน
      * หลายคลิก (ติ๊ก Sales Channel → กด Save แผงนั้น (updateChannels() ด้านบน)
      * → ไล่กด Push ทีละร้าน) ให้เหลือคลิกเดียว: ตั้ง enabled=true, sync

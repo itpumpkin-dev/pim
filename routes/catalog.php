@@ -72,6 +72,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // view_sales_channels พอ ส่วนที่ push/deactivate/toggle จริงต้อง
     // edit_sales_channels
     Route::put('products/{product}/channels', [ProductController::class, 'updateChannels'])->name('products.updateChannels')->middleware('permission:sales_channels,edit_sales_channels');
+    // Toggle ร้านเดียว — ปลอดภัยให้เรียกจากหน้าที่รู้ scope แค่ platform เดียว
+    // (marketplace hub ของแต่ละ platform) ต่างจาก updateChannels() ด้านบนตรงที่
+    // ไม่ sync() ทั้งชุด (ดู ProductController::toggleShopPublished()'s docblock)
+    Route::post('products/{product}/shops/{shop}/toggle-published', [ProductController::class, 'toggleShopPublished'])->name('products.toggleShopPublished')->middleware('permission:sales_channels,edit_sales_channels');
     // ปุ่ม "Publish" ของ toolbar หน้า Edit — ตั้ง enabled=true + sync/push
     // Sales Channels ในคำขอเดียว ใช้สิทธิ์เดียวกับ endpoint อื่นๆ ของแผงนี้
     // ด้านล่าง (sales_channels,edit_sales_channels) — ส่วน products,edit_products
@@ -126,12 +130,23 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('marketplace/shopee/attribute-mapping', [MarketplaceAttributeMappingController::class, 'shopee'])->name('marketplace.shopee.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/lazada/products', [LazadaAttributeMappingController::class, 'lazadaProducts'])->name('marketplace.lazada.products')->middleware('permission:products,list_products');
     Route::get('marketplace/lazada/products/{product}/detail', [LazadaAttributeMappingController::class, 'productDetail'])->name('marketplace.lazada.products.detail')->middleware('permission:products,list_products');
+    // ปุ่ม "แนะนำหมวดหมู่จาก Lazada" ของ Section 1 (Category Mapping) —
+    // สิทธิ์เดียวกับที่ใช้บันทึกการแมป (categories,edit_categories) เพราะเป็น
+    // ส่วนหนึ่งของ workflow เดียวกัน ไม่ใช่แค่ดูข้อมูล
+    Route::get('marketplace/lazada/products/{product}/category-suggestions', [LazadaAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.lazada.products.categorySuggestions')->middleware('permission:categories,edit_categories');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');
+    // ปุ่ม "แนะนำหมวดหมู่จาก Shopee" ของ Section 1 (Category Mapping) — mirror
+    // ของ marketplace.lazada.products.categorySuggestions เป๊ะ เหตุผลสิทธิ์
+    // เดียวกัน (เป็นส่วนหนึ่งของ workflow แมปหมวดหมู่ ไม่ใช่แค่ดูข้อมูล)
+    Route::get('marketplace/shopee/products/{product}/category-suggestions', [ShopeeAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.shopee.products.categorySuggestions')->middleware('permission:categories,edit_categories');
     Route::get('marketplace/lazada/attribute-mapping', [MarketplaceAttributeMappingController::class, 'lazada'])->name('marketplace.lazada.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/tiktok/attribute-mapping', [MarketplaceAttributeMappingController::class, 'tiktok'])->name('marketplace.tiktok.attributeMapping')->middleware('permission:attributes,edit_attributes');
     Route::get('marketplace/tiktok/products', [TikTokAttributeMappingController::class, 'tiktokProducts'])->name('marketplace.tiktok.products')->middleware('permission:products,list_products');
     Route::get('marketplace/tiktok/products/{product}/detail', [TikTokAttributeMappingController::class, 'productDetail'])->name('marketplace.tiktok.products.detail')->middleware('permission:products,list_products');
+    // ปุ่ม "แนะนำหมวดหมู่จาก TikTok" ของ Section 1 (Category Mapping) — mirror
+    // ของ marketplace.lazada/shopee.products.categorySuggestions เป๊ะ
+    Route::get('marketplace/tiktok/products/{product}/category-suggestions', [TikTokAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.tiktok.products.categorySuggestions')->middleware('permission:categories,edit_categories');
     Route::post('attributes/woocommerce-mapping', [WooCommerceAttributeMappingController::class, 'update'])->name('attributes.saveWoocommerceMapping')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/woocommerce-mapping/sync', [WooCommerceAttributeMappingController::class, 'syncWoocommerceAttributes'])->name('attributes.syncWoocommerceAttributes')->middleware('permission:attributes,edit_attributes');
     Route::get('attributes/woocommerce-mapping/attributes-list', [WooCommerceAttributeMappingController::class, 'woocommerceAttributesList'])->name('attributes.woocommerceAttributesList')->middleware('permission:attributes,edit_attributes');

@@ -63,6 +63,29 @@ class ShopeeClient
     }
 
     /**
+     * v2.product.category_recommend — GET /api/v2/product/category_recommend.
+     * Recommends leaf category ids for a product from its item name —
+     * Shopee's equivalent of Lazada's `/product/category/suggestion/get`.
+     *
+     * Confirmed against Shopee's real docs page for this exact endpoint
+     * (2026-09): path is `category_recommend`, NOT `get_category_recommend`
+     * — an earlier guess at this same feature used the wrong path and a
+     * live call correctly 404'd on it. `item_name` is the only required
+     * param; `product_cover_image` is optional (an image_id from
+     * uploadImage(), NOT a URL — the docs say Shopee "will ignore if this
+     * field is empty string", so omit it rather than pass a bogus value)
+     * and is not sent here since callers only have a product name at this
+     * point. Response shape per the docs: `response.category_id` is a flat
+     * int[] of category ids, no name/path attached (unlike Lazada's
+     * suggestion response) — the caller must resolve name/path itself from
+     * the locally-synced shopee_categories table.
+     */
+    public function getCategoryRecommend(string $itemName): array
+    {
+        return $this->request('/api/v2/product/category_recommend', ['item_name' => $itemName]);
+    }
+
+    /**
      * v2.product.get_brand_list — GET /api/v2/product/get_brand_list. Some
      * categories mandate add_item's `brand` object (confirmed live,
      * 2026-08-14: product.error_invalid_brand — "Brand information

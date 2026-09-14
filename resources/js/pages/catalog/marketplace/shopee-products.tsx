@@ -23,6 +23,7 @@ import {
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -32,7 +33,9 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
+import PublishIcon from '@mui/icons-material/Publish';
 import SearchIcon from '@mui/icons-material/Search';
+import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import SyncIcon from '@mui/icons-material/Sync';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
@@ -40,6 +43,7 @@ import {
     Box,
     Button,
     Checkbox,
+    Chip,
     CircularProgress,
     Dialog,
     DialogActions,
@@ -119,9 +123,13 @@ interface ProductDetailSyncHistoryRow {
     created_at: string;
 }
 
+/** ทุกร้าน Shopee ที่มีในระบบ (ไม่ใช่แค่ร้านที่สินค้านี้ publish อยู่แล้ว) — ให้แท็บ "ร้านค้า" ติ๊ก publish/push/deactivate ได้เองในที่เดียว */
 interface ProductDetailShop {
     id: number;
     name: string;
+    published: boolean;
+    is_live: boolean;
+    last_synced_at: string | null;
 }
 
 interface ProductDetailPlatformField {
@@ -144,7 +152,7 @@ interface ProductDetailData {
     platform_fields: ProductDetailPlatformField[];
     platform_images: string[];
     sync_history: ProductDetailSyncHistoryRow[];
-    published_shopee_shops: ProductDetailShop[];
+    shopee_shops: ProductDetailShop[];
 }
 
 interface PaginatedData<T> {
@@ -159,6 +167,8 @@ interface Props {
     products: PaginatedData<ProductRow>;
     stats: { total: number; mapped: number; unmapped: number };
     filters: { filter: ProductFilter; search: string; per_page: number };
+    /** ทุกร้าน Shopee ในระบบ — ใช้เป็นตัวเลือกใน dialog "Push ที่เลือก" (bulk) ด้านล่างตาราง */
+    shopeeShops: { id: number; name: string }[];
 }
 
 /** ป้ายภาษาไทยของ ProductMarketplaceSyncJob.action/.status — ใช้ในแท็บ "ประวัติ Sync" ของ quick-view sidebar เท่านั้น — mirror ของ lazada-products.tsx */
@@ -242,7 +252,7 @@ interface PayloadFieldRow {
 // mirror ของ lazada-products.tsx เป๊ะ
 const SECTION_SCROLL_MARGIN = 72;
 
-export default function ShopeeProductsMapping({ products, stats, filters }: Props) {
+export default function ShopeeProductsMapping({ products, stats, filters, shopeeShops }: Props) {
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
 
@@ -250,6 +260,12 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
     const [perPage, setPerPage] = useState<number>(products.per_page ?? 25);
     const [selectedRows, setSelectedRows] = useState<number[]>([]);
+    // Bulk "Push ที่เลือก" — เรียก ProductController::pushBulk() ตัวเดียวกับที่
+    // products/index.tsx's "Share" dialog ใช้ (ดู index.tsx's shareSelectedProducts())
+    // แค่เปิดทางลัดให้กดจากหน้านี้ได้เลย ไม่ต้องสลับไปหน้า list สินค้าทั่วไปก่อน
+    const [bulkPushDialogOpen, setBulkPushDialogOpen] = useState(false);
+    const [bulkPushShopId, setBulkPushShopId] = useState<number | ''>('');
+    const [bulkPushing, setBulkPushing] = useState(false);
     const firstRender = useRef(true);
 
     // Active product being viewed as an Object Page (null = list view)
@@ -264,12 +280,29 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     const [detailData, setDetailData] = useState<ProductDetailData | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [detailTab, setDetailTab] = useState(0);
-    const [detailPushing, setDetailPushing] = useState(false);
-    const [detailPushConfirmOpen, setDetailPushConfirmOpen] = useState(false);
     const [detailPushResult, setDetailPushResult] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
+    // ร้านที่กำลัง push/deactivate อยู่ตอนนี้ (null = ไม่มี) — ทำได้ทีละร้านเท่านั้น
+    // ต่อ 1 sidebar (ปุ่มร้านอื่นๆ ใน "แท็บร้านค้า" ยัง disabled ไม่ได้ระหว่างนี้)
+    const [actingShopId, setActingShopId] = useState<number | null>(null);
+    // ร้านที่กำลังติ๊ก publish/unpublish อยู่ (แยกจาก actingShopId — คนละ action)
+    const [togglingShopId, setTogglingShopId] = useState<number | null>(null);
+    // confirm dialog ก่อน push/deactivate จริง — เก็บทั้งร้านและ action ไว้ในก้อน
+    // เดียว (ต่างจากเดิมที่ hardcode ไว้แค่ "ร้านเดียว, push อย่างเดียว")
+    const [shopActionConfirm, setShopActionConfirm] = useState<{ shopId: number; shopName: string; action: 'push' | 'deactivate' } | null>(null);
+    // ผลเช็คสถานะ live ล่าสุดของร้านที่กำลังจะ confirm อยู่ — โชว์ในตัว dialog
+    // เดียวกับที่ products/edit.tsx's push-confirm dialog ทำ (เตือน "ยังไม่เคย push"/
+    // "live อยู่แล้ว จะอัปเดต" ก่อนกดยืนยันจริง)
+    const [shopStatusCheck, setShopStatusCheck] = useState<{
+        shopId: number;
+        loading: boolean;
+        is_live?: boolean;
+        never_pushed?: boolean;
+        status?: string | null;
+        error?: string;
+    } | null>(null);
 
     // สินค้าที่ drawer "กำลังเปิดดูอยู่จริง" ตอนนี้ — แยกจาก detailProductId (state)
-    // เพราะ closure ของ pollDetailPushStatus/refreshDetail ด้านล่างถูกสร้างไว้
+    // เพราะ closure ของ pollShopActionStatus/refreshDetail ด้านล่างถูกสร้างไว้
     // ตอน push ครั้งนั้นๆ (จำ productId เดิมไว้ใน closure) ถ้าผู้ใช้ปิด drawer แล้ว
     // เปิดสินค้าอื่นก่อน poll รอบเก่าจะ resolve, poll รอบเก่าจะยังทำงานต่อและเผลอ
     // เอาผลของสินค้าเก่าไปทับ state ของสินค้าใหม่ที่กำลังโชว์อยู่ — เช็ค ref นี้
@@ -283,11 +316,12 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         setDetailData(null);
         setDetailTab(0);
         setDetailPushResult(null);
-        // เผื่อสินค้าตัวก่อนหน้ายังมี poll ค้างอยู่ตอนสลับมาที่นี่ — รีเซ็ตปุ่ม
-        // push ของ sidebar ใหม่ให้เริ่มจากสถานะปกติเสมอ ไม่ใช่ค้าง "กำลังส่ง..."
-        // ต่อจากสินค้าเดิม
-        setDetailPushing(false);
-        setDetailPushConfirmOpen(false);
+        // เผื่อสินค้าตัวก่อนหน้ายังมี poll ค้างอยู่ตอนสลับมาที่นี่ — รีเซ็ตสถานะ
+        // ปุ่มต่างๆ ของ sidebar ใหม่ให้เริ่มจากปกติเสมอ ไม่ใช่ค้างจากสินค้าเดิม
+        setActingShopId(null);
+        setTogglingShopId(null);
+        setShopActionConfirm(null);
+        setShopStatusCheck(null);
         setLoadingDetail(true);
         fetch(`/catalog/marketplace/shopee/products/${productId}/detail`, { headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
@@ -311,8 +345,8 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     };
 
     // เรียกใหม่แบบเงียบๆ (ไม่เคลียร์ detailData/เปิด loading spinner ก่อน) —
-    // ใช้หลัง push เสร็จ เพื่อให้ค่า attribute/ประวัติ sync ที่โชว์อยู่ใน drawer
-    // อัปเดตเป็นสถานะล่าสุดโดยไม่กระพริบทั้ง panel
+    // ใช้หลัง toggle publish/push เสร็จ เพื่อให้ค่า attribute/ประวัติ sync/สถานะ
+    // ร้านที่โชว์อยู่ใน drawer อัปเดตเป็นสถานะล่าสุดโดยไม่กระพริบทั้ง panel
     const refreshDetail = (productId: number) => {
         fetch(`/catalog/marketplace/shopee/products/${productId}/detail`, { headers: { Accept: 'application/json' } })
             .then((res) => (res.ok ? res.json() : null))
@@ -323,10 +357,69 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
             });
     };
 
+    // ปุ่ม checkbox publish/unpublish ต่อร้านใน "แท็บร้านค้า" — เขียนผ่าน
+    // ProductController::toggleShopPublished() (endpoint ใหม่ที่ปลอดภัยให้เรียก
+    // จากหน้าที่รู้จักแค่ร้านของ platform เดียว ต่างจาก updateChannels() ที่
+    // sync() ทั้งชุดของทุก platform) แล้ว refresh sidebar เงียบๆ
+    const toggleShopPublished = (shopId: number, published: boolean) => {
+        const productId = detailProductId;
+        if (!productId) return;
+        setTogglingShopId(shopId);
+        fetch(`/catalog/products/${productId}/shops/${shopId}/toggle-published`, {
+            method: 'POST',
+            headers: { 'X-XSRF-TOKEN': xsrfToken(), 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ published }),
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error();
+                if (detailProductIdRef.current === productId) {
+                    refreshDetail(productId);
+                    router.reload({ only: ['products'] });
+                }
+            })
+            .catch(() => {
+                if (detailProductIdRef.current === productId) {
+                    setDetailPushResult({ severity: 'error', message: 'บันทึกสถานะ publish ไม่สำเร็จ' });
+                }
+            })
+            .finally(() => {
+                if (detailProductIdRef.current === productId) {
+                    setTogglingShopId(null);
+                }
+            });
+    };
+
+    // เหมือน checkPlatformStatus() ของ products/edit.tsx — เรียกทันทีที่เปิด
+    // confirm dialog ของร้านหนึ่งๆ เพื่อโชว์สถานะ live สดๆ ก่อนกดยืนยันจริง
+    const checkShopStatus = (productId: number, shopId: number) => {
+        setShopStatusCheck({ shopId, loading: true });
+        fetch(`/catalog/products/${productId}/shopee-status/${shopId}`, { headers: { Accept: 'application/json' } })
+            .then(async (res) => {
+                const body = await res.json();
+                // เช็ค detailProductIdRef ก่อน setState เสมอ เหมือน fetch handler อื่นๆ
+                // ในไฟล์นี้ — ไม่งั้นถ้าปิด drawer แล้วเปิดสินค้าอื่นที่มีร้านเดียวกัน
+                // (shopId ซ้ำ) ก่อน response เก่าจะกลับมา ผลเช็คสถานะของสินค้าเก่าจะ
+                // ทับ state ของสินค้าใหม่ที่กำลังเปิด confirm dialog อยู่ (บั๊กที่เจอ
+                // จาก code review — mirror ของ lazada-products.tsx's fix เป๊ะ)
+                if (detailProductIdRef.current !== productId) return;
+                setShopStatusCheck(res.ok ? { shopId, loading: false, ...body } : { shopId, loading: false, error: body.message });
+            })
+            .catch(() => {
+                if (detailProductIdRef.current !== productId) return;
+                setShopStatusCheck({ shopId, loading: false, error: 'ตรวจสอบสถานะไม่สำเร็จ' });
+            });
+    };
+
+    const openShopActionConfirm = (shopId: number, shopName: string, action: 'push' | 'deactivate') => {
+        if (!detailProductId) return;
+        setShopActionConfirm({ shopId, shopName, action });
+        checkShopStatus(detailProductId, shopId);
+    };
+
     // Poll เดียวกับที่ products/edit.tsx ทำ (SyncProductToMarketplaceJob ทำงาน
     // เป็น background job — ดู ProductController::queueMarketplaceSync()) แค่
     // เขียนแยกชุดเองที่นี่เพราะหน้านี้ไม่มี state ของ push dialog ชุดเดิมให้ใช้ร่วม
-    const pollDetailPushStatus = (productId: number, jobId: number, attempts = 0) => {
+    const pollShopActionStatus = (productId: number, jobId: number, shopId: number, attempts = 0) => {
         // drawer ย้ายไปสินค้าอื่น (หรือปิดไปแล้ว) ตั้งแต่ก่อนจะยิง request รอบนี้ด้วยซ้ำ
         // — หยุดเงียบๆ ไม่ต้อง setState หรือ schedule รอบถัดไปอีกเลย
         if (detailProductIdRef.current !== productId) return;
@@ -338,48 +431,49 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
 
                 if (!res.ok) {
                     setDetailPushResult({ severity: 'error', message: body.message ?? 'ตรวจสอบสถานะไม่สำเร็จ' });
-                    setDetailPushing(false);
+                    setActingShopId(null);
                     return;
                 }
                 if (body.status === 'completed') {
                     setDetailPushResult({ severity: 'success', message: body.message });
-                    setDetailPushing(false);
+                    setActingShopId(null);
                     refreshDetail(productId);
                     router.reload({ only: ['products'] });
                     return;
                 }
                 if (body.status === 'failed') {
                     setDetailPushResult({ severity: 'error', message: body.message ?? 'sync ไม่สำเร็จ' });
-                    setDetailPushing(false);
+                    setActingShopId(null);
                     return;
                 }
                 if (attempts >= 40) {
                     setDetailPushResult({ severity: 'error', message: 'ยังไม่เสร็จภายในเวลาที่กำหนด ตรวจสอบภายหลังที่หน้า Edit Product' });
-                    setDetailPushing(false);
+                    setActingShopId(null);
                     return;
                 }
-                setTimeout(() => pollDetailPushStatus(productId, jobId, attempts + 1), 1500);
+                setTimeout(() => pollShopActionStatus(productId, jobId, shopId, attempts + 1), 1500);
             })
             .catch(() => {
                 if (detailProductIdRef.current !== productId) return;
                 if (attempts >= 40) {
                     setDetailPushResult({ severity: 'error', message: 'เครือข่ายมีปัญหา ตรวจสอบภายหลัง' });
-                    setDetailPushing(false);
+                    setActingShopId(null);
                     return;
                 }
-                setTimeout(() => pollDetailPushStatus(productId, jobId, attempts + 1), 1500);
+                setTimeout(() => pollShopActionStatus(productId, jobId, shopId, attempts + 1), 1500);
             });
     };
 
-    const confirmDetailPush = () => {
-        if (!detailData || detailData.published_shopee_shops.length !== 1) return;
-        const productId = detailData.id;
-        const shopId = detailData.published_shopee_shops[0].id;
-        setDetailPushConfirmOpen(false);
-        setDetailPushing(true);
+    const confirmShopAction = () => {
+        if (!shopActionConfirm || !detailProductId) return;
+        const { shopId, action } = shopActionConfirm;
+        const productId = detailProductId;
+        const routeSegment = action === 'push' ? 'push-shopee' : 'deactivate-shopee';
+        setShopActionConfirm(null);
+        setActingShopId(shopId);
         setDetailPushResult(null);
 
-        fetch(`/catalog/products/${productId}/push-shopee/${shopId}`, {
+        fetch(`/catalog/products/${productId}/${routeSegment}/${shopId}`, {
             method: 'POST',
             headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
         })
@@ -387,16 +481,19 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                 if (detailProductIdRef.current !== productId) return;
                 const body = await res.json();
                 if (!res.ok || !body.job_id) {
-                    setDetailPushResult({ severity: 'error', message: body.message ?? 'ส่งไป Shopee ไม่สำเร็จ' });
-                    setDetailPushing(false);
+                    setDetailPushResult({
+                        severity: 'error',
+                        message: body.message ?? (action === 'push' ? 'ส่งไป Shopee ไม่สำเร็จ' : 'ปิดการขายบน Shopee ไม่สำเร็จ'),
+                    });
+                    setActingShopId(null);
                     return;
                 }
-                pollDetailPushStatus(productId, body.job_id);
+                pollShopActionStatus(productId, body.job_id, shopId);
             })
             .catch(() => {
                 if (detailProductIdRef.current !== productId) return;
                 setDetailPushResult({ severity: 'error', message: 'เกิดข้อผิดพลาดในการเชื่อมต่อ' });
-                setDetailPushing(false);
+                setActingShopId(null);
             });
     };
 
@@ -412,6 +509,15 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
     // การ sync ต้นไม้หมวดหมู่ได้เลยจาก UI (บั๊กที่เจอจากคำถามผู้ใช้)
     const [syncingCategoryTree, setSyncingCategoryTree] = useState(false);
     const [categorySyncMessage, setCategorySyncMessage] = useState<{ text: string; isError: boolean } | null>(null);
+    // "แนะนำหมวดหมู่จาก Shopee" — เรียก v2.product.category_recommend จริง (ดู
+    // ShopeeAttributeMappingController::categorySuggestions()) mirror ของ
+    // Lazada เป๊ะ แค่เสนอตัวเลือกให้กดเลือกแทนการเดินหา manual ใน
+    // MarketplaceCategoryPicker เอง — ไม่ได้บันทึกอะไรทันทีที่กด แค่ set
+    // selectedShopeeCatId (ค่าเดียวกับที่ picker เขียน) ผู้ใช้ยังต้องกด
+    // "บันทึก Category Mapping" ตามปกติเหมือนเดิม
+    const [categorySuggestions, setCategorySuggestions] = useState<{ category_id: number; name: string | null; path: string }[] | null>(null);
+    const [loadingCategorySuggestions, setLoadingCategorySuggestions] = useState(false);
+    const [categorySuggestionError, setCategorySuggestionError] = useState<string | null>(null);
 
     // Attribute mapping section state
     const [shopeeAttributes, setShopeeAttributes] = useState<ShopeeAttributeRow[] | null>(null);
@@ -519,6 +625,8 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         setFamilySyncError(null);
         setOptionMappingRow(null);
         setCategorySyncMessage(null);
+        setCategorySuggestions(null);
+        setCategorySuggestionError(null);
 
         if (product.category_mapped && product.shopee_category) {
             loadAttributes(product.shopee_category.id);
@@ -555,6 +663,22 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
         handleScroll();
         return () => scrollParent.removeEventListener('scroll', handleScroll);
     }, [activeProduct]);
+
+    // เรียกเฉพาะตอนกดปุ่มเอง (ไม่ auto-fetch ตอนเปิดสินค้า) เพราะเป็น live API
+    // call ไป Shopee จริงทุกครั้ง — เผื่อ rate limit เหมือนกับฝั่ง Lazada
+    const loadCategorySuggestions = () => {
+        if (!activeProduct) return;
+        setLoadingCategorySuggestions(true);
+        setCategorySuggestionError(null);
+        fetch(`/catalog/marketplace/shopee/products/${activeProduct.id}/category-suggestions`, { headers: { Accept: 'application/json' } })
+            .then(async (res) => {
+                const body = await res.json();
+                if (!res.ok) throw new Error(body.message ?? 'โหลดคำแนะนำไม่สำเร็จ');
+                setCategorySuggestions(body.data);
+            })
+            .catch((e: Error) => setCategorySuggestionError(e.message))
+            .finally(() => setLoadingCategorySuggestions(false));
+    };
 
     const saveCategoryMapping = () => {
         if (!activeProduct || !activeProduct.master_category || !selectedShopeeCatId) return;
@@ -771,6 +895,24 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
 
     const toggleSelectRow = (id: number) => {
         setSelectedRows((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    };
+
+    const confirmBulkPush = () => {
+        if (!bulkPushShopId || selectedRows.length === 0) return;
+        setBulkPushing(true);
+        router.post(
+            '/catalog/products/push-bulk',
+            { product_ids: selectedRows, shop_ids: [bulkPushShopId] },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setBulkPushDialogOpen(false);
+                    setBulkPushShopId('');
+                    setSelectedRows([]);
+                },
+                onFinish: () => setBulkPushing(false),
+            },
+        );
     };
 
     const columns: FioriResponsiveColumn<ProductRow>[] = [
@@ -1073,6 +1215,52 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                                             value={selectedShopeeCatId}
                                             onChange={setSelectedShopeeCatId}
                                         />
+                                    </Box>
+
+                                    {/* แนะนำหมวดหมู่จาก Shopee จริง (v2.product.category_recommend)
+                                    — เลือกจากชื่อสินค้าตัวนี้ กดแล้วแค่ตั้งค่า
+                                    selectedShopeeCatId เหมือน picker ด้านบน ยังต้อง
+                                    กด "บันทึก Category Mapping" ต่อเองเหมือนเดิม */}
+                                    <Box>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            disabled={loadingCategorySuggestions}
+                                            startIcon={loadingCategorySuggestions ? <CircularProgress size={14} /> : <AutoAwesomeIcon fontSize="small" />}
+                                            onClick={loadCategorySuggestions}
+                                            sx={fioriDefaultSx}
+                                        >
+                                            {loadingCategorySuggestions ? 'กำลังค้นหา...' : 'แนะนำหมวดหมู่จาก Shopee'}
+                                        </Button>
+
+                                        {categorySuggestionError && (
+                                            <Alert severity="warning" sx={{ mt: 1 }} onClose={() => setCategorySuggestionError(null)}>
+                                                {categorySuggestionError}
+                                            </Alert>
+                                        )}
+
+                                        {categorySuggestions && (
+                                            categorySuggestions.length === 0 ? (
+                                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 1 }}>
+                                                    Shopee ไม่มีคำแนะนำให้สำหรับสินค้านี้
+                                                </Typography>
+                                            ) : (
+                                                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1 }}>
+                                                    {categorySuggestions.map((s) => (
+                                                        <Chip
+                                                            key={s.category_id}
+                                                            label={s.path || s.name || String(s.category_id)}
+                                                            onClick={() => setSelectedShopeeCatId(s.category_id)}
+                                                            sx={
+                                                                selectedShopeeCatId === s.category_id
+                                                                    ? { bgcolor: FIORI.brand, color: '#fff', fontWeight: 600 }
+                                                                    : { bgcolor: FIORI.brandBg, color: FIORI.brand }
+                                                            }
+                                                        />
+                                                    ))}
+                                                </Stack>
+                                            )
+                                        )}
                                     </Box>
 
                                     <Box>
@@ -1615,6 +1803,22 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                         </Stack>
                     </Stack>
 
+                    {selectedRows.length > 0 && (
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{ px: 2, py: 1, bgcolor: FIORI.brandBg, borderTop: `1px solid ${FIORI.border}`, borderBottom: `1px solid ${FIORI.border}` }}
+                        >
+                            <Typography variant="body2" sx={{ color: FIORI.brand, fontWeight: 600 }}>
+                                เลือกอยู่ {selectedRows.length} รายการ
+                            </Typography>
+                            <Button size="small" variant="contained" startIcon={<PublishIcon fontSize="small" />} onClick={() => setBulkPushDialogOpen(true)} sx={fioriEmphasizedSx}>
+                                Push ที่เลือก
+                            </Button>
+                        </Stack>
+                    )}
+
                     <Divider sx={{ borderColor: FIORI.border }} />
 
                     {/* Data Table */}
@@ -1705,6 +1909,7 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                         <Tabs value={detailTab} onChange={(_, v) => setDetailTab(v)} sx={fioriTabsSx}>
                             <Tab label="Attribute" />
                             <Tab label="ข้อมูลสินค้า (Platform)" />
+                            <Tab label="ร้านค้า" />
                             <Tab label="ประวัติ Sync" />
                         </Tabs>
 
@@ -1829,6 +2034,74 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                                         </Stack>
                                     )}
                                 </>
+                            ) : detailTab === 2 ? (
+                                <Stack spacing={1}>
+                                    {detailData.shopee_shops.map((shop) => (
+                                        <Box
+                                            key={shop.id}
+                                            sx={{
+                                                p: 1.5,
+                                                border: `1px solid ${FIORI.border}`,
+                                                borderRadius: 1,
+                                                bgcolor: FIORI.surface,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={shop.published}
+                                                    disabled={togglingShopId === shop.id}
+                                                    onChange={() => toggleShopPublished(shop.id, !shop.published)}
+                                                />
+                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }} noWrap>
+                                                    {shop.name}
+                                                </Typography>
+                                                {shop.is_live && <FioriStatus label="Live" tone="success" />}
+                                            </Stack>
+                                            <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                                {shop.published && (
+                                                    <Tooltip title={`Push to ${shop.name}`}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                disabled={actingShopId === shop.id}
+                                                                onClick={() => openShopActionConfirm(shop.id, shop.name, 'push')}
+                                                            >
+                                                                {actingShopId === shop.id ? (
+                                                                    <CircularProgress size={16} />
+                                                                ) : (
+                                                                    <PublishIcon fontSize="small" />
+                                                                )}
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                )}
+                                                {shop.published && shop.is_live && (
+                                                    <Tooltip title={`Deactivate on ${shop.name}`}>
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                disabled={actingShopId === shop.id}
+                                                                onClick={() => openShopActionConfirm(shop.id, shop.name, 'deactivate')}
+                                                            >
+                                                                <UnpublishedIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
+                                                )}
+                                            </Stack>
+                                        </Box>
+                                    ))}
+                                    {detailData.shopee_shops.length === 0 && (
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                            ยังไม่มีร้าน Shopee เชื่อมต่อไว้ในระบบเลย
+                                        </Typography>
+                                    )}
+                                </Stack>
                             ) : (
                                 <Stack spacing={1.5}>
                                     {detailData.sync_history.length === 0 && (
@@ -1868,7 +2141,9 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                             )}
                         </Box>
 
-                        {/* Footer */}
+                        {/* Footer — ปุ่ม push/deactivate ย้ายไปอยู่ในแท็บ "ร้านค้า" แล้ว
+                        (รองรับได้หลายร้านพร้อมกัน) footer นี้เหลือแค่ทางลัดไปแก้
+                        ข้อมูลเต็มรูปแบบ/ปิด sidebar เท่านั้น */}
                         <Stack
                             direction="row"
                             spacing={1}
@@ -1879,54 +2154,225 @@ export default function ShopeeProductsMapping({ products, stats, filters }: Prop
                             <Button size="small" onClick={() => router.visit(`/catalog/products/${detailProductId}/edit`)} sx={fioriGhostSx}>
                                 แก้ไข
                             </Button>
-                            <Stack direction="row" spacing={1}>
-                                <Button size="small" onClick={closeDetail} sx={fioriGhostSx}>
-                                    ยกเลิก
-                                </Button>
-                                <Tooltip
-                                    title={
-                                        !detailData
-                                            ? ''
-                                            : detailData.published_shopee_shops.length === 0
-                                              ? 'สินค้านี้ยังไม่ได้ผูกกับร้าน Shopee ไหนเลย — ไปตั้งค่าที่หน้า Edit Product ก่อน'
-                                              : detailData.published_shopee_shops.length > 1
-                                                ? 'สินค้านี้ผูกกับหลายร้าน Shopee พร้อมกัน — ไปที่หน้า Edit Product เพื่อเลือก sync ทีละร้าน'
-                                                : ''
-                                    }
-                                >
-                                    <span>
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            disabled={!detailData || detailData.published_shopee_shops.length !== 1 || detailPushing}
-                                            onClick={() => setDetailPushConfirmOpen(true)}
-                                            startIcon={detailPushing ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                            sx={fioriEmphasizedSx}
-                                        >
-                                            {detailPushing ? 'กำลังส่ง...' : 'ส่งอนุมัติ & sync'}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
-                            </Stack>
+                            <Button size="small" onClick={closeDetail} sx={fioriGhostSx}>
+                                ปิด
+                            </Button>
                         </Stack>
                     </Box>
                 )}
             </Drawer>
 
-            <Dialog open={detailPushConfirmOpen} onClose={() => setDetailPushConfirmOpen(false)}>
-                <DialogTitle>ส่งไป Shopee?</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        การดำเนินการนี้จะสร้างหรืออัปเดตประกาศขายจริงบน Shopee สำหรับร้าน &quot;
-                        {detailData?.published_shopee_shops[0]?.name}&quot; — ลูกค้าจริงจะมองเห็นทันที
-                    </DialogContentText>
+            {/* Push = เปิดเป็นหน้า "ตรวจสอบข้อมูลก่อนส่ง" เต็มรูปแบบ (เหมือนหน้า view
+            product ย่อยๆ) เพราะกดครั้งเดียวมีผลจริงกับ listing บน Shopee เลย — ใช้
+            ข้อมูลชุดเดียวกับแท็บ Attribute/ข้อมูลสินค้า/รูปสินค้า มาเรียงต่อกันให้เห็น
+            "ทุกอย่างที่กำลังจะส่งไป" ในที่เดียว ไม่ต้องสลับแท็บเอง — Deactivate ไม่มี
+            อะไรให้ตรวจ (แค่ปิดของเดิม) เลยยังคงเป็น dialog สั้นๆ เหมือนเดิม */}
+            <Dialog
+                open={shopActionConfirm !== null}
+                onClose={() => setShopActionConfirm(null)}
+                fullWidth
+                maxWidth={shopActionConfirm?.action === 'push' ? 'sm' : 'xs'}
+            >
+                <DialogTitle>
+                    {shopActionConfirm?.action === 'push' ? 'ตรวจสอบข้อมูลก่อนส่งไป Shopee' : 'ปิดการขายบน Shopee?'}
+                    {detailData && (
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontWeight: 400, mt: 0.25 }}>
+                            {detailData.name} · {detailData.sku} · ร้าน &quot;{shopActionConfirm?.shopName}&quot;
+                        </Typography>
+                    )}
+                </DialogTitle>
+                <DialogContent dividers>
+                    {shopActionConfirm?.action === 'deactivate' && (
+                        <DialogContentText>
+                            การดำเนินการนี้จะปิดการขาย (ไม่ลบ) ประกาศขายบน Shopee สำหรับร้าน &quot;{shopActionConfirm?.shopName}&quot;
+                        </DialogContentText>
+                    )}
+
+                    {shopStatusCheck && shopActionConfirm && shopStatusCheck.shopId === shopActionConfirm.shopId && (
+                        <Box sx={{ mb: shopActionConfirm.action === 'push' ? 2 : 0 }}>
+                            {shopStatusCheck.loading ? (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <CircularProgress size={14} />
+                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                        กำลังตรวจสอบสถานะบน Shopee...
+                                    </Typography>
+                                </Stack>
+                            ) : shopStatusCheck.error ? (
+                                <Alert severity="warning">ตรวจสอบสถานะไม่สำเร็จ: {shopStatusCheck.error}</Alert>
+                            ) : shopStatusCheck.never_pushed ? (
+                                <Alert severity="info">ยังไม่เคยส่งมาก่อน — การดำเนินการนี้จะสร้างประกาศขายใหม่</Alert>
+                            ) : shopStatusCheck.is_live ? (
+                                <Alert severity="success">กำลังขายอยู่บน Shopee แล้ว — การดำเนินการนี้จะอัปเดตของเดิม</Alert>
+                            ) : (
+                                <Alert severity="info">มีประกาศขายอยู่แล้วแต่ไม่ active (สถานะ: {shopStatusCheck.status ?? 'ไม่ทราบ'})</Alert>
+                            )}
+                        </Box>
+                    )}
+
+                    {shopActionConfirm?.action === 'push' &&
+                        detailData &&
+                        (() => {
+                            const missing = detailData.attributes.filter((a) => a.mandatory && !a.value);
+
+                            return (
+                                <>
+                                    {missing.length > 0 ? (
+                                        <Alert severity="error" sx={{ mb: 2 }}>
+                                            <Typography variant="body2" fontWeight={600}>
+                                                ยังกรอกข้อมูลที่ Shopee บังคับไม่ครบ {missing.length} รายการ: {missing.map((a) => a.label).join(', ')}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                                                ยังกด &quot;ยืนยันส่ง&quot; ต่อได้ แต่ Shopee อาจปฏิเสธถ้าข้อมูลไม่ครบจริง
+                                            </Typography>
+                                        </Alert>
+                                    ) : (
+                                        <Alert severity="success" sx={{ mb: 2 }}>ข้อมูลที่ Shopee บังคับครบถ้วนแล้ว</Alert>
+                                    )}
+
+                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                        ข้อมูลสินค้า (Platform)
+                                    </Typography>
+                                    <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0} sx={{ mb: 2 }}>
+                                        {detailData.platform_fields.map((field, idx) => (
+                                            <Stack key={idx} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ py: 0.75 }}>
+                                                <Box sx={{ flexShrink: 0 }}>
+                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                                                        {field.label}
+                                                    </Typography>
+                                                    {field.type && (
+                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
+                                                            {field.type}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        color: field.value ? FIORI.textPrimary : FIORI.error,
+                                                        fontWeight: field.value ? 400 : 600,
+                                                        textAlign: 'right',
+                                                    }}
+                                                >
+                                                    {field.value ?? '— ยังไม่ได้กรอก —'}
+                                                </Typography>
+                                            </Stack>
+                                        ))}
+                                    </Stack>
+
+                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                        รูปสินค้า ({detailData.platform_images.length})
+                                    </Typography>
+                                    {detailData.platform_images.length === 0 ? (
+                                        <Typography variant="body2" sx={{ color: FIORI.error, mb: 2 }}>
+                                            — ยังไม่มีรูปสินค้าให้ส่งไป Shopee —
+                                        </Typography>
+                                    ) : (
+                                        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
+                                            {detailData.platform_images.map((url, idx) => (
+                                                <Box
+                                                    key={idx}
+                                                    component="img"
+                                                    src={url}
+                                                    alt={`รูปสินค้า ${idx + 1}`}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.visibility = 'hidden';
+                                                    }}
+                                                    sx={{
+                                                        width: 64,
+                                                        height: 64,
+                                                        borderRadius: 1,
+                                                        objectFit: 'cover',
+                                                        border: `1px solid ${FIORI.border}`,
+                                                        bgcolor: FIORI.headerBg,
+                                                    }}
+                                                />
+                                            ))}
+                                        </Stack>
+                                    )}
+
+                                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                        Attribute
+                                    </Typography>
+                                    <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0}>
+                                        {detailData.attributes.map((attr, idx) => (
+                                            <Stack key={idx} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ py: 0.75 }}>
+                                                <Box sx={{ flexShrink: 0 }}>
+                                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                                                        {attr.label}{' '}
+                                                        {attr.mandatory && (
+                                                            <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
+                                                                จำเป็น
+                                                            </Typography>
+                                                        )}
+                                                    </Typography>
+                                                    {attr.type && (
+                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
+                                                            {attr.type}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        color: attr.value ? FIORI.textPrimary : FIORI.error,
+                                                        fontWeight: attr.value ? 400 : 600,
+                                                        textAlign: 'right',
+                                                    }}
+                                                >
+                                                    {attr.value ?? '— ยังไม่ได้กรอก —'}
+                                                </Typography>
+                                            </Stack>
+                                        ))}
+                                    </Stack>
+                                </>
+                            );
+                        })()}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDetailPushConfirmOpen(false)} sx={fioriGhostSx}>
+                    <Button onClick={() => setShopActionConfirm(null)} sx={fioriGhostSx}>
                         ยกเลิก
                     </Button>
-                    <Button onClick={confirmDetailPush} variant="contained" sx={fioriEmphasizedSx}>
-                        ส่ง
+                    <Button onClick={confirmShopAction} variant="contained" sx={fioriEmphasizedSx}>
+                        {shopActionConfirm?.action === 'push' ? 'ยืนยันส่ง' : 'ปิดการขาย'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog open={bulkPushDialogOpen} onClose={() => setBulkPushDialogOpen(false)}>
+                <DialogTitle>Push {selectedRows.length} รายการที่เลือกไป Shopee?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ mb: 2 }}>
+                        เลือกร้าน Shopee ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish ให้อัตโนมัติก่อน push
+                    </DialogContentText>
+                    <Select
+                        fullWidth
+                        size="small"
+                        displayEmpty
+                        value={bulkPushShopId}
+                        onChange={(e) => setBulkPushShopId(e.target.value === '' ? '' : Number(e.target.value))}
+                    >
+                        <MenuItem value="" disabled>
+                            เลือกร้าน...
+                        </MenuItem>
+                        {shopeeShops.map((shop) => (
+                            <MenuItem key={shop.id} value={shop.id}>
+                                {shop.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setBulkPushDialogOpen(false)} sx={fioriGhostSx}>
+                        ยกเลิก
+                    </Button>
+                    <Button
+                        onClick={confirmBulkPush}
+                        variant="contained"
+                        disabled={!bulkPushShopId || bulkPushing}
+                        startIcon={bulkPushing ? <CircularProgress size={14} color="inherit" /> : undefined}
+                        sx={fioriEmphasizedSx}
+                    >
+                        {bulkPushing ? 'กำลังส่ง...' : 'Push'}
                     </Button>
                 </DialogActions>
             </Dialog>

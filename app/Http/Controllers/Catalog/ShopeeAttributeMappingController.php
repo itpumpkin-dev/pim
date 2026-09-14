@@ -11,6 +11,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
+use App\Models\SalesPlatformShop;
 use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeAttributeOptionMapping;
@@ -395,6 +396,15 @@ class ShopeeAttributeMappingController extends Controller
                 ->orWhereHas('categories', fn ($cq) => $cq->whereNotNull('categories.shopee_category_id'));
         })->count();
 
+        // สำหรับ dropdown เลือกร้านของ dialog "Push ที่เลือก" (bulk) ด้านล่างตาราง —
+        // ใช้ endpoint เดียวกับ ProductController::pushBulk() ที่ products/index.tsx's
+        // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
+        // สลับไปหน้า list สินค้าทั่วไปก่อน — mirror ของ
+        // LazadaAttributeMappingController::lazadaProducts() เป๊ะ
+        $shopeeShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'shopee'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('catalog/marketplace/shopee-products', [
             'products' => $paginated,
             'stats' => [
@@ -407,6 +417,7 @@ class ShopeeAttributeMappingController extends Controller
                 'filter' => $filter,
                 'per_page' => $perPage,
             ],
+            'shopeeShops' => $shopeeShops,
         ]);
     }
 
@@ -517,9 +528,33 @@ class ShopeeAttributeMappingController extends Controller
                 'created_at' => $job->created_at,
             ]);
 
-        $publishedShopeeShops = $product->platformShops()
-            ->whereHas('platform', fn ($q) => $q->where('code', 'shopee'))
-            ->get(['sales_platform_shops.id', 'sales_platform_shops.name', 'sales_platform_shops.channel_id']);
+        // ทุกร้าน Shopee ที่มีในระบบ (ไม่ใช่แค่ร้านที่สินค้านี้ publish อยู่แล้ว) —
+        // ให้ sidebar ติ๊ก publish/unpublish ได้เองโดยไม่ต้องไปที่หน้า Edit
+        // Product ก่อน (ดู ProductController::toggleShopPublished()) พร้อม
+        // สถานะ live ล่าสุดต่อร้าน (จาก product_platform_shops.status ตัวเดียวกับ
+        // ที่หน้า Edit Product's Sales Channels panel ใช้โชว์ badge "Live") —
+        // mirror ของ LazadaAttributeMappingController::productDetail() เป๊ะ
+        $allShopeeShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'shopee'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'channel_id']);
+
+        $pivotByShopId = DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->whereIn('sales_platform_shop_id', $allShopeeShops->pluck('id'))
+            ->get()
+            ->keyBy('sales_platform_shop_id');
+
+        $shopeeShops = $allShopeeShops->map(function ($shop) use ($pivotByShopId) {
+            $pivot = $pivotByShopId->get($shop->id);
+
+            return [
+                'id' => $shop->id,
+                'name' => $shop->name,
+                'published' => $pivot !== null,
+                'is_live' => $pivot !== null && $pivot->status === 'live',
+                'last_synced_at' => $pivot->last_synced_at ?? null,
+            ];
+        });
 
         // "ข้อมูลสินค้า (Platform)" tab — ต่างจาก $attributeRows ด้านบน (custom
         // category attribute เฉพาะหมวดหมู่นี้ + แบรนด์) ตรงที่กลุ่มนี้คือฟิลด์ตายตัว
@@ -535,7 +570,8 @@ class ShopeeAttributeMappingController extends Controller
         // ใช้ channel ของร้านที่ published อยู่ตัวเดียว (ถ้ามีพอดี 1 ร้าน) เพื่อให้
         // ราคา/ค่าที่ผูกกับ channel ตรงกับร้านนั้นจริงๆ — ถ้าไม่มีหรือมีหลายร้าน
         // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels)
-        $channelId = $publishedShopeeShops->count() === 1 ? $publishedShopeeShops->first()->channel_id : null;
+        $publishedShopeeShopIds = $allShopeeShops->filter(fn ($shop) => $pivotByShopId->has($shop->id));
+        $channelId = $publishedShopeeShopIds->count() === 1 ? $publishedShopeeShopIds->first()->channel_id : null;
 
         // buildPayload() ตั้ง description ให้ fallback เป็น $name ตายตัวถ้ายังไม่ได้
         // map (ดู ShopeeProductSyncService::buildPayload() บรรทัดที่ resolve
@@ -569,8 +605,79 @@ class ShopeeAttributeMappingController extends Controller
             'platform_fields' => $platformFields,
             'platform_images' => $platformImages,
             'sync_history' => $syncHistory,
-            'published_shopee_shops' => $publishedShopeeShops,
+            'shopee_shops' => $shopeeShops,
         ]);
+    }
+
+    /**
+     * แนะนำหมวดหมู่ Shopee ให้สินค้าตัวนี้ จาก endpoint จริงของ Shopee
+     * (`v2.product.category_recommend` — ยืนยันแล้วจากเอกสารจริงของ Shopee
+     * เอง 2026-09 ว่า path ถูกต้องคือ `category_recommend` ไม่ใช่
+     * `get_category_recommend` ที่เดาไว้รอบแรกแล้วโดน 404 — ดู ShopeeClient::
+     * getCategoryRecommend()'s docblock) mirror ของ
+     * LazadaAttributeMappingController::categorySuggestions() — ต่างกันตรงที่
+     * response ของ Shopee มีแค่ category_id ดิบๆ (int array) ไม่มี name/path
+     * แนบมาให้แบบของ Lazada เลยต้อง resolve ชื่อ/path เองจาก shopee_categories
+     * ที่ sync ไว้ในเครื่อง ไม่ส่ง product_cover_image เพราะจุดนี้มีแค่ชื่อสินค้า
+     * (Shopee เอกสารระบุว่าถ้าเป็น empty string จะถูก ignore อยู่แล้ว)
+     *
+     * เป็นแค่ตัวช่วยเสนอตัวเลือก ไม่ได้บันทึกอะไรเอง ผู้ใช้ยังต้องกดเลือกแล้วกด
+     * Save ตามปกติ (ผ่าน CategoryController::bulkMapShopee() เหมือนเดิม)
+     * กรองเอาเฉพาะ suggestion ที่มีอยู่จริงในตาราง shopee_categories ของเรา
+     * และเป็น leaf เท่านั้น ด้วยเหตุผลเดียวกับฝั่ง Lazada
+     */
+    public function categorySuggestions(Product $product): JsonResponse
+    {
+        $account = ShopeeSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No Shopee seller account found to authenticate the request.'], 422);
+        }
+
+        // เหตุผลเดียวกับ $pname ใน productDetail() ด้านบน — จงใจ duplicate
+        // แทนที่จะดึงมาเป็น method ร่วม (ดู LazadaAttributeMappingController::
+        // categorySuggestions()'s comment เดียวกัน)
+        $nameAttrId = Attribute::idForCode('pname');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        $productName = null;
+        if ($nameAttrId) {
+            $productName = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $nameAttrId)
+                ->whereNull('channel_id')
+                ->where(function ($q) use ($activeLocaleId) {
+                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
+                })
+                ->orderByRaw('locale_id IS NULL')
+                ->value('value');
+        }
+        $productName = $productName ?: $product->sku;
+
+        try {
+            $response = (new ShopeeClient($account))->getCategoryRecommend($productName);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $categoryIds = collect($response['response']['category_id'] ?? [])
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id);
+
+        $knownLeaf = ShopeeCategory::whereIn('id', $categoryIds)->where('is_leaf', true)->get(['id', 'name']);
+
+        // เอกสาร Shopee ไม่ได้เรียงลำดับ category_id ตามความมั่นใจไว้ชัดเจน แต่
+        // เพื่อให้ suggestion ที่ Shopee คืนมาก่อนอยู่ก่อนใน UI (Shopee มักเรียง
+        // จากมั่นใจมากไปน้อย) จึง sort ตามตำแหน่งใน $categoryIds เดิมแทนที่จะ
+        // ปล่อยตามลำดับ query ที่ ORM คืนมา
+        $orderIndex = $categoryIds->flip();
+        $data = $knownLeaf
+            ->sortBy(fn ($cat) => $orderIndex->get($cat->id, PHP_INT_MAX))
+            ->map(fn ($cat) => [
+                'category_id' => $cat->id,
+                'name' => $cat->name,
+                'path' => $this->shopeeCategoryPathFor($cat->id),
+            ])
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 
     /**

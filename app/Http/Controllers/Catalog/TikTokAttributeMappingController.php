@@ -11,6 +11,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
+use App\Models\SalesPlatformShop;
 use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
@@ -284,9 +285,34 @@ class TikTokAttributeMappingController extends Controller
                 'created_at' => $job->created_at,
             ]);
 
-        $publishedTikTokShops = $product->platformShops()
-            ->whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
-            ->get(['sales_platform_shops.id', 'sales_platform_shops.name', 'sales_platform_shops.channel_id']);
+        // ทุกร้าน TikTok ที่มีในระบบ (ไม่ใช่แค่ร้านที่สินค้านี้ publish อยู่แล้ว) —
+        // ให้ sidebar ติ๊ก publish/unpublish ได้เองโดยไม่ต้องไปที่หน้า Edit
+        // Product ก่อน (ดู ProductController::toggleShopPublished()) พร้อม
+        // สถานะ live ล่าสุดต่อร้าน (จาก product_platform_shops.status ตัวเดียวกับ
+        // ที่หน้า Edit Product's Sales Channels panel ใช้โชว์ badge "Live") —
+        // mirror ของ LazadaAttributeMappingController::productDetail()'s
+        // $allLazadaShops/$pivotByShopId/$lazadaShops เป๊ะ
+        $allTikTokShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'channel_id']);
+
+        $pivotByShopId = DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->whereIn('sales_platform_shop_id', $allTikTokShops->pluck('id'))
+            ->get()
+            ->keyBy('sales_platform_shop_id');
+
+        $tiktokShops = $allTikTokShops->map(function ($shop) use ($pivotByShopId) {
+            $pivot = $pivotByShopId->get($shop->id);
+
+            return [
+                'id' => $shop->id,
+                'name' => $shop->name,
+                'published' => $pivot !== null,
+                'is_live' => $pivot !== null && $pivot->status === 'live',
+                'last_synced_at' => $pivot->last_synced_at ?? null,
+            ];
+        });
 
         // "ข้อมูลสินค้า (Platform)" tab — ต่างจาก $attributeRows ด้านบน (custom
         // category attribute เฉพาะหมวดหมู่นี้) ตรงที่กลุ่มนี้คือฟิลด์ตายตัวที่
@@ -301,8 +327,13 @@ class TikTokAttributeMappingController extends Controller
         //
         // ใช้ channel ของร้านที่ published อยู่ตัวเดียว (ถ้ามีพอดี 1 ร้าน) เพื่อให้
         // ราคา/ค่าที่ผูกกับ channel ตรงกับร้านนั้นจริงๆ — ถ้าไม่มีหรือมีหลายร้าน
-        // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels)
-        $channelId = $publishedTikTokShops->count() === 1 ? $publishedTikTokShops->first()->channel_id : null;
+        // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels) — กรอง
+        // เฉพาะร้านที่ published จริง (ไม่ใช่ทุกร้าน TikTok ในระบบ) ก่อนนับ เหมือน
+        // ที่ LazadaAttributeMappingController แก้ไปแล้ว (บั๊กเดิม: นับร้านทุกร้าน
+        // ในระบบ ทำให้ channelId เป็น null เสมอเมื่อมีมากกว่า 1 ร้าน TikTok ทั้งที่
+        // สินค้านี้ published อยู่แค่ร้านเดียว)
+        $publishedTikTokShopIds = $allTikTokShops->filter(fn ($shop) => $pivotByShopId->has($shop->id));
+        $channelId = $publishedTikTokShopIds->count() === 1 ? $publishedTikTokShopIds->first()->channel_id : null;
 
         $platformFields = [
             ['label' => 'Seller SKU', 'value' => $product->sku, 'type' => 'text'],
@@ -337,8 +368,94 @@ class TikTokAttributeMappingController extends Controller
             'platform_fields' => $platformFields,
             'platform_images' => $platformImages,
             'sync_history' => $syncHistory,
-            'published_tiktok_shops' => $publishedTikTokShops,
+            'tiktok_shops' => $tiktokShops,
         ]);
+    }
+
+    /**
+     * แนะนำหมวดหมู่ TikTok ให้สินค้าตัวนี้ จาก endpoint จริงของ TikTok
+     * (`POST /product/{version}/categories/recommend` — ดู TikTokClient::
+     * getRecommendedCategories()'s docblock) mirror ของ
+     * LazadaAttributeMappingController::categorySuggestions() —
+     * ต่างจาก Lazada ตรงที่ TikTok แนบ name มาให้ในตัว response เลย (ไม่ต้อง
+     * join ตาราง local เพื่อหา name เหมือน Shopee) แต่ path ยังต้อง resolve
+     * เองจาก tiktok_categories ที่ sync ไว้ในเครื่องอยู่ดี (response ไม่มี path)
+     * ใช้ data.leaf_category_id เป็นตัวเลือกแรกสุด (ดู docblock ของ
+     * getRecommendedCategories()) แล้วตามด้วยแถวอื่นใน data.categories ที่
+     * is_leaf และมีอยู่จริงในเครื่อง โดยไม่ซ้ำกับตัวแรก
+     *
+     * เป็นแค่ตัวช่วยเสนอตัวเลือก ไม่ได้บันทึกอะไรเอง ผู้ใช้ยังต้องกดเลือกแล้วกด
+     * Save ตามปกติ (ผ่าน CategoryController::bulkMapTikTok() เหมือนเดิม)
+     */
+    public function categorySuggestions(Product $product): JsonResponse
+    {
+        $account = TikTokSellerAccount::first();
+        if (! $account) {
+            return response()->json(['message' => 'No TikTok seller account found to authenticate the request.'], 422);
+        }
+
+        // เหตุผลเดียวกับ $pname ใน productDetail() ด้านบน — จงใจ duplicate
+        // แทนที่จะดึงมาเป็น method ร่วม (ดู LazadaAttributeMappingController::
+        // categorySuggestions()'s comment เดียวกัน)
+        $nameAttrId = Attribute::idForCode('pname');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        $productName = null;
+        if ($nameAttrId) {
+            $productName = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $nameAttrId)
+                ->whereNull('channel_id')
+                ->where(function ($q) use ($activeLocaleId) {
+                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
+                })
+                ->orderByRaw('locale_id IS NULL')
+                ->value('value');
+        }
+        $productName = $productName ?: $product->sku;
+
+        // ยืนยันจาก error จริง (12052051 "Value Out Of Range") — TikTok บังคับ
+        // ความยาว product_title ไว้ [25, 255] ตัวอักษรสำหรับตลาดที่ไม่ได้ระบุไว้
+        // เฉพาะ (ไทยไม่อยู่ใน DE/ES/FR/IE/IT/JP/UK/US/BR/MX ที่มีช่วงของตัวเอง เลย
+        // เข้ากลุ่ม "Other regions" นี้) เช็คก่อนยิงจริงเพื่อโชว์ข้อความที่เข้าใจง่าย
+        // แทนที่จะปล่อยให้ผู้ใช้เห็น error ภาษาอังกฤษดิบๆ จาก TikTok — ชื่อสินค้า
+        // สั้นส่วนใหญ่มักมาจาก $product->sku fallback ด้านบน (ยังไม่ได้ตั้งชื่อ
+        // สินค้า/pname ไว้) ไม่ pad ข้อความเองเพราะจะทำให้คำแนะนำผิดเพี้ยนไปจาก
+        // สินค้าจริง (ดีกว่าให้ผู้ใช้ไปกรอกชื่อสินค้าที่ยาวพอก่อน)
+        $nameLength = mb_strlen($productName);
+        if ($nameLength < 25 || $nameLength > 255) {
+            return response()->json([
+                'message' => "ชื่อสินค้าที่ใช้ค้นหา (\"{$productName}\") มีความยาว {$nameLength} ตัวอักษร แต่ TikTok กำหนดให้ต้องมี 25-255 ตัวอักษรถึงจะแนะนำหมวดหมู่ได้ — กรุณาตั้งชื่อสินค้า (pname) ให้ยาวขึ้นก่อน",
+            ], 422);
+        }
+
+        try {
+            $response = (new TikTokClient($account))->getRecommendedCategories($productName);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $categories = collect($response['data']['categories'] ?? []);
+        $leafCategoryId = $response['data']['leaf_category_id'] ?? null;
+
+        // เรียง leaf_category_id (คำแนะนำอันดับ 1 ตามเอกสาร) ไว้ก่อนเสมอ ตามด้วย
+        // แถวอื่นที่เหลือใน categories[] ที่เป็น leaf และไม่ซ้ำกับตัวแรก
+        $orderedIds = collect([$leafCategoryId])
+            ->merge($categories->where('is_leaf', true)->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $knownById = TikTokCategory::whereIn('id', $orderedIds)->where('is_leaf', true)->get(['id', 'name'])->keyBy('id');
+
+        $data = $orderedIds
+            ->filter(fn ($id) => $knownById->has((int) $id))
+            ->map(fn ($id) => [
+                'category_id' => (int) $id,
+                'name' => $knownById[(int) $id]->name,
+                'path' => $this->tiktokCategoryPathFor((int) $id),
+            ])
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -641,6 +758,15 @@ class TikTokAttributeMappingController extends Controller
                 ->orWhereHas('categories', fn ($cq) => $cq->whereNotNull('categories.tiktok_category_id'));
         })->count();
 
+        // สำหรับ dropdown เลือกร้านของ dialog "Push ที่เลือก" (bulk) ด้านล่างตาราง —
+        // ใช้ endpoint เดียวกับ ProductController::pushBulk() ที่ products/index.tsx's
+        // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
+        // สลับไปหน้า list สินค้าทั่วไปก่อน — mirror ของ
+        // LazadaAttributeMappingController::lazadaProducts()'s $lazadaShops เป๊ะ
+        $tiktokShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('catalog/marketplace/tiktok-products', [
             'products' => $paginated,
             'stats' => [
@@ -653,6 +779,7 @@ class TikTokAttributeMappingController extends Controller
                 'filter' => $filter,
                 'per_page' => $perPage,
             ],
+            'tiktokShops' => $tiktokShops,
         ]);
     }
 

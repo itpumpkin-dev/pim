@@ -69,6 +69,39 @@ class LazadaClient
     }
 
     /**
+     * Suggests Lazada leaf categories for a product, given its name and a
+     * product image URL — official endpoint
+     * `/product/category/suggestion/get`. Confirmed live, 2026-09-11, against
+     * a real seller account and a real product (a silicone-adhesive product
+     * correctly returned 5 adhesive/sealant-related leaf categories):
+     * `data.categorySuggestions[]`, each `{categoryId, categoryName,
+     * categoryPath}` — matches third-party SDK documentation exactly on
+     * shape, but that documentation was WRONG about one thing:
+     *
+     * - `image_url` is confirmed MANDATORY, not optional — a real call
+     *   without it returns `MissingParameter` for exactly that field. Made a
+     *   required param here rather than nullable to match.
+     * - Our own storage-hosted image URL (not a Lazada-CDN one) was accepted
+     *   fine — unlike the actual product create/update payload, this
+     *   endpoint doesn't require BIZ_CHECK_EXIST_OUTER_MAIN_IMAGE-style
+     *   Lazada-hosted images first.
+     * - `requiresAccessToken: true` was also confirmed correct by that same
+     *   live call (no auth error) — this sits under `/product/...`, grouped
+     *   with seller-scoped product management calls like getLiveProducts()/
+     *   createProduct(), unlike getCategoryTree()/getCategoryAttributes()/
+     *   queryBrands() above (`/category/...`, confirmed "system tools", no
+     *   token needed).
+     */
+    public function getCategorySuggestion(string $productName, string $imageUrl): array
+    {
+        return $this->request(
+            '/product/category/suggestion/get',
+            ['product_name' => $productName, 'image_url' => $imageUrl],
+            requiresAccessToken: true
+        );
+    }
+
+    /**
      * Lists this shop's own live listings — confirmed live, 2026-08-13,
      * against a real seller account (265 real products returned in the
      * expected shape). Response: `data.total_products` (int) and

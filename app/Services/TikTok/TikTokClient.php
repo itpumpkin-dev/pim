@@ -119,6 +119,45 @@ class TikTokClient
     }
 
     /**
+     * POST /product/{version}/categories/recommend — recommends leaf
+     * category ids for a product from its title. TikTok's equivalent of
+     * Lazada's `/product/category/suggestion/get` / Shopee's
+     * `v2.product.category_recommend`.
+     *
+     * Confirmed against TikTok's own real docs page for this exact endpoint
+     * (2026-09): the real path is `categories/recommend`, POST (not GET like
+     * every other read-only method in this file) — `product_title` is the
+     * only required field, everything else (description/images/
+     * category_version/locale/...) is optional. Response:
+     * `data.categories[]`, each {id, is_leaf, level, name,
+     * permission_statuses}, plus a top-level `data.leaf_category_id` — the
+     * single best-match leaf id, distinct from the full `categories` list
+     * (which can include non-leaf ancestors per the docs' own example
+     * showing only one leaf entry, so callers should prefer id ==
+     * leaf_category_id, or filter is_leaf, rather than assuming every row
+     * is directly usable).
+     *
+     * $categoryVersion defaults 'v2' to match every other category-related
+     * method in this file (getCategoryTree()/getCategoryRules()/
+     * getAttributes()) — the docs say "Default: v1" but also that US/EU/SEA
+     * shops (this shop included) MUST pass v2, so v1 would silently mismatch
+     * this shop's actual (v2) category tree.
+     *
+     * NOT yet confirmed live — no live test of this specific endpoint has
+     * been run yet in this session; treat the exact field/response shape as
+     * "per the docs" until a real call confirms it, same caveat as every
+     * other not-yet-exercised method in this file.
+     */
+    public function getRecommendedCategories(string $productTitle, string $categoryVersion = 'v2', string $locale = 'th-TH', string $apiVersion = '202309'): array
+    {
+        return $this->request("/product/{$apiVersion}/categories/recommend", method: 'POST', body: array_filter([
+            'product_title' => $productTitle,
+            'category_version' => $categoryVersion,
+            'locale' => $locale,
+        ], fn ($value) => $value !== null));
+    }
+
+    /**
      * GET /product/{version}/categories/{category_id}/rules — confirmed
      * shape from the shared docs: `data` is a map keyed by requirement name
      * (e.g. "cod", "package_dimension", "epr", "responsible_person",

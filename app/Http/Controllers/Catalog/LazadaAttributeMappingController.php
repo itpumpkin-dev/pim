@@ -18,6 +18,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
+use App\Models\SalesPlatformShop;
 use App\Services\Catalog\LazadaAttributeFamilyGenerator;
 use App\Services\Catalog\LazadaMappedAttributeCreator;
 use App\Services\Catalog\LazadaMappingTimelineBuilder;
@@ -295,6 +296,14 @@ class LazadaAttributeMappingController extends Controller
                 ->orWhereHas('categories', fn ($cq) => $cq->whereNotNull('categories.lazada_category_id'));
         })->count();
 
+        // สำหรับ dropdown เลือกร้านของ dialog "Push ที่เลือก" (bulk) ด้านล่างตาราง —
+        // ใช้ endpoint เดียวกับ ProductController::pushBulk() ที่ products/index.tsx's
+        // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
+        // สลับไปหน้า list สินค้าทั่วไปก่อน
+        $lazadaShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('catalog/marketplace/lazada-products', [
             'products' => $paginated,
             'stats' => [
@@ -307,6 +316,7 @@ class LazadaAttributeMappingController extends Controller
                 'filter' => $filter,
                 'per_page' => $perPage,
             ],
+            'lazadaShops' => $lazadaShops,
         ]);
     }
 
@@ -413,9 +423,32 @@ class LazadaAttributeMappingController extends Controller
                 'created_at' => $job->created_at,
             ]);
 
-        $publishedLazadaShops = $product->platformShops()
-            ->whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
-            ->get(['sales_platform_shops.id', 'sales_platform_shops.name', 'sales_platform_shops.channel_id']);
+        // ทุกร้าน Lazada ที่มีในระบบ (ไม่ใช่แค่ร้านที่สินค้านี้ publish อยู่แล้ว) —
+        // ให้ sidebar ติ๊ก publish/unpublish ได้เองโดยไม่ต้องไปที่หน้า Edit
+        // Product ก่อน (ดู ProductController::toggleShopPublished()) พร้อม
+        // สถานะ live ล่าสุดต่อร้าน (จาก product_platform_shops.status ตัวเดียวกับ
+        // ที่หน้า Edit Product's Sales Channels panel ใช้โชว์ badge "Live")
+        $allLazadaShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'channel_id']);
+
+        $pivotByShopId = DB::table('product_platform_shops')
+            ->where('product_id', $product->id)
+            ->whereIn('sales_platform_shop_id', $allLazadaShops->pluck('id'))
+            ->get()
+            ->keyBy('sales_platform_shop_id');
+
+        $lazadaShops = $allLazadaShops->map(function ($shop) use ($pivotByShopId) {
+            $pivot = $pivotByShopId->get($shop->id);
+
+            return [
+                'id' => $shop->id,
+                'name' => $shop->name,
+                'published' => $pivot !== null,
+                'is_live' => $pivot !== null && $pivot->status === 'live',
+                'last_synced_at' => $pivot->last_synced_at ?? null,
+            ];
+        });
 
         // "ข้อมูลสินค้า (Platform)" tab — ต่างจาก $attributeRows ด้านบน (custom
         // category attribute เฉพาะหมวดหมู่นี้) ตรงที่กลุ่มนี้คือฟิลด์ตายตัวที่
@@ -432,7 +465,8 @@ class LazadaAttributeMappingController extends Controller
         // ใช้ channel ของร้านที่ published อยู่ตัวเดียว (ถ้ามีพอดี 1 ร้าน) เพื่อให้
         // ราคา/ค่าที่ผูกกับ channel ตรงกับร้านนั้นจริงๆ — ถ้าไม่มีหรือมีหลายร้าน
         // fallback เป็น channel เริ่มต้น (null = ค่า Default/All Channels)
-        $channelId = $publishedLazadaShops->count() === 1 ? $publishedLazadaShops->first()->channel_id : null;
+        $publishedLazadaShopIds = $allLazadaShops->filter(fn ($shop) => $pivotByShopId->has($shop->id));
+        $channelId = $publishedLazadaShopIds->count() === 1 ? $publishedLazadaShopIds->first()->channel_id : null;
 
         $platformFields = [
             ['label' => 'Seller SKU', 'value' => $product->sku, 'type' => 'text'],
@@ -464,8 +498,86 @@ class LazadaAttributeMappingController extends Controller
             'platform_fields' => $platformFields,
             'platform_images' => $platformImages,
             'sync_history' => $syncHistory,
-            'published_lazada_shops' => $publishedLazadaShops,
+            'lazada_shops' => $lazadaShops,
         ]);
+    }
+
+    /**
+     * แนะนำหมวดหมู่ Lazada ให้สินค้าตัวนี้ จาก endpoint จริงของ Lazada
+     * (`/product/category/suggestion/get` — ดู LazadaClient::
+     * getCategorySuggestion()'s docblock สำหรับ request/response shape และ
+     * หมายเหตุเรื่อง access_token ที่ยังไม่ยืนยัน 100%) ใช้ที่ Section
+     * "1. Category Mapping" ของ lazada-products.tsx (ปุ่ม "แนะนำหมวดหมู่จาก
+     * Lazada" ข้างๆ MarketplaceCategoryPicker) — เป็นแค่ตัวช่วยเสนอตัวเลือก
+     * ไม่ได้บันทึกอะไรเอง ผู้ใช้ยังต้องกดเลือกแล้วกด Save ตามปกติ (ผ่าน
+     * CategoryController::bulkMapLazada() เหมือนเดิมทุกอย่าง)
+     *
+     * กรองเอาเฉพาะ suggestion ที่มีอยู่จริงในตาราง lazada_categories ของเรา
+     * (sync มาจาก getCategoryTree() แล้ว) และเป็น leaf เท่านั้น — เพราะ
+     * bulkMapLazada()'s validation เองก็บังคับแบบนี้อยู่แล้ว (เห็น suggestion
+     * ที่กดแล้ว save ไม่ผ่านจะสับสนกว่าไม่เห็นเลย) ตัวที่ยังไม่รู้จัก (ยังไม่เคย
+     * sync แผนผังมาถึงจุดนั้น) จะถูกข้ามไปเงียบๆ
+     */
+    public function categorySuggestions(Product $product): JsonResponse
+    {
+        $account = LazadaSellerAccount::active()->first();
+        if (! $account) {
+            return response()->json(['message' => 'No active Lazada seller account found to authenticate the request.'], 422);
+        }
+
+        // เหตุผลเดียวกับ $pname ใน productDetail() ด้านบน — จงใจ duplicate
+        // แทนที่จะดึงมาเป็น method ร่วม เพราะ productDetail() ใช้
+        // $activeLocaleId ต่อในหลายจุดถัดจากนี้ ดึงแยกออกมาเสี่ยงกระทบโค้ด
+        // ที่ทดสอบแล้วโดยไม่จำเป็น ส่วนตรงนี้ต้องการแค่ชื่อสินค้าเฉยๆ
+        $nameAttrId = Attribute::idForCode('pname');
+        $activeLocaleId = Locale::idForCode(app()->getLocale());
+        $productName = null;
+        if ($nameAttrId) {
+            $productName = ProductValue::where('product_id', $product->id)
+                ->where('attribute_id', $nameAttrId)
+                ->whereNull('channel_id')
+                ->where(function ($q) use ($activeLocaleId) {
+                    $q->where('locale_id', $activeLocaleId)->orWhereNull('locale_id');
+                })
+                ->orderByRaw('locale_id IS NULL')
+                ->value('value');
+        }
+        $productName = $productName ?: $product->sku;
+
+        // Confirmed live (ดู LazadaClient::getCategorySuggestion()'s docblock)
+        // ว่า image_url เป็น mandatory จริง ไม่ใช่ optional ตามที่เอกสารฝั่งที่สาม
+        // เขียนไว้ — ไม่มีรูปเลยก็เรียก endpoint นี้ไม่ได้ตั้งแต่ต้น
+        $imageUrl = $this->resolveProductImageUrls($product, null)[0] ?? null;
+        if (! $imageUrl) {
+            return response()->json(['message' => 'สินค้านี้ยังไม่มีรูปเลย — Lazada ต้องการรูปสินค้าอย่างน้อย 1 รูปถึงจะแนะนำหมวดหมู่ได้'], 422);
+        }
+
+        try {
+            $response = (new LazadaClient($account))->getCategorySuggestion($productName, $imageUrl);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $suggestions = $response['data']['categorySuggestions'] ?? [];
+
+        // Cast เป็น int ก่อน filter/compare เสมอ — Lazada's JSON อาจส่ง categoryId
+        // มาเป็น numeric string แทน native int ก็ได้ (พบจาก code review: ถ้าเป็น
+        // string, in_array(..., true) แบบ strict เดิมจะไม่ match กับ $knownLeafIds
+        // ที่เป็น int จาก DB เลย ทำให้ suggestion ที่ถูกต้องทุกตัวหายไปเงียบๆ) —
+        // เหมือนที่ Shopee/TikTok categorySuggestions() ทำไว้อยู่แล้ว
+        $categoryIds = collect($suggestions)->pluck('categoryId')->filter()->map(fn ($id) => (int) $id);
+        $knownLeafIds = LazadaCategory::whereIn('id', $categoryIds)->where('is_leaf', true)->pluck('id')->all();
+
+        $data = collect($suggestions)
+            ->filter(fn ($s) => isset($s['categoryId']) && in_array((int) $s['categoryId'], $knownLeafIds, true))
+            ->map(fn ($s) => [
+                'category_id' => (int) $s['categoryId'],
+                'name' => $s['categoryName'] ?? null,
+                'path' => $s['categoryPath'] ?? $this->lazadaCategoryPathFor((int) $s['categoryId']),
+            ])
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 
     /**
