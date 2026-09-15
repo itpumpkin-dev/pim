@@ -147,10 +147,14 @@ class LazadaProductSyncService
         }
 
         foreach ($mappedAttributes as $lazadaName => $result) {
+            // 'wire_value' (not 'value' — see resolveMappedAttributes()'s
+            // docblock) is what actually goes in the payload: the option's
+            // NAME for select-type attributes, the plain resolved value for
+            // everything else.
             if ($result['attribute_type'] === 'sku') {
-                $skuFields[$lazadaName] = $result['value'];
+                $skuFields[$lazadaName] = $result['wire_value'];
             } else {
-                $normalAttributes[$lazadaName] = $result['value'];
+                $normalAttributes[$lazadaName] = $result['wire_value'];
             }
         }
 
@@ -221,19 +225,41 @@ class LazadaProductSyncService
 
                 $inputType = $mapping->lazadaAttribute->input_type ?? null;
                 $label = null;
+                // What actually goes in the payload — see the wire_value
+                // assignments below for why this can differ from $value.
+                $wireValue = null;
 
                 if (in_array($inputType, ['multiSelect', 'multiEnumInput'], true)) {
+                    // Now resolves to option NAMEs directly (see
+                    // resolveMultiSelectOptionValues()'s docblock) — same
+                    // wire format as singleSelect below, no separate id vs.
+                    // name step needed here.
                     $value = $this->resolveMultiSelectOptionValues($mapping, $product, $channelId);
                     $isEmpty = $value === [];
+                    $wireValue = $value;
                 } else {
                     // A locale-based PIM attribute mapped here without a
                     // matching localeCode would otherwise silently resolve to
                     // null forever, the same bug already found and fixed once
                     // this session for WooCommerceProductSyncService::buildPayload().
                     $value = $this->attributeValue($product, $mapping->attribute->code, $channelId, localeCode: $localeCode);
+                    $wireValue = $value;
 
                     if (in_array($inputType, ['singleSelect', 'enumInput'], true)) {
                         [$value, $label] = $this->resolveSingleSelectOptionValue($mapping, $value);
+                        // Lazada's `attributes` payload wants the option's
+                        // NAME string, not its numeric id — confirmed live
+                        // 2026-09-15: pushing category `multipack_bundle`
+                        // with the raw id (e.g. "310684") got Lazada's
+                        // CHK_CATPROP_CPV_NOT_ENUM ("value not in the
+                        // dropdown list"), while `brand` — already routed
+                        // through $label via the special-case below —
+                        // succeeded with the name. $value (the raw id) is
+                        // kept as-is in the 'value' key below purely for
+                        // resolveGenericBrandName()'s legacy id-based
+                        // lookup; falls back to it only for option-mappings
+                        // saved before lazada_option_label existed.
+                        $wireValue = ($label !== null && $label !== '') ? $label : $value;
                     }
 
                     $isEmpty = $value === null || $value === '';
@@ -248,6 +274,9 @@ class LazadaProductSyncService
                         // แทนที่จะพึ่ง lazada_attributes.options ที่ sync ของ category
                         // อื่นทับได้ตลอดเวลา (ดูบั๊กที่แก้ไปใน resolveGenericBrandName())
                         'label' => $label,
+                        // สิ่งที่ buildPayload()'s generic loop จะใส่ลง payload จริง —
+                        // ดู comment ด้านบนว่าทำไมต่างจาก 'value' สำหรับ select-type
+                        'wire_value' => $wireValue,
                         'attribute_type' => $mapping->lazadaAttribute->attribute_type ?? null,
                     ];
                     break;
@@ -314,6 +343,10 @@ class LazadaProductSyncService
      * tested against a live multiSelect attribute. See this class's
      * LazadaAttributeMappingController docblock cross-reference.
      *
+     * Each element is the option's NAME (lazada_option_label), not its
+     * numeric id — same wire format as resolveSingleSelectOptionValue(),
+     * confirmed live 2026-09-15 (see that method's docblock).
+     *
      * @return array<int, string>
      */
     private function resolveMultiSelectOptionValues(LazadaAttributeMapping $mapping, Product $product, ?int $channelId): array
@@ -344,17 +377,27 @@ class LazadaProductSyncService
             return [];
         }
 
-        $lazadaValueByOptionId = LazadaAttributeOptionMapping::where('lazada_attribute_mapping_id', $mapping->id)
+        $optionMappingByOptionId = LazadaAttributeOptionMapping::where('lazada_attribute_mapping_id', $mapping->id)
             ->whereIn('attribute_option_id', $optionIdByCode->values())
-            ->pluck('lazada_option_value', 'attribute_option_id');
+            ->get(['attribute_option_id', 'lazada_option_value', 'lazada_option_label'])
+            ->keyBy('attribute_option_id');
 
         $resolved = [];
         foreach ($codes as $code) {
             $optionId = $optionIdByCode->get($code);
-            $value = $optionId ? $lazadaValueByOptionId->get($optionId) : null;
-            if ($value !== null) {
-                $resolved[] = $value;
+            $optionMapping = $optionId ? $optionMappingByOptionId->get($optionId) : null;
+            if ($optionMapping === null) {
+                continue;
             }
+
+            // Same NAME-over-id preference as resolveSingleSelectOptionValue()
+            // (see that method's docblock — confirmed live 2026-09-15 that
+            // Lazada's `attributes` payload wants the option's name, not its
+            // numeric id). Falls back to the raw id only for option-mappings
+            // saved before lazada_option_label existed.
+            $resolved[] = ($optionMapping->lazada_option_label !== null && $optionMapping->lazada_option_label !== '')
+                ? $optionMapping->lazada_option_label
+                : $optionMapping->lazada_option_value;
         }
 
         return $resolved;
@@ -755,7 +798,7 @@ class LazadaProductSyncService
      * (a) every field it marks is_mandatory=1 has a non-empty value in
      * $payload, and (b) every dropdown-type field (`options` non-empty in
      * this same live schema) we DID provide a value for actually matches one
-     * of Lazada's current option ids.
+     * of Lazada's current option names.
      *
      * (b) exists because our own `lazada_attribute_option_mappings` table
      * (admin-configured via LazadaAttributeMappingController, resolved by
@@ -795,15 +838,25 @@ class LazadaProductSyncService
             }
 
             // options shape confirmed in encodeLazadaOptions()'s docblock:
-            // {name, en_name, id} — `id` is what we send back and what we
-            // stored as lazada_option_value, so compare against that.
+            // {name, en_name, id} — compared against `name`/`en_name`, NOT
+            // `id`: resolveMappedAttributes() sends the option's NAME in the
+            // payload (confirmed live 2026-09-15 — see its docblock), so
+            // that's what actually needs to match here.
             if (!$isEmpty && !empty($field['options'])) {
-                $validIds = array_map(static fn ($o) => (string) ($o['id'] ?? null), $field['options']);
-                $providedIds = array_map('strval', is_array($value) ? $value : [$value]);
-                $badIds = array_diff($providedIds, $validIds);
+                $validNames = [];
+                foreach ($field['options'] as $o) {
+                    if (isset($o['name'])) {
+                        $validNames[] = (string) $o['name'];
+                    }
+                    if (isset($o['en_name'])) {
+                        $validNames[] = (string) $o['en_name'];
+                    }
+                }
+                $providedValues = array_map('strval', is_array($value) ? $value : [$value]);
+                $badValues = array_diff($providedValues, $validNames);
 
-                if (!empty($badIds)) {
-                    $invalidEnum[] = ($field['label'] ?? $field['name']).' ('.$field['name'].'): '.implode(', ', $badIds);
+                if (!empty($badValues)) {
+                    $invalidEnum[] = ($field['label'] ?? $field['name']).' ('.$field['name'].'): '.implode(', ', $badValues);
                 }
             }
         }
