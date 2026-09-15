@@ -1,3 +1,4 @@
+import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category-panel';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
@@ -737,6 +738,24 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                         <Alert severity={categorySyncMessage.isError ? 'error' : 'success'} onClose={() => setCategorySyncMessage(null)}>
                                             {categorySyncMessage.text}
                                         </Alert>
+                                    )}
+
+                                    {/* สินค้ายังไม่มีหมวดหมู่ PIM เลย — ปุ่ม "บันทึก Category
+                                    Mapping" ด้านล่างจะกดไปก็ไม่มีผลอะไร (saveCategoryMapping()
+                                    เช็ค master_category ก่อนเสมอ) เปิดทางกำหนดให้ตรงนี้เลย
+                                    แทนที่จะให้กดแล้วเงียบๆ ไม่มีอะไรเกิดขึ้น — ดู
+                                    AssignPimCategoryPanel's docblock */}
+                                    {!activeProduct.master_category && (
+                                        <AssignPimCategoryPanel
+                                            productId={activeProduct.id}
+                                            onAssigned={(category) =>
+                                                setActiveProduct((prev) =>
+                                                    prev
+                                                        ? { ...prev, master_category: { id: category.id, name: category.name, path: category.path, woocommerce_category_id: null } }
+                                                        : prev,
+                                                )
+                                            }
+                                        />
                                     )}
 
                                     <Box sx={{ maxWidth: 420 }}>

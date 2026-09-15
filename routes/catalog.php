@@ -91,6 +91,14 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // ไม่มี canViewMasterCategories คู่กัน เพราะแผงนี้ไม่มี endpoint แบบอ่านอย่างเดียว
     // ให้แยกสิทธิ์ view ออกจาก edit เหมือน Sales Channels)
     Route::put('products/{product}/master-categories', [ProductController::class, 'updateMasterCategories'])->name('products.updateMasterCategories')->middleware('permission:master_categories,edit_master_categories');
+    // ให้หน้า mapping ของทั้ง 4 marketplace (Section 1, Category Mapping) กำหนด
+    // PIM category ได้จากหน้านั้นเลยตอนสินค้ายังไม่มีหมวดหมู่ — ไม่งั้นปุ่ม "บันทึก
+    // Category Mapping" จะเงียบๆ ไม่มีผลอะไร (activeProduct.master_category ยัง
+    // null อยู่) โดยไม่บอกเหตุผลใดๆ ให้แอดมินรู้เลย — ดู
+    // ProductController::assignCategory()'s docblock ว่าทำไมแยกจาก
+    // updateMasterCategories() ด้านบน (คนละกลไกกัน: id-based ตรงๆ ผ่าน
+    // CategoryPicker ไม่ใช่ code-based ผ่าน 3 legacy attributes)
+    Route::post('products/{product}/assign-category', [ProductController::class, 'assignCategory'])->name('products.assignCategory')->middleware('permission:master_categories,edit_master_categories');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->name('products.destroy')->middleware('permission:products,delete_products');
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');

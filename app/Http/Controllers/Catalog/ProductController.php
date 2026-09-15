@@ -3707,6 +3707,49 @@ class ProductController extends Controller
         return back()->with('success', 'Categories saved.');
     }
 
+    /**
+     * Lightweight first-time PIM-category assignment — lets each
+     * {Platform}AttributeMappingController's product Object Page (Section 1,
+     * "Category Mapping") unblock itself right there when the product has no
+     * PIM category yet, instead of silently doing nothing (the "บันทึก
+     * Category Mapping" button there needs `master_category` to already be
+     * non-null — see resolveMasterCategory()/saveCategoryMapping() on each
+     * of those pages) and forcing a trip to the full Edit Product form just
+     * to pick one.
+     *
+     * Deliberately narrow, unlike update()'s category_ids handling above or
+     * updateMasterCategories()'s legacy-code panel: only ever attaches (via
+     * sync(), harmless here since there's nothing to lose), and only when
+     * the product has zero categories already. A product that already has
+     * one goes through those two instead, which know how to handle a
+     * *change* (audit diff against a real old value, re-deriving legacy
+     * codes, etc.) — this endpoint only ever handles the empty case.
+     *
+     * Called via plain fetch() (AssignPimCategoryPanel), not Inertia's
+     * router.post — same convention as this page's other inline actions
+     * (e.g. ShopeeAttributeMappingController-backed syncAttributes()) —
+     * so it replies with real JSON on both paths instead of an Inertia
+     * redirect+flash, which the caller has no direct way to inspect.
+     */
+    public function assignCategory(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', Rule::exists('categories', 'id')],
+        ]);
+
+        if ($product->categories()->exists()) {
+            abort(422, "Product '{$product->sku}' already has a PIM category — change it from the Edit Product page instead.");
+        }
+
+        DB::transaction(function () use ($validated, $product) {
+            $product->categories()->sync([$validated['category_id']]);
+            ProductCategoryLinker::deriveLegacyCodesFromCategories($product, [$validated['category_id']]);
+            AuditLog::record('categories_updated', $product, ['category_ids' => []], ['category_ids' => [$validated['category_id']]]);
+        });
+
+        return response()->json(['success' => true]);
+    }
+
     public function destroy(Product $product): RedirectResponse
     {
         $productId = $product->id;
