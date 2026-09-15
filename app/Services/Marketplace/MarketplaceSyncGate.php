@@ -3,7 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Models\Attribute;
-use App\Models\AttributeOption;
+use App\Models\Brand;
 use App\Models\LazadaAttributeMapping;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -43,8 +43,20 @@ class MarketplaceSyncGate
      * เช็คแบบเดียวกับที่ mappedBrandOptionId() (ResolvesProductAttributeValues
      * trait ที่ sync service ทุกตัวใช้ตอน build payload จริง) ใช้: ค่า override
      * เฉพาะสินค้า (products.{platform}_brand_id) ถ้ามี ไม่งั้น fallback ไปดูว่า
-     * ค่า attribute `pbrand` ของสินค้านี้ ชี้ไปที่ AttributeOption ที่มี mapping
-     * ของ platform นี้หรือเปล่า
+     * ค่า attribute `pbrand` ของสินค้านี้ ชี้ไปที่ Brand (ตาราง `brands` — master
+     * จริงตั้งแต่ migration create_brands_table) ที่มี mapping ของ platform นี้
+     * หรือเปล่า
+     *
+     * เดิมเช็คที่ attribute_options.{platform}_brand_id แทน — คอลัมน์ที่ไม่มีวัน
+     * ถูกเขียนอีกต่อไปตั้งแต่ brands กลายเป็น master (ดู
+     * MasterAttributeOptionSync::brandRow()'s docblock ที่บอกไว้ตรงๆ ว่า
+     * marketplace brand id "ไม่เกี่ยวกับตัวเลือกใน select field เลย" —
+     * BrandController/ResolvesProductAttributeValues อ่านตรงจาก brands โดยไม่
+     * ผ่าน AttributeOption แล้ว) ทำให้ gate นี้ปฏิเสธ push อยู่เสมอแม้
+     * mappedBrandOptionId() จะ resolve แบรนด์ได้จริงและ preview ก็โชว์ค่าถูกต้อง
+     * — เจอจริงจาก error "This product has no shopee brand set" ทั้งที่ preview
+     * เห็นแบรนด์ชัดเจน แก้ให้เช็คตาราง brands ตรงๆ แบบเดียวกับ
+     * mappedBrandOptionId() แล้ว
      *
      * Lazada เท่านั้น: มีอีกเส้นทางหนึ่งที่ทำให้ brand resolve ได้โดยไม่ต้องพึ่งหน้า
      * Master Brand เลย — แอดมิน map PIM attribute ตรงเข้ากับ Lazada attribute
@@ -67,7 +79,7 @@ class MarketplaceSyncGate
                 ->whereNull('locale_id')
                 ->value('value');
 
-            if ($brandCode && AttributeOption::where('attribute_id', $pbrandAttributeId)->where('code', $brandCode)->whereNotNull($column)->exists()) {
+            if ($brandCode && Brand::where('code', $brandCode)->whereNotNull($column)->exists()) {
                 return true;
             }
         }
