@@ -1,7 +1,7 @@
 import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, fioriDefaultSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
@@ -270,7 +270,7 @@ export function ShopeeBrandMappingPanel({ shopeeCategoryId, shopeeCategoryName }
                         disabled={brandSyncing}
                         startIcon={brandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
                         onClick={triggerBrandSync}
-                        sx={{ textTransform: 'none' }}
+                        sx={fioriDefaultSx}
                     >
                         {brandSyncing ? t('syncingBrands') : t('syncBrandsForCategory')}
                     </Button>
