@@ -1168,8 +1168,9 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                             <Tabs value={sectionIndex} onChange={(_, v) => scrollToSection(v)} sx={fioriTabsSx}>
                                 <Tab label="1. Category Mapping" />
                                 <Tab label="2. Attribute Mapping" disabled={!activeProduct.category_mapped} />
-                                <Tab label="3. Payload Shopee" />
-                                <Tab label="4. History" disabled={!activeProduct.master_category} />
+                                <Tab label="3. Brand Mapping" disabled={!activeProduct.category_mapped} />
+                                <Tab label="4. Payload Shopee" />
+                                <Tab label="5. History" disabled={!activeProduct.master_category} />
                             </Tabs>
                         </Paper>
 
@@ -1345,20 +1346,6 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                                             </Stack>
                                         </Stack>
 
-                                        {/* Brand ของ Shopee ไม่ได้ sync มาเป็น Shopee attribute ธรรมดา
-                                        (ผูกกับ pbrand + Brand master แทน — ดู
-                                        ShopeeProductSyncService::resolveShopeeBrandId()) เลยไม่มีวัน
-                                        โผล่ในตาราง Attribute ด้านล่างนี้ไม่ว่ายังไง — ตารางนี้ย้ายมาจาก
-                                        categories/shopee-mapping.tsx ทั้งก้อน (ดู
-                                        ShopeeBrandMappingPanel's docblock) ให้จับคู่ได้ตรงนี้เลย
-                                        แทนที่จะต้องสลับไปอีกหน้า */}
-                                        <ShopeeBrandMappingPanel
-                                            shopeeCategoryId={activeProduct.shopee_category.id}
-                                            shopeeCategoryName={activeProduct.shopee_category.path || activeProduct.shopee_category.name}
-                                        />
-
-                                        <Divider />
-
                                         {familySyncResult && (
                                             <Alert severity="success" onClose={() => setFamilySyncResult(null)}>
                                                 สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count} attributes
@@ -1507,14 +1494,43 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                                 )}
                             </Paper>
 
-                            {/* Section 3 — Payload Shopee: ฟิลด์ payload ตายตัวของ Shopee เอง
+                            {/* Section 3 — Brand Mapping: แยกออกมาจาก Section 2 เป็นของตัวเอง
+                                (ไม่ยัดรวมกัน) — Brand ของ Shopee ไม่ได้ sync มาเป็น Shopee
+                                attribute ธรรมดา (ผูกกับ pbrand + Brand master แทน — ดู
+                                ShopeeProductSyncService::resolveShopeeBrandId()) เลยไม่มีวันโผล่
+                                ในตาราง Attribute ของ section 2 ไม่ว่ายังไง — section นี้ย้ายมาจาก
+                                categories/shopee-mapping.tsx ทั้งก้อน (ดู
+                                ShopeeBrandMappingPanel's docblock) ให้จับคู่ได้ตรงนี้เลย แทนที่จะ
+                                ต้องสลับไปอีกหน้า — lock เหมือน section 2 เพราะต้องรู้ shopee_category
+                                ก่อนถึงจะรู้ว่าจะ sync/จับคู่แบรนด์ของหมวดหมู่ไหน */}
+                            <Paper
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[2] = el;
+                                }}
+                                elevation={0}
+                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                            >
+                                {!activeProduct.category_mapped || !activeProduct.shopee_category ? (
+                                    <Stack alignItems="center" spacing={1} sx={{ py: 4, color: FIORI.textSecondary }}>
+                                        <LockOutlinedIcon fontSize="small" />
+                                        <Typography variant="body2">กรุณาบันทึก Category Mapping (Section 1) ก่อน ถึงจะแมป Brand ได้</Typography>
+                                    </Stack>
+                                ) : (
+                                    <ShopeeBrandMappingPanel
+                                        shopeeCategoryId={activeProduct.shopee_category.id}
+                                        shopeeCategoryName={activeProduct.shopee_category.path || activeProduct.shopee_category.name}
+                                    />
+                                )}
+                            </Paper>
+
+                            {/* Section 4 — Payload Shopee: ฟิลด์ payload ตายตัวของ Shopee เอง
                                 (name/price/qty/weight/length/width/height/description/video)
                                 ไม่ผูกกับหมวดหมู่ไหนเลย ต่างจาก section 2 ที่เป็น category
                                 attribute — เลยไม่ต้อง lock ไว้จนกว่าจะแมป Category ก่อนเหมือน
                                 section 2 */}
                             <Paper
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[2] = el;
+                                    sectionRefs.current[3] = el;
                                 }}
                                 elevation={0}
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
@@ -1589,12 +1605,12 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                                 </Stack>
                             </Paper>
 
-                            {/* Section 4 — History: audit trail รวมของทุกขั้นตอนการแมพ Shopee
+                            {/* Section 5 — History: audit trail รวมของทุกขั้นตอนการแมพ Shopee
                                 ของ master category นี้ — ดู ShopeeMappingTimelineBuilder ฝั่ง
                                 backend สำหรับขอบเขต/ที่มาของแต่ละแหล่งข้อมูล */}
                             <Paper
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[3] = el;
+                                    sectionRefs.current[4] = el;
                                 }}
                                 elevation={0}
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
