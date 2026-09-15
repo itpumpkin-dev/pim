@@ -2,6 +2,7 @@ import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { ShopeeBrandMappingPanel } from '@/components/catalog/shopee-brand-mapping-panel';
 import {
     ShopeeAttributeOptionMappingDialog,
     type ShopeeAttributeOptionMappingInfo,
@@ -1343,6 +1344,20 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                                                 </Button>
                                             </Stack>
                                         </Stack>
+
+                                        {/* Brand ของ Shopee ไม่ได้ sync มาเป็น Shopee attribute ธรรมดา
+                                        (ผูกกับ pbrand + Brand master แทน — ดู
+                                        ShopeeProductSyncService::resolveShopeeBrandId()) เลยไม่มีวัน
+                                        โผล่ในตาราง Attribute ด้านล่างนี้ไม่ว่ายังไง — ตารางนี้ย้ายมาจาก
+                                        categories/shopee-mapping.tsx ทั้งก้อน (ดู
+                                        ShopeeBrandMappingPanel's docblock) ให้จับคู่ได้ตรงนี้เลย
+                                        แทนที่จะต้องสลับไปอีกหน้า */}
+                                        <ShopeeBrandMappingPanel
+                                            shopeeCategoryId={activeProduct.shopee_category.id}
+                                            shopeeCategoryName={activeProduct.shopee_category.path || activeProduct.shopee_category.name}
+                                        />
+
+                                        <Divider />
 
                                         {familySyncResult && (
                                             <Alert severity="success" onClose={() => setFamilySyncResult(null)}>

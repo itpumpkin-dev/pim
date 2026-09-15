@@ -1,6 +1,5 @@
 import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
-import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
@@ -54,12 +53,6 @@ interface ShopeeRow {
     brand_count: number;
 }
 
-interface ShopeeBrandRow {
-    id: number;
-    name: string;
-    mapped: { id: number; name: string } | null;
-}
-
 interface ShopeeAttributeRow {
     id: number;
     name: string;
@@ -104,14 +97,14 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
 
-    // ตาราง Shopee Brands ด้านล่าง (sync + PIM mapping ของหมวดหมู่ที่เลือกอยู่)
-    // เขียนข้อมูลแบรนด์ ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วยสิทธิ์แยกของตัวเอง
-    // (marketplace_shopee.edit_brand_mapping_shopee / edit_attribute_mapping_shopee)
-    // ไม่ได้พ่วงกับ brands.edit_brands / attributes.edit_attributes ทั่วไป หรือ
-    // categories.edit_categories ที่ gate ทั้งหน้านี้อีกต่อไป (ดู routes/catalog.php)
+    // เขียนข้อมูล attribute mapping ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วยสิทธิ์แยก
+    // ของตัวเอง (marketplace_shopee.edit_attribute_mapping_shopee) ไม่ได้พ่วงกับ
+    // attributes.edit_attributes ทั่วไป หรือ categories.edit_categories ที่ gate
+    // ทั้งหน้านี้อีกต่อไป (ดู routes/catalog.php) — ส่วนตาราง "Shopee Brands"
+    // ที่เคยอยู่ตรงนี้ ย้ายไปอยู่ที่ shopee-products.tsx (ผ่าน
+    // ShopeeBrandMappingPanel) แล้ว ใกล้จุดที่แอดมินจะเจอปัญหา brand จริงๆ มากกว่า
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    const canEditBrands = permissions.includes('marketplace_shopee.edit_brand_mapping_shopee');
     const canEditAttributes = permissions.includes('marketplace_shopee.edit_attribute_mapping_shopee');
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -130,179 +123,14 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     const [saving, setSaving] = useState(false);
     const [syncingCategories, setSyncingCategories] = useState(false);
 
-    // ตาราง Shopee Brands แยกต่างหากที่อยู่ใต้ตารางหมวดหมู่ — ขับเคลื่อนด้วยแถว
-    // leaf category ล่าสุดที่คลิก ไม่ใช่ expander แยกต่อแถวแล้ว (เพราะ get_brand_list
-    // เองก็ scope ตามหมวดหมู่อยู่แล้ว มีแค่หมวดหมู่เดียวที่เกี่ยวข้องในแต่ละครั้ง เลยทำเป็น
-    // ตาราง "detail" เต็มความกว้างอ่านง่ายกว่าไปยัด picker ไว้ในทุกแถว)
+    // "detail" ที่อยู่ใต้ตารางหมวดหมู่ — ขับเคลื่อนด้วยแถว leaf category ล่าสุดที่คลิก
+    // (เดิมมีตาราง Shopee Brands คู่กันตรงนี้ด้วย ย้ายไปอยู่ที่ shopee-products.tsx
+    // แล้ว — ดู ShopeeBrandMappingPanel's docblock)
     const [selectedCategory, setSelectedCategory] = useState<ShopeeRow | null>(null);
-    const [brands, setBrands] = useState<ShopeeBrandRow[] | null>(null);
-    const [brandsMeta, setBrandsMeta] = useState<{ currentPage: number; lastPage: number; total: number } | null>(null);
-    const [brandSearch, setBrandSearch] = useState('');
-    const [brandPerPage, setBrandPerPage] = useState(25);
-    const [loadingBrands, setLoadingBrands] = useState(false);
-    const [brandSyncing, setBrandSyncing] = useState(false);
-    const [brandSyncMessage, setBrandSyncMessage] = useState('');
-    const [savingBrandId, setSavingBrandId] = useState<number | null>(null);
-    const brandPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const firstRender = useRef(true);
-    const firstBrandSearchRender = useRef(true);
-    // ตั้งค่าไว้ก่อนที่การสลับหมวดหมู่จะรีเซ็ต brandSearch เป็น '' — ไม่งั้นการเปลี่ยน
-    // state ตรงนี้จะไปทริกเกอร์ effect ค้นหาแบบ debounced ด้านล่างด้วย ทำให้ยิง fetch
-    // ซ้ำซ้อนอีกรอบหลังจากที่ effect ตอนสลับหมวดหมู่ยิงไปแล้วรอบหนึ่ง
-    const skipNextSearchDebounce = useRef(false);
 
-    useEffect(() => {
-        return () => {
-            if (brandPollTimer.current) clearTimeout(brandPollTimer.current);
-        };
-    }, []);
-
-    // รายการแบรนด์ของหมวดหมู่หนึ่งอาจมีได้เป็นหลักหมื่น (เจอจริงมาแล้ว: 12,102 รายการ
-    // ในหมวดหมู่จริงหมวดเดียว) เลยต้องทำ pagination + search แบบเดียวกับตารางหมวดหมู่
-    // ด้านบน — เพราะการโหลดและ render ทุกแถวพร้อมกันคือสาเหตุที่ทำให้ตารางนี้เปิดช้า
-    const loadBrands = (shopeeCategoryId: number, opts: { search?: string; page?: number; perPage?: number } = {}) => {
-        const search = opts.search ?? brandSearch;
-        const page = opts.page ?? 1;
-        const perPage = opts.perPage ?? brandPerPage;
-
-        setLoadingBrands(true);
-        const params = new URLSearchParams({ search, page: String(page), per_page: String(perPage) });
-
-        fetch(`/catalog/categories/${shopeeCategoryId}/shopee-brands?${params.toString()}`, { headers: { Accept: 'application/json' } })
-            .then((res) => (res.ok ? res.json() : { data: [], current_page: 1, last_page: 1, total: 0 }))
-            .then((body: { data: ShopeeBrandRow[]; current_page: number; last_page: number; total: number }) => {
-                setBrands(body.data);
-                setBrandsMeta({ currentPage: body.current_page, lastPage: body.last_page, total: body.total });
-            })
-            .finally(() => setLoadingBrands(false));
-    };
-
-    // พอเลือกหมวดหมู่อื่น ให้ล้างรายการแบรนด์/สถานะ sync ของหมวดหมู่เดิมทิ้งไปเลย —
-    // เพราะเป็นหมวดหมู่คนละอันกัน ไม่ควรมีอะไรค้างข้ามมา
-    useEffect(() => {
-        setBrands(null);
-        setBrandsMeta(null);
-        setBrandSyncMessage('');
-        if (brandPollTimer.current) clearTimeout(brandPollTimer.current);
-        skipNextSearchDebounce.current = true;
-        setBrandSearch('');
-        if (selectedCategory) loadBrands(selectedCategory.id, { search: '', page: 1 });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedCategory?.id]);
-
-    useEffect(() => {
-        if (firstBrandSearchRender.current) {
-            firstBrandSearchRender.current = false;
-            return;
-        }
-        if (skipNextSearchDebounce.current) {
-            skipNextSearchDebounce.current = false;
-            return;
-        }
-        if (!selectedCategory) return;
-
-        const timeout = setTimeout(() => loadBrands(selectedCategory.id, { search: brandSearch, page: 1 }), 300);
-        return () => clearTimeout(timeout);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [brandSearch]);
-
-    const handleBrandPerPageChange = (value: number) => {
-        setBrandPerPage(value);
-        if (selectedCategory) loadBrands(selectedCategory.id, { search: brandSearch, page: 1, perPage: value });
-    };
-
-    const goToBrandPage = (page: number) => {
-        if (selectedCategory) loadBrands(selectedCategory.id, { search: brandSearch, page });
-    };
-
-    const pollBrandSync = (shopeeCategoryId: number, jobTrackerId: number) => {
-        fetch(`/catalog/brands/sync-jobs/${jobTrackerId}/status`, { headers: { Accept: 'application/json' } })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok) {
-                    setBrandSyncing(false);
-                    setBrandSyncMessage(body.message ?? 'Could not check sync status.');
-                    return;
-                }
-
-                if (body.status === 'completed') {
-                    setBrandSyncing(false);
-                    setBrandSyncMessage(t('brandsSyncedCount', { count: body.total_records_created ?? 0 }));
-                    loadBrands(shopeeCategoryId, { search: brandSearch, page: 1 });
-                    router.reload({ only: ['categories'] });
-                    return;
-                }
-
-                if (body.status === 'failed' || body.status === 'cancelled') {
-                    setBrandSyncing(false);
-                    setBrandSyncMessage(body.error_log?.[0]?.message ?? 'Sync failed.');
-                    return;
-                }
-
-                brandPollTimer.current = setTimeout(() => pollBrandSync(shopeeCategoryId, jobTrackerId), 2000);
-            })
-            .catch(() => {
-                setBrandSyncing(false);
-                setBrandSyncMessage('Network error while checking sync status.');
-            });
-    };
-
-    const triggerBrandSync = () => {
-        if (!selectedCategory) return;
-        setBrandSyncing(true);
-        setBrandSyncMessage('');
-
-        fetch('/catalog/categories/shopee-mapping/sync-brands', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
-            body: JSON.stringify({ shopee_category_id: selectedCategory.id }),
-        })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok || !body.job_tracker_id) {
-                    setBrandSyncing(false);
-                    setBrandSyncMessage(body.message ?? 'Could not start sync.');
-                    return;
-                }
-
-                pollBrandSync(selectedCategory.id, body.job_tracker_id);
-            })
-            .catch(() => {
-                setBrandSyncing(false);
-                setBrandSyncMessage('Network error while starting sync.');
-            });
-    };
-
-    // `optionId` คือแถว PIM AttributeOption ที่จะถูกเขียนค่าลงไปจริงๆ
-    // (attribute_options.shopee_brand_id) — ถ้าเป็นการจับคู่ใหม่ ก็คือ id ของแบรนด์ PIM
-    // ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping เดิมนั้น
-    // ไม่ใช่อะไรที่คำนวณมาจาก `shopeeBrandId` ส่วน `display` คือสิ่งที่จะโชว์ในแถวหลังจากนั้น
-    const persistBrand = (shopeeBrandId: number, optionId: number, newShopeeId: number | null, display: { id: number; name: string } | null) => {
-        setSavingBrandId(shopeeBrandId);
-        fetch('/catalog/brands/shopee-mapping', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
-            body: JSON.stringify({ mappings: [{ option_id: optionId, marketplace_brand_id: newShopeeId }] }),
-        })
-            .then((res) => {
-                if (!res.ok) return;
-                setBrands((prev) => (prev ? prev.map((b) => (b.id === shopeeBrandId ? { ...b, mapped: display } : b)) : prev));
-            })
-            .finally(() => setSavingBrandId(null));
-    };
-
-    const assignBrand = (shopeeBrandId: number, pimBrand: PimBrandOption) => {
-        persistBrand(shopeeBrandId, pimBrand.id, shopeeBrandId, { id: pimBrand.id, name: pimBrand.name });
-    };
-
-    const clearBrand = (shopeeBrandId: number, currentPimOptionId: number) => {
-        persistBrand(shopeeBrandId, currentPimOptionId, null, null);
-    };
-
-    // ตาราง Shopee Attributes — ใช้แพทเทิร์นตาราง "detail" แบบเดียวกับตาราง Brands
-    // คือเลือก leaf category ด้านบนก่อน แต่ทำงานแบบ synchronous (ไม่มี JobTracker/
+    // ตาราง Shopee Attributes — ใช้แพทเทิร์นตาราง "detail" เดียวกัน คือเลือก leaf
+    // category ด้านบนก่อน แต่ทำงานแบบ synchronous (ไม่มี JobTracker/
     // polling) เพราะ get_attribute_tree ไม่มี pagination และ schema ของแต่ละหมวดหมู่
     // ก็เล็ก ทำให้ ShopeeAttributeMappingController::syncShopeeAttributesForCategory()
     // แค่ return ผลลัพธ์กลับมาตรงๆ ได้เลย
@@ -648,53 +476,6 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
         },
     ];
 
-    const brandColumns: FioriResponsiveColumn<ShopeeBrandRow>[] = [
-        {
-            key: 'id',
-            header: t('idColumn'),
-            priority: 'high',
-            align: 'right',
-            width: 120,
-            render: (brand) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {brand.id}
-                </Typography>
-            ),
-        },
-        {
-            key: 'name',
-            header: t('nameColumn'),
-            priority: 'always',
-            minWidth: 200,
-            render: (brand) => <Typography fontWeight={600}>{brand.name}</Typography>,
-        },
-        {
-            key: 'mapping',
-            header: t('brandMappingColumn'),
-            priority: 'high',
-            minWidth: 260,
-            render: (brand) => (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <PimBrandPicker
-                            value={brand.mapped}
-                            disabled={savingBrandId === brand.id}
-                            onChange={(val) => {
-                                if (val) {
-                                    assignBrand(brand.id, val);
-                                } else if (brand.mapped) {
-                                    clearBrand(brand.id, brand.mapped.id);
-                                }
-                            }}
-                            placeholder={t('searchPimBrandPlaceholder')}
-                        />
-                    </Box>
-                    {savingBrandId === brand.id && <CircularProgress size={14} />}
-                </Stack>
-            ),
-        },
-    ];
-
     const attributeColumns: FioriResponsiveColumn<ShopeeAttributeRow>[] = [
         {
             key: 'id',
@@ -946,127 +727,6 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                     })}
                     emptyMessage={t('noCategoriesFound')}
                 />
-
-                {canEditBrands && (
-                    <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>
-                                {selectedCategory ? t('brandsForCategory', { name: selectedCategory.name }) : t('shopeeBrandsSectionTitle')}
-                            </Typography>
-
-                            {selectedCategory && (
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    {brandSyncMessage && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            {brandSyncMessage}
-                                        </Typography>
-                                    )}
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={brandSyncing}
-                                        startIcon={brandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                        onClick={triggerBrandSync}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        {brandSyncing ? t('syncingBrands') : t('syncBrandsForCategory')}
-                                    </Button>
-                                </Stack>
-                            )}
-                        </Stack>
-
-                        {!selectedCategory ? (
-                            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-                                <Typography color="text.secondary">{t('selectCategoryPrompt')}</Typography>
-                            </Paper>
-                        ) : (
-                            <>
-                                <Stack
-                                    direction={{ xs: 'column', md: 'row' }}
-                                    justifyContent="space-between"
-                                    alignItems="center"
-                                    spacing={2}
-                                    sx={{ mb: 2 }}
-                                >
-                                    <TextField
-                                        value={brandSearch}
-                                        onChange={(event) => setBrandSearch(event.target.value)}
-                                        placeholder={t('searchBrands')}
-                                        size="small"
-                                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    />
-
-                                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                                        {loadingBrands && <CircularProgress size={18} />}
-
-                                        <Select
-                                            value={brandPerPage}
-                                            onChange={(e) => handleBrandPerPageChange(Number(e.target.value))}
-                                            size="small"
-                                            sx={{ minWidth: 60, height: 36 }}
-                                        >
-                                            <MenuItem value={10}>10</MenuItem>
-                                            <MenuItem value={25}>25</MenuItem>
-                                            <MenuItem value={50}>50</MenuItem>
-                                            <MenuItem value={100}>100</MenuItem>
-                                        </Select>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {tGrid('perPage')}
-                                        </Typography>
-
-                                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                                            <Typography variant="body2">{brandsMeta?.currentPage ?? 1}</Typography>
-                                        </Paper>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {tGrid('pageOf', { lastPage: brandsMeta?.lastPage ?? 1 })}
-                                        </Typography>
-
-                                        <Stack direction="row" spacing={0.2}>
-                                            <IconButton size="small" disabled={(brandsMeta?.currentPage ?? 1) <= 1} onClick={() => goToBrandPage(1)}>
-                                                <FirstPageIcon fontSize="small" />
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                disabled={(brandsMeta?.currentPage ?? 1) <= 1}
-                                                onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) - 1)}
-                                            >
-                                                <ChevronLeftIcon fontSize="small" />
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
-                                                onClick={() => goToBrandPage((brandsMeta?.currentPage ?? 1) + 1)}
-                                            >
-                                                <ChevronRightIcon fontSize="small" />
-                                            </IconButton>
-                                            <IconButton
-                                                size="small"
-                                                disabled={(brandsMeta?.currentPage ?? 1) >= (brandsMeta?.lastPage ?? 1)}
-                                                onClick={() => goToBrandPage(brandsMeta?.lastPage ?? 1)}
-                                            >
-                                                <LastPageIcon fontSize="small" />
-                                            </IconButton>
-                                        </Stack>
-                                    </Stack>
-                                </Stack>
-
-                                <FioriResponsiveTable
-                                    columns={brandColumns}
-                                    rows={brands ?? []}
-                                    getRowKey={(brand) => brand.id}
-                                    emptyMessage={loadingBrands ? <CircularProgress size={20} /> : t('noBrandsInCategory')}
-                                />
-                            </>
-                        )}
-                    </>
-                )}
 
                 {canEditAttributes && (
                     <>
