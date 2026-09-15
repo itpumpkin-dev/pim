@@ -752,19 +752,32 @@ class LazadaProductSyncService
 
     /**
      * Read-only — fetches the category's live attribute schema and checks
-     * every field it marks is_mandatory=1 has a non-empty value in $payload.
+     * (a) every field it marks is_mandatory=1 has a non-empty value in
+     * $payload, and (b) every dropdown-type field (`options` non-empty in
+     * this same live schema) we DID provide a value for actually matches one
+     * of Lazada's current option ids.
+     *
+     * (b) exists because our own `lazada_attribute_option_mappings` table
+     * (admin-configured via LazadaAttributeMappingController, resolved by
+     * resolveSingleSelectOptionValue()/resolveMultiSelectOptionValues()
+     * above) can go stale the moment Lazada edits that category's dropdown —
+     * the mapping still resolves to *a* value, so buildPayload() has no way
+     * to know it's now wrong, and push() would only find out from Lazada's
+     * own CHK_CATPROP_CPV_NOT_ENUM rejection (error 4115: "Attribute value
+     * that you input is not included in the dropdown list given"). Checking
+     * against this same live schema call — already fetched for the
+     * mandatory-field check above, no extra request — catches that before
+     * push() ever sends it, with a message that names the actual attribute
+     * instead of Lazada's opaque property id.
      */
     private function assertMandatoryFieldsPresent(int $categoryId, array $payload): void
     {
         $schema = $this->client->getCategoryAttributes($categoryId);
         $skuFields = $payload['skus'][0] ?? [];
         $missing = [];
+        $invalidEnum = [];
 
         foreach ($schema['data'] ?? [] as $field) {
-            if (empty($field['is_mandatory'])) {
-                continue;
-            }
-
             $providedIn = $field['attribute_type'] === 'sku' ? $skuFields : $payload['attributes'];
             // Confirmed via a live (read-only) getCategoryAttributes() call:
             // Lazada's schema names the SKU image slot "__images__", but our
@@ -775,16 +788,44 @@ class LazadaProductSyncService
             // a literal key mismatch.
             $fieldName = $field['name'] === '__images__' ? 'images' : $field['name'];
             $value = $providedIn[$fieldName] ?? null;
+            $isEmpty = $value === null || $value === '' || $value === [];
 
-            if ($value === null || $value === '' || $value === []) {
+            if (!empty($field['is_mandatory']) && $isEmpty) {
                 $missing[] = ($field['label'] ?? $field['name']).' ('.$field['name'].')';
+            }
+
+            // options shape confirmed in encodeLazadaOptions()'s docblock:
+            // {name, en_name, id} — `id` is what we send back and what we
+            // stored as lazada_option_value, so compare against that.
+            if (!$isEmpty && !empty($field['options'])) {
+                $validIds = array_map(static fn ($o) => (string) ($o['id'] ?? null), $field['options']);
+                $providedIds = array_map('strval', is_array($value) ? $value : [$value]);
+                $badIds = array_diff($providedIds, $validIds);
+
+                if (!empty($badIds)) {
+                    $invalidEnum[] = ($field['label'] ?? $field['name']).' ('.$field['name'].'): '.implode(', ', $badIds);
+                }
             }
         }
 
-        if (!empty($missing)) {
-            throw new RuntimeException(
-                'Missing mandatory Lazada field(s) for this category: '.implode(', ', $missing)
-            );
+        if (empty($missing) && empty($invalidEnum)) {
+            return;
         }
+
+        $parts = [];
+        if (!empty($missing)) {
+            $parts[] = 'missing mandatory field(s): '.implode(', ', $missing);
+        }
+        if (!empty($invalidEnum)) {
+            // Points the admin at LazadaAttributeMappingController's
+            // per-product "จับคู่ตัวเลือก" option-mapping dialog rather than
+            // leaving them to decode Lazada's own error 4115 later.
+            $parts[] = 'value(s) not in Lazada\'s current dropdown for: '.implode('; ', $invalidEnum)
+                .' — re-check the option mapping for this attribute (Lazada may have changed its option list)';
+        }
+
+        throw new RuntimeException(
+            'Cannot push to Lazada — '.implode('; ', $parts).'.'
+        );
     }
 }
