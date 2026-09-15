@@ -2,6 +2,7 @@ import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { TikTokBrandMappingPanel } from '@/components/catalog/tiktok-brand-mapping-panel';
 import {
     TikTokAttributeOptionMappingDialog,
     type TikTokAttributeOptionMappingInfo,
@@ -1156,8 +1157,9 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                             <Tabs value={sectionIndex} onChange={(_, v) => scrollToSection(v)} sx={fioriTabsSx}>
                                 <Tab label="1. Category Mapping" />
                                 <Tab label="2. Attribute Mapping" disabled={!activeProduct.category_mapped} />
-                                <Tab label="3. Payload TikTok" />
-                                <Tab label="4. History" disabled={!activeProduct.master_category} />
+                                <Tab label="3. Brand Mapping" />
+                                <Tab label="4. Payload TikTok" />
+                                <Tab label="5. History" disabled={!activeProduct.master_category} />
                             </Tabs>
                         </Paper>
 
@@ -1473,14 +1475,31 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                 )}
                             </Paper>
 
-                            {/* Section 3 — Payload TikTok: ฟิลด์ payload ตายตัวของ TikTok เอง
+                            {/* Section 3 — Brand Mapping: แยกออกมาจาก Section 2 เป็นของตัวเอง —
+                                brand ของ TikTok ไม่ได้ sync มาเป็น attribute ธรรมดา (ผูกกับ
+                                pbrand + Brand master แทน) เลยไม่มีวันโผล่ในตาราง Attribute ของ
+                                section 2 — section นี้ย้ายมาจาก categories/tiktok-mapping.tsx
+                                ทั้งก้อน (ดู TikTokBrandMappingPanel's docblock) ไม่ต้อง lock
+                                รอ Category Mapping ก่อนเหมือน section 2 เพราะ brand catalog ของ
+                                TikTok เป็น global ไม่ผูกกับหมวดหมู่เลย (ต่างจาก Shopee) */}
+                            <Paper
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[2] = el;
+                                }}
+                                elevation={0}
+                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                            >
+                                <TikTokBrandMappingPanel />
+                            </Paper>
+
+                            {/* Section 4 — Payload TikTok: ฟิลด์ payload ตายตัวของ TikTok เอง
                                 (name/price/qty/weight/length/width/height/description/video)
                                 ไม่ผูกกับหมวดหมู่ไหนเลย ต่างจาก section 2 ที่เป็น category
                                 attribute — เลยไม่ต้อง lock ไว้จนกว่าจะแมป Category ก่อนเหมือน
                                 section 2 */}
                             <Paper
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[2] = el;
+                                    sectionRefs.current[3] = el;
                                 }}
                                 elevation={0}
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
@@ -1555,12 +1574,12 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                 </Stack>
                             </Paper>
 
-                            {/* Section 4 — History: audit trail รวมของทุกขั้นตอนการแมพ TikTok
+                            {/* Section 5 — History: audit trail รวมของทุกขั้นตอนการแมพ TikTok
                                 ของ master category นี้ — ดู TikTokMappingTimelineBuilder ฝั่ง
                                 backend สำหรับขอบเขต/ที่มาของแต่ละแหล่งข้อมูล */}
                             <Paper
                                 ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[3] = el;
+                                    sectionRefs.current[4] = el;
                                 }}
                                 elevation={0}
                                 sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}

@@ -1,6 +1,5 @@
 import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
-import { PimBrandPicker, type PimBrandOption } from '@/components/catalog/pim-brand-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
@@ -9,7 +8,6 @@ import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CancelIcon from '@mui/icons-material/Cancel';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
@@ -59,18 +57,8 @@ interface TikTokRow {
     mapped_categories: MappedCategory[];
 }
 
-// `id` เป็น string ไม่ใช่ number — เพราะ brand id ของ TikTok เองเป็นเลข 19 หลัก
-// สไตล์ snowflake ซึ่งจะเสีย precision ทันทีที่ JSON.parse ของ JS แตะเข้าไปเกิน
-// Number.MAX_SAFE_INTEGER (ดู docblock ของ BrandController::tiktokBrandsList()
-// — เจอจริงกับข้อมูลจริงมาแล้ว) ส่วน category id ไม่มีปัญหานี้ (เอกสารของ TikTok เอง
-// ก็โชว์เป็นเลขน้อยๆ เช่น "600002") เลยทำให้ TikTokRow.id ด้านบนยังคงเป็น
-// number ธรรมดาได้
-interface TikTokBrandRow {
-    id: string;
-    name: string;
-    mapped: { id: number; name: string } | null;
-}
-
+// (TikTokBrandRow เคยอยู่ตรงนี้ — ย้ายไปอยู่ใน TikTokBrandMappingPanel แล้ว
+// พร้อมกับ docblock อธิบายว่าทำไม id ของมันเป็น string ไม่ใช่ number)
 interface TikTokAttributeRow {
     // ใช้ `id` เป็น key ซึ่งเป็น string — ดู docblock ของ TikTokAttribute ประกอบ
     id: string;
@@ -108,10 +96,11 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
-    // แยกสิทธิ์ต่อแพลตฟอร์มแล้ว (marketplace_tiktok.edit_brand_mapping_tiktok /
-    // edit_attribute_mapping_tiktok) — ไม่ได้พ่วงกับ brands.edit_brands /
-    // attributes.edit_attributes ทั่วไปอีกต่อไป (ดู routes/catalog.php)
-    const canEditBrands = permissions.includes('marketplace_tiktok.edit_brand_mapping_tiktok');
+    // แยกสิทธิ์ต่อแพลตฟอร์มแล้ว (marketplace_tiktok.edit_attribute_mapping_tiktok)
+    // — ไม่ได้พ่วงกับ attributes.edit_attributes ทั่วไปอีกต่อไป (ดู
+    // routes/catalog.php) — ส่วนสิทธิ์ edit_brand_mapping_tiktok ย้ายไปเช็คใน
+    // TikTokBrandMappingPanel เอง (ดู docblock ของตัวนั้น) พร้อมกับตาราง
+    // "TikTok Brands" ที่ย้ายไปอยู่ที่ tiktok-products.tsx แล้ว
     const canEditAttributes = permissions.includes('marketplace_tiktok.edit_attribute_mapping_tiktok');
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -139,171 +128,6 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
     const runCategorySync = () => {
         setSyncingCategories(true);
         router.post('/catalog/categories/sync-tiktok', {}, { preserveScroll: true, onFinish: () => setSyncingCategories(false) });
-    };
-
-    // ---- TikTok Brands (global — ดู docblock ของ TikTokBrandRow ประกอบ) ----
-    const [tiktokBrands, setTiktokBrands] = useState<PaginatedData<TikTokBrandRow> | null>(null);
-    const [loadingTiktokBrands, setLoadingTiktokBrands] = useState(false);
-    const [tiktokBrandSearch, setTiktokBrandSearch] = useState('');
-    const [tiktokBrandPerPage, setTiktokBrandPerPage] = useState(25);
-    const [savingTiktokBrandId, setSavingTiktokBrandId] = useState<string | null>(null);
-    const [tiktokBrandSyncing, setTiktokBrandSyncing] = useState(false);
-    const [tiktokBrandSyncMessage, setTiktokBrandSyncMessage] = useState('');
-    const [activeTiktokBrandJobTrackerId, setActiveTiktokBrandJobTrackerId] = useState<number | null>(null);
-    const tiktokBrandPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const firstTiktokBrandSearchRender = useRef(true);
-
-    useEffect(() => {
-        return () => {
-            if (tiktokBrandPollTimer.current) clearTimeout(tiktokBrandPollTimer.current);
-        };
-    }, []);
-
-    const loadTiktokBrands = (opts: { search?: string; page?: number; perPage?: number } = {}) => {
-        const params = new URLSearchParams({
-            search: opts.search ?? tiktokBrandSearch,
-            page: String(opts.page ?? 1),
-            per_page: String(opts.perPage ?? tiktokBrandPerPage),
-        });
-
-        setLoadingTiktokBrands(true);
-        fetch(`/catalog/categories/tiktok-mapping/tiktok-brands?${params.toString()}`, { headers: { Accept: 'application/json' } })
-            .then((res) => (res.ok ? res.json() : { data: [], current_page: 1, last_page: 1, per_page: 25, total: 0 }))
-            .then((body: PaginatedData<TikTokBrandRow>) => setTiktokBrands(body))
-            .finally(() => setLoadingTiktokBrands(false));
-    };
-
-    // โหลดครั้งเดียวตอน mount — ต่างจากตาราง Brands ของ Shopee ตรงนี้ไม่ต้องเลือก
-    // หมวดหมู่ก่อนถึงจะโหลดได้ (brand catalog ของ TikTok ไม่มีมิติหมวดหมู่เลย
-    // เหมือนกับของ Lazada)
-    useEffect(() => {
-        if (canEditBrands) loadTiktokBrands({ page: 1 });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        if (firstTiktokBrandSearchRender.current) {
-            firstTiktokBrandSearchRender.current = false;
-            return;
-        }
-
-        const timeout = setTimeout(() => loadTiktokBrands({ search: tiktokBrandSearch, page: 1 }), 300);
-        return () => clearTimeout(timeout);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tiktokBrandSearch]);
-
-    const handleTiktokBrandPerPageChange = (value: number) => {
-        setTiktokBrandPerPage(value);
-        loadTiktokBrands({ page: 1, perPage: value });
-    };
-
-    const goToTiktokBrandPage = (page: number) => {
-        loadTiktokBrands({ page });
-    };
-
-    const pollTiktokBrandSync = (jobTrackerId: number) => {
-        fetch(`/catalog/brands/sync-jobs/${jobTrackerId}/status`, { headers: { Accept: 'application/json' } })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok) {
-                    setTiktokBrandSyncing(false);
-                    setTiktokBrandSyncMessage(body.message ?? 'Could not check sync status.');
-                    setActiveTiktokBrandJobTrackerId(null);
-                    return;
-                }
-
-                if (body.status === 'completed') {
-                    setTiktokBrandSyncing(false);
-                    setActiveTiktokBrandJobTrackerId(null);
-                    setTiktokBrandSyncMessage(t('brandsSyncedCount', { count: body.total_records_created ?? 0 }));
-                    loadTiktokBrands({ page: 1 });
-                    return;
-                }
-
-                if (body.status === 'failed' || body.status === 'cancelled') {
-                    setTiktokBrandSyncing(false);
-                    setActiveTiktokBrandJobTrackerId(null);
-                    setTiktokBrandSyncMessage(body.error_log?.[0]?.message ?? 'Sync failed.');
-                    return;
-                }
-
-                tiktokBrandPollTimer.current = setTimeout(() => pollTiktokBrandSync(jobTrackerId), 2000);
-            })
-            .catch(() => {
-                setTiktokBrandSyncing(false);
-                setActiveTiktokBrandJobTrackerId(null);
-                setTiktokBrandSyncMessage('Network error while checking sync status.');
-            });
-    };
-
-    const triggerTiktokBrandSync = () => {
-        setTiktokBrandSyncing(true);
-        setTiktokBrandSyncMessage('');
-
-        fetch('/catalog/brands/sync-tiktok', {
-            method: 'POST',
-            headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
-        })
-            .then(async (res) => {
-                const body = await res.json();
-
-                if (!res.ok || !body.job_tracker_id) {
-                    setTiktokBrandSyncing(false);
-                    setTiktokBrandSyncMessage(body.message ?? 'Could not start sync.');
-                    return;
-                }
-
-                setActiveTiktokBrandJobTrackerId(body.job_tracker_id);
-                pollTiktokBrandSync(body.job_tracker_id);
-            })
-            .catch(() => {
-                setTiktokBrandSyncing(false);
-                setTiktokBrandSyncMessage('Network error while starting sync.');
-            });
-    };
-
-    const cancelTiktokBrandSync = () => {
-        if (!activeTiktokBrandJobTrackerId) return;
-
-        fetch(`/catalog/brands/sync-jobs/${activeTiktokBrandJobTrackerId}/cancel`, {
-            method: 'POST',
-            headers: { 'X-XSRF-TOKEN': xsrfToken(), Accept: 'application/json' },
-        }).catch(() => setTiktokBrandSyncMessage('Network error while cancelling sync.'));
-    };
-
-    // `optionId` คือแถว PIM AttributeOption ที่จะถูกเขียนค่าลงไปจริงๆ
-    // (attribute_options.tiktok_brand_id) — ถ้าเป็นการจับคู่ใหม่ ก็คือ id ของแบรนด์ PIM
-    // ที่เพิ่งเลือก แต่ถ้าเป็นการล้าง mapping เดิม ก็คือ PIM id ของ mapping เดิมนั้น
-    // ไม่ใช่อะไรที่คำนวณมาจาก `tiktokBrandId` ส่วน `display` คือสิ่งที่จะโชว์ในแถวหลังจากนั้น
-    // รูปแบบเดียวกับ persistBrand() ของ ShopeeCategoryMapping/LazadaCategoryMapping
-    const persistTiktokBrand = (
-        tiktokBrandId: string,
-        optionId: number,
-        newTiktokId: string | null,
-        display: { id: number; name: string } | null,
-    ) => {
-        setSavingTiktokBrandId(tiktokBrandId);
-        fetch('/catalog/brands/tiktok-mapping', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
-            body: JSON.stringify({ mappings: [{ option_id: optionId, marketplace_brand_id: newTiktokId }] }),
-        })
-            .then((res) => {
-                if (!res.ok) return;
-                setTiktokBrands((prev) =>
-                    prev ? { ...prev, data: prev.data.map((b) => (b.id === tiktokBrandId ? { ...b, mapped: display } : b)) } : prev,
-                );
-            })
-            .finally(() => setSavingTiktokBrandId(null));
-    };
-
-    const assignTiktokBrand = (tiktokBrandId: string, pimBrand: PimBrandOption) => {
-        persistTiktokBrand(tiktokBrandId, pimBrand.id, tiktokBrandId, { id: pimBrand.id, name: pimBrand.name });
-    };
-
-    const clearTiktokBrand = (tiktokBrandId: string, currentPimOptionId: number) => {
-        persistTiktokBrand(tiktokBrandId, currentPimOptionId, null, null);
     };
 
     // ---- TikTok Attributes (ผูกกับหมวดหมู่ เลียนแบบของ Shopee) ----
@@ -634,53 +458,6 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
         },
     ];
 
-    const tiktokBrandColumns: FioriResponsiveColumn<TikTokBrandRow>[] = [
-        {
-            key: 'id',
-            header: t('idColumn'),
-            priority: 'high',
-            align: 'right',
-            width: 160,
-            render: (brand) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {brand.id}
-                </Typography>
-            ),
-        },
-        {
-            key: 'name',
-            header: t('nameColumn'),
-            priority: 'always',
-            minWidth: 200,
-            render: (brand) => <Typography fontWeight={600}>{brand.name}</Typography>,
-        },
-        {
-            key: 'mapping',
-            header: t('brandMappingColumn'),
-            priority: 'high',
-            minWidth: 260,
-            render: (brand) => (
-                <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ flex: 1, minWidth: 200 }}>
-                        <PimBrandPicker
-                            value={brand.mapped}
-                            disabled={savingTiktokBrandId === brand.id}
-                            onChange={(val) => {
-                                if (val) {
-                                    assignTiktokBrand(brand.id, val);
-                                } else if (brand.mapped) {
-                                    clearTiktokBrand(brand.id, brand.mapped.id);
-                                }
-                            }}
-                            placeholder={t('searchPimBrandPlaceholder')}
-                        />
-                    </Box>
-                    {savingTiktokBrandId === brand.id && <CircularProgress size={14} />}
-                </Stack>
-            ),
-        },
-    ];
-
     const tiktokAttributeColumns: FioriResponsiveColumn<TikTokAttributeRow>[] = [
         {
             key: 'name',
@@ -909,122 +686,6 @@ export default function TikTokCategoryMapping({ categories, stats, lastSyncedAt,
                     emptyMessage={t('noCategoriesFound')}
                 />
 
-                {canEditBrands && (
-                    <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>
-                                {t('tiktokBrandsSectionTitle')}
-                            </Typography>
-
-                            <Stack direction="row" spacing={1.5} alignItems="center">
-                                {tiktokBrandSyncMessage && (
-                                    <Typography variant="caption" color="text.secondary">
-                                        {tiktokBrandSyncMessage}
-                                    </Typography>
-                                )}
-                                <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled={tiktokBrandSyncing}
-                                    startIcon={tiktokBrandSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                    onClick={triggerTiktokBrandSync}
-                                    sx={{ textTransform: 'none' }}
-                                >
-                                    {tiktokBrandSyncing ? t('syncingBrands') : t('syncBrands')}
-                                </Button>
-                                {tiktokBrandSyncing && activeTiktokBrandJobTrackerId && (
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        color="error"
-                                        startIcon={<CancelIcon fontSize="small" />}
-                                        onClick={cancelTiktokBrandSync}
-                                        sx={{ textTransform: 'none' }}
-                                    >
-                                        {t('cancel')}
-                                    </Button>
-                                )}
-                            </Stack>
-                        </Stack>
-
-                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                            <TextField
-                                value={tiktokBrandSearch}
-                                onChange={(event) => setTiktokBrandSearch(event.target.value)}
-                                placeholder={t('searchBrands')}
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-
-                            <Stack direction="row" alignItems="center" spacing={1.5}>
-                                {loadingTiktokBrands && <CircularProgress size={18} />}
-
-                                <Select
-                                    value={tiktokBrandPerPage}
-                                    onChange={(e) => handleTiktokBrandPerPageChange(Number(e.target.value))}
-                                    size="small"
-                                    sx={{ minWidth: 60, height: 36 }}
-                                >
-                                    <MenuItem value={10}>10</MenuItem>
-                                    <MenuItem value={25}>25</MenuItem>
-                                    <MenuItem value={50}>50</MenuItem>
-                                    <MenuItem value={100}>100</MenuItem>
-                                </Select>
-                                <Typography variant="body2" color="text.secondary">
-                                    {tGrid('perPage')}
-                                </Typography>
-
-                                <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                                    <Typography variant="body2">{tiktokBrands?.current_page ?? 1}</Typography>
-                                </Paper>
-                                <Typography variant="body2" color="text.secondary">
-                                    {tGrid('pageOf', { lastPage: tiktokBrands?.last_page ?? 1 })}
-                                </Typography>
-
-                                <Stack direction="row" spacing={0.2}>
-                                    <IconButton size="small" disabled={(tiktokBrands?.current_page ?? 1) <= 1} onClick={() => goToTiktokBrandPage(1)}>
-                                        <FirstPageIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(tiktokBrands?.current_page ?? 1) <= 1}
-                                        onClick={() => goToTiktokBrandPage((tiktokBrands?.current_page ?? 1) - 1)}
-                                    >
-                                        <ChevronLeftIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(tiktokBrands?.current_page ?? 1) >= (tiktokBrands?.last_page ?? 1)}
-                                        onClick={() => goToTiktokBrandPage((tiktokBrands?.current_page ?? 1) + 1)}
-                                    >
-                                        <ChevronRightIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        disabled={(tiktokBrands?.current_page ?? 1) >= (tiktokBrands?.last_page ?? 1)}
-                                        onClick={() => goToTiktokBrandPage(tiktokBrands?.last_page ?? 1)}
-                                    >
-                                        <LastPageIcon fontSize="small" />
-                                    </IconButton>
-                                </Stack>
-                            </Stack>
-                        </Stack>
-
-                        <FioriResponsiveTable
-                            columns={tiktokBrandColumns}
-                            rows={tiktokBrands?.data ?? []}
-                            getRowKey={(brand) => brand.id}
-                            emptyMessage={loadingTiktokBrands ? <CircularProgress size={20} /> : t('noBrandsFound')}
-                        />
-                    </>
-                )}
 
                 {canEditAttributes && (
                     <>
