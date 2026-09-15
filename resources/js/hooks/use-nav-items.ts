@@ -292,18 +292,18 @@ export function useMainNavItems(): NavItem[] {
                         permission: 'user_groups.list_user_groups',
                         iconName: 'navUserGroups',
                     },
-                    {
-                        title: t('departments'),
-                        url: '/system/department',
-                        permission: 'departments.list_departments',
-                        iconName: 'navDepartments',
-                    },
-                    {
-                        title: t('jobPositions'),
-                        url: '/system/jobPosition',
-                        permission: 'job_positions.list_job_positions',
-                        iconName: 'navJobPositions',
-                    },
+                    // {
+                    //     title: t('departments'),
+                    //     url: '/system/department',
+                    //     permission: 'departments.list_departments',
+                    //     iconName: 'navDepartments',
+                    // },
+                    // {
+                    //     title: t('jobPositions'),
+                    //     url: '/system/jobPosition',
+                    //     permission: 'job_positions.list_job_positions',
+                    //     iconName: 'navJobPositions',
+                    // },
                     {
                         title: t('roles'),
                         url: '/system/roles',
