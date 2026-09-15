@@ -52,6 +52,15 @@ class ShopeeProductSyncService
      */
     private ?string $lastVideoUploadWarning = null;
 
+    /**
+     * logistics_channel_id => logistics_channel_name, populated by
+     * enabledLogisticsChannelIds() — kept around only so
+     * withoutOverLimitChannel() can map the channel *name* Shopee's error
+     * message names back to the id buildPayload() actually sent (see that
+     * method's own docblock for why nothing more structured is available).
+     */
+    private array $logisticsChannelNames = [];
+
     public static function forShop(SalesPlatformShop $shop): self
     {
         $account = $shop->shopeeAccount();
@@ -296,15 +305,21 @@ class ShopeeProductSyncService
 
         if ($cachedItemId) {
             try {
-                return $this->withVideoWarning($this->client->updateItem([...$payload, 'item_id' => (int) $cachedItemId]));
+                return $this->withVideoWarning($this->submitToShopee(
+                    fn (array $p) => $this->client->updateItem([...$p, 'item_id' => (int) $cachedItemId]),
+                    $payload
+                ));
             } catch (\Throwable $e) {
                 // Cached item_id no longer resolves on Shopee's side (e.g.
                 // deleted outside this app) — fall through to create fresh
                 // rather than leaving this product stuck unable to push.
+                // (Also reached if submitToShopee()'s own one retry still
+                // failed — addItem() below gets its own fresh chance at the
+                // same channel-drop retry, via the same helper.)
             }
         }
 
-        $result = $this->client->addItem($payload);
+        $result = $this->submitToShopee(fn (array $p) => $this->client->addItem($p), $payload);
 
         $newItemId = $result['response']['item_id'] ?? null;
         if ($newItemId) {
@@ -457,18 +472,97 @@ class ShopeeProductSyncService
      * account is fee_type=SIZE_INPUT (Shopee computes the buyer's shipping
      * cost from package size), so enabling a channel needs nothing beyond
      * its id — no shipping_fee to compute or supply.
+     *
+     * Also stashes id => name into $logisticsChannelNames for
+     * withoutOverLimitChannel() — get_channel_list carries no price-limit
+     * field for any channel (confirmed live checking the real response),
+     * so that's the only use this raw list has beyond the ids themselves.
      */
     private function enabledLogisticsChannelIds(): array
     {
         $response = $this->client->getChannelList();
-        $channels = $response['response']['logistics_channel_list'] ?? [];
+        $channels = collect($response['response']['logistics_channel_list'] ?? []);
 
-        return collect($channels)
+        $this->logisticsChannelNames = $channels->pluck('logistics_channel_name', 'logistics_channel_id')->all();
+
+        return $channels
             ->where('enabled', true)
             ->pluck('logistics_channel_id')
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Shopee's product.error_busi "The max price of the product is over max
+     * limit" rejection (seen live pushing a high-priced item through a
+     * COD/self-pickup channel — e.g. "SPX Express - ผู้ซื้อรับที่จุดบริการ
+     * SPX") names the offending channel only as free text ("Channel detail:
+     * <name>") — no channel_id, no threshold, nothing structured, and
+     * get_channel_list exposes no price-limit field to check ahead of time
+     * either (confirmed against the real response — only weight/dimension
+     * limits are there). This can only be discovered by Shopee rejecting a
+     * real attempt.
+     *
+     * Parses that name back out and maps it to the id buildPayload() sent
+     * via $logisticsChannelNames (populated by enabledLogisticsChannelIds()
+     * earlier in this same push()), returning a copy of $payload with just
+     * that one channel dropped from logistic_info. Returns null — meaning
+     * "don't retry, let the original exception surface" — when the message
+     * doesn't match this exact error shape, the name doesn't resolve to a
+     * channel we actually sent, or dropping it would leave zero channels
+     * enabled (Shopee rejects that too, so retrying would just trade one
+     * error for another).
+     */
+    private function withoutOverLimitChannel(array $payload, string $errorMessage): ?array
+    {
+        if (!str_contains($errorMessage, 'max price') || !preg_match('/Channel detail:\s*(.+)$/u', $errorMessage, $matches)) {
+            return null;
+        }
+
+        $channelId = array_search(trim($matches[1]), $this->logisticsChannelNames, true);
+        if ($channelId === false) {
+            return null;
+        }
+
+        $remaining = array_values(array_filter(
+            $payload['logistic_info'] ?? [],
+            fn (array $entry) => $entry['logistic_id'] !== $channelId
+        ));
+
+        if (empty($remaining) || count($remaining) === count($payload['logistic_info'] ?? [])) {
+            return null;
+        }
+
+        $payload['logistic_info'] = $remaining;
+
+        return $payload;
+    }
+
+    /**
+     * Wraps one live write call (addItem()/updateItem()) with exactly one
+     * automatic retry via withoutOverLimitChannel() — see that method's
+     * docblock for what it recognizes and why only one retry (not a loop
+     * until success): a second distinct over-limit channel on the same
+     * product is an edge case rare enough not to warrant the complexity/risk
+     * of repeatedly re-parsing and stripping channels from a live payload.
+     */
+    private function submitToShopee(callable $call, array $payload): array
+    {
+        try {
+            return $call($payload);
+        } catch (\Throwable $e) {
+            $retryPayload = $this->withoutOverLimitChannel($payload, $e->getMessage());
+            if ($retryPayload === null) {
+                throw $e;
+            }
+
+            Log::warning('Shopee rejected a logistics channel for exceeding its price limit — retrying without it.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $call($retryPayload);
+        }
     }
 
     /**
