@@ -129,9 +129,9 @@ class LocaleController extends Controller
         return to_route('system.locales.index')->with('success', 'Locale deleted successfully.');
     }
 
-    public function translate(Locale $locale): RedirectResponse
+    public function translate(Request $request, Locale $locale): RedirectResponse
     {
-        $this->localeTranslationService->queueTranslation($locale);
+        $this->localeTranslationService->queueTranslation($locale, $request->user()?->id);
 
         return back()->with('success', 'Translation started.');
     }

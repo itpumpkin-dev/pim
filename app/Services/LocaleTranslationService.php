@@ -71,7 +71,7 @@ class LocaleTranslationService
      * English source (i.e. were never successfully translated) — strings
      * from a previous run are left untouched rather than re-translated.
      */
-    public function queueTranslation(Locale $locale): void
+    public function queueTranslation(Locale $locale, ?int $userId = null): void
     {
         if ($locale->code === self::SOURCE_LOCALE) {
             return;
@@ -87,7 +87,7 @@ class LocaleTranslationService
             'translation_completed_at' => null,
         ]);
 
-        TranslateLocaleJob::dispatch($locale->id);
+        TranslateLocaleJob::dispatch($locale->id, $userId);
     }
 
     /**

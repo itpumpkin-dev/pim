@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\AppNotifier;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -107,6 +108,24 @@ class JobTracker extends Model
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);
+
+            // Only ever reached from AutoTranslateLabelsJob/
+            // AutoTranslateJsonLabelsJob's standalone runs (JobTracker::
+            // openTranslation() — "translate missing" triggered directly by
+            // a user, not from inside an import). AutoTranslateProductValueJob
+            // reports onto an *import's* tracker instead via a raw
+            // increment(), never through this method, so an import's
+            // translation sub-jobs finishing never fires a notification here
+            // — imports were deliberately left out of this feature's scope.
+            $errorCount = count($fresh->error_log ?? []);
+            AppNotifier::notify(
+                $fresh->user_id,
+                'Translation completed',
+                $errorCount > 0
+                    ? "Translated {$fresh->total_translations_completed} item(s), {$errorCount} failed."
+                    : "Translated {$fresh->total_translations_completed} item(s) successfully.",
+                $errorCount > 0 ? 'failed' : 'success'
+            );
         }
     }
 
