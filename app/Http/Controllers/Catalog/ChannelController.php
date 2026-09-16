@@ -34,9 +34,9 @@ class ChannelController extends Controller
 
         $query = Channel::with(['rootCategory'])
             ->when($search, function ($query, $search) {
-                $query->where('code', 'like', "%{$search}%")
+                $query->where('code', 'ilike', "%{$search}%")
                     ->orWhereHas('translations', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
+                        $q->where('name', 'ilike', "%{$search}%");
                     });
             })
             ->orderBy('id', 'desc');

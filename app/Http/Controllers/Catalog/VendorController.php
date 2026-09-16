@@ -55,10 +55,10 @@ class VendorController extends Controller
         $vendors = Vendor::query()
             ->with('currency:id,code')
             ->when($search !== '', function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('short_name', 'like', "%{$search}%")
-                    ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                $q->where('code', 'ilike', "%{$search}%")
+                    ->orWhere('name', 'ilike', "%{$search}%")
+                    ->orWhere('short_name', 'ilike', "%{$search}%")
+                    ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
             })
             ->orderBy($sort, $dir)
             ->paginate($perPage)

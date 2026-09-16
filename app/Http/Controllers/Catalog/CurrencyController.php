@@ -58,7 +58,7 @@ class CurrencyController extends Controller
         $currencies = Currency::query()
             ->withCount(['channels', 'vendors'])
             ->when($search !== '', function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%");
+                $q->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%");
             })
             ->orderBy($sort, $dir)
             ->paginate($perPage)

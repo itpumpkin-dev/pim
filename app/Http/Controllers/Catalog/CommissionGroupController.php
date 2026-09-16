@@ -42,7 +42,7 @@ class CommissionGroupController extends Controller
 
         $groups = CommissionGroup::query()
             ->when($search !== '', function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")->orWhere('p_group_name', 'like', "%{$search}%");
+                $q->where('code', 'ilike', "%{$search}%")->orWhere('p_group_name', 'ilike', "%{$search}%");
             })
             ->orderBy($sort, $dir)
             ->paginate($perPage)

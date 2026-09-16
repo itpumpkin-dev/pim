@@ -29,7 +29,7 @@ class ImportConfigController extends Controller
         $search = $request->input('search');
 
         $configs = ImportConfig::query()
-            ->when($search, fn ($q, $search) => $q->where('code', 'like', "%{$search}%"))
+            ->when($search, fn ($q, $search) => $q->where('code', 'ilike', "%{$search}%"))
             ->orderBy('id', 'desc')
             ->paginate(15)
             ->withQueryString();

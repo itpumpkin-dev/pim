@@ -131,16 +131,16 @@ class CategoryController extends Controller
             ->when(!$parentId && !$search, fn ($q) => $q->whereNull('parent_id'))
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                    $q->where('code', 'ilike', "%{$search}%")
+                        ->orWhere('name', 'ilike', "%{$search}%")
+                        ->orWhere('description', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
                 });
             })
             ->when($nameFilter, function ($query, $nameFilter) {
                 $query->where(function ($q) use ($nameFilter) {
-                    $q->where('name', 'like', "%{$nameFilter}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
+                    $q->where('name', 'ilike', "%{$nameFilter}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$nameFilter}%"));
                 });
             });
 
@@ -520,7 +520,7 @@ class CategoryController extends Controller
         $model = self::MARKETPLACE_CATEGORY_MODELS[$platform];
 
         $results = $model::where('is_leaf', true)
-            ->where('name', 'like', "%{$query}%")
+            ->where('name', 'ilike', "%{$query}%")
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'parent_id']);
@@ -1281,7 +1281,7 @@ class CategoryController extends Controller
                     ->whereHas('parent', fn ($q2) => $q2->where('is_active', true));
             })
             ->when($query !== '', fn ($q) => $q->where(function ($q2) use ($query) {
-                $q2->where('name', 'like', "%{$query}%")
+                $q2->where('name', 'ilike', "%{$query}%")
                     ->orWhereRaw("additional_data->>'name_eng' ILIKE ?", ["%{$query}%"]);
             }))
             ->orderBy('name')
@@ -1319,7 +1319,7 @@ class CategoryController extends Controller
         $query = trim((string) $request->query('q', ''));
 
         $categories = LazadaCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->when($query !== '', fn ($q) => $q->where('name', 'ilike', "%{$query}%"))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'parent_id']);
@@ -1336,7 +1336,7 @@ class CategoryController extends Controller
         $query = trim((string) $request->query('q', ''));
 
         $categories = ShopeeCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where(fn ($q2) => $q2->where('name', 'like', "%{$query}%")->orWhere('name_th', 'like', "%{$query}%")))
+            ->when($query !== '', fn ($q) => $q->where(fn ($q2) => $q2->where('name', 'ilike', "%{$query}%")->orWhere('name_th', 'ilike', "%{$query}%")))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'name_th', 'parent_id']);
@@ -1353,7 +1353,7 @@ class CategoryController extends Controller
         $query = trim((string) $request->query('q', ''));
 
         $categories = TikTokCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where(fn ($q2) => $q2->where('name', 'like', "%{$query}%")->orWhere('name_th', 'like', "%{$query}%")))
+            ->when($query !== '', fn ($q) => $q->where(fn ($q2) => $q2->where('name', 'ilike', "%{$query}%")->orWhere('name_th', 'ilike', "%{$query}%")))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'name_th', 'parent_id']);
@@ -1370,7 +1370,7 @@ class CategoryController extends Controller
         $query = trim((string) $request->query('q', ''));
 
         $categories = WooCommerceCategory::where('is_leaf', true)
-            ->when($query !== '', fn ($q) => $q->where('name', 'like', "%{$query}%"))
+            ->when($query !== '', fn ($q) => $q->where('name', 'ilike', "%{$query}%"))
             ->orderBy('name')
             ->limit(50)
             ->get(['id', 'name', 'parent_id']);
@@ -1458,7 +1458,7 @@ class CategoryController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%");
                 if (ctype_digit($search)) {
                     $q->orWhere('id', (int) $search);
                 }
@@ -1570,8 +1570,8 @@ class CategoryController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('name_th', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('name_th', 'ilike', "%{$search}%");
                 if (ctype_digit($search)) {
                     $q->orWhere('id', (int) $search);
                 }
@@ -1689,8 +1689,8 @@ class CategoryController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('name_th', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('name_th', 'ilike', "%{$search}%");
                 if (ctype_digit($search)) {
                     $q->orWhere('id', (int) $search);
                 }
@@ -1798,7 +1798,7 @@ class CategoryController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%");
                 if (ctype_digit($search)) {
                     $q->orWhere('id', (int) $search);
                 }

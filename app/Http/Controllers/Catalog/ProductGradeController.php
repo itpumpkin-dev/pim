@@ -60,9 +60,9 @@ class ProductGradeController extends Controller
 
         $productGrades = ProductGrade::query()
             ->when($search !== '', function ($q) use ($search) {
-                $q->where('code', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+                $q->where('code', 'ilike', "%{$search}%")
+                    ->orWhere('name', 'ilike', "%{$search}%")
+                    ->orWhere('description', 'ilike', "%{$search}%");
             })
             ->orderBy($sort, $dir)
             ->paginate($perPage)

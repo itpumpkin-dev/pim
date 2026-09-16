@@ -49,7 +49,7 @@ class BomController extends Controller
     private function rawMaterialCategoryIds(): array
     {
         return Category::where('code', self::RAW_MATERIAL_CATEGORY_CODE)
-            ->orWhere('code', 'like', self::RAW_MATERIAL_CATEGORY_CODE.'%')
+            ->orWhere('code', 'ilike', self::RAW_MATERIAL_CATEGORY_CODE.'%')
             ->pluck('id')
             ->all();
     }
@@ -65,14 +65,14 @@ class BomController extends Controller
 
         $nameAttributeId = Attribute::idForCode('pname');
         $matchingProductIds = $nameAttributeId && $search !== ''
-            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$search}%")->pluck('product_id')
+            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'ilike', "%{$search}%")->pluck('product_id')
             : collect();
 
         $boms = ProductBom::withCount('components')
             ->with('product:id,sku')
             ->when($search !== '', function ($q) use ($search, $matchingProductIds) {
                 $q->whereHas('product', function ($sub) use ($search, $matchingProductIds) {
-                    $sub->where('sku', 'like', "%{$search}%");
+                    $sub->where('sku', 'ilike', "%{$search}%");
                     if ($matchingProductIds->isNotEmpty()) {
                         $sub->orWhereIn('id', $matchingProductIds);
                     }

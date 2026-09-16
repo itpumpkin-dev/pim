@@ -56,16 +56,16 @@ class AttributeFamilyController extends Controller
         $gridData = $grid->getData($request, function ($query) use ($search, $nameFilter) {
             if ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                    $q->where('code', 'ilike', "%{$search}%")
+                        ->orWhere('name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
                 });
             }
 
             if ($nameFilter) {
                 $query->where(function ($q) use ($nameFilter) {
-                    $q->where('name', 'like', "%{$nameFilter}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$nameFilter}%"));
+                    $q->where('name', 'ilike', "%{$nameFilter}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$nameFilter}%"));
                 });
             }
         });

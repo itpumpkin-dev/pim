@@ -39,7 +39,7 @@ class PointController extends Controller
         }
 
         $points = Point::query()
-            ->when($search !== '', fn ($q) => $q->where('point_type', 'like', "%{$search}%"))
+            ->when($search !== '', fn ($q) => $q->where('point_type', 'ilike', "%{$search}%"))
             ->orderBy($sort, $dir)
             ->paginate($perPage)
             ->withQueryString();

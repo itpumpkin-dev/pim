@@ -53,7 +53,7 @@ class BusinessTypeController extends Controller
 
         $businessTypes = BusinessType::query()
             ->when($search !== '', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")->orWhere('description', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")->orWhere('description', 'ilike', "%{$search}%");
             })
             ->orderBy($sort, $dir)
             ->paginate($perPage)

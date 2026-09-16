@@ -50,9 +50,9 @@ class SubcategoryController extends Controller
             ->withCount(['children', 'products'])
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($qq) use ($search) {
-                    $qq->where('categories.code', 'like', "%{$search}%")
-                        ->orWhere('categories.name', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                    $qq->where('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
                 });
             })
             ->when($request->integer('category') ?: null, fn ($q, $id) => $q->where('root.id', $id))

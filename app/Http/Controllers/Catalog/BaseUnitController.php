@@ -77,9 +77,9 @@ class BaseUnitController extends Controller
         $units = BaseUnit::query()
             ->when($search, function ($q) use ($search) {
                 $q->where(function ($q2) use ($search) {
-                    $q2->where('name', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                    $q2->where('name', 'ilike', "%{$search}%")
+                        ->orWhere('slug', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
                 });
             })
             ->get();

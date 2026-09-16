@@ -95,8 +95,14 @@ class BrandController extends Controller
         $model = self::MARKETPLACE_BRAND_MODELS[$platform];
         $categoryId = $platform === 'shopee' ? ($request->integer('category_id') ?: null) : null;
 
+        // 'ilike', not 'like' — confirmed live: Postgres's plain LIKE is
+        // case-sensitive (unlike MySQL's default collation), so searching
+        // "pumpkin" silently missed a real "PUMPKIN"/"Pumpkin" brand that
+        // was sitting right there in the synced list. Every brand-name
+        // search in this controller had the same bug — fixed everywhere at
+        // once (see git blame on this line for the rest).
         $results = $model::query()
-            ->where('name', 'like', "%{$query}%")
+            ->where('name', 'ilike', "%{$query}%")
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
             ->orderBy('name')
             ->limit(50)
@@ -166,9 +172,9 @@ class BrandController extends Controller
         $brands = Brand::query()
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$search}%"));
+                    $q->where('name', 'ilike', "%{$search}%")
+                        ->orWhere('slug', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
                 });
             })
             ->when($platformFilter, function ($query, $platformFilter) use ($platformColumns) {
@@ -648,7 +654,7 @@ class BrandController extends Controller
         $query = ShopeeBrand::where('category_id', $shopeeCategoryId);
 
         if ($search !== '') {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where('name', 'ilike', "%{$search}%");
         }
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
@@ -691,8 +697,8 @@ class BrandController extends Controller
         $brands = Brand::query()
             ->when($query !== '', function ($q) use ($query) {
                 $q->where(function ($q2) use ($query) {
-                    $q2->where('name', 'like', "%{$query}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
+                    $q2->where('name', 'ilike', "%{$query}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$query}%"));
                 });
             })
             ->orderBy('name')
@@ -721,7 +727,7 @@ class BrandController extends Controller
         $query = WooCommerceBrand::query();
 
         if ($search !== '') {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where('name', 'ilike', "%{$search}%");
         }
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
@@ -780,7 +786,7 @@ class BrandController extends Controller
         $query = LazadaBrand::query();
 
         if ($search !== '') {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where('name', 'ilike', "%{$search}%");
         }
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();
@@ -829,7 +835,7 @@ class BrandController extends Controller
         $query = TikTokBrand::query();
 
         if ($search !== '') {
-            $query->where('name', 'like', "%{$search}%");
+            $query->where('name', 'ilike', "%{$search}%");
         }
 
         $paginated = $query->orderBy('name')->paginate($perPage)->withQueryString();

@@ -38,13 +38,13 @@ class RawMaterialController extends Controller
 
         $nameAttributeId = Attribute::idForCode('pname');
         $matchingProductIds = $nameAttributeId && $search !== ''
-            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$search}%")->pluck('product_id')
+            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'ilike', "%{$search}%")->pluck('product_id')
             : collect();
 
         $products = Product::where('is_raw_material', true)
             ->when($search !== '', function ($q) use ($search, $matchingProductIds) {
                 $q->where(function ($sub) use ($search, $matchingProductIds) {
-                    $sub->where('sku', 'like', "%{$search}%");
+                    $sub->where('sku', 'ilike', "%{$search}%");
                     if ($matchingProductIds->isNotEmpty()) {
                         $sub->orWhereIn('id', $matchingProductIds);
                     }

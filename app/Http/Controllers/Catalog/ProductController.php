@@ -119,7 +119,7 @@ class ProductController extends Controller
     private function rawMaterialCategoryIds(): array
     {
         return Category::where('code', self::RAW_MATERIAL_CATEGORY_CODE)
-            ->orWhere('code', 'like', self::RAW_MATERIAL_CATEGORY_CODE.'%')
+            ->orWhere('code', 'ilike', self::RAW_MATERIAL_CATEGORY_CODE.'%')
             ->pluck('id')
             ->all();
     }
@@ -142,7 +142,7 @@ class ProductController extends Controller
             $nameValue = $filtersInput['name'] ?? null;
             if ($nameValue !== null && $nameValue !== '' && $nameAttributeId) {
                 $query->whereHas('values', function ($q) use ($nameAttributeId, $nameValue) {
-                    $q->where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$nameValue}%");
+                    $q->where('attribute_id', $nameAttributeId)->where('value', 'ilike', "%{$nameValue}%");
                 });
             }
 
@@ -154,7 +154,7 @@ class ProductController extends Controller
                 }
 
                 $query->whereHas('values', function ($q) use ($attributeId, $value) {
-                    $q->where('attribute_id', $attributeId)->where('value', 'like', '%'.$value.'%');
+                    $q->where('attribute_id', $attributeId)->where('value', 'ilike', '%'.$value.'%');
                 });
             }
 
@@ -433,11 +433,11 @@ class ProductController extends Controller
         $nameAttributeId = Attribute::idForCode('pname');
 
         $matchingProductIds = $nameAttributeId
-            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'like', "%{$query}%")->pluck('product_id')
+            ? ProductValue::where('attribute_id', $nameAttributeId)->where('value', 'ilike', "%{$query}%")->pluck('product_id')
             : collect();
 
         $products = Product::where(function ($q) use ($query, $matchingProductIds) {
-            $q->where('sku', 'like', "%{$query}%");
+            $q->where('sku', 'ilike', "%{$query}%");
             if ($matchingProductIds->isNotEmpty()) {
                 $q->orWhereIn('id', $matchingProductIds);
             }
@@ -1039,7 +1039,7 @@ class ProductController extends Controller
             'sku' => ['required', 'string', 'min:1'],
         ]);
 
-        $products = Product::where('sku', 'like', '%'.$validated['sku'].'%')->get(['id', 'sku']);
+        $products = Product::where('sku', 'ilike', '%'.$validated['sku'].'%')->get(['id', 'sku']);
 
         $names = $this->resolveProductNamesInCurrentLocale($products->pluck('id'));
 
@@ -1145,7 +1145,7 @@ class ProductController extends Controller
             $query->whereIn('id', $ids);
         } else {
             if (! empty($validated['search'])) {
-                $query->where('sku', 'like', '%'.$validated['search'].'%');
+                $query->where('sku', 'ilike', '%'.$validated['search'].'%');
             }
 
             if (! empty($validated['types'])) {
@@ -1650,7 +1650,7 @@ class ProductController extends Controller
         }
 
         $options = AttributeOption::where('attribute_id', $attribute->id)
-            ->where('code', 'like', $validated['parent_code'].'%')
+            ->where('code', 'ilike', $validated['parent_code'].'%')
             ->orderBy('sort_order')
             ->orderBy('code')
             ->get(['id', 'code', 'admin_label', 'is_active']);

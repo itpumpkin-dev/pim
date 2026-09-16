@@ -163,11 +163,11 @@ class LazadaAttributeMappingController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search, $nameAttrId) {
-                $q->where('sku', 'like', "%{$search}%");
+                $q->where('sku', 'ilike', "%{$search}%");
                 if ($nameAttrId) {
                     $q->orWhereHas('values', function ($vq) use ($nameAttrId, $search) {
                         $vq->where('attribute_id', $nameAttrId)
-                            ->where('value', 'like', "%{$search}%");
+                            ->where('value', 'ilike', "%{$search}%");
                     });
                 }
             });

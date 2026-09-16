@@ -41,9 +41,9 @@ class CategoryFieldController extends Controller
 
         $query = CategoryField::query()
             ->when($search, function ($query, $search) {
-                $query->where('code', 'like', "%{$search}%")
-                    ->orWhere('type', 'like', "%{$search}%")
-                    ->orWhere('display_section', 'like', "%{$search}%");
+                $query->where('code', 'ilike', "%{$search}%")
+                    ->orWhere('type', 'ilike', "%{$search}%")
+                    ->orWhere('display_section', 'ilike', "%{$search}%");
             })
             ->orderBy('position')
             ->orderBy('id', 'desc');

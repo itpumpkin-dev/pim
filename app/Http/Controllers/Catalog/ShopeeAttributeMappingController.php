@@ -263,11 +263,11 @@ class ShopeeAttributeMappingController extends Controller
 
         if ($search !== '') {
             $query->where(function ($q) use ($search, $nameAttrId) {
-                $q->where('sku', 'like', "%{$search}%");
+                $q->where('sku', 'ilike', "%{$search}%");
                 if ($nameAttrId) {
                     $q->orWhereHas('values', function ($vq) use ($nameAttrId, $search) {
                         $vq->where('attribute_id', $nameAttrId)
-                            ->where('value', 'like', "%{$search}%");
+                            ->where('value', 'ilike', "%{$search}%");
                     });
                 }
             });
@@ -1219,8 +1219,8 @@ class ShopeeAttributeMappingController extends Controller
         $attributes = Attribute::query()
             ->when($query !== '', function ($q) use ($query) {
                 $q->where(function ($q2) use ($query) {
-                    $q2->where('name', 'like', "%{$query}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'like', "%{$query}%"));
+                    $q2->where('name', 'ilike', "%{$query}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$query}%"));
                 });
             })
             ->when($types !== [], fn ($q) => $q->whereIn('type', $types))
