@@ -41,15 +41,24 @@ interface Attribute {
     name: string;
 }
 
+interface RoleShopOption {
+    id: number;
+    name: string;
+    sales_platform_id: number;
+    platform_name: string;
+}
+
 interface EditRoleProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
+    shops: RoleShopOption[];
     role: {
         id: number;
         label: string;
         is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
+        shop_ids?: number[];
     };
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
@@ -60,6 +69,7 @@ interface EditRoleProps {
 export default function RoleEdit({
     catalog,
     users,
+    shops,
     role,
     attributeGroups,
     attributes,
@@ -70,6 +80,7 @@ export default function RoleEdit({
         <RoleFormPage
             catalog={catalog}
             users={users}
+            shops={shops}
             role={role}
             attributeGroups={attributeGroups}
             attributes={attributes}

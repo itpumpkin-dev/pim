@@ -2716,6 +2716,17 @@ class ProductController extends Controller
      */
     private function queueMarketplaceSync(Product $product, SalesPlatformShop $shop, string $platform, string $action): JsonResponse
     {
+        // Role-scoped shop restriction (see User::canAccessShop()) — checked
+        // even though the `marketplace_{$platform}` permission on the route
+        // already passed, since that permission is platform-wide and says
+        // nothing about *which* shop. Most roles have no restriction rows at
+        // all and hit this for free (canAccessShop() short-circuits to true).
+        if (! auth()->user()?->canAccessShop($shop)) {
+            return response()->json([
+                'message' => "You don't have access to '{$shop->name}'.",
+            ], 403);
+        }
+
         $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
         if (! $isPublished) {
             return response()->json([
@@ -2823,7 +2834,14 @@ class ProductController extends Controller
         ]);
 
         $products = Product::whereIn('id', $validated['product_ids'])->get();
-        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get();
+        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get()
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
+
+        if ($shops->isEmpty()) {
+            return back()->with('error', "You don't have access to any of the selected shop(s).");
+        }
+
         $shopIds = $shops->pluck('id')->all();
 
         foreach ($products as $product) {
@@ -2857,7 +2875,13 @@ class ProductController extends Controller
         ]);
 
         $products = Product::whereIn('id', $validated['product_ids'])->get();
-        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get();
+        $shops = SalesPlatformShop::with('platform:id,code')->whereIn('id', $validated['shop_ids'])->get()
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
+
+        if ($shops->isEmpty()) {
+            return back()->with('error', "You don't have access to any of the selected shop(s).");
+        }
 
         $queued = 0;
         $skipped = 0;
@@ -3560,6 +3584,12 @@ class ProductController extends Controller
      */
     public function toggleShopPublished(Request $request, Product $product, SalesPlatformShop $shop): JsonResponse
     {
+        if (! $request->user()?->canAccessShop($shop)) {
+            return response()->json([
+                'message' => "You don't have access to '{$shop->name}'.",
+            ], 403);
+        }
+
         $validated = $request->validate([
             'published' => ['required', 'boolean'],
         ]);

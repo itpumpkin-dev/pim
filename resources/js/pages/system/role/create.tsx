@@ -41,20 +41,29 @@ interface Attribute {
     name: string;
 }
 
+interface RoleShopOption {
+    id: number;
+    name: string;
+    sales_platform_id: number;
+    platform_name: string;
+}
+
 interface CreateRoleProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
+    shops: RoleShopOption[];
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
     platformAttributeGroups: AttributeGroup[];
     platformAttributes: Attribute[];
 }
 
-export default function RoleCreate({ catalog, users, attributeGroups, attributes, platformAttributeGroups, platformAttributes }: CreateRoleProps) {
+export default function RoleCreate({ catalog, users, shops, attributeGroups, attributes, platformAttributeGroups, platformAttributes }: CreateRoleProps) {
     return (
         <RoleFormPage
             catalog={catalog}
             users={users}
+            shops={shops}
             attributeGroups={attributeGroups}
             attributes={attributes}
             platformAttributeGroups={platformAttributeGroups}

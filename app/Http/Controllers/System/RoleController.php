@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\FamilyAttribute;
 use App\Models\Role;
 use App\Models\RolePermission;
+use App\Models\SalesPlatformShop;
 use App\Models\User;
 use App\Services\GridManager;
 use App\Services\PermissionCatalog;
@@ -38,8 +39,28 @@ class RoleController extends Controller
         return Inertia::render('system/role/create', [
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
+            'shops' => $this->shopOptions(),
             ...$this->attributeAccessProps(),
         ]);
+    }
+
+    /**
+     * Every shop across every marketplace platform, for the role form's
+     * "Shops" tab (see role-form.tsx) — grouped client-side by
+     * sales_platform_id, so the response just needs the platform's name
+     * alongside each shop.
+     */
+    private function shopOptions()
+    {
+        return SalesPlatformShop::with('platform:id,name')
+            ->orderBy('name')
+            ->get(['id', 'name', 'sales_platform_id'])
+            ->map(fn ($shop) => [
+                'id' => $shop->id,
+                'name' => $shop->name,
+                'sales_platform_id' => $shop->sales_platform_id,
+                'platform_name' => $shop->platform->name ?? 'Other',
+            ]);
     }
 
     /**
@@ -94,6 +115,8 @@ class RoleController extends Controller
             SessionInvalidator::usersExceptCurrentActor($userIds);
         }
 
+        $role->salesPlatformShops()->sync($request->input('shop_ids', []));
+
         return to_route('system.roles.index')->with('success', 'Role created successfully.');
     }
 
@@ -104,12 +127,14 @@ class RoleController extends Controller
         return Inertia::render('system/role/edit', [
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
+            'shops' => $this->shopOptions(),
             'role' => [
                 'id' => $role->id,
                 'label' => $role->label,
                 'is_guest' => $role->is_guest,
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
+                'shop_ids' => $role->salesPlatformShops()->pluck('sales_platform_shops.id'),
             ],
             ...$this->attributeAccessProps(),
         ]);
@@ -156,6 +181,18 @@ class RoleController extends Controller
         $usersChanged = $this->idsChanged($oldUserIds, $newUserIds);
         if ($usersChanged) {
             AuditLog::record('users_updated', $role, ['user_ids' => $oldUserIds], ['user_ids' => $newUserIds]);
+        }
+
+        // Not part of the re-auth trigger below — unlike permissions/users,
+        // shop access (User::allowedShopIds()) is only ever memoized for the
+        // lifetime of a single request, never cached across requests, so
+        // there's no stale value a logged-in session could keep reading.
+        $oldShopIds = $role->salesPlatformShops()->pluck('sales_platform_shops.id')->all();
+        $newShopIds = array_map('intval', $request->input('shop_ids', []));
+        $role->salesPlatformShops()->sync($newShopIds);
+
+        if ($this->idsChanged($oldShopIds, $newShopIds)) {
+            AuditLog::record('shops_updated', $role, ['shop_ids' => $oldShopIds], ['shop_ids' => $newShopIds]);
         }
 
         if ($permissionsChanged || $usersChanged) {

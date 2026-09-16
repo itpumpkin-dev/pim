@@ -294,7 +294,9 @@ class TikTokAttributeMappingController extends Controller
         // $allLazadaShops/$pivotByShopId/$lazadaShops เป๊ะ
         $allTikTokShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
             ->orderBy('name')
-            ->get(['id', 'name', 'channel_id']);
+            ->get(['id', 'name', 'channel_id', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => request()->user()?->canAccessShop($shop))
+            ->values();
 
         $pivotByShopId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)
@@ -763,9 +765,14 @@ class TikTokAttributeMappingController extends Controller
         // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
         // สลับไปหน้า list สินค้าทั่วไปก่อน — mirror ของ
         // LazadaAttributeMappingController::lazadaProducts()'s $lazadaShops เป๊ะ
+        // เฉพาะร้านที่ role ของผู้ใช้คนนี้เข้าถึงได้ — mirror ของ
+        // ShopeeAttributeMappingController::shopeeProducts() เป๊ะ (ดู
+        // User::canAccessShop())
         $tiktokShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'tiktok'))
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
 
         return Inertia::render('catalog/marketplace/tiktok-products', [
             'products' => $paginated,

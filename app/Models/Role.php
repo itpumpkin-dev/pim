@@ -115,4 +115,43 @@ class Role extends Model
     {
         return $this->belongsToMany(UserGroup::class, 'role_user_group', 'role_id', 'group_id');
     }
+
+    /**
+     * Shops this role is whitelisted for, across every platform — an empty
+     * relation means unrestricted (see hasShopRestrictionFor()/
+     * allowedShopIdsFor()), not "no shops allowed". Configured on the role
+     * form's "Shops" tab.
+     */
+    public function salesPlatformShops(): BelongsToMany
+    {
+        return $this->belongsToMany(SalesPlatformShop::class, 'role_sales_platform_shop');
+    }
+
+    /**
+     * Whether this role has any shop whitelisted for the given platform at
+     * all. False means unrestricted for that platform (every shop of it is
+     * allowed) — a role can be restricted on one platform and unrestricted
+     * on another, since rows are scoped per shop, not per role.
+     */
+    public function hasShopRestrictionFor(int $salesPlatformId): bool
+    {
+        return $this->salesPlatformShops()
+            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
+            ->exists();
+    }
+
+    /**
+     * The whitelisted shop ids for the given platform. Only meaningful when
+     * hasShopRestrictionFor() is true for that platform — call that first
+     * (see User::allowedShopIds(), which does).
+     *
+     * @return array<int, int>
+     */
+    public function allowedShopIdsFor(int $salesPlatformId): array
+    {
+        return $this->salesPlatformShops()
+            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
+            ->pluck('sales_platform_shops.id')
+            ->all();
+    }
 }

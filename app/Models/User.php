@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -299,5 +300,81 @@ class User extends Authenticatable
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(UserGroup::class, 'user_group_user', 'user_id', 'group_id');
+    }
+
+    /**
+     * Per-instance memoization of allowedShopIds(), keyed by platform id —
+     * same rationale as $permissionsCache: a single request can call
+     * canAccessShop() once per shop row rendered (product mapping pages list
+     * every shop for a platform), so this avoids re-querying
+     * role_sales_platform_shop on every one of them.
+     *
+     * @var array<int, array<int, int>|null>
+     */
+    private array $allowedShopIdsCache = [];
+
+    /**
+     * This user's shop whitelist for one platform (own roles + roles
+     * inherited through a group, same union as getAllPermissions()) — null
+     * means unrestricted (every shop of that platform is allowed), an array
+     * means only those shop ids are. Any role held that itself has no
+     * restriction for this platform makes the whole result unrestricted
+     * (same "most permissive role wins" logic hasPermission() already uses
+     * via getAllPermissions()'s union), matching Role::hasShopRestrictionFor()'s
+     * docblock.
+     *
+     * @return array<int, int>|null
+     */
+    public function allowedShopIds(int $salesPlatformId): ?array
+    {
+        if (array_key_exists($salesPlatformId, $this->allowedShopIdsCache)) {
+            return $this->allowedShopIdsCache[$salesPlatformId];
+        }
+
+        $roleIds = array_values(array_unique(array_merge(
+            $this->roles()->pluck('roles.id')->all(),
+            $this->groups()
+                ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
+                ->pluck('role_user_group.role_id')
+                ->all()
+        )));
+
+        if ($roleIds === []) {
+            // No role at all — hasPermission() already denies every action
+            // for this user regardless, so this result is never actually
+            // consulted; kept unrestricted rather than [] purely so an empty
+            // role list can't accidentally read as "blocked from everything".
+            return $this->allowedShopIdsCache[$salesPlatformId] = null;
+        }
+
+        $restrictedRoleIds = DB::table('role_sales_platform_shop')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'role_sales_platform_shop.sales_platform_shop_id')
+            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
+            ->whereIn('role_sales_platform_shop.role_id', $roleIds)
+            ->pluck('role_sales_platform_shop.role_id')
+            ->unique();
+
+        $hasUnrestrictedRole = collect($roleIds)->diff($restrictedRoleIds)->isNotEmpty();
+        if ($hasUnrestrictedRole) {
+            return $this->allowedShopIdsCache[$salesPlatformId] = null;
+        }
+
+        $allowed = DB::table('role_sales_platform_shop')
+            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'role_sales_platform_shop.sales_platform_shop_id')
+            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
+            ->whereIn('role_sales_platform_shop.role_id', $roleIds)
+            ->pluck('sales_platform_shops.id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->allowedShopIdsCache[$salesPlatformId] = $allowed;
+    }
+
+    public function canAccessShop(SalesPlatformShop $shop): bool
+    {
+        $allowed = $this->allowedShopIds($shop->sales_platform_id);
+
+        return $allowed === null || in_array($shop->id, $allowed, true);
     }
 }

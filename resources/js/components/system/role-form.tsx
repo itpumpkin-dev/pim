@@ -64,6 +64,13 @@ interface RoleUserOption {
     last_name: string;
 }
 
+interface RoleShopOption {
+    id: number;
+    name: string;
+    sales_platform_id: number;
+    platform_name: string;
+}
+
 interface AttributeGroup {
     id: number;
     code: string;
@@ -83,12 +90,14 @@ interface Attribute {
 interface RoleFormProps {
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
+    shops: RoleShopOption[];
     role?: {
         id: number;
         label: string;
         is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
+        shop_ids?: number[];
     };
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];
@@ -105,14 +114,16 @@ interface RoleForm {
     is_guest: boolean;
     permissions: Record<string, string[]>;
     users: number[];
+    shop_ids: number[];
     [key: string]: string | boolean | number[] | Record<string, string[]>;
 }
 
-const TAB_KEYS = ['roleFormTabGeneral', 'roleFormTabPermissions', 'roleFormTabUsers'];
+const TAB_KEYS = ['roleFormTabGeneral', 'roleFormTabPermissions', 'roleFormTabUsers', 'roleFormTabShops'];
 
 export default function RoleFormPage({
     catalog,
     users,
+    shops,
     role,
     attributeGroups,
     attributes,
@@ -175,7 +186,36 @@ export default function RoleFormPage({
         is_guest: role?.is_guest ?? false,
         permissions: role?.permissions ?? {},
         users: role?.user_ids ?? [],
+        shop_ids: role?.shop_ids ?? [],
     });
+
+    // Shops grouped by platform for the "Shops" tab — a platform with every
+    // one of its shops checked is stored as *no* restriction at all (see
+    // RoleController::update()/store() — sync() with an empty subset for
+    // that platform), so "select all" and "no restriction" are the same
+    // state from the admin's point of view.
+    const shopsByPlatform = useMemo(() => {
+        const groups = new Map<number, { platformName: string; shops: RoleShopOption[] }>();
+        shops.forEach((shop) => {
+            const existing = groups.get(shop.sales_platform_id);
+            if (existing) {
+                existing.shops.push(shop);
+            } else {
+                groups.set(shop.sales_platform_id, { platformName: shop.platform_name, shops: [shop] });
+            }
+        });
+        return Array.from(groups.values());
+    }, [shops]);
+
+    const toggleShop = (shopId: number) => {
+        setData('shop_ids', data.shop_ids.includes(shopId) ? data.shop_ids.filter((id) => id !== shopId) : [...data.shop_ids, shopId]);
+    };
+
+    const toggleAllShopsForPlatform = (platformShopIds: number[]) => {
+        const allChecked = platformShopIds.every((id) => data.shop_ids.includes(id));
+        const withoutPlatform = data.shop_ids.filter((id) => !platformShopIds.includes(id));
+        setData('shop_ids', allChecked ? withoutPlatform : [...withoutPlatform, ...platformShopIds]);
+    };
 
     // Check if user has both products AND attributes permissions to show Attribute Access
     const hasProductsPermission = useMemo(
@@ -510,8 +550,15 @@ export default function RoleFormPage({
             if (!currentUserIds.has(id)) return true;
         }
 
+        const initialShopIds = new Set(role?.shop_ids ?? []);
+        const currentShopIds = new Set(data.shop_ids);
+        if (initialShopIds.size !== currentShopIds.size) return true;
+        for (const id of initialShopIds) {
+            if (!currentShopIds.has(id)) return true;
+        }
+
         return permissionChanges.added.length > 0 || permissionChanges.removed.length > 0;
-    }, [data.label, data.is_guest, data.users, permissionChanges, role]);
+    }, [data.label, data.is_guest, data.users, data.shop_ids, permissionChanges, role]);
 
     // Column pop-in priority (SAP Fiori responsive table): the "Has Role"
     // checkbox is the control being edited here, so it stays always visible
@@ -1295,6 +1342,64 @@ export default function RoleFormPage({
                         rowSx={(user) => fioriTableRowSx(data.users.includes(user.id))}
                         emptyMessage="No users found."
                     />
+                )}
+
+                {tab === 3 && (
+                    <Box sx={{ maxWidth: 640 }}>
+                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 3 }}>
+                            {t('roleFormShopsHint')}
+                        </Typography>
+
+                        {shopsByPlatform.length === 0 && (
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('roleFormShopsNoShops')}
+                            </Typography>
+                        )}
+
+                        {shopsByPlatform.map(({ platformName, shops: platformShops }) => {
+                            const platformShopIds = platformShops.map((shop) => shop.id);
+                            const allChecked = platformShopIds.every((id) => data.shop_ids.includes(id));
+                            const someChecked = platformShopIds.some((id) => data.shop_ids.includes(id));
+
+                            return (
+                                <Box key={platformName} sx={{ mb: 3, pb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 700, color: FIORI.textPrimary, mb: 1 }}>
+                                        {platformName}
+                                    </Typography>
+
+                                    <FormControlLabel
+                                        control={
+                                            <Checkbox
+                                                size="small"
+                                                checked={allChecked}
+                                                indeterminate={someChecked && !allChecked}
+                                                onChange={() => toggleAllShopsForPlatform(platformShopIds)}
+                                            />
+                                        }
+                                        label={t('roleFormShopsSelectAll')}
+                                        sx={{ mb: 0.5 }}
+                                    />
+
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', pl: 4 }}>
+                                        {platformShops.map((shop) => (
+                                            <FormControlLabel
+                                                key={shop.id}
+                                                control={
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={data.shop_ids.includes(shop.id)}
+                                                        onChange={() => toggleShop(shop.id)}
+                                                    />
+                                                }
+                                                label={shop.name}
+                                                slotProps={{ typography: { variant: 'body2' } }}
+                                            />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            );
+                        })}
+                    </Box>
                 )}
                 </Box>
 

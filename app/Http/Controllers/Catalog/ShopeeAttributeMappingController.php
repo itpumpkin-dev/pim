@@ -401,9 +401,15 @@ class ShopeeAttributeMappingController extends Controller
         // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
         // สลับไปหน้า list สินค้าทั่วไปก่อน — mirror ของ
         // LazadaAttributeMappingController::lazadaProducts() เป๊ะ
+        // เฉพาะร้านที่ role ของผู้ใช้คนนี้เข้าถึงได้ (ส่วนใหญ่ไม่มีข้อจำกัดเลยและ
+        // เห็นทุกร้าน — ดู User::canAccessShop()) กรองตรงนี้จุดเดียวก็พอ เพราะ
+        // ทั้ง dropdown ของ dialog "Push ที่เลือก" และแท็บ "ร้านค้า" ต่อสินค้า
+        // (allShopeeShops ด้านล่าง) ต่างก็อ่านจาก query เดียวกันนี้
         $shopeeShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'shopee'))
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
 
         return Inertia::render('catalog/marketplace/shopee-products', [
             'products' => $paginated,
@@ -536,7 +542,9 @@ class ShopeeAttributeMappingController extends Controller
         // mirror ของ LazadaAttributeMappingController::productDetail() เป๊ะ
         $allShopeeShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'shopee'))
             ->orderBy('name')
-            ->get(['id', 'name', 'channel_id']);
+            ->get(['id', 'name', 'channel_id', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => request()->user()?->canAccessShop($shop))
+            ->values();
 
         $pivotByShopId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)

@@ -300,9 +300,14 @@ class LazadaAttributeMappingController extends Controller
         // ใช้ endpoint เดียวกับ ProductController::pushBulk() ที่ products/index.tsx's
         // "Share" dialog เรียกอยู่แล้ว แค่เปิดทางลัดให้กดจากหน้านี้ได้เลยโดยไม่ต้อง
         // สลับไปหน้า list สินค้าทั่วไปก่อน
+        // เฉพาะร้านที่ role ของผู้ใช้คนนี้เข้าถึงได้ — mirror ของ
+        // ShopeeAttributeMappingController::shopeeProducts() เป๊ะ (ดู
+        // User::canAccessShop())
         $lazadaShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
 
         return Inertia::render('catalog/marketplace/lazada-products', [
             'products' => $paginated,
@@ -430,7 +435,9 @@ class LazadaAttributeMappingController extends Controller
         // ที่หน้า Edit Product's Sales Channels panel ใช้โชว์ badge "Live")
         $allLazadaShops = SalesPlatformShop::whereHas('platform', fn ($q) => $q->where('code', 'lazada'))
             ->orderBy('name')
-            ->get(['id', 'name', 'channel_id']);
+            ->get(['id', 'name', 'channel_id', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => request()->user()?->canAccessShop($shop))
+            ->values();
 
         $pivotByShopId = DB::table('product_platform_shops')
             ->where('product_id', $product->id)
