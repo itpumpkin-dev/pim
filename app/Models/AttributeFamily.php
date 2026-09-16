@@ -69,7 +69,13 @@ class AttributeFamily extends Model
      */
     public function tiktokCategory(): BelongsTo
     {
-        return $this->belongsTo(TikTokCategory::class);
+        // FK ต้องระบุตรงๆ — เหตุผลเดียวกับที่แก้ใน TikTokAttributeMapping::
+        // optionMappings()/TikTokAttributeOptionMapping::tiktokAttributeMapping():
+        // Laravel เดา default FK จาก snake_case ของ "TikTokCategory" เป็น
+        // "tik_tok_category_id" (แยก "TikTok" เป็นสองคำ) ต่างจากคอลัมน์จริง
+        // "tiktok_category_id" (คำเดียว — ดู Category::tiktokCategory()/
+        // Product::tiktokCategory() ที่ระบุตรงๆ ไว้อยู่แล้ว)
+        return $this->belongsTo(TikTokCategory::class, 'tiktok_category_id');
     }
 
     public function creator(): BelongsTo

@@ -64,7 +64,15 @@ class TikTokAttributeMapping extends Model
      */
     public function optionMappings(): HasMany
     {
-        return $this->hasMany(TikTokAttributeOptionMapping::class);
+        // FK ต้องระบุตรงๆ — Laravel เดา default FK จาก snake_case ของชื่อคลาสนี้
+        // เป็น "tik_tok_attribute_mapping_id" (แยก "TikTok" เป็นสองคำ) ต่างจาก
+        // คอลัมน์จริง "tiktok_attribute_mapping_id" (คำเดียว) — บั๊กจริงที่เจอ:
+        // TikTokAttributeMappingController::tiktokAttributesForCategory()'s
+        // ->with(['optionMappings']) พังด้วย SQLSTATE 42703 ทุกครั้ง ทำให้ทั้ง
+        // request คืน 500 แล้วฝั่ง frontend fallback เป็นลิสต์ว่างเปล่าเงียบๆ
+        // (attribute ทั้งหมดของหมวดหมู่ดูเหมือน "หายไป" หลังกด sync attribute
+        // family ทั้งที่ backend สร้าง/แมปสำเร็จจริง)
+        return $this->hasMany(TikTokAttributeOptionMapping::class, 'tiktok_attribute_mapping_id');
     }
 
     public function creator(): BelongsTo

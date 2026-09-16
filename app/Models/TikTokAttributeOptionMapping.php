@@ -29,7 +29,14 @@ class TikTokAttributeOptionMapping extends Model
 
     public function tiktokAttributeMapping(): BelongsTo
     {
-        return $this->belongsTo(TikTokAttributeMapping::class);
+        // FK ต้องระบุตรงๆ — Laravel เดา default FK จากชื่อคลาสด้วย snake_case
+        // ซึ่งแยก "TikTok" เป็น "tik_tok" (คนละคำ) ต่างจากคอลัมน์จริงที่ใช้
+        // "tiktok" คำเดียว (ดู migration create_tiktok_attribute_option_mappings_table)
+        // — บั๊กจริงที่เจอ: ทำให้ eager-load ผ่าน optionMappings() พังด้วย
+        // SQLSTATE 42703 "column tik_tok_attribute_mapping_id does not exist"
+        // ทุกครั้งที่ TikTokAttributeMappingController::tiktokAttributesForCategory()
+        // ถูกเรียก
+        return $this->belongsTo(TikTokAttributeMapping::class, 'tiktok_attribute_mapping_id');
     }
 
     public function attributeOption(): BelongsTo
