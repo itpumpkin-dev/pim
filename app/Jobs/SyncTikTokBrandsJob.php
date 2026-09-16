@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\JobTracker;
 use App\Models\TikTokBrand;
 use App\Models\TikTokSellerAccount;
+use App\Services\AppNotifier;
 use App\Services\TikTok\TikTokClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -125,6 +126,14 @@ class SyncTikTokBrandsJob implements ShouldQueue
         $tracker->total_records_created = count($seenIds);
         $tracker->total_rows_processed = count($seenIds);
         $tracker->save();
+
+        AppNotifier::notify(
+            $tracker->user_id,
+            'Synced TikTok Brands',
+            'Synced '.count($seenIds).' brand(s).',
+            'success',
+            '/catalog/categories/tiktok-mapping'
+        );
     }
 
     public function failed(\Throwable $exception): void
@@ -143,5 +152,7 @@ class SyncTikTokBrandsJob implements ShouldQueue
         $tracker->status = 'failed';
         $tracker->completed_at = now();
         $tracker->save();
+
+        AppNotifier::notify($tracker->user_id, 'TikTok Brand sync failed', $message, 'failed', '/catalog/categories/tiktok-mapping');
     }
 }

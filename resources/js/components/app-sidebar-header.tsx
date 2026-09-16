@@ -2,6 +2,7 @@ import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import LocaleDropdown from '@/components/locale-dropdown';
 import { NavUser } from '@/components/nav-user';
+import { NotificationBell } from '@/components/notification-bell';
 import { ShellSearch } from '@/components/shell-search';
 import { useSidebar } from '@/hooks/use-sidebar';
 import { getFioriShell } from '@/theme';
@@ -115,6 +116,7 @@ export function AppSidebarHeader({ breadcrumbs = [], actions }: AppSidebarHeader
                     sx={{ my: 1, mx: 0.5, borderColor: shell.searchBorder, display: { xs: 'none', sm: 'block' } }}
                 />
 
+                <NotificationBell />
                 <LocaleDropdown />
                 <AppearanceToggleDropdown />
                 <NavUser />

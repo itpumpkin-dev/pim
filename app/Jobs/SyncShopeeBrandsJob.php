@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\JobTracker;
 use App\Models\ShopeeBrand;
 use App\Models\ShopeeSellerAccount;
+use App\Services\AppNotifier;
 use App\Services\Shopee\ShopeeClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -198,6 +199,14 @@ class SyncShopeeBrandsJob implements ShouldQueue
         $tracker->total_records_created = count($seenIds);
         $tracker->total_rows_processed = count($seenIds);
         $tracker->save();
+
+        AppNotifier::notify(
+            $tracker->user_id,
+            'Synced Shopee Brands',
+            'Synced '.count($seenIds).' brand(s).',
+            'success',
+            '/catalog/categories/shopee-mapping'
+        );
     }
 
     public function failed(\Throwable $exception): void
@@ -216,5 +225,7 @@ class SyncShopeeBrandsJob implements ShouldQueue
         $tracker->status = 'failed';
         $tracker->completed_at = now();
         $tracker->save();
+
+        AppNotifier::notify($tracker->user_id, 'Shopee Brand sync failed', $message, 'failed', '/catalog/categories/shopee-mapping');
     }
 }

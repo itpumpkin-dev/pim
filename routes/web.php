@@ -3,6 +3,7 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\LocaleController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\StorefrontController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,14 @@ Route::middleware(['auth'])->group(function () {
     // checks each result group's own list_* permission itself, the same way
     // DashboardController resolves each stat against the viewer's access.
     Route::get('/search', [GlobalSearchController::class, 'search'])->name('search');
+
+    // Shell-bar notification bell (NotificationBell.tsx) — no permission
+    // gate here either, same reasoning: every route only ever touches the
+    // signed-in user's own notifications, nothing that needs a per-feature
+    // permission check.
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notificationId}/read', [NotificationController::class, 'markRead'])->name('notifications.markRead');
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
 });
 
 // Public product detail page. Anonymous visitors always see the full mapped

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\JobTracker;
 use App\Models\LazadaBrand;
 use App\Models\LazadaSellerAccount;
+use App\Services\AppNotifier;
 use App\Services\Lazada\LazadaClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -155,6 +156,14 @@ class SyncLazadaBrandsJob implements ShouldQueue
         $tracker->total_records_created = count($seenIds);
         $tracker->total_rows_processed = count($seenIds);
         $tracker->save();
+
+        AppNotifier::notify(
+            $tracker->user_id,
+            'Synced Lazada Brands',
+            'Synced '.count($seenIds).' brand(s).',
+            'success',
+            '/catalog/categories/lazada-mapping'
+        );
     }
 
     public function failed(\Throwable $exception): void
@@ -173,5 +182,7 @@ class SyncLazadaBrandsJob implements ShouldQueue
         $tracker->status = 'failed';
         $tracker->completed_at = now();
         $tracker->save();
+
+        AppNotifier::notify($tracker->user_id, 'Lazada Brand sync failed', $message, 'failed', '/catalog/categories/lazada-mapping');
     }
 }

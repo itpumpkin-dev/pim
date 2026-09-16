@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\AuditLog;
 use App\Models\ProductMarketplaceSyncJob;
+use App\Services\AppNotifier;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Shopee\ShopeeProductSyncService;
 use App\Services\TikTok\TikTokProductSyncService;
@@ -98,14 +99,40 @@ class SyncProductToMarketplaceJob implements ShouldQueue
                 'shop_id' => $record->shop->id,
                 'shop_name' => $record->shop->name,
             ], $this->userId);
+
+            AppNotifier::notify(
+                $this->userId,
+                "{$verb} {$record->shop->name}",
+                $message,
+                'success',
+                "/catalog/products/{$record->product->id}/edit"
+            );
         } catch (\Throwable $e) {
             $record->update(['status' => 'failed', 'message' => $e->getMessage()]);
+
+            AppNotifier::notify(
+                $this->userId,
+                "Failed — {$record->action} on {$record->shop->name}",
+                $e->getMessage(),
+                'failed',
+                "/catalog/products/{$record->product->id}/edit"
+            );
         }
     }
 
     public function failed(\Throwable $exception): void
     {
-        $record = ProductMarketplaceSyncJob::find($this->syncJobId);
+        $record = ProductMarketplaceSyncJob::with(['product', 'shop'])->find($this->syncJobId);
         $record?->update(['status' => 'failed', 'message' => "Job failed: {$exception->getMessage()}"]);
+
+        if ($record?->product && $record->shop) {
+            AppNotifier::notify(
+                $this->userId,
+                "Failed — {$record->action} on {$record->shop->name}",
+                "Job failed: {$exception->getMessage()}",
+                'failed',
+                "/catalog/products/{$record->product->id}/edit"
+            );
+        }
     }
 }
