@@ -2200,7 +2200,19 @@ class ProductController extends Controller
             ->get(['sales_platform_shop_id', 'last_synced_at'])
             ->keyBy('sales_platform_shop_id');
 
+        // Channels without a shop (plain "Website" channels) always show —
+        // only marketplace shops are subject to the role's shop restriction
+        // (see User::canAccessShop()). Filtered before map() so a restricted
+        // shop never even reaches the Sales Channels panel, matching the
+        // same visibility restriction already applied to the Shopee/Lazada/
+        // TikTok product-mapping pages' shop lists.
+        $currentUser = auth()->user();
         $channelGroups = $channels
+            ->filter(function ($channel) use ($shopByChannelId, $currentUser) {
+                $shop = $shopByChannelId->get($channel['id']);
+
+                return ! $shop || ($currentUser?->canAccessShop($shop) ?? true);
+            })
             ->map(function ($channel) use ($shopByChannelId, $liveStatusByShopId) {
                 $shop = $shopByChannelId->get($channel['id']);
                 $liveStatus = $shop ? $liveStatusByShopId->get($shop->id) : null;
