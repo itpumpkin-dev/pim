@@ -17,12 +17,13 @@ import {
     fioriTabsSx,
     fioriTableRowSx,
 } from '@/lib/fiori-style';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import EditIcon from '@mui/icons-material/Edit';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -47,6 +48,7 @@ import {
     TextField,
     ToggleButton,
     ToggleButtonGroup,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
@@ -151,6 +153,12 @@ const SECTION_SCROLL_MARGIN = 72;
 export default function WooCommerceProductsMapping({ products, stats, filters }: Props) {
     const { t: tNav } = useTranslation('nav');
     const { t: tGrid } = useTranslation('grid');
+
+    // ไอคอนแก้ไขสินค้าข้างชื่อในตาราง — พาไปหน้า Edit Product ตรงๆ (products/edit.tsx)
+    // ไม่ใช่หน้า mapping นี้ — เช็คสิทธิ์แยกจากสิทธิ์ marketplace_woocommerce ของหน้านี้เอง
+    // เพราะเป็นคนละ permission group กัน (ดู routes/catalog.php: products.edit)
+    const { auth } = usePage<SharedData>().props;
+    const canEditProducts = (auth.permissions || []).includes('products.edit_products');
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
@@ -553,14 +561,30 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             minWidth: 260,
             render: (row) => (
                 <Box>
-                    <Typography
-                        variant="body2"
-                        fontWeight={600}
-                        sx={{ color: FIORI.brand, cursor: 'pointer' }}
-                        onClick={() => openProduct(row)}
-                    >
-                        {row.name}
-                    </Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography
+                            variant="body2"
+                            fontWeight={600}
+                            sx={{ color: FIORI.brand, cursor: 'pointer' }}
+                            onClick={() => openProduct(row)}
+                        >
+                            {row.name}
+                        </Typography>
+                        {canEditProducts && (
+                            <Tooltip title="แก้ไขสินค้า">
+                                <IconButton
+                                    size="small"
+                                    sx={fioriIconButtonSx}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.visit(`/catalog/products/${row.id}/edit`);
+                                    }}
+                                >
+                                    <EditIcon fontSize="inherit" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Stack>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
                         <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
                             {row.sku}
