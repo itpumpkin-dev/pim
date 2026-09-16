@@ -295,7 +295,7 @@ export default function Home({
                         width: 36,
                         height: 36,
                         color: '#fff',
-                        background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
+                        // background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                         '&:hover': { background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)' },
                     }}
                 >
@@ -306,7 +306,7 @@ export default function Home({
             <Button
                 component={Link}
                 href={route('login')}
-                variant="contained"
+                // variant="contained"
                 startIcon={<LoginIcon />}
                 sx={{
                     borderRadius: '50px',
@@ -314,13 +314,13 @@ export default function Home({
                     fontWeight: 600,
                     px: 2,
                     py: 1,
-                    color: '#fff',
-                    background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
+                    color: '-moz-initial',
+                    // background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
                     transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                        transform: 'translateY(-2px)',
-                        background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                    },
+                    // '&:hover': {
+                    //     transform: 'translateY(-2px)',
+                    //     background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
+                    // },
                 }}
             >
                 {t('signIn')}
