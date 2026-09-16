@@ -1312,16 +1312,26 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                                 </Typography>
                                             </Box>
                                             <Stack direction="row" spacing={1}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    disabled={syncingFamily || !(tiktokAttributes ?? []).some((a) => a.mapped)}
-                                                    startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
-                                                    onClick={syncAttributeFamily}
-                                                    sx={fioriDefaultSx}
+                                                <Tooltip
+                                                    title={
+                                                        !syncingFamily && !(tiktokAttributes ?? []).some((a) => a.mapped)
+                                                            ? 'ต้องจับคู่ PIM Attribute อย่างน้อย 1 ตัวในตารางด้านล่างก่อน ถึงจะสร้าง/อัปเดต Attribute Family ได้'
+                                                            : ''
+                                                    }
                                                 >
-                                                    สร้าง/อัปเดต Attribute Family
-                                                </Button>
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            disabled={syncingFamily || !(tiktokAttributes ?? []).some((a) => a.mapped)}
+                                                            startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                            onClick={syncAttributeFamily}
+                                                            sx={fioriDefaultSx}
+                                                        >
+                                                            สร้าง/อัปเดต Attribute Family
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
