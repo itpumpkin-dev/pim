@@ -1323,16 +1323,26 @@ export default function ShopeeProductsMapping({ products, stats, filters, shopee
                                                 </Typography>
                                             </Box>
                                             <Stack direction="row" spacing={1}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    disabled={syncingFamily || !(shopeeAttributes ?? []).some((a) => a.mapped)}
-                                                    startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
-                                                    onClick={syncAttributeFamily}
-                                                    sx={fioriDefaultSx}
+                                                <Tooltip
+                                                    title={
+                                                        !syncingFamily && (shopeeAttributes ?? []).length === 0
+                                                            ? 'ยังไม่มีข้อมูล Shopee Attributes ในระบบ กด "Sync Attributes" ก่อน'
+                                                            : ''
+                                                    }
                                                 >
-                                                    สร้าง/อัปเดต Attribute Family
-                                                </Button>
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            disabled={syncingFamily || (shopeeAttributes ?? []).length === 0}
+                                                            startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                            onClick={syncAttributeFamily}
+                                                            sx={fioriDefaultSx}
+                                                        >
+                                                            สร้าง/อัปเดต Attribute Family
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
                                                 <Button
                                                     size="small"
                                                     variant="outlined"

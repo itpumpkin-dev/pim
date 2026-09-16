@@ -1314,8 +1314,8 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                             <Stack direction="row" spacing={1}>
                                                 <Tooltip
                                                     title={
-                                                        !syncingFamily && !(tiktokAttributes ?? []).some((a) => a.mapped)
-                                                            ? 'ต้องจับคู่ PIM Attribute อย่างน้อย 1 ตัวในตารางด้านล่างก่อน ถึงจะสร้าง/อัปเดต Attribute Family ได้'
+                                                        !syncingFamily && (tiktokAttributes ?? []).length === 0
+                                                            ? 'ยังไม่มีข้อมูล TikTok Attributes ในระบบ กด "Sync Attributes" ก่อน'
                                                             : ''
                                                     }
                                                 >
@@ -1323,7 +1323,7 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                                         <Button
                                                             size="small"
                                                             variant="outlined"
-                                                            disabled={syncingFamily || !(tiktokAttributes ?? []).some((a) => a.mapped)}
+                                                            disabled={syncingFamily || (tiktokAttributes ?? []).length === 0}
                                                             startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
                                                             onClick={syncAttributeFamily}
                                                             sx={fioriDefaultSx}

@@ -1398,16 +1398,26 @@ export default function LazadaProductsMapping({ products, stats, filters, lazada
                                                 </Typography>
                                             </Box>
                                             <Stack direction="row" spacing={1}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    disabled={syncingFamily || !(lazadaAttributes ?? []).some((a) => a.mapped)}
-                                                    startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
-                                                    onClick={syncAttributeFamily}
-                                                    sx={fioriDefaultSx}
+                                                <Tooltip
+                                                    title={
+                                                        !syncingFamily && (lazadaAttributes ?? []).length === 0
+                                                            ? 'ยังไม่มีข้อมูล Lazada Attributes ในระบบ กด "Sync Attributes" ก่อน'
+                                                            : ''
+                                                    }
                                                 >
-                                                    สร้าง/อัปเดต Attribute Family
-                                                </Button>
+                                                    <span>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            disabled={syncingFamily || (lazadaAttributes ?? []).length === 0}
+                                                            startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                            onClick={syncAttributeFamily}
+                                                            sx={fioriDefaultSx}
+                                                        >
+                                                            สร้าง/อัปเดต Attribute Family
+                                                        </Button>
+                                                    </span>
+                                                </Tooltip>
                                                 <Button
                                                     size="small"
                                                     variant="outlined"
