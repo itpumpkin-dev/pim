@@ -132,7 +132,7 @@ class SyncTikTokBrandsJob implements ShouldQueue
             'Synced TikTok Brands',
             'Synced '.count($seenIds).' brand(s).',
             'success',
-            '/catalog/categories/tiktok-mapping'
+            '/catalog/marketplace/tiktok/products'
         );
     }
 
@@ -153,6 +153,6 @@ class SyncTikTokBrandsJob implements ShouldQueue
         $tracker->completed_at = now();
         $tracker->save();
 
-        AppNotifier::notify($tracker->user_id, 'TikTok Brand sync failed', $message, 'failed', '/catalog/categories/tiktok-mapping');
+        AppNotifier::notify($tracker->user_id, 'TikTok Brand sync failed', $message, 'failed', '/catalog/marketplace/tiktok/products');
     }
 }

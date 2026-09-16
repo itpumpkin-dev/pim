@@ -205,7 +205,7 @@ class SyncShopeeBrandsJob implements ShouldQueue
             'Synced Shopee Brands',
             'Synced '.count($seenIds).' brand(s).',
             'success',
-            '/catalog/categories/shopee-mapping'
+            '/catalog/marketplace/shopee/products'
         );
     }
 
@@ -226,6 +226,6 @@ class SyncShopeeBrandsJob implements ShouldQueue
         $tracker->completed_at = now();
         $tracker->save();
 
-        AppNotifier::notify($tracker->user_id, 'Shopee Brand sync failed', $message, 'failed', '/catalog/categories/shopee-mapping');
+        AppNotifier::notify($tracker->user_id, 'Shopee Brand sync failed', $message, 'failed', '/catalog/marketplace/shopee/products');
     }
 }
