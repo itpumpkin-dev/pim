@@ -59,6 +59,7 @@ interface EditRoleProps {
         permissions: Record<string, string[]>;
         user_ids: number[];
         shop_ids?: number[];
+        restricted_platform_ids?: number[];
     };
     attributeGroups: AttributeGroup[];
     attributes: Attribute[];

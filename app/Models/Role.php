@@ -117,10 +117,13 @@ class Role extends Model
     }
 
     /**
-     * Shops this role is whitelisted for, across every platform — an empty
-     * relation means unrestricted (see hasShopRestrictionFor()/
-     * allowedShopIdsFor()), not "no shops allowed". Configured on the role
-     * form's "Shops" tab.
+     * Shops this role is whitelisted for, across every platform. Only
+     * meaningful for a platform the role has actually restricted (see
+     * hasShopRestrictionFor()) — for an unrestricted platform this can be
+     * empty, partial, or stale leftovers from before the restriction was
+     * turned off, none of which matter since allowedShopIdsFor() is never
+     * consulted unless hasShopRestrictionFor() said yes first. Configured on
+     * the role form's "Shops" tab.
      */
     public function salesPlatformShops(): BelongsToMany
     {
@@ -128,22 +131,40 @@ class Role extends Model
     }
 
     /**
-     * Whether this role has any shop whitelisted for the given platform at
-     * all. False means unrestricted for that platform (every shop of it is
-     * allowed) — a role can be restricted on one platform and unrestricted
-     * on another, since rows are scoped per shop, not per role.
+     * Platforms this role has explicitly turned shop-restriction on for —
+     * i.e. the "restrict to selected shops" toggle on the role form's
+     * "Shops" tab, per platform. This is a separate on/off flag from the
+     * whitelist itself (salesPlatformShops()) precisely so "restricted, but
+     * to zero shops" (block the whole platform) is a real, distinct state
+     * from "not restricted at all" — both used to look identical (an empty
+     * checkbox list), so unchecking every shop silently fell back to
+     * unrestricted instead of blocking the platform. See
+     * hasShopRestrictionFor().
+     */
+    public function restrictedPlatforms(): BelongsToMany
+    {
+        return $this->belongsToMany(SalesPlatform::class, 'role_sales_platform_restrictions');
+    }
+
+    /**
+     * Whether this role has turned shop-restriction on for the given
+     * platform at all. False means unrestricted for that platform (every
+     * shop of it is allowed, including ones added later) regardless of
+     * whatever rows happen to sit in salesPlatformShops() — a role can be
+     * restricted on one platform and unrestricted on another, since the
+     * toggle is scoped per platform, not per role.
      */
     public function hasShopRestrictionFor(int $salesPlatformId): bool
     {
-        return $this->salesPlatformShops()
-            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
-            ->exists();
+        return $this->restrictedPlatforms()->where('sales_platforms.id', $salesPlatformId)->exists();
     }
 
     /**
      * The whitelisted shop ids for the given platform. Only meaningful when
      * hasShopRestrictionFor() is true for that platform — call that first
-     * (see User::allowedShopIds(), which does).
+     * (see User::allowedShopIds(), which does). An empty array here, with
+     * hasShopRestrictionFor() true, is a deliberate "block every shop of
+     * this platform" — not "unrestricted".
      *
      * @return array<int, int>
      */

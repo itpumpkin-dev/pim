@@ -317,11 +317,16 @@ class User extends Authenticatable
      * This user's shop whitelist for one platform (own roles + roles
      * inherited through a group, same union as getAllPermissions()) — null
      * means unrestricted (every shop of that platform is allowed), an array
-     * means only those shop ids are. Any role held that itself has no
-     * restriction for this platform makes the whole result unrestricted
-     * (same "most permissive role wins" logic hasPermission() already uses
-     * via getAllPermissions()'s union), matching Role::hasShopRestrictionFor()'s
-     * docblock.
+     * means only those shop ids are (which can legitimately be empty — a
+     * role that turned the restriction on but picked zero shops is blocked
+     * from the whole platform, not unrestricted). Whether a role restricts a
+     * platform at all is its own toggle (Role::restrictedPlatforms()), kept
+     * separate from the whitelist itself (Role::salesPlatformShops()) so
+     * "restricted to zero shops" and "not restricted" can't collapse into
+     * the same state. Any role held that hasn't turned the restriction on
+     * for this platform makes the whole result unrestricted (same "most
+     * permissive role wins" logic hasPermission() already uses via
+     * getAllPermissions()'s union).
      *
      * @return array<int, int>|null
      */
@@ -347,11 +352,10 @@ class User extends Authenticatable
             return $this->allowedShopIdsCache[$salesPlatformId] = null;
         }
 
-        $restrictedRoleIds = DB::table('role_sales_platform_shop')
-            ->join('sales_platform_shops', 'sales_platform_shops.id', '=', 'role_sales_platform_shop.sales_platform_shop_id')
-            ->where('sales_platform_shops.sales_platform_id', $salesPlatformId)
-            ->whereIn('role_sales_platform_shop.role_id', $roleIds)
-            ->pluck('role_sales_platform_shop.role_id')
+        $restrictedRoleIds = DB::table('role_sales_platform_restrictions')
+            ->where('sales_platform_id', $salesPlatformId)
+            ->whereIn('role_id', $roleIds)
+            ->pluck('role_id')
             ->unique();
 
         $hasUnrestrictedRole = collect($roleIds)->diff($restrictedRoleIds)->isNotEmpty();

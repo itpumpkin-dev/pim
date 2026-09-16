@@ -37,6 +37,9 @@ class UpdateRoleRequest extends FormRequest
 
             'shop_ids' => ['array'],
             'shop_ids.*' => ['integer', 'exists:sales_platform_shops,id'],
+
+            'restricted_platforms' => ['array'],
+            'restricted_platforms.*' => ['integer', 'exists:sales_platforms,id'],
         ];
     }
 }

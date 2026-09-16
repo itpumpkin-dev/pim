@@ -115,6 +115,7 @@ class RoleController extends Controller
             SessionInvalidator::usersExceptCurrentActor($userIds);
         }
 
+        $role->restrictedPlatforms()->sync($request->input('restricted_platforms', []));
         $role->salesPlatformShops()->sync($request->input('shop_ids', []));
 
         return to_route('system.roles.index')->with('success', 'Role created successfully.');
@@ -135,6 +136,7 @@ class RoleController extends Controller
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
                 'shop_ids' => $role->salesPlatformShops()->pluck('sales_platform_shops.id'),
+                'restricted_platform_ids' => $role->restrictedPlatforms()->pluck('sales_platforms.id'),
             ],
             ...$this->attributeAccessProps(),
         ]);
@@ -187,12 +189,22 @@ class RoleController extends Controller
         // shop access (User::allowedShopIds()) is only ever memoized for the
         // lifetime of a single request, never cached across requests, so
         // there's no stale value a logged-in session could keep reading.
+        $oldRestrictedPlatformIds = $role->restrictedPlatforms()->pluck('sales_platforms.id')->all();
+        $newRestrictedPlatformIds = array_map('intval', $request->input('restricted_platforms', []));
+        $role->restrictedPlatforms()->sync($newRestrictedPlatformIds);
+
         $oldShopIds = $role->salesPlatformShops()->pluck('sales_platform_shops.id')->all();
         $newShopIds = array_map('intval', $request->input('shop_ids', []));
         $role->salesPlatformShops()->sync($newShopIds);
 
-        if ($this->idsChanged($oldShopIds, $newShopIds)) {
-            AuditLog::record('shops_updated', $role, ['shop_ids' => $oldShopIds], ['shop_ids' => $newShopIds]);
+        if ($this->idsChanged($oldShopIds, $newShopIds) || $this->idsChanged($oldRestrictedPlatformIds, $newRestrictedPlatformIds)) {
+            AuditLog::record('shops_updated', $role, [
+                'shop_ids' => $oldShopIds,
+                'restricted_platform_ids' => $oldRestrictedPlatformIds,
+            ], [
+                'shop_ids' => $newShopIds,
+                'restricted_platform_ids' => $newRestrictedPlatformIds,
+            ]);
         }
 
         if ($permissionsChanged || $usersChanged) {
