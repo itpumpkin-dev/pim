@@ -15,6 +15,13 @@ use App\Notifications\JobResultNotification;
  * one go, so every call site (SyncTikTokBrandsJob and siblings,
  * SyncProductToMarketplaceJob) doesn't have to remember to do both.
  *
+ * Also used synchronously, not just from queued jobs — e.g.
+ * ProductController::update()/updateMasterCategories() call this right
+ * inline (not via a job) when a PIM category change leaves a platform
+ * category mapping unset, so the admin still has a record of it in the
+ * bell's history even after the one-shot flash toast on that same save has
+ * long since disappeared.
+ *
  * Silently no-ops when $userId is null/unknown — every current call site
  * only has a user to notify when a human triggered the job themselves
  * (JobTracker.user_id / SyncProductToMarketplaceJob.$userId), which can
@@ -24,7 +31,7 @@ use App\Notifications\JobResultNotification;
 class AppNotifier
 {
     /**
-     * @param  'success'|'failed'  $status
+     * @param  'success'|'failed'|'warning'  $status
      */
     public static function notify(?int $userId, string $title, string $body, string $status, ?string $url = null): void
     {

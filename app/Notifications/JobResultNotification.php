@@ -29,7 +29,7 @@ class JobResultNotification extends Notification
     use Queueable;
 
     /**
-     * @param  'success'|'failed'  $status
+     * @param  'success'|'failed'|'warning'  $status
      */
     public function __construct(
         public string $title,

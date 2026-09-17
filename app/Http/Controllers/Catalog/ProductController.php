@@ -28,6 +28,7 @@ use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeCategoryAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokCategoryAttribute;
+use App\Services\AppNotifier;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
 use App\Services\Catalog\MasterAttributeOptionSync;
@@ -1750,6 +1751,93 @@ class ProductController extends Controller
     }
 
     /**
+     * A per-product platform-category override (products.{platform}_category_id
+     * — set from that platform's own category picker on this same Edit
+     * Product form, independent of the PIM `categories` tree) always wins
+     * over whatever the product's PIM categories map to — see e.g.
+     * TikTokProductSyncService::resolveTikTokCategoryId(), which checks
+     * $product->tiktok_category_id before ever looking at $product->
+     * categories(). Nothing previously cleared it when the PIM category
+     * assignment changed, so a product left with a stale override kept
+     * silently pushing to the OLD platform category forever, even after its
+     * PIM category (and that category's own platform mapping) moved on —
+     * same class of staleness ProductCategoryLinker::
+     * deriveLegacyCodesFromCategories() already guards against for the
+     * legacy pcatname/psubcatname/productgroupname attributes; this is the
+     * equivalent guard for these four columns.
+     *
+     * Called from update()/updateMasterCategories() only once the PIM
+     * category assignment has *actually* settled for this request — update()
+     * mutates `categories` in two separate steps (the category_ids tree sync,
+     * then relinkMasterCategoryCodes() further down from the Master
+     * Categories panel's own values), so this must run after both, against
+     * $newCategoryIds as the truly final set, not an intermediate one.
+     * $oldOverrides is captured (via $product->only([...])) BEFORE any of
+     * this request's writes touched $product, so $product->{$column} here
+     * already holds this save's final value for each column. Only clears an
+     * override the admin didn't actively touch on this same save (new value
+     * === old value, i.e. just carried over from page load) — an override
+     * deliberately changed in the very same request that also changed the
+     * PIM category is respected, not treated as stale.
+     *
+     * Also reports which platforms lost their EFFECTIVE resolved category
+     * entirely because of this — i.e. went from "override or a mapped
+     * category" to "nothing at all" — the exact gap that would make
+     * {Platform}ProductSyncService::resolve{Platform}CategoryId() start
+     * throwing on the next push. Doesn't flag a platform that still
+     * resolves to *something* (even a different category than before),
+     * only a platform that's now completely unmapped — see update()/
+     * updateMasterCategories() for how the caller turns this into a
+     * "warning" flash so the admin finds out here, on save, instead of only
+     * discovering it the next time a push fails.
+     *
+     * @return string[] display names of platforms that lost their mapping (e.g. ['Lazada', 'TikTok'])
+     */
+    private function reconcilePlatformCategoryOverrides(Product $product, array $oldCategoryIds, array $newCategoryIds, array $oldOverrides): array
+    {
+        $platformLabels = [
+            'shopee_category_id' => 'Shopee',
+            'lazada_category_id' => 'Lazada',
+            'tiktok_category_id' => 'TikTok',
+            'woocommerce_category_id' => 'WooCommerce',
+        ];
+
+        foreach (array_keys($platformLabels) as $column) {
+            $new = $product->{$column};
+            $old = $oldOverrides[$column] ?? null;
+
+            // Compared as strings, not ===: these columns have no cast on
+            // the model, so $new (from this request's validated input) and
+            // $old (read back from Eloquent) aren't guaranteed to be the
+            // same PHP type (e.g. "123" vs 123) even when they represent
+            // the same id — a strict === here would treat every save as
+            // "changed" and never actually clear anything.
+            if ($new !== null && (string) $new === (string) ($old ?? '')) {
+                $product->{$column} = null;
+            }
+        }
+
+        if ($product->isDirty()) {
+            $product->save();
+        }
+
+        $lostPlatforms = [];
+        foreach ($platformLabels as $column => $label) {
+            $before = $oldOverrides[$column] ?? Category::whereIn('id', $oldCategoryIds)->whereNotNull($column)->value($column);
+            if ($before === null) {
+                continue;
+            }
+
+            $after = $product->{$column} ?? Category::whereIn('id', $newCategoryIds)->whereNotNull($column)->value($column);
+            if ($after === null) {
+                $lostPlatforms[] = $label;
+            }
+        }
+
+        return $lostPlatforms;
+    }
+
+    /**
      * PIM attribute ids that Lazada's category schema marks mandatory for
      * $product's resolved Lazada category — surfaced on the Edit Product
      * form as a "Required by Lazada" chip (see RenderAttributeInput's
@@ -3051,7 +3139,9 @@ class ProductController extends Controller
 
         $validated = $validator->validate();
 
-        DB::transaction(function () use ($validated, $request, $product) {
+        $lostPlatformMappings = [];
+
+        DB::transaction(function () use ($validated, $request, $product, &$lostPlatformMappings) {
             // lockForUpdate() ก่อน ไม่ใช่แค่เช็ค $product->updated_at ที่โหลดมา
             // ตั้งแต่ต้น request — ป้องกัน race แคบๆ ที่ request คู่ขนานอีกตัว
             // insert/update แถวนี้เสร็จไปแล้วระหว่างที่ request นี้กำลัง validate
@@ -3062,6 +3152,13 @@ class ProductController extends Controller
             $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
 
             $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+            // Captured before update() below overwrites these — used once the
+            // PIM category assignment has fully settled for this request, by
+            // reconcilePlatformCategoryOverrides() further down.
+            $oldPlatformCategoryOverrides = $product->only([
+                'shopee_category_id', 'lazada_category_id', 'tiktok_category_id', 'woocommerce_category_id',
+            ]);
 
             $product->update([
                 'sku' => $validated['sku'],
@@ -3126,6 +3223,17 @@ class ProductController extends Controller
                 ->filter(fn ($code) => is_string($code) && $code !== '')
                 ->all();
             $this->relinkMasterCategoryCodes($product, $oldMasterCategoryCodes, $masterCategoryCodes, $newCategoryIds);
+
+            // Only NOW is the PIM category assignment truly settled for this
+            // request — categories()->sync() above and relinkMasterCategoryCodes()
+            // just above can each independently change it (the tree picker vs.
+            // the Master Categories panel's own values), so this has to read
+            // the category set fresh rather than trust $newCategoryIds, which
+            // only reflects the first of those two steps.
+            $finalCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+            if ($finalCategoryIds !== $oldCategoryIds) {
+                $lostPlatformMappings = $this->reconcilePlatformCategoryOverrides($product, $oldCategoryIds, $finalCategoryIds, $oldPlatformCategoryOverrides);
+            }
 
             // เก็บ error แบบ "values.{attributeId}" => message ไว้ตรงนี้ ทั้งจาก
             // รอบอัปโหลดไฟล์และรอบเช็ค required/unique ด้านล่าง แล้วค่อยโยน
@@ -3547,7 +3655,32 @@ class ProductController extends Controller
         // ไปหน้า Read (แสดงข้อมูลที่เพิ่งบันทึกแบบ read-only) แทนที่จะกลับไปหน้า
         // รายการสินค้า — ให้ผู้แก้ไขเห็นทันทีว่าสิ่งที่กรอกไปถูกบันทึกไว้ครบถ้วน
         // ถูกต้องจริงๆ ก่อนออกจากหน้านี้
-        return to_route('catalog.products.show', $product)->with('success', 'Product updated successfully.');
+        $redirect = to_route('catalog.products.show', $product);
+
+        // $lostPlatformMappings (from reconcilePlatformCategoryOverrides(),
+        // via the transaction closure above) — surfaced here as a 'warning'
+        // flash instead of the usual plain 'success' so it can't be missed
+        // right now, AND as a bell notification (AppNotifier) so it isn't
+        // lost the moment that one-shot toast disappears — the save itself
+        // succeeded, but a platform this product used to have a category
+        // mapped for now has none at all, and nothing else in the app would
+        // tell the admin that until the next push simply fails on it.
+        if (! empty($lostPlatformMappings)) {
+            $platforms = implode(', ', $lostPlatformMappings);
+            $message = "Product updated, but the category change left {$platforms} with no category mapped anymore — remap it under that platform's tab before pushing this product.";
+
+            AppNotifier::notify(
+                $request->user()?->id,
+                "Category mapping needs attention — {$product->sku}",
+                $message,
+                'warning',
+                route('catalog.products.edit', $product)
+            );
+
+            return $redirect->with('warning', $message);
+        }
+
+        return $redirect->with('success', 'Product updated successfully.');
     }
 
     /**
@@ -3694,8 +3827,12 @@ class ProductController extends Controller
         }
         $validated = $request->validate($rules);
 
-        DB::transaction(function () use ($validated, $attributeIdsByCode, $request, $product) {
+        $lostPlatformMappings = [];
+
+        DB::transaction(function () use ($validated, $attributeIdsByCode, $request, $product, &$lostPlatformMappings) {
             $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());
+
+            $oldCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
             $codes = [];
             $oldCodes = [];
@@ -3735,6 +3872,17 @@ class ProductController extends Controller
                 }
             }
 
+            // ต้องอ่านค่า override เดิมไว้ก่อน relinkMasterCategoryCodes() —
+            // ฟอร์มนี้ไม่มีฟิลด์ override พวกนี้ให้กรอกเลย เพราะฉะนั้นค่าที่
+            // $product ถืออยู่ตอนนี้ ("old") กับตอนหลัง ("new") จะเหมือนกันเป๊ะ
+            // เสมอ — ทำให้ reconcilePlatformCategoryOverrides() (ที่ปกติจะ
+            // แยกแยะ "แอดมินเพิ่งตั้งใจแก้ override เอง" ออกจาก "ค่าเดิมที่ค้าง
+            // มาจากก่อนหน้า") เคลียร์ override เก่าทิ้งแบบไม่มีเงื่อนไข ถูกต้อง
+            // แล้วสำหรับ endpoint นี้โดยเฉพาะ
+            $oldPlatformCategoryOverrides = $product->only([
+                'shopee_category_id', 'lazada_category_id', 'tiktok_category_id', 'woocommerce_category_id',
+            ]);
+
             $this->relinkMasterCategoryCodes($product, $oldCodes, $codes);
 
             // เหตุผลเดียวกับ updateChannels() ด้านบน — ProductValue::update()/
@@ -3742,9 +3890,26 @@ class ProductController extends Controller
             // เองเลย (คนละแถว/ตาราง) ต้อง touch() ให้ OCC check เห็นว่าแผงนี้
             // เพิ่งเปลี่ยนแปลงไปแล้วจริงๆ
             if ($oldCodes !== $codes) {
+                $newCategoryIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+                $lostPlatformMappings = $this->reconcilePlatformCategoryOverrides($product, $oldCategoryIds, $newCategoryIds, $oldPlatformCategoryOverrides);
                 $product->touch();
             }
         });
+
+        if (! empty($lostPlatformMappings)) {
+            $platforms = implode(', ', $lostPlatformMappings);
+            $message = "Categories saved, but the category change left {$platforms} with no category mapped anymore — remap it under that platform's tab before pushing this product.";
+
+            AppNotifier::notify(
+                $request->user()?->id,
+                "Category mapping needs attention — {$product->sku}",
+                $message,
+                'warning',
+                route('catalog.products.edit', $product)
+            );
+
+            return back()->with('warning', $message);
+        }
 
         return back()->with('success', 'Categories saved.');
     }

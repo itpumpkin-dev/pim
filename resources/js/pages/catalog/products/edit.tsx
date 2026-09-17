@@ -18,7 +18,6 @@ import {
     fioriEmphasizedSx,
     fioriGhostSx,
     fioriNegativeSx,
-    fioriPositiveSx,
     fioriSwitchSx,
     fioriTabsSx,
     fioriToggleButtonGroupSx,
@@ -29,6 +28,7 @@ import { type BreadcrumbItem, type SharedData } from '@/types';
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -38,6 +38,7 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DraftsIcon from '@mui/icons-material/Drafts';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import PublishIcon from '@mui/icons-material/Publish';
@@ -352,6 +353,13 @@ export default function ProductEdit({
     const toggleGroupCollapse = (groupId: number) => {
         setCollapsedGroupIds((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
     };
+
+    // ตัวกรองฟิลด์ — ใช้ค่าเดียวกันทุก group เพราะทุก panel render พร้อมกันหมด
+    // อยู่แล้ว (scroll-spy, ไม่ใช่แท็บคลิกสลับ — ดูคอมเมนต์ตรง assignedGroups.map()
+    // ด้านล่าง) รวมกันแบบ OR: เลือกหลายตัวพร้อมกัน = โชว์ฟิลด์ที่ตรงกับอย่างน้อย
+    // หนึ่งตัวที่เลือกไว้ ไม่ใช่ต้องตรงทุกตัว ค่าเริ่มต้น [] = ไม่กรอง (โชว์ทุกฟิลด์
+    // ตามปกติ)
+    const [attributeFilters, setAttributeFilters] = useState<string[]>([]);
 
     const scrollToGroup = (idx: number) => {
         suppressScrollSpy.current = true;
@@ -837,7 +845,11 @@ export default function ProductEdit({
             },
             {
                 key: 'sku',
-                header: 'SKU *',
+                header: (
+                    <>
+                        SKU <Box component="span" sx={{ color: 'error.main' }}>*</Box>
+                    </>
+                ),
                 priority: 'high',
                 render: ({ v, index }: VariantRow) => (
                     <TextField
@@ -1471,7 +1483,13 @@ export default function ProductEdit({
     // ยืนยันใน dialog เท่านั้น (คลิกที่ MenuItem แค่เปิด dialog ไว้ก่อน)
     const saveAsTemplate = () => {
         setSaveAsTemplateConfirmOpen(false);
-        performSave({ onSuccess: () => duplicateProduct() });
+        performSave({
+            onSuccess: () =>
+                duplicateProduct({
+                    errorMessage: (fallback) =>
+                        `บันทึกการแก้ไขของสินค้านี้สำเร็จแล้ว แต่สร้างสำเนา (เทมเพลต) ไม่สำเร็จ: ${fallback} — ลองกด "ทำสำเนา" จากเมนู More อีกครั้ง`,
+                }),
+        });
     };
 
     // Per-panel Save (Sales Channels / Master Categories): each hits its own
@@ -1527,7 +1545,14 @@ export default function ProductEdit({
     const [deleting, setDeleting] = useState(false);
     const [queuingTranslations, setQueuingTranslations] = useState(false);
 
-    const duplicateProduct = () => {
+    // $errorMessage: ให้ saveAsTemplate() ปรับข้อความ error ให้บอกด้วยว่าการแก้ไข
+    // ของสินค้าเดิมถูกบันทึกไปแล้ว (แค่ขั้นตอนทำสำเนาต่างหากที่พัง) — ไม่งั้นถ้าใช้
+    // ข้อความ fallback เฉยๆ ผู้ใช้จะไม่รู้ว่าแก้ไขที่เพิ่ง save ไปหายหรือเปล่า เดิม
+    // endpoint นี้ไม่มี onError เลยทั้งสองที่เรียก (ปุ่ม "ทำสำเนา" ตรงๆ กับ
+    // saveAsTemplate() นี้) ทำให้ error หายเงียบๆ ไม่มีอะไรบอกผู้ใช้เลยว่าทำไม
+    // หน้าไม่ไปไหนต่อ — ใช้ pushResult ตัวเดียวกับ snackbar แจ้งผล push/deactivate
+    // อยู่แล้ว แทนที่จะเพิ่ม state ใหม่
+    const duplicateProduct = (options?: { errorMessage?: (fallback: string) => string }) => {
         setDuplicating(true);
         router.post(
             `/catalog/products/${product.id}/duplicate`,
@@ -1536,6 +1561,10 @@ export default function ProductEdit({
                 // สำเร็จแล้ว backend redirect ไปหน้า Edit ของสำเนาใหม่เลย (ดู
                 // ProductController::duplicate()) เลยไม่ต้อง setDuplicateConfirmOpen(false)
                 // เอง — หน้าจะเปลี่ยนไปทั้งหน้าอยู่แล้ว
+                onError: (errs) => {
+                    const fallback = (Object.values(errs)[0] as string | undefined) || 'ทำสำเนาสินค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                    setPushResult({ severity: 'error', message: options?.errorMessage ? options.errorMessage(fallback) : fallback });
+                },
                 onFinish: () => setDuplicating(false),
             },
         );
@@ -1605,6 +1634,19 @@ export default function ProductEdit({
         );
     };
 
+    // "Save and Publish" — เดิมเป็นปุ่ม "เผยแพร่" แยกต่างหากในทูลบาร์ที่เรียก
+    // publishProduct() ตรงๆ (ไม่ผ่านฟอร์มหลักเลย) ทำให้ field อื่นที่พิมพ์แก้ไข
+    // ค้างอยู่แต่ยังไม่ได้กด Save Product ไม่ถูกบันทึกไปด้วยตอนกด Publish — ย้าย
+    // มารวมในเมนู Save Product แทนตามที่ขอมา และให้ save ฟอร์มทั้งหมดก่อน (เหมือน
+    // performSave ปกติ) แล้วค่อย publish ต่อ (เหมือน saveAsTemplate() ลง
+    // duplicateProduct() ต่อ) เพื่อไม่ให้เกิดเคสนั้นอีก ปุ่ม/dialog ยืนยันยังใช้
+    // publishing state ตัวเดิม — disabled ต้องเช็คทั้ง publishing (คั่นตอน publish)
+    // และ processing (คั่นตอน save ฟอร์มก่อนหน้านั้น) ไม่งั้นจะกดซ้ำได้ระหว่างรอ
+    // save เสร็จ
+    const saveAndPublish = () => {
+        performSave({ onSuccess: () => publishProduct() });
+    };
+
     const sectionSaveButton = (section: 'channels' | 'master-categories', onClick: () => void) => (
         <Button
             size="small"
@@ -1643,9 +1685,20 @@ export default function ProductEdit({
                 {/* แถบเครื่องมือย่อยใต้หัวข้อ */}
                 <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 0.5 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-                        <Typography variant="h5" fontWeight={700} color="text.primary">
-                            Edit Product | SKU: {data.sku}
-                        </Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            {/* ย้ายมาจากปุ่มข้อความฝั่งขวา (เดิมอยู่รวมกับ Publish/Save Product) มา
+                                ไว้เป็นไอคอนหน้าหัวข้อแทน ตามที่ขอมาเฉพาะหน้านี้ — หน้า catalog
+                                CRUD อื่นๆ (เช่น brands/edit.tsx) ยังใช้ปุ่มข้อความ + startIcon
+                                ฝั่งขวาคู่กับ Save เหมือนเดิม ไม่ได้เปลี่ยนตาม */}
+                            <Tooltip title={t('back')}>
+                                <IconButton component={Link} href="/catalog/products" size="small">
+                                    <ArrowBackIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                            <Typography variant="h5" fontWeight={700} color="text.primary">
+                                Edit Product | SKU: {data.sku}
+                            </Typography>
+                        </Stack>
 
                         <Stack direction="row" spacing={1.5} alignItems="center">
                             <Box
@@ -1657,8 +1710,8 @@ export default function ProductEdit({
                                     py: 0.5,
                                     bgcolor: 'grey.100',
                                     border: `1px solid ${UI_BORDER}`,
-                                    borderRadius: 1.5,
-                                    minHeight: 38,
+                                    borderRadius: 1,
+                                    minHeight: 40,
                                 }}
                             >
                                 <Typography variant="caption" fontWeight={600} color="text.secondary">
@@ -1739,28 +1792,12 @@ export default function ProductEdit({
                                 </>
                             )}
 
-                            <Button component={Link} href="/catalog/products" variant="outlined" sx={{ ...fioriDefaultSx, px: 2.5 }}>
-                                {t('back')}
-                            </Button>
-                            {/* เปิดใช้งานสินค้า + push ทุกช่องทางขายที่ติ๊กไว้ในคราวเดียว — ดู
-                                publishProduct()/ProductController::publish() ตัดขั้นตอน
-                                ติ๊ก→Save แผง Sales Channels→ไล่กด Push ทีละร้านที่ปกติต้องทำแยก
-                                กันหลายคลิกออกไป กดปุ่มนี้ปุ่มเดียวจบ */}
-                            {canEditSalesChannels && (
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<PublishIcon fontSize="small" />}
-                                    onClick={() => setPublishConfirmOpen(true)}
-                                    sx={{ ...fioriPositiveSx, px: 2.5 }}
-                                >
-                                    {t('publish')}
-                                </Button>
-                            )}
                             {/* Save Product เป็น split-button สไตล์ WordPress: ปุ่มหลักยัง submit
-                                ฟอร์มตามปกติ ลูกศรข้างๆ เปิดเมนู Save Draft / Save as Template /
-                                View Page — action ระดับ "วิธี save" ที่ไม่อยากให้ toolbar รกด้วย
-                                ปุ่มแยกอีกสามปุ่ม (View Page ย้ายมาจากปุ่ม "ดูสินค้า" เดิมที่เคยแยก
-                                อยู่ต่างหากตรงนี้) */}
+                                ฟอร์มตามปกติ ลูกศรข้างๆ เปิดเมนู Save Draft / Save and Publish /
+                                Save as Template / View Page — action ระดับ "วิธี save" ที่ไม่อยาก
+                                ให้ toolbar รกด้วยปุ่มแยกอีกหลายปุ่ม (View Page ย้ายมาจากปุ่ม
+                                "ดูสินค้า" เดิมที่เคยแยกอยู่ต่างหากตรงนี้ — Publish ก็ย้ายเข้ามารวมที่
+                                นี่เหมือนกัน ดู saveAndPublish() ด้านล่าง) */}
                             <ButtonGroup variant="contained">
                                 {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
                                     เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
@@ -1793,12 +1830,30 @@ export default function ProductEdit({
                                     <DraftsIcon fontSize="small" sx={{ mr: 1.5 }} />
                                     {t('saveDraft')}
                                 </MenuItem>
+                                {/* ย้ายมาจากปุ่ม "เผยแพร่" แยกต่างหากในทูลบาร์เดิม — gate ด้วย
+                                    canEditSalesChannels ตัวเดียวกับปุ่มเดิมนั้น (คุม published_shop_ids
+                                    ที่ publish() ใช้) เปิด dialog ยืนยันเดิมไว้ก่อน กด confirm ค่อยเรียก
+                                    saveAndPublish() จริง */}
+                                {canEditSalesChannels && (
+                                    <MenuItem
+                                        onClick={() => {
+                                            setSaveMenuAnchor(null);
+                                            setPublishConfirmOpen(true);
+                                        }}
+                                    >
+                                        <PublishIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                        {t('saveAndPublish')}
+                                    </MenuItem>
+                                )}
                                 {/* saveAsTemplate() ลง duplicateProduct() ต่อหลัง save สำเร็จ —
-                                    endpoint นั้นเช็ค products,create_products ฝั่ง server (เหมือน
-                                    "ทำสำเนา" ใน More menu ด้านบนที่ gate ด้วย canDuplicateProduct
-                                    อยู่แล้ว) ไม่ gate ตรงนี้ด้วย จะโชว์ปุ่มให้กดได้ทั้งที่กดแล้วต้อง
-                                    พังแน่ๆ ที่ขั้นตอน duplicate (ซึ่งไม่มี onError โชว์ผลด้วย —
-                                    แก้ไขที่บันทึกไปแล้วในขั้นตอนก่อนหน้าจะดูเหมือนหายเงียบๆ) */}
+                                    endpoint นั้นเช็ค products.create_products ฝั่ง server เหมือน
+                                    "ทำสำเนา" ใน More menu ด้านบน เลย gate MenuItem นี้ด้วย
+                                    canDuplicateProduct ตัวเดียวกัน ไม่ให้โชว์ปุ่มที่กดแล้วต้องพังแน่ๆ
+                                    ที่ขั้นตอน duplicate ถ้าสิทธิ์เปลี่ยนกลางเซสชัน (เช่น role โดนแก้
+                                    ระหว่างที่หน้านี้เปิดค้างอยู่) duplicateProduct()'s onError จะโชว์
+                                    ผ่าน pushResult snackbar ว่าการแก้ไขที่ save ไปแล้วไม่ได้หาย
+                                    เพียงแต่ขั้นตอนทำสำเนาต่างหากที่พัง (ดู duplicateProduct()'s
+                                    $errorMessage) */}
                                 {canDuplicateProduct && (
                                     <MenuItem
                                         onClick={() => {
@@ -1930,6 +1985,38 @@ export default function ProductEdit({
                                         <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
                                     ))}
                                 </Tabs>
+                                {/* ตัวกรองฟิลด์ — กรองทุก group พร้อมกัน (ไม่ใช่แค่ group ที่ active
+                                อยู่) เพราะทุก panel render พร้อมกันหมดอยู่แล้วแบบ scroll-spy วางไว้ใน
+                                Paper เดียวกับแท็บกลุ่ม (sticky ตัวเดียวกัน) เพื่อให้กรองได้ตลอดเวลาที่
+                                เลื่อนดูอยู่ ไม่ต้องเลื่อนกลับขึ้นไปบนสุดก่อน ดู attributeFilters'
+                                state comment กับ visibleAttrs ใน assignedGroups.map() ด้านล่าง */}
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    alignItems="center"
+                                    flexWrap="wrap"
+                                    sx={{ px: 2, py: 1, borderTop: `1px solid ${UI_BORDER}` }}
+                                >
+                                    <FilterListIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                    <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mr: 0.5 }}>
+                                        {t('filterFieldsLabel')}
+                                    </Typography>
+                                    <ToggleButtonGroup
+                                        size="small"
+                                        value={attributeFilters}
+                                        onChange={(_, newFilters: string[]) => setAttributeFilters(newFilters)}
+                                        sx={fioriToggleButtonGroupSx}
+                                    >
+                                        <ToggleButton value="required">{t('filterRequired')}</ToggleButton>
+                                        <ToggleButton value="locale">{t('filterLocaleBased')}</ToggleButton>
+                                        <ToggleButton value="channel">{t('filterChannelBased')}</ToggleButton>
+                                    </ToggleButtonGroup>
+                                    {attributeFilters.length > 0 && (
+                                        <Button size="small" onClick={() => setAttributeFilters([])} sx={{ textTransform: 'none' }}>
+                                            {t('clearFilter')}
+                                        </Button>
+                                    )}
+                                </Stack>
                             </Paper>
                             <Grid container spacing={3}>
                                 {/* พื้นที่หลักฝั่งซ้าย: กลุ่ม Attribute จริงจากฐานข้อมูล */}
@@ -1970,12 +2057,27 @@ export default function ProductEdit({
                                         {assignedGroups.map((group, idx) => {
                                             const isGeneral = group.code.toLowerCase() === 'general';
                                             const isSales = group.code.toLowerCase() === 'pricing_packaging';
-                                            const visibleAttrs = group.attributes.filter((attr) => {
+                                            const assignedAttrs = group.attributes.filter((attr) => {
                                                 if (data.type.toLowerCase() === 'configurable') {
                                                     return attr.code !== 'price' && attr.code !== 'qty';
                                                 }
                                                 return true;
                                             });
+                                            // ตัวกรอง (attributeFilters, ดูคอมเมนต์ตรงประกาศ state) กรองซ้ำจาก
+                                            // assignedAttrs อีกที — แยกตัวแปรออกจากกันเพื่อให้ข้อความ "ไม่มี
+                                            // attribute ผูกกับกลุ่มนี้" ด้านล่างยังเช็คจาก assignedAttrs (สภาพ
+                                            // จริงของกลุ่ม) ไม่ใช่ visibleAttrs ที่โดนกรองไปแล้ว ไม่งั้นกลุ่มที่มี
+                                            // field จริงแต่ไม่ตรงตัวกรองที่เลือกไว้จะขึ้นข้อความผิดว่า "ไม่มี
+                                            // attribute" ทั้งที่จริงๆ มี แค่ถูกซ่อนเพราะตัวกรอง
+                                            const visibleAttrs =
+                                                attributeFilters.length === 0
+                                                    ? assignedAttrs
+                                                    : assignedAttrs.filter(
+                                                          (attr) =>
+                                                              (attributeFilters.includes('required') && attr.is_required) ||
+                                                              (attributeFilters.includes('locale') && attr.is_locale_based) ||
+                                                              (attributeFilters.includes('channel') && attr.is_channel_based),
+                                                      );
 
                                             const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
 
@@ -2056,10 +2158,11 @@ export default function ProductEdit({
                                                                         color="#334155"
                                                                         sx={{ display: 'block', mb: 0.5 }}
                                                                     >
-                                                                        SKU *
+                                                                        SKU <Box component="span" sx={{ color: 'error.main' }}>*</Box>
                                                                     </Typography>
                                                                     <TextField
                                                                         fullWidth
+                                                                        required
                                                                         size="small"
                                                                         value={data.sku}
                                                                         onChange={(e) => setData('sku', e.target.value)}
@@ -2070,7 +2173,7 @@ export default function ProductEdit({
                                                                 </Box>
                                                             )}
 
-                                                            {visibleAttrs.length === 0 &&
+                                                            {assignedAttrs.length === 0 &&
                                                                 isGeneral &&
                                                                 assignedGroups.length === 1 && (
                                                                     <FioriMessageStrip severity="information">
@@ -2078,13 +2181,22 @@ export default function ProductEdit({
                                                                     </FioriMessageStrip>
                                                                 )}
 
-                                                            {visibleAttrs.length === 0 &&
+                                                            {assignedAttrs.length === 0 &&
                                                                 !isGeneral &&
                                                                 !(isSales && data.type.toLowerCase() === 'configurable') && (
                                                                     <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
                                                                         No attributes assigned to this group yet.
                                                                     </Typography>
                                                                 )}
+
+                                                            {/* กลุ่มนี้มี field จริง แค่ไม่มีตัวไหนตรงกับตัวกรองที่เลือกไว้ —
+                                                            คนละข้อความกับ 2 อันด้านบน (ซึ่งคือกลุ่มไม่มี field ผูกไว้เลย
+                                                            จริงๆ) ไม่งั้นจะดูเหมือนกลุ่มนี้ไม่มี attribute ทั้งที่มีจริง */}
+                                                            {assignedAttrs.length > 0 && visibleAttrs.length === 0 && (
+                                                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                                    {t('noFieldsMatchFilter')}
+                                                                </Typography>
+                                                            )}
 
                                                             {visibleAttrs.map((attr) => {
                                                                 const { channelKey, localeKey } = getValueKeys(attr);
@@ -2822,7 +2934,7 @@ export default function ProductEdit({
             {/* Dialog ยืนยันก่อน Publish — สรุปให้ชัดว่าจะเปิดใช้งานสินค้า +
                 push ไปร้านไหนบ้าง (หรือไม่ push เลยถ้ายังไม่ได้ติ๊กร้านไหนไว้) */}
             <Dialog open={publishConfirmOpen} onClose={() => setPublishConfirmOpen(false)}>
-                <DialogTitle>{t('confirmPublish')}</DialogTitle>
+                <DialogTitle>{t('confirmSaveAndPublish')}</DialogTitle>
                 <DialogContent>
                     <DialogContentText>
                         {tickedShopsForPublish.length > 0
@@ -2842,17 +2954,17 @@ export default function ProductEdit({
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setPublishConfirmOpen(false)} color="inherit" disabled={publishing}>
+                    <Button onClick={() => setPublishConfirmOpen(false)} color="inherit" disabled={publishing || processing}>
                         {t('cancel')}
                     </Button>
                     <Button
-                        onClick={publishProduct}
+                        onClick={saveAndPublish}
                         variant="contained"
-                        disabled={publishing}
-                        startIcon={publishing ? <CircularProgress size={16} color="inherit" /> : <PublishIcon fontSize="small" />}
+                        disabled={publishing || processing}
+                        startIcon={publishing || processing ? <CircularProgress size={16} color="inherit" /> : <PublishIcon fontSize="small" />}
                         sx={fioriEmphasizedSx}
                     >
-                        {t('publish')}
+                        {t('saveAndPublish')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -3569,7 +3681,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <FormControl fullWidth size="small">
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3620,7 +3732,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3643,7 +3755,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3667,7 +3779,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3690,7 +3802,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3718,7 +3830,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                         }
                         label={
                             <Typography variant="caption" fontWeight={600} color="#334155">
-                                {label} {attr.is_required && '*'}
+                                {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                             </Typography>
                         }
                     />
@@ -3733,7 +3845,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3828,7 +3940,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3919,7 +4031,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -3981,7 +4093,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                     <Typography variant="caption" fontWeight={600} color="#334155">
-                        {label} {attr.is_required && '*'}
+                        {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                     </Typography>
                     {renderChips()}
                 </Stack>
@@ -4034,7 +4146,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                 <Typography variant="caption" fontWeight={600} color="#334155">
-                    {label} {attr.is_required && '*'}
+                    {label} {attr.is_required && <Box component="span" sx={{ color: 'error.main' }}>*</Box>}
                 </Typography>
                 {renderChips()}
             </Stack>

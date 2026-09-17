@@ -7,6 +7,7 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
     Badge,
     Box,
@@ -25,11 +26,17 @@ interface NotificationRow {
     id: string;
     title: string;
     body: string;
-    status: 'success' | 'failed';
+    status: 'success' | 'failed' | 'warning';
     url: string | null;
     read_at: string | null;
     created_at: string;
 }
+
+const STATUS_COLOR: Record<NotificationRow['status'], string> = {
+    failed: 'error.main',
+    warning: 'warning.main',
+    success: 'success.main',
+};
 
 /**
  * Shell-bar bell — real-time notification list for background jobs the
@@ -167,8 +174,14 @@ export function NotificationBell() {
                                 whiteSpace: 'normal',
                             }}
                         >
-                            <Box sx={{ mt: 0.25, color: n.status === 'failed' ? 'error.main' : 'success.main', display: 'flex' }}>
-                                {n.status === 'failed' ? <ErrorOutlineIcon fontSize="small" /> : <CheckCircleOutlineIcon fontSize="small" />}
+                            <Box sx={{ mt: 0.25, color: STATUS_COLOR[n.status], display: 'flex' }}>
+                                {n.status === 'failed' ? (
+                                    <ErrorOutlineIcon fontSize="small" />
+                                ) : n.status === 'warning' ? (
+                                    <WarningAmberIcon fontSize="small" />
+                                ) : (
+                                    <CheckCircleOutlineIcon fontSize="small" />
+                                )}
                             </Box>
                             <Box sx={{ minWidth: 0, flex: 1 }}>
                                 <Typography variant="body2" fontWeight={n.read_at ? 400 : 600} noWrap>

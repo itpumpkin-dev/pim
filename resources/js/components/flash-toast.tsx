@@ -4,31 +4,36 @@ import { Alert, Snackbar } from '@mui/material';
 import { useEffect, useState } from 'react';
 
 export function FlashToast() {
-    const { success, error } = usePage<SharedData>().props;
+    const { success, error, warning } = usePage<SharedData>().props;
     const [open, setOpen] = useState(false);
     const [message, setMessage] = useState('');
-    const [severity, setSeverity] = useState<'success' | 'error'>('success');
+    const [severity, setSeverity] = useState<'success' | 'error' | 'warning'>('success');
 
-    // success/error are mutually exclusive per redirect (a controller flashes
-    // one or the other, never both) — error is checked first only so a
-    // stray leftover 'success' from an earlier visit can't mask a fresh
-    // error flash if both were somehow present at once.
+    // success/error/warning are mutually exclusive per redirect (a controller
+    // flashes exactly one, never more than one) — checked error, then
+    // warning, then success, so a stray leftover from an earlier visit can't
+    // mask a fresher, more important flash if more than one were somehow
+    // present at once.
     useEffect(() => {
         if (error) {
             setMessage(error);
             setSeverity('error');
+            setOpen(true);
+        } else if (warning) {
+            setMessage(warning);
+            setSeverity('warning');
             setOpen(true);
         } else if (success) {
             setMessage(success);
             setSeverity('success');
             setOpen(true);
         }
-    }, [success, error]);
+    }, [success, error, warning]);
 
     return (
         <Snackbar
             open={open}
-            autoHideDuration={severity === 'error' ? 10000 : 6000}
+            autoHideDuration={severity === 'success' ? 6000 : 10000}
             onClose={() => setOpen(false)}
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         >

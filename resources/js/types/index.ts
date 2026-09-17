@@ -62,6 +62,7 @@ export interface SharedData {
     status?: string | null;
     success?: string | null;
     error?: string | null;
+    warning?: string | null;
     created_option_code?: string | null;
     locale: string;
     locales: Locale[];
