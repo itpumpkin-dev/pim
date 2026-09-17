@@ -225,6 +225,49 @@ class TikTokClient
     }
 
     /**
+     * POST /product/{version}/brands — creates a new "custom" brand under
+     * this seller's account and returns its id (`data.id`), per the shared
+     * "Create Custom Brands" docs. $name is sent as-is; TikTok itself
+     * enforces the [2, 30] character range and rejects Chinese/special
+     * fonts/emoticons (error codes 12052189-12052192/12052204/12052206) —
+     * not re-validated here, same "let the marketplace's own error surface"
+     * convention as every other write in this file. A name that already
+     * exists on this shop fails with 12052205 — see
+     * TikTokProductSyncService::ensureTikTokBrandMapped(), which checks the
+     * local TikTokBrand cache for an exact name match before ever calling
+     * this, though a brand created outside that cache (or since the last
+     * SyncTikTokBrandsJob run) can still collide.
+     *
+     * Per the shared docs' own Query Header table, this endpoint's query
+     * params are app_key/sign/timestamp only — NO shop_cipher, unlike
+     * getBrands() above (same irregularity as the two upload endpoints/
+     * getGlobalSellerWarehouse() — see class docblock). CONFIRMED live,
+     * 2026-09-17: a real call sent with the default $includeShopCipher=true
+     * came back `[36009004] Unexpected identifier. The 'shop_cipher' query
+     * parameter is not required for this request.` — fixed by passing
+     * includeShopCipher: false below, matching what the docs' table said
+     * all along.
+     *
+     * CONFIRMED LIVE, 2026-09-17, once that fix landed: a real call for an
+     * already-taken brand name reached TikTok correctly and got a legitimate
+     * business error back — `[12052205] This operation requires a unique
+     * brand name` (worded slightly differently live than the docs' own
+     * "This brand name already exists", same code) — proving the request
+     * itself (signing, headers, body) is valid; a create for a genuinely-new
+     * name hasn't been separately confirmed to succeed yet, so the exact
+     * shape of a *successful* `data.id` response is still "per the docs"
+     * until one does.
+     *
+     * FIRES A REAL, LIVE WRITE — permanently creates a brand on the
+     * seller's TikTok Shop account and counts against TikTok's daily/total
+     * brand-creation limits (12052202/12052203).
+     */
+    public function createCustomBrand(string $name, string $apiVersion = '202309'): array
+    {
+        return $this->request("/product/{$apiVersion}/brands", method: 'POST', body: ['name' => $name], includeShopCipher: false);
+    }
+
+    /**
      * GET /logistics/{version}/warehouses — confirmed live, 2026-08-17:
      * `data.warehouses[]`, each {id, entity_id, name, effect_status
      * ("ENABLED"/"DISABLED"/"RESTRICTED"), type ("SALES_WAREHOUSE"/
@@ -641,8 +684,15 @@ class TikTokClient
                 'response' => $data,
             ]);
 
+            // TikTok's own numeric code is passed as the exception's code
+            // (not just embedded in the message string) specifically so a
+            // caller can react to one particular code — e.g.
+            // TikTokProductSyncService::ensureTikTokBrandMapped() catching
+            // 12052205 ("brand name already exists") to fall back to a live
+            // brand lookup instead of failing the whole push.
             throw new RuntimeException(
-                "TikTok API error [{$data['code']}]: ".($data['message'] ?? 'unknown error')
+                "TikTok API error [{$data['code']}]: ".($data['message'] ?? 'unknown error'),
+                (int) $data['code']
             );
         }
 

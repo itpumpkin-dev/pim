@@ -83,6 +83,18 @@ class SyncProductToMarketplaceJob implements ShouldQueue
                 $message .= " Video upload skipped: {$result['_video_upload_warning']}";
             }
 
+            // Only TikTokProductSyncService::push() ever sets this (see
+            // ensureTikTokBrandMapped()/withAutoBrandMapping()) — a brand
+            // this product's pbrand pointed to had no tiktok_brand_id
+            // mapping yet, so push() auto-resolved it instead of failing.
+            // Surfaced here for the same reason the video warning above is.
+            if (! empty($result['_auto_mapped_tiktok_brand'])) {
+                $brand = $result['_auto_mapped_tiktok_brand'];
+                $message .= $brand['created']
+                    ? " Auto-created TikTok brand '{$brand['name']}' (id {$brand['id']})."
+                    : " Auto-mapped to existing TikTok brand '{$brand['name']}' (id {$brand['id']}).";
+            }
+
             $record->update([
                 'status' => 'completed',
                 'message' => $message,

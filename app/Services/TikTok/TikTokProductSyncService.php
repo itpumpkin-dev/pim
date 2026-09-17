@@ -3,10 +3,12 @@
 namespace App\Services\TikTok;
 
 use App\Models\AttributeOption;
+use App\Models\Brand;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
+use App\Models\TikTokBrand;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -59,6 +61,9 @@ use RuntimeException;
 class TikTokProductSyncService
 {
     use ResolvesProductAttributeValues;
+
+    /** Tags push()'s result via withAutoBrandMapping() — see ensureTikTokBrandMapped(). */
+    private ?array $lastAutoBrandMapping = null;
 
     public function __construct(private readonly TikTokClient $client) {}
 
@@ -156,14 +161,21 @@ class TikTokProductSyncService
             'title' => $name,
             'description' => $description,
             'category_id' => (string) $tiktokCategoryId,
-            // ADDED 2026-08-27, NOT confirmed live — TikTok never had any
-            // brand-related code at all until now (see class docblock
-            // history). Shape (`brand.id`, an object like `video`/warehouse
-            // references elsewhere in this payload) is a best guess from
-            // TikTok Shop's published Create Product schema, not verified
-            // against a real push yet — the first real product with a
-            // brand set is a test of this path.
-            'brand' => ['id' => (string) $tiktokBrandId],
+            // ADDED 2026-08-27 as a nested `brand: {id}` object (guessing
+            // it'd match `video`/warehouse's own object shape elsewhere in
+            // this payload) — CONFIRMED WRONG live, 2026-09-17: a real push
+            // succeeded with zero errors/warnings but TikTok silently
+            // dropped the field entirely (an unrecognized key, not even an
+            // invalid-value warning) — the pushed product came back from
+            // both getProduct() and TikTok Seller Center with no brand at
+            // all. The Create Product docs' own Request Body table has it
+            // as a flat top-level `brand_id` string instead, confirmed by
+            // its own response `warnings[].message` example: `"The
+            // [brand_id]:123 field is incorrect and has been automatically
+            // cleared..."` — TikTok validates and warns on a *wrong-valued*
+            // brand_id, which is exactly what never happened here, only
+            // consistent with the key itself being unrecognized.
+            'brand_id' => (string) $tiktokBrandId,
             // Matches the default already used when syncing the category
             // tree itself (see TikTokClient::getCategoryTree()) — Thailand
             // is a SEA market, which the docs say must use v2.
@@ -259,6 +271,8 @@ class TikTokProductSyncService
      */
     public function push(Product $product, SalesPlatformShop $shop): array
     {
+        $this->ensureTikTokBrandMapped($product);
+
         $payload = $this->buildPayload($product, $shop);
         $payload = $this->uploadImagesToTikTok($payload);
         $payload = $this->uploadVideoToTikTok($payload);
@@ -270,7 +284,7 @@ class TikTokProductSyncService
 
         if ($cachedProductId) {
             try {
-                return $this->client->updateProduct((string) $cachedProductId, $payload);
+                return $this->withAutoBrandMapping($this->client->updateProduct((string) $cachedProductId, $payload));
             } catch (\Throwable $e) {
                 // Cached product_id no longer resolves on TikTok's side
                 // (e.g. deleted outside this app) — fall through to create
@@ -289,7 +303,7 @@ class TikTokProductSyncService
             );
         }
 
-        return $result;
+        return $this->withAutoBrandMapping($result);
     }
 
     /**
@@ -395,11 +409,159 @@ class TikTokProductSyncService
     }
 
     /**
+     * Auto-creates a TikTok "custom" brand (TikTokClient::createCustomBrand())
+     * for this product's master Brand row (the `brands` table's own `name`
+     * column — see mappedBrandOptionId()'s docblock for why that table, not
+     * AttributeOption, is the source of truth) whenever the product's
+     * `pbrand` resolves to a Brand with no `tiktok_brand_id` mapping yet.
+     * Called from push() only, BEFORE buildPayload() — never from
+     * buildPayload() itself, so that method stays side-effect-free/safe to
+     * call anytime for inspection, same reasoning as
+     * uploadImagesToTikTok()/uploadVideoToTikTok() being kept out of
+     * buildPayload() too.
+     *
+     * A no-op whenever resolveTikTokBrandId() would already succeed
+     * (per-product override, or an existing mapping) or the product has no
+     * pbrand value/matching Brand row at all — in the latter case
+     * buildPayload() still throws its usual "no brand mapped" error right
+     * after, since there's no name to create a brand from. This method
+     * returns void and re-reads the Brand row itself rather than returning
+     * an id — buildPayload()'s own resolveTikTokBrandId() re-resolves it
+     * right after via the now-updated `brands.tiktok_brand_id`.
+     *
+     * Checks the locally cached TikTokBrand table (kept in sync by
+     * SyncTikTokBrandsJob for the Brands mapping page) for an exact name
+     * match first, to avoid needlessly creating a duplicate on TikTok when
+     * a brand with that name already exists there — would otherwise fail
+     * with TikTok's own 12052205 "This brand name already exists" (see
+     * TikTokClient::createCustomBrand()'s docblock). That cache can still be
+     * stale, though (a brand created outside SyncTikTokBrandsJob's sync, or
+     * simply not synced recently) — CONFIRMED live, 2026-09-17: a real push
+     * hit exactly this, 12052205, for a brand our local cache didn't have
+     * yet (which brand isn't recorded here — not re-checked against the DB
+     * at the time). Caught below by falling back to a live
+     * findTikTokBrandIdByExactName() lookup instead of failing the whole
+     * push over a name collision that's actually resolvable.
+     *
+     * createCustomBrand() itself is CONFIRMED live, 2026-09-17 (the
+     * shop_cipher-related 36009004 that blocked the very first attempt is
+     * fixed — see that method's docblock); the exact-name-already-exists
+     * fallback path below is not yet separately confirmed to find the right
+     * brand (only confirmed that TikTok returns 12052205 for it).
+     */
+    private function ensureTikTokBrandMapped(Product $product): void
+    {
+        $this->lastAutoBrandMapping = null;
+
+        if ($product->tiktok_brand_id) {
+            return;
+        }
+
+        if ($this->mappedBrandOptionId($product, 'tiktok_brand_id') !== null) {
+            return;
+        }
+
+        $brandCode = $this->attributeValue($product, 'pbrand', null);
+        if (!$brandCode) {
+            return;
+        }
+
+        $brand = Brand::where('code', $brandCode)->first();
+        if (!$brand) {
+            return;
+        }
+
+        $existing = TikTokBrand::where('name', $brand->name)->first();
+        if ($existing) {
+            $brand->update(['tiktok_brand_id' => $existing->id]);
+            $this->lastAutoBrandMapping = ['name' => $brand->name, 'id' => $existing->id, 'created' => false];
+
+            return;
+        }
+
+        try {
+            $response = $this->client->createCustomBrand($brand->name);
+        } catch (RuntimeException $e) {
+            if ($e->getCode() !== 12052205) {
+                throw $e;
+            }
+
+            $tiktokBrandId = $this->findTikTokBrandIdByExactName($brand->name);
+            if ($tiktokBrandId === null) {
+                throw $e;
+            }
+
+            TikTokBrand::updateOrCreate(['id' => $tiktokBrandId], ['name' => $brand->name]);
+            $brand->update(['tiktok_brand_id' => $tiktokBrandId]);
+            $this->lastAutoBrandMapping = ['name' => $brand->name, 'id' => $tiktokBrandId, 'created' => false];
+
+            return;
+        }
+
+        $tiktokBrandId = (int) ($response['data']['id'] ?? 0);
+        if ($tiktokBrandId <= 0) {
+            throw new RuntimeException("TikTok did not return a brand id when creating brand '{$brand->name}' for product '{$product->sku}'.");
+        }
+
+        TikTokBrand::updateOrCreate(['id' => $tiktokBrandId], ['name' => $brand->name]);
+        $brand->update(['tiktok_brand_id' => $tiktokBrandId]);
+        $this->lastAutoBrandMapping = ['name' => $brand->name, 'id' => $tiktokBrandId, 'created' => true];
+    }
+
+    /**
+     * Live fallback for ensureTikTokBrandMapped()'s 12052205 catch —
+     * TikTokClient::getBrands()'s $brandName filter is a "begins with"
+     * match per the shared docs, not exact, so this fetches one page (100,
+     * TikTok's max page_size) of candidates by that prefix and picks the
+     * one whose `name` matches $name exactly. Returns null (falls back to
+     * the original 12052205 exception) if no exact match turns up on that
+     * first page — good enough for the realistic case (a generic-enough
+     * name pulling in more than 100 same-prefix brands is not the common
+     * path this exists for), not exhaustive pagination.
+     */
+    private function findTikTokBrandIdByExactName(string $name): ?int
+    {
+        $brands = $this->client->getBrands(brandName: $name, pageSize: 100)['data']['brands'] ?? [];
+
+        foreach ($brands as $candidate) {
+            if (($candidate['name'] ?? null) === $name) {
+                return (int) $candidate['id'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Tags push()'s result with the brand auto-mapping/auto-creation
+     * ensureTikTokBrandMapped() just did, if any — same "stash a note during
+     * processing, tag the final result on the way out" shape as
+     * ShopeeProductSyncService::withVideoWarning(). Consumed by
+     * SyncProductToMarketplaceJob to append a line to the push's success
+     * message shown in the UI (Edit Product page's push result Alert / the
+     * marketplace product page's Sync history tab), so a fully-automatic
+     * brand mapping doesn't silently disappear into a `result` JSON nobody
+     * looks at.
+     */
+    private function withAutoBrandMapping(array $result): array
+    {
+        if ($this->lastAutoBrandMapping !== null) {
+            $result['_auto_mapped_tiktok_brand'] = $this->lastAutoBrandMapping;
+        }
+
+        return $result;
+    }
+
+    /**
      * A product's own `tiktok_brand_id` override (set directly from
      * TikTok's synced brand list on the Edit Product page) wins when
      * present; otherwise falls back to whichever marketplace brand this
      * product's `pbrand` attribute value's AttributeOption is mapped to —
-     * same resolve-then-throw shape as resolveTikTokCategoryId().
+     * same resolve-then-throw shape as resolveTikTokCategoryId(). By push
+     * time this only throws for a product with no pbrand value/matching
+     * Brand row at all — ensureTikTokBrandMapped() (called right before
+     * buildPayload() in push()) has already filled in a Brand row's
+     * mapping otherwise.
      */
     private function resolveTikTokBrandId(Product $product): int
     {

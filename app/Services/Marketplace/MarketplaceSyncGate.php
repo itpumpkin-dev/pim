@@ -82,6 +82,19 @@ class MarketplaceSyncGate
             if ($brandCode && Brand::where('code', $brandCode)->whereNotNull($column)->exists()) {
                 return true;
             }
+
+            // TikTok, uniquely among these four, can create a brand via API
+            // (TikTokClient::createCustomBrand()) — see
+            // TikTokProductSyncService::ensureTikTokBrandMapped(), called
+            // right before buildPayload() on every push. So a Brand row
+            // existing for this pbrand code is enough to let the push
+            // proceed even with no tiktok_brand_id mapped yet; push() fills
+            // that mapping in itself instead of failing here the way the
+            // whereNotNull($column) check above requires for every other
+            // platform.
+            if ($platform === 'tiktok' && $brandCode && Brand::where('code', $brandCode)->exists()) {
+                return true;
+            }
         }
 
         if ($platform === 'lazada') {
