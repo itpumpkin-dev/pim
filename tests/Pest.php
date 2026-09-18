@@ -45,3 +45,29 @@ function something()
 {
     // ..
 }
+
+/**
+ * Shared by the *MappingTimelineBuilderTest files — creates an AuditLog row
+ * for $model with explicit old/new values, optionally backdated.
+ *
+ * Eloquent auto-stamps created_at on INSERT regardless of what's passed to
+ * create() (AuditLog only nulls UPDATED_AT, not $timestamps), so a desired
+ * $createdAt is applied via a separate UPDATE afterwards instead, which
+ * Eloquent does not re-stamp.
+ */
+function logFor(object $model, string $event, ?array $old = null, ?array $new = null, ?\Illuminate\Support\Carbon $createdAt = null): \App\Models\AuditLog
+{
+    $log = \App\Models\AuditLog::create([
+        'event' => $event,
+        'auditable_type' => $model->getMorphClass(),
+        'auditable_id' => $model->getKey(),
+        'old_values' => $old,
+        'new_values' => $new,
+    ]);
+
+    if ($createdAt !== null) {
+        $log->forceFill(['created_at' => $createdAt])->save();
+    }
+
+    return $log;
+}

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -50,15 +51,33 @@ return new class extends Migration
 
     public function up(): void
     {
+        // CONCURRENTLY is Postgres-only syntax (and only makes sense against
+        // a real, already-populated database, to avoid locking writers while
+        // the index builds) — everywhere else (sqlite in the test suite,
+        // notably) fall back to a plain index create.
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
         foreach ($this->indexes as $name => [$table, $column]) {
-            DB::statement("CREATE INDEX CONCURRENTLY IF NOT EXISTS {$name} ON {$table} ({$column})");
+            if ($isPgsql) {
+                DB::statement("CREATE INDEX CONCURRENTLY IF NOT EXISTS {$name} ON {$table} ({$column})");
+            } else {
+                Schema::table($table, function ($table) use ($name, $column) {
+                    $table->index($column, $name);
+                });
+            }
         }
     }
 
     public function down(): void
     {
+        $isPgsql = DB::connection()->getDriverName() === 'pgsql';
+
         foreach (array_keys($this->indexes) as $name) {
-            DB::statement("DROP INDEX CONCURRENTLY IF EXISTS {$name}");
+            if ($isPgsql) {
+                DB::statement("DROP INDEX CONCURRENTLY IF EXISTS {$name}");
+            } else {
+                DB::statement("DROP INDEX IF EXISTS {$name}");
+            }
         }
     }
 };

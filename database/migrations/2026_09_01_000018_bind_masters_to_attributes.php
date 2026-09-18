@@ -9,6 +9,7 @@ use App\Models\Currency;
 use App\Models\Locale;
 use App\Models\Point;
 use App\Models\Vendor;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -36,12 +37,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $this->createBusinessTypeAttribute();
-        $this->backfillPoints();
-        $this->backfillCommissionGroups();
-        $this->backfillBusinessTypes();
-        $this->backfillVendors();
-        $this->backfillCurrencies();
+        // withoutEvents: AppServiceProvider::boot() wires a global `saved`
+        // listener onto every master model (BusinessType/Vendor/Currency/...)
+        // that queries `attributes.master_source` to keep that attribute's
+        // options mirrored — added by a migration two days after this one.
+        // This backfill's writes don't need that live sync (nothing has
+        // options mirrored onto it yet at this point), so it's disabled for
+        // the duration of this migration only; the real app boots with
+        // events enabled as normal.
+        Model::withoutEvents(function () {
+            $this->createBusinessTypeAttribute();
+            $this->backfillPoints();
+            $this->backfillCommissionGroups();
+            $this->backfillBusinessTypes();
+            $this->backfillVendors();
+            $this->backfillCurrencies();
+        });
     }
 
     private function createBusinessTypeAttribute(): void
@@ -50,7 +61,10 @@ return new class extends Migration
             $table->string('code')->nullable()->unique()->after('id');
         });
 
-        foreach (BusinessType::orderBy('id')->get() as $businessType) {
+        // ->without('translations'): see backfillBusinessTypes() below —
+        // business_type_translations doesn't exist yet at this point in
+        // migration order, and $with would otherwise eager-load it here too.
+        foreach (BusinessType::query()->without('translations')->orderBy('id')->get() as $businessType) {
             $businessType->update(['code' => 'biztype_'.$businessType->id]);
         }
 
@@ -126,21 +140,28 @@ return new class extends Migration
 
     private function backfillBusinessTypes(): void
     {
-        foreach (BusinessType::all() as $businessType) {
+        // ->without('translations'): BusinessType's default-eager-loaded
+        // `translations` relation points at business_type_translations,
+        // which create_business_type_translations_table only creates two
+        // days later in migration order — ::all() would eager-load it here
+        // and fail on a fresh migrate.
+        foreach (BusinessType::query()->without('translations')->get() as $businessType) {
             $this->mirrorOption('business_type', $businessType->code, $businessType->name, $businessType->is_active);
         }
     }
 
     private function backfillVendors(): void
     {
-        foreach (Vendor::all() as $vendor) {
+        // Same reason as backfillBusinessTypes() above, for vendor_translations.
+        foreach (Vendor::query()->without('translations')->get() as $vendor) {
             $this->mirrorOption('vendor', $vendor->code, $vendor->name, $vendor->is_active);
         }
     }
 
     private function backfillCurrencies(): void
     {
-        foreach (Currency::all() as $currency) {
+        // Same reason as backfillBusinessTypes() above, for currency_translations.
+        foreach (Currency::query()->without('translations')->get() as $currency) {
             $this->mirrorOption('purchase_currency', strtolower($currency->code), $currency->name);
         }
     }
