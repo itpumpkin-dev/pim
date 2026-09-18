@@ -352,6 +352,10 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     const [checkingLiveIds, setCheckingLiveIds] = useState<Set<number>>(new Set());
     const [liveStatusOverrides, setLiveStatusOverrides] = useState<Record<number, { total: number; platforms: Record<string, number> }>>({});
     const [liveStatusError, setLiveStatusError] = useState<string | null>(null);
+    // เช็คแล้วไม่ live ที่ไหนเลย (total === 0) แถวในตารางจะยังโชว์ป้าย "ยังไม่ Live"
+    // เหมือนก่อนกด เลยดูจากภายนอกเหมือนกดแล้วไม่มีอะไรเกิดขึ้น — โชว์ toast ยืนยันว่า
+    // เช็คจริงแล้ว แค่ผลลัพธ์คือไม่มีช่องทางไหน live (ตามที่ user ขอ)
+    const [liveStatusInfo, setLiveStatusInfo] = useState<string | null>(null);
 
     const checkLiveStatus = (productId: number) => {
         setCheckingLiveIds((prev) => new Set(prev).add(productId));
@@ -379,6 +383,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 setLiveStatusOverrides((prev) => ({ ...prev, [productId]: body.sales_channels }));
                 if (Array.isArray(body.errors) && body.errors.length > 0) {
                     setLiveStatusError(body.errors.join('; '));
+                } else if (!body.sales_channels?.total) {
+                    setLiveStatusInfo(t('checkLiveStatusNotLive'));
                 }
             })
             .catch(() => setLiveStatusError(t('checkLiveStatusFailed')))
@@ -1162,6 +1168,17 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             >
                 <Alert severity="error" variant="filled" onClose={() => setLiveStatusError(null)} sx={{ maxWidth: 480 }}>
                     {liveStatusError}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
+                open={!!liveStatusInfo}
+                autoHideDuration={6000}
+                onClose={() => setLiveStatusInfo(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+                <Alert severity="info" variant="filled" onClose={() => setLiveStatusInfo(null)} sx={{ maxWidth: 480 }}>
+                    {liveStatusInfo}
                 </Alert>
             </Snackbar>
         </AppLayout>

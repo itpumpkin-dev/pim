@@ -1570,8 +1570,17 @@ export default function ProductEdit({
     // and the pbrand exclusion that used to live in the attribute-groups
     // loop) in favor of the Master pages + this new right-column panel.
     const [savingSection, setSavingSection] = useState<'channels' | 'master-categories' | null>(null);
+    // เปิดจากลิงก์ "เลือกกลุ่มสินค้า" ใน Tips ตอนสินค้ายังไม่มีตระกูลแอตทริบิวต์ให้
+    // กรอก (ดู noAttributeFamilyBoundYet) — ยกฟิลด์ชุดเดียวกับแผง Master Categories
+    // ด้านล่างมาไว้ใน dialog ให้เลือกโดยไม่ต้อง scroll ไปหา ผูกกับ data.values ตัว
+    // เดียวกันเลย เปลี่ยนที่ไหนก็สะท้อนอีกที่ทันที
+    const [masterCategoryPickerOpen, setMasterCategoryPickerOpen] = useState(false);
 
-    const saveSection = (section: 'channels' | 'master-categories', payload: Record<string, FormDataConvertible>) => {
+    const saveSection = (
+        section: 'channels' | 'master-categories',
+        payload: Record<string, FormDataConvertible>,
+        options?: { onSuccess?: () => void },
+    ) => {
         setSavingSection(section);
         setConflictMessage(null);
         skipNavigationGuardRef.current = true;
@@ -1585,6 +1594,7 @@ export default function ProductEdit({
             {
                 preserveScroll: true,
                 preserveState: true,
+                onSuccess: () => options?.onSuccess?.(),
                 onError: (errs) => {
                     if (errs.conflict) setConflictMessage(errs.conflict);
                 },
@@ -2305,7 +2315,32 @@ export default function ProductEdit({
                                                                 isGeneral &&
                                                                 assignedGroups.length === 1 && (
                                                                     <FioriMessageStrip severity="information">
-                                                                        {t('noAttributeFamilyBoundYet')}
+                                                                        <Trans
+                                                                            t={t}
+                                                                            i18nKey="noAttributeFamilyBoundYet"
+                                                                            components={{
+                                                                                groupLink: (
+                                                                                    <Box
+                                                                                        component="span"
+                                                                                        role="button"
+                                                                                        tabIndex={0}
+                                                                                        onClick={() => setMasterCategoryPickerOpen(true)}
+                                                                                        onKeyDown={(e) => {
+                                                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                                                e.preventDefault();
+                                                                                                setMasterCategoryPickerOpen(true);
+                                                                                            }
+                                                                                        }}
+                                                                                        sx={{
+                                                                                            color: FIORI.brand,
+                                                                                            fontWeight: 700,
+                                                                                            textDecoration: 'underline',
+                                                                                            cursor: 'pointer',
+                                                                                        }}
+                                                                                    />
+                                                                                ),
+                                                                            }}
+                                                                        />
                                                                     </FioriMessageStrip>
                                                                 )}
 
@@ -3345,6 +3380,68 @@ export default function ProductEdit({
                     components={{ strong: <strong /> }}
                 />
             </FioriMessageBox>
+
+            <Dialog
+                open={masterCategoryPickerOpen}
+                onClose={() => setMasterCategoryPickerOpen(false)}
+                fullWidth
+                maxWidth="sm"
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={700}>
+                        {t('masterCategoriesBlockTitle')}
+                    </Typography>
+                    <IconButton size="small" onClick={() => setMasterCategoryPickerOpen(false)}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+                        {cascadedMasterCategoryAttributes.map((attr) => {
+                            const { channelKey, localeKey } = getValueKeys(attr);
+                            const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
+                            const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+                            return (
+                                <RenderAttributeInput
+                                    key={attr.id}
+                                    attr={attr}
+                                    value={val}
+                                    channelKey={channelKey}
+                                    localeKey={localeKey}
+                                    onValueChange={handleMasterCategoryChange}
+                                    label={localizedLabel(attr, activeLocaleId)}
+                                    activeLocaleCode={activeLocaleCode}
+                                    canAddOptions={canAddAttributeOptions}
+                                    sku={data.sku}
+                                    productId={product.id}
+                                    masterSources={masterSources}
+                                    platformContext={platformContext}
+                                />
+                            );
+                        })}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button onClick={() => setMasterCategoryPickerOpen(false)}>{t('cancel')}</Button>
+                    {canEditMasterCategories && (
+                        <Button
+                            variant="contained"
+                            disabled={savingSection === 'master-categories'}
+                            startIcon={savingSection === 'master-categories' ? <CircularProgress size={16} /> : undefined}
+                            onClick={() => {
+                                const payload: Record<string, FormDataConvertible> = {};
+                                masterCategoryAttributes.forEach((attr) => {
+                                    payload[attr.code] = selectedMasterCategoryCode(attr);
+                                });
+                                saveSection('master-categories', payload, { onSuccess: () => setMasterCategoryPickerOpen(false) });
+                            }}
+                        >
+                            {t('save')}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
 
             <Dialog
                 open={variantDialogOpen}
