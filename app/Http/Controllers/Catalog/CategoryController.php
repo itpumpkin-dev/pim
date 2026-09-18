@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Models\AttributeFamily;
 use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\CategoryField;
@@ -11,6 +12,7 @@ use App\Models\CategoryTranslation;
 use App\Models\LazadaCategory;
 use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
+use App\Models\Product;
 use App\Models\ShopeeBrand;
 use App\Models\ShopeeCategory;
 use App\Models\ShopeeSellerAccount;
@@ -32,6 +34,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -1949,5 +1952,122 @@ class CategoryController extends Controller
     public function bulkMapWoocommerce(Request $request): RedirectResponse
     {
         return $this->bulkMapMarketplaceCategory($request, 'woocommerce_category_id', 'woocommerce_categories', WooCommerceCategory::class, 'woocommerce_category_mapped');
+    }
+
+    public function clearProductLazadaMapping(Request $request): RedirectResponse
+    {
+        return $this->clearProductMarketplaceCategory($request, 'lazada_category_id', 'lazada_category_mapped');
+    }
+
+    /**
+     * เหมือนกับ clearProductLazadaMapping() ด้านบน แต่ใช้กับ Shopee
+     */
+    public function clearProductShopeeMapping(Request $request): RedirectResponse
+    {
+        return $this->clearProductMarketplaceCategory($request, 'shopee_category_id', 'shopee_category_mapped');
+    }
+
+    /**
+     * เหมือนกับ clearProductLazadaMapping()/clearProductShopeeMapping() ด้านบน
+     * แต่ใช้กับ TikTok
+     */
+    public function clearProductTiktokMapping(Request $request): RedirectResponse
+    {
+        return $this->clearProductMarketplaceCategory($request, 'tiktok_category_id', 'tiktok_category_mapped');
+    }
+
+    /**
+     * ปุ่ม "ล้าง Category Mapping" ใน {platform}-products.tsx's Object Page —
+     * รับ product_id แทน category_id ตรงๆ (ต่างจาก bulkMapMarketplaceCategory()
+     * ด้านบนที่ใช้กับตาราง bulk-mapping) แล้ว "หาเอง" ว่าหมวดหมู่ไหนในสาย
+     * (category/subcategory/product group) ของสินค้านี้ผูก $fkColumn ไว้จริง
+     * — ไม่ใช่แค่หมวดหมู่ที่ Object Page แสดงเป็น "Master Category" (ตัวที่
+     * ลึกที่สุด สำหรับแสดงผล path เท่านั้น — ดู ResolvesMarketplaceMasterCategory::
+     * resolveMasterCategory()'s docblock)
+     *
+     * เดิมปุ่มนี้ (ก่อน refactor นี้) ส่ง master_category.id จาก frontend มา
+     * ตรงๆ ให้ bulkMapMarketplaceCategory() ล้าง — ใช้ได้ถูกต้องเฉพาะตอน
+     * mapping ถูกตั้งไว้ที่หมวดหมู่ระดับลึกสุดนั้นเป๊ะๆ (กรณีปกติ เพราะ
+     * saveCategoryMapping() ฝั่ง frontend ก็เขียนลงตรงนั้นเสมอ) แต่ข้อมูลเก่า/
+     * ที่แมปมาจากที่อื่น (เช่นหน้า categories/{platform}-mapping.tsx เดิม
+     * ซึ่งเลือกหมวดหมู่ระดับไหนก็ได้) อาจมี mapping ตั้งอยู่ที่หมวดแม่แทน —
+     * กดล้างจะไปล้างหมวดหมู่ลูกที่ไม่มี mapping อยู่แล้ว (no-op เงียบๆ) โดย
+     * mapping จริงที่หมวดแม่ยังอยู่ครบ ทำให้ field ที่แพลตฟอร์มนั้นบังคับ
+     * (เช่น "Lazada บังคับกรอก") ยังโชว์อยู่ในหน้า Edit Product เหมือนเดิม
+     * ทุกอย่างทั้งที่กดล้างไปแล้ว — บั๊กจริงที่ผู้ใช้เจอ ตอนนี้เลยไล่ล้างทุก
+     * หมวดหมู่ในสายของสินค้านี้ที่มีค่า $fkColumn ไม่ใช่ null เลย ไม่ใช่แค่
+     * ตัวเดียว ให้ตรงกับวิธีที่ฝั่งอ่านค่า (ProductController::
+     * lazadaMandatoryAttributeIds() ฯลฯ ที่ทำ whereNotNull(...)->value(...)
+     * ซึ่งเจอหมวดหมู่ไหนก็ได้ในสายที่มีค่า ไม่สนว่าลึกแค่ไหน)
+     */
+    private function clearProductMarketplaceCategory(Request $request, string $fkColumn, string $auditEvent): RedirectResponse
+    {
+        $validated = $request->validate([
+            'product_id' => ['required', 'integer', 'exists:products,id'],
+        ]);
+
+        $product = Product::with('categories')->findOrFail($validated['product_id']);
+
+        $updated = 0;
+
+        DB::transaction(function () use ($product, $fkColumn, $auditEvent, &$updated) {
+            // เผื่อ override ระดับสินค้าเอง (คอลัมน์นี้มีอยู่บน products ด้วย
+            // และ resolve ก่อนหมวดหมู่เสมอ — ดู ProductController::
+            // lazadaMandatoryAttributeIds() ที่เช็ค $product->{$fkColumn} ก่อน
+            // categories() เสมอ — แม้ตอนนี้ยังไม่มี UI ไหนตั้งค่านี้ตรงๆ ก็ตาม)
+            // — นับรวมกับ $updated ด้วย (ไม่งั้น flash message จะบอก "ล้าง 0
+            // รายการ" ทั้งที่จริงมีการเปลี่ยนแปลงเกิดขึ้นจริง) และบันทึก audit
+            // log ให้เหมือนกับ category ด้านล่าง เผื่อวันหนึ่งมี UI ให้ตั้งค่า
+            // override นี้ตรงๆ ขึ้นมาจริง
+            if ($product->{$fkColumn} !== null) {
+                $oldProductOverride = $product->{$fkColumn};
+                $product->update([$fkColumn => null]);
+                AuditLog::record($auditEvent, $product, [$fkColumn => $oldProductOverride], [$fkColumn => null]);
+                $updated++;
+            }
+
+            $categoriesToClear = $product->categories->filter(fn ($c) => $c->{$fkColumn} !== null);
+
+            // ถอด attribute family ที่ auto-generate ไว้ให้ platform category
+            // ตัวนั้นๆ โดยเฉพาะ (attribute_families.{$fkColumn} ตรงกับค่าที่
+            // กำลังจะล้างของหมวดหมู่นั้น — ดู {Platform}AttributeFamilyGenerator::
+            // findOrCreateFamily()) ออกจากหมวดหมู่นั้นด้วย — ไม่งั้นฟิลด์ของ
+            // แพลตฟอร์มนั้น (เช่นแท็บ "Shopee" ในหน้า Edit Product) จะยัง
+            // โผล่อยู่เหมือนเดิมทั้งที่เพิ่งล้าง Category Mapping ไปแล้ว เพราะ
+            // family ผูกกับหมวดหมู่ผ่าน category_attribute_family pivot ซึ่งเป็น
+            // คนละตารางกับ categories.{$fkColumn} ที่เพิ่งล้างไป ไม่มีอะไรถอดให้
+            // อัตโนมัติ (บั๊กจริงที่ผู้ใช้เจอ) — ไม่ลบ family ทิ้ง แค่ถอด pivot
+            // ออกจากหมวดหมู่นั้น เผื่อ map กลับไป platform category เดิมอีกครั้ง
+            // จะได้ reuse family เดิมได้ (ดู findOrCreateFamily()'s firstOrNew
+            // ด้วย {$fkColumn} เดียวกัน) — ไม่แตะ family อื่นที่ผูกอยู่กับ
+            // หมวดหมู่นั้นด้วย (เช่น family ทั่วไปที่ไม่ผูกกับแพลตฟอร์มไหนเลย)
+            //
+            // ดึง AttributeFamily มาครั้งเดียวเผื่อสินค้ามีหลายหมวดหมู่ในสาย
+            // (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) แทนที่จะยิง query ทีละหมวดหมู่
+            // ในลูป
+            $familyIdsByOldValue = AttributeFamily::whereIn($fkColumn, $categoriesToClear->pluck($fkColumn))
+                ->get(['id', $fkColumn])
+                ->groupBy($fkColumn)
+                ->map(fn ($families) => $families->pluck('id'));
+
+            foreach ($categoriesToClear as $category) {
+                $oldId = $category->{$fkColumn};
+
+                $platformFamilyIds = $familyIdsByOldValue->get($oldId);
+                if ($platformFamilyIds && $platformFamilyIds->isNotEmpty()) {
+                    $category->attributeFamilies()->detach($platformFamilyIds);
+                }
+
+                $category->update([$fkColumn => null]);
+                AuditLog::record($auditEvent, $category, [$fkColumn => $oldId], [$fkColumn => null]);
+                $updated++;
+            }
+        });
+
+        if ($updated > 0) {
+            Category::bumpTreeCacheVersion();
+        }
+
+        return back()->with('success', "Cleared {$updated} category mapping(s).");
     }
 }

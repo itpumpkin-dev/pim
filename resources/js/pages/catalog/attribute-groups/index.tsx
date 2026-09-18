@@ -12,12 +12,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Divider,
     IconButton,
     InputAdornment,
@@ -30,6 +24,7 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import {
@@ -275,37 +270,27 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
             </Box>
 
             {/* ไดอะล็อกยืนยันการลบ */}
-            <Dialog open={deleteGroupId !== null} onClose={() => setDeleteGroupId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tCatalog('confirmDeleteAttributeGroupMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteGroupId(null)} color="inherit" disabled={deleting} sx={{ textTransform: 'none' }}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteGroupId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/attributeGroups/${deleteGroupId}`, {
-                                    onSuccess: () => setDeleteGroupId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteGroupId !== null}
+                onCancel={() => setDeleteGroupId(null)}
+                onConfirm={() => {
+                    if (deleteGroupId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/attributeGroups/${deleteGroupId}`, {
+                            onSuccess: () => setDeleteGroupId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tCatalog('confirmDeleteAttributeGroupMessage')}
+            </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

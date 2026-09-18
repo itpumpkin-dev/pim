@@ -146,8 +146,11 @@ class MarketplaceAttributeMappingController extends Controller
     // ค่า target_field ของกลุ่ม custom-attribute ในแต่ละแพลตฟอร์ม (ดูคอมเมนต์ของ
     // self::PAYLOAD_FIELDS ด้านบน) — นี่คือค่าที่ `target_field` ของแถวจะเป็น
     // เมื่อถูก map เข้ากับ attribute เฉพาะตัวของแพลตฟอร์มนั้น (หาด้วย id/name key
-    // ด้านล่าง) แทนที่จะเป็นหนึ่งในฟิลด์ payload ตายตัว
-    private const CUSTOM_TARGET_FIELD = [
+    // ด้านล่าง) แทนที่จะเป็นหนึ่งในฟิลด์ payload ตายตัว — public เพื่อให้
+    // ProductController::platformFieldMappingsFor() reuse ค่าเดียวกันได้ แทนที่
+    // จะพิมพ์ array นี้ซ้ำอีกชุด (เคยเป็น private แล้วมีคนก็อปไปพิมพ์ใหม่จริงๆ —
+    // ดูคอมเมนต์เดิมที่ ProductController ก่อนแก้)
+    public const CUSTOM_TARGET_FIELD = [
         'woocommerce' => 'wc_attribute',
         'shopee' => 'shopee_attribute',
         'lazada' => 'lazada_attribute',

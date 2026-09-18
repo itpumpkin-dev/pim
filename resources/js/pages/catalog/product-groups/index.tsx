@@ -13,11 +13,6 @@ import {
     Box,
     Button,
     Chip,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -30,9 +25,10 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
-import { FIORI, FioriStatus, fioriDefaultSx, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface GroupItem {
     id: number;
@@ -373,20 +369,19 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
                     <FioriResponsiveTable columns={columns} rows={groups.data} getRowKey={(row) => row.id} emptyMessage={t('noProductGroupsFound')} />
                 </Box>
 
-                <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                    <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                    <DialogContent>
-                        <DialogContentText>{t('confirmDeleteProductGroup')}</DialogContentText>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setDeleteId(null)} sx={fioriDefaultSx}>
-                            {t('back')}
-                        </Button>
-                        <Button onClick={confirmDelete} disabled={deleting} color="error" variant="contained">
-                            {tGrid('confirmDeletion')}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                <FioriMessageBox
+                    open={deleteId !== null}
+                    onCancel={() => setDeleteId(null)}
+                    onConfirm={confirmDelete}
+                    title={tGrid('confirmDeletion')}
+                    severity="warning"
+                    destructive
+                    confirmLabel={tGrid('confirmDeletion')}
+                    cancelLabel={t('back')}
+                    confirmLoading={deleting}
+                >
+                    {t('confirmDeleteProductGroup')}
+                </FioriMessageBox>
             </AppLayout>
         </ImagePreviewProvider>
     );

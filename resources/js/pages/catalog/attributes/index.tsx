@@ -15,12 +15,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Divider,
     IconButton,
     InputAdornment,
@@ -35,6 +29,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
 import { encodeQueryParams } from '@/lib/query-string';
@@ -317,28 +312,27 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                     </FioriBusyOverlay>
                 </Paper>
             </Box>
-            <Dialog open={deleteAttributeId !== null} onClose={() => setDeleteAttributeId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tCatalog('confirmDeleteAttributeMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteAttributeId(null)} color="inherit" sx={{ textTransform: 'none' }} disabled={deleting}>{t('cancel')}</Button>
-                    <Button onClick={() => {
-                        if (deleteAttributeId !== null) {
-                            setDeleting(true);
-                            router.delete(`/catalog/attributes/${deleteAttributeId}`, {
-                                onSuccess: () => setDeleteAttributeId(null),
-                                onFinish: () => setDeleting(false),
-                            });
-                        }
-                    }} color="error" variant="contained" sx={{ textTransform: 'none', borderRadius: '8px' }} disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}>
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteAttributeId !== null}
+                onCancel={() => setDeleteAttributeId(null)}
+                onConfirm={() => {
+                    if (deleteAttributeId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/attributes/${deleteAttributeId}`, {
+                            onSuccess: () => setDeleteAttributeId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tCatalog('confirmDeleteAttributeMessage')}
+            </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

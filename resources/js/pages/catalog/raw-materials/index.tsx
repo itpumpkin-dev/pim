@@ -11,11 +11,6 @@ import {
     Box,
     Button,
     CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     Paper,
@@ -27,9 +22,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FioriFormGroup } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
-import { FIORI, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx, fioriNegativeSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface RawMaterialItem {
     id: number;
@@ -205,34 +201,28 @@ export default function RawMaterialIndex({ products, filters }: Props) {
                 </Stack>
             </Box>
 
-            <Dialog open={removeId !== null} onClose={() => setRemoveId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmRemoveRawMaterial')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setRemoveId(null)} sx={fioriGhostSx} disabled={removing}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (removeId !== null) {
-                                setRemoving(true);
-                                router.delete(`/catalog/raw-materials/${removeId}`, {
-                                    preserveScroll: true,
-                                    onSuccess: () => setRemoveId(null),
-                                    onFinish: () => setRemoving(false),
-                                });
-                            }
-                        }}
-                        variant="outlined"
-                        disabled={removing}
-                        sx={fioriNegativeSx}
-                    >
-                        {removing ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={removeId !== null}
+                onCancel={() => setRemoveId(null)}
+                onConfirm={() => {
+                    if (removeId !== null) {
+                        setRemoving(true);
+                        router.delete(`/catalog/raw-materials/${removeId}`, {
+                            preserveScroll: true,
+                            onSuccess: () => setRemoveId(null),
+                            onFinish: () => setRemoving(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={removing}
+            >
+                {t('confirmRemoveRawMaterial')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

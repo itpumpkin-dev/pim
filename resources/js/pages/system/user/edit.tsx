@@ -1,4 +1,5 @@
 import { TimelinePanel } from '@/components/timeline-panel';
+import { useFioriConfirm } from '@/components/fiori-message-box';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
@@ -201,6 +202,10 @@ export default function UserEdit({
     const canListUsers = viewerPermissions.includes('users.list_users');
     const cancelHref = canListUsers ? '/system/user' : '/dashboard';
 
+    // Fiori Message Box แทน window.confirm() ของเบราว์เซอร์ (ดู copyAccessToManager()
+    // ด้านล่าง) — {confirmElement} ต้อง render ไว้ในต้นไม้ JSX ของหน้านี้ด้วย
+    const { confirm, confirmElement } = useFioriConfirm();
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('system'), href: '#' },
         { title: tNav('users'), href: canListUsers ? '/system/user' : '#' },
@@ -345,10 +350,15 @@ export default function UserEdit({
     // assigned roles onto the selected manager right away (separate PUT).
     // preserveState keeps the form as-is; the refreshed managerPermissionsById
     // prop makes the warning recompute.
-    const copyAccessToManager = () => {
+    const copyAccessToManager = async () => {
         if (data.manager_id === '') return;
         const managerName = managerOptions.find((o) => o.id === data.manager_id)?.name ?? '';
-        if (!window.confirm(t('copyRolesToManagerConfirm', { name: managerName }))) return;
+        const confirmed = await confirm({
+            title: t('copyRolesToManager'),
+            message: t('copyRolesToManagerConfirm', { name: managerName }),
+            severity: 'warning',
+        });
+        if (!confirmed) return;
 
         setCopyingAccess(true);
         router.put(
@@ -903,6 +913,7 @@ export default function UserEdit({
                     </Button>
                 </Box>
             </Box>
+            {confirmElement}
         </AppLayout>
     );
 }

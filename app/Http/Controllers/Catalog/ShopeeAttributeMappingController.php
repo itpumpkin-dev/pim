@@ -1234,8 +1234,44 @@ class ShopeeAttributeMappingController extends Controller
             ->when($types !== [], fn ($q) => $q->whereIn('type', $types))
             ->orderBy('name')
             ->limit(50)
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'auto_created_platform']);
 
-        return response()->json(['data' => $attributes->map(fn (Attribute $a) => ['id' => $a->id, 'name' => $a->name])]);
+        return response()->json(['data' => $attributes->map(fn (Attribute $a) => [
+            'id' => $a->id,
+            'name' => $a->name,
+            // null = สร้างเองในระบบ PIM ตามปกติ, ไม่ null = สร้างอัตโนมัติตอนกด
+            // "สร้าง/อัปเดต Attribute Family" ของแพลตฟอร์มนั้น — ให้
+            // PimAttributePicker โชว์ chip บอกที่มา (ดู {Platform}
+            // MappedAttributeCreator::findOrCreateAttribute())
+            'auto_created_platform' => $a->auto_created_platform,
+        ])]);
+    }
+
+    /**
+     * หนุนหลังปุ่ม "ดู attributes ทั้งหมด" ใน PimAttributePicker — ต่างจาก
+     * searchPimAttributes() ด้านบนตรงที่ (1) ไม่บังคับต้องพิมพ์ค้นหาก่อน คืน
+     * attribute ทั้งหมดที่ผ่าน $typeFilter (ถ้ามี) มาให้ครั้งเดียว แล้วให้
+     * ฝั่ง frontend กรองด้วยคำค้นหา/แหล่งที่มาเองแบบ client-side ไม่ยิง
+     * request ซ้ำทุกครั้งที่พิมพ์ (จำนวน attribute ทั้งระบบตอนนี้หลักร้อยเท่านั้น
+     * ไม่จำเป็นต้องแบ่งหน้า) และ (2) ส่ง `code`/`type` เพิ่มมาด้วย ให้หน้าต่าง
+     * รายการทั้งหมดแสดงรายละเอียดได้มากกว่าดรอปดาวน์ค้นหาเฉยๆ
+     */
+    public function listAllPimAttributes(Request $request): JsonResponse
+    {
+        $types = array_filter(explode(',', (string) $request->query('type', '')));
+
+        $attributes = Attribute::query()
+            ->when($types !== [], fn ($q) => $q->whereIn('type', $types))
+            ->orderBy('name')
+            ->limit(1000)
+            ->get(['id', 'code', 'name', 'type', 'auto_created_platform']);
+
+        return response()->json(['data' => $attributes->map(fn (Attribute $a) => [
+            'id' => $a->id,
+            'code' => $a->code,
+            'name' => $a->name,
+            'type' => $a->type,
+            'auto_created_platform' => $a->auto_created_platform,
+        ])]);
     }
 }

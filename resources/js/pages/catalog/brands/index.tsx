@@ -14,12 +14,6 @@ import {
     Box,
     Button,
     Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     Paper,
@@ -32,11 +26,11 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import {
     FIORI,
     fioriEmphasizedSx,
-    fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
@@ -326,44 +320,37 @@ export default function BrandIndex({ brands, parentOptions, attributeId, filters
                 </Box>
             </Box>
 
-            <Dialog open={deleteBrandId !== null} onClose={() => setDeleteBrandId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteBrand')}</DialogContentText>
-                    {(() => {
-                        const target = brands.data.find((b) => b.id === deleteBrandId);
-                        const count = target?.products_count ?? 0;
-                        if (count === 0) return null;
-                        return (
-                            <DialogContentText color="error" sx={{ mt: 1.5, fontWeight: 600 }}>
-                                {t('deleteBrandProductWarning', { count })}
-                            </DialogContentText>
-                        );
-                    })()}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteBrandId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteBrandId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/brands/${deleteBrandId}`, {
-                                    onSuccess: () => setDeleteBrandId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        sx={{ textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {deleting ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteBrandId !== null}
+                onCancel={() => setDeleteBrandId(null)}
+                onConfirm={() => {
+                    if (deleteBrandId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/brands/${deleteBrandId}`, {
+                            onSuccess: () => setDeleteBrandId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteBrand')}
+                {(() => {
+                    const target = brands.data.find((b) => b.id === deleteBrandId);
+                    const count = target?.products_count ?? 0;
+                    if (count === 0) return null;
+                    return (
+                        <Typography color="error" variant="body2" sx={{ mt: 1.5, fontWeight: 600 }}>
+                            {t('deleteBrandProductWarning', { count })}
+                        </Typography>
+                    );
+                })()}
+            </FioriMessageBox>
         </AppLayout>
         </ImagePreviewProvider>
     );

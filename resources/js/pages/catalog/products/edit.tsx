@@ -1,6 +1,7 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
 import { FioriFormGroup, FioriMessageStrip, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
@@ -42,6 +43,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import PublishIcon from '@mui/icons-material/Publish';
+import SearchIcon from '@mui/icons-material/Search';
 import TranslateIcon from '@mui/icons-material/Translate';
 import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -81,12 +83,43 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 // ระยะห่างจากขอบบนของพื้นที่ scroll ที่ section ของแต่ละ Attribute Group จะไปจอด
 // เมื่อคลิกแท็บ (scrollMarginTop ของ Paper) — ใช้ร่วมกับ scroll-spy ที่คำนวณว่า
 // แท็บไหนควรไฮไลต์ ค่าต้องตรงกันสองที่ ไม่งั้นแท็บกับเนื้อหาจะไม่ sync
 const GROUP_SECTION_SCROLL_MARGIN = 80;
+
+// ชื่อโชว์ผู้ใช้ของแต่ละ platform key (Props.platformContext, มาจาก ?platform=
+// ของ URL ตอนกดแก้ไขจากหน้า Products Mapping) — ตัวพิมพ์ใหญ่-เล็กเป๊ะตามที่
+// backend เก็บไว้จริงใน sales_platforms.name (TikTok/WooCommerce ไม่ใช่แค่
+// capitalize ตัวแรกเฉยๆ) ใช้ในข้อความ chip "Mapped to {{platform}} payload"
+const PLATFORM_DISPLAY_NAMES: Record<'shopee' | 'lazada' | 'tiktok' | 'woocommerce', string> = {
+    shopee: 'Shopee',
+    lazada: 'Lazada',
+    tiktok: 'TikTok',
+    woocommerce: 'WooCommerce',
+};
+
+// attr.platform_field_mapping.target_field (snake_case, ตรงกับ
+// ProductController::platformFieldMappingsFor()) → catalog.json translation
+// key — ส่วนใหญ่ชื่อตรงกันเป๊ะอยู่แล้ว (price/qty/weight/...) ยกเว้น
+// short_description ที่คีย์เป็น camelCase (เหมือนกับ FIELD_LABEL_KEYS ของ
+// woocommerce-attribute-mapping-panel.tsx) — target_field ที่ไม่อยู่ในนี้
+// (ไม่ควรเกิดขึ้นจริง) fallback ไปโชว์ตัว target_field ดิบๆ แทน
+const PAYLOAD_FIELD_LABEL_KEYS: Record<string, string> = {
+    name: 'name',
+    price: 'price',
+    qty: 'qty',
+    weight: 'weight',
+    length: 'length',
+    width: 'width',
+    height: 'height',
+    description: 'description',
+    short_description: 'shortDescription',
+    image: 'image',
+    video: 'video',
+};
 
 interface AttributeOption {
     id: number;
@@ -123,6 +156,11 @@ interface AttributeItem {
     translations?: Translation[];
     /** โค้ดของ master ที่ตัวเลือกของ attribute นี้ mirror มา (เช่น 'brands', 'currencies') — null/ไม่มีค่า แปลว่าตัวเลือกกรอกเองตรงๆ ไม่ได้มาจาก master ไหน ดู MasterAttributeOptionSync */
     master_source?: string | null;
+    /** มีค่าเฉพาะตอนหน้านี้เปิดมาพร้อม ?platform= (ดู Props.platformContext) และ
+     * attribute ตัวนี้ถูก map เข้ากับ payload field ของ platform นั้นจริงๆ
+     * เท่านั้น — null ทุกกรณีอื่น (รวมถึงตอนไม่มี platformContext เลย) ดู
+     * ProductController::platformFieldMappingsFor() */
+    platform_field_mapping?: { target_field: string; is_custom: boolean; label: string } | null;
 }
 
 /** ตัวเลือก master_source หนึ่งตัว — จับคู่กับ MasterAttributeOptionSync::pickerOptions() ฝั่ง backend */
@@ -225,6 +263,13 @@ interface Props {
     canEditMasterCategories?: boolean;
     /** ให้แปล attribute.master_source (เช่น 'brands') เป็นชื่ออ่านง่ายสำหรับ chip "Master: ..." — ดู ProductController::buildProductFormProps() */
     masterSources?: MasterSourceOption[];
+    /** มาจาก query param ?platform= ตอนกดปุ่มแก้ไขจากหน้า Products Mapping ของ
+     * marketplace ไหนสักตัว (resources/js/pages/catalog/marketplace/
+     * {platform}-products.tsx) — null ถ้าเปิดหน้านี้มาแบบปกติ ใช้คู่กับ
+     * attr.platform_field_mapping ด้านล่างเพื่อโชว์ chip ว่าฟิลด์ไหนถูก map
+     * เข้ากับ payload ของ platform ที่กำลังโฟกัสอยู่ (ดู
+     * ProductController::platformFieldMappingsFor()) */
+    platformContext?: 'shopee' | 'lazada' | 'tiktok' | 'woocommerce' | null;
 }
 
 type AttributeValue = string | File | (string | File)[];
@@ -301,6 +346,7 @@ export default function ProductEdit({
     canPushProducts = { lazada: false, shopee: false, tiktok: false, woocommerce: false },
     canEditMasterCategories = false,
     masterSources = [],
+    platformContext = null,
 }: Props) {
     const { locales, locale: currentLocaleCode, setLocale } = useLocale();
     const { t } = useTranslation('catalog');
@@ -360,6 +406,10 @@ export default function ProductEdit({
     // หนึ่งตัวที่เลือกไว้ ไม่ใช่ต้องตรงทุกตัว ค่าเริ่มต้น [] = ไม่กรอง (โชว์ทุกฟิลด์
     // ตามปกติ)
     const [attributeFilters, setAttributeFilters] = useState<string[]>([]);
+    // ค้นหาฟิลด์ด้วยชื่อ (label ตาม locale ที่ active อยู่) หรือ code — กรองซ้อนกับ
+    // attributeFilters ด้านบน (ต้องตรงทั้งคู่ ถ้าเลือกไว้ทั้งสองอย่าง) ค่าเริ่มต้น
+    // '' = ไม่กรอง
+    const [attributeSearchQuery, setAttributeSearchQuery] = useState('');
 
     const scrollToGroup = (idx: number) => {
         suppressScrollSpy.current = true;
@@ -473,7 +523,7 @@ export default function ProductEdit({
         initialValues[productTypeAttribute.id] = (productValues[productTypeAttribute.id] as any) || {};
     }
 
-    const { data, setData, post, transform, processing, errors, isDirty } = useForm<ProductForm>({
+    const { data, setData, post, transform, processing, errors, isDirty, setDefaults } = useForm<ProductForm>({
         sku: product.sku || '',
         family_id: product.family_id,
         type: (product.type || 'simple').toLowerCase(),
@@ -835,7 +885,7 @@ export default function ProductEdit({
         () => [
             {
                 key: 'option',
-                header: 'ตัวเลือก',
+                header: t('variantColumnOption'),
                 priority: 'always',
                 render: ({ v }: VariantRow) => (
                     <Typography component="span" fontWeight={600}>
@@ -869,7 +919,7 @@ export default function ProductEdit({
             },
             {
                 key: 'price',
-                header: 'ราคา',
+                header: t('price'),
                 priority: 'medium',
                 render: ({ v, index }: VariantRow) => (
                     <TextField
@@ -884,13 +934,13 @@ export default function ProductEdit({
                                 return { ...prev, variants: updated };
                             });
                         }}
-                        placeholder="ราคา"
+                        placeholder={t('price')}
                     />
                 ),
             },
             {
                 key: 'qty',
-                header: 'จำนวนสต๊อก (Qty)',
+                header: t('variantColumnQty'),
                 priority: 'medium',
                 render: ({ v, index }: VariantRow) => (
                     <TextField
@@ -905,23 +955,23 @@ export default function ProductEdit({
                                 return { ...prev, variants: updated };
                             });
                         }}
-                        placeholder="สต๊อก"
+                        placeholder={t('stockPlaceholder')}
                     />
                 ),
             },
             {
                 key: 'actions',
-                header: 'ลบ',
+                header: t('delete'),
                 priority: 'always',
                 align: 'right',
                 render: ({ index }: VariantRow) => (
-                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label="Remove variant">
+                    <IconButton size="small" color="error" onClick={() => handleRemoveVariant(index)} aria-label={t('removeVariantAriaLabel')}>
                         <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
                 ),
             },
         ],
-        [variantLabel, handleRemoveVariant],
+        [variantLabel, handleRemoveVariant, t],
     );
 
     // rows/getRowKey ก็ memo เหมือนกัน — rows ต้อง recompute เฉพาะตอน data.variants
@@ -1140,7 +1190,7 @@ export default function ProductEdit({
         if (!routes) return;
 
         fetch(`/catalog/products/${product.id}/${routes.status}/${shopId}`, { headers: { Accept: 'application/json' } })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => router.reload({ only: ['channelGroups'] }));
     };
 
@@ -1452,8 +1502,29 @@ export default function ProductEdit({
                 // Saved for real now — the auto-saved copy would only ever be
                 // read back as a *stale* draft from here on.
                 clearDraft();
+                // backend redirect กลับมาหน้า Edit เดิม (ไม่ใช่หน้า Read แบบเก่า
+                // แล้ว — ดู ProductController::update()) เลยต้องมี toast ยืนยันเอง
+                // ตรงนี้ว่า save สำเร็จจริง ไม่งั้นฟอร์มจะแค่ reload เงียบๆ โดยไม่มี
+                // อะไรบอกผู้ใช้เลยว่าที่กรอกไปถูกบันทึกแล้ว — ใช้ pushResult ตัวเดียว
+                // กับ snackbar แจ้งผล push/deactivate ที่มีอยู่แล้ว (ดู duplicateProduct()
+                // ด้านบนที่ก็ทำแบบเดียวกัน)
+                setPushResult({ severity: 'success', message: t('productSavedSuccess') });
+                // useForm()'s post()/put() default preserveState:true (ไม่เหมือน
+                // GET) — component instance เดิมไม่ได้ remount ใหม่ตอน redirect
+                // กลับมาหน้า Edit นี้ (ต่างจาก object/key เปลี่ยนตอน navigate ไปหน้า
+                // อื่นที่ไม่ใช่หน้านี้) ทำให้ isDirty ยังเทียบกับ baseline เดิมตอน
+                // โหลดหน้าครั้งแรกอยู่ ไม่ใช่ค่าที่เพิ่ง save ไปสำเร็จแล้ว — ปุ่ม Save
+                // Product จะไม่มีวัน disabled กลับเลยหลัง save ถ้าไม่รีเซ็ต baseline
+                // ตรงนี้เอง ดู useForm.d.ts's setDefaults()
+                setDefaults();
                 options?.onSuccess?.();
             },
+            // แบนเนอร์ "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก" (ดู errors block ด้านล่าง)
+            // อยู่บนสุดของกล่อง scroll เสมอ — แต่ผู้ใช้มักเลื่อนลงไปแก้ไขฟิลด์
+            // ที่อยู่ล่างๆ ของฟอร์มมาก่อนกด Save ทำให้กด Save แล้วดูเหมือนไม่มี
+            // อะไรเกิดขึ้นเลย (แบนเนอร์โผล่จริง แค่อยู่นอกจอด้านบน) ต้องเลื่อน
+            // กลับขึ้นไปให้เห็นเองตรงนี้
+            onError: () => scrollToTop(),
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
@@ -1486,8 +1557,7 @@ export default function ProductEdit({
         performSave({
             onSuccess: () =>
                 duplicateProduct({
-                    errorMessage: (fallback) =>
-                        `บันทึกการแก้ไขของสินค้านี้สำเร็จแล้ว แต่สร้างสำเนา (เทมเพลต) ไม่สำเร็จ: ${fallback} — ลองกด "ทำสำเนา" จากเมนู More อีกครั้ง`,
+                    errorMessage: (fallback) => t('savedButDuplicateFailedError', { error: fallback }),
                 }),
         });
     };
@@ -1562,7 +1632,7 @@ export default function ProductEdit({
                 // ProductController::duplicate()) เลยไม่ต้อง setDuplicateConfirmOpen(false)
                 // เอง — หน้าจะเปลี่ยนไปทั้งหน้าอยู่แล้ว
                 onError: (errs) => {
-                    const fallback = (Object.values(errs)[0] as string | undefined) || 'ทำสำเนาสินค้าไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+                    const fallback = (Object.values(errs)[0] as string | undefined) || t('duplicateProductError');
                     setPushResult({ severity: 'error', message: options?.errorMessage ? options.errorMessage(fallback) : fallback });
                 },
                 onFinish: () => setDuplicating(false),
@@ -1628,7 +1698,15 @@ export default function ProductEdit({
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => setPublishConfirmOpen(false),
+                onSuccess: () => {
+                    setPublishConfirmOpen(false);
+                    // เหตุผลเดียวกับ setDefaults() ใน performSave() ด้านบน — ถ้า
+                    // saveAndPublish() เรียกมา (performSave() ก่อนหน้านี้เพิ่งตั้ง
+                    // baseline ไว้ตอน enabled ยังเป็นค่าก่อน publish) ไม่ทำตรงนี้ด้วย
+                    // ปุ่ม Save Product จะโผล่ enabled กลับมาเฉยๆ ทั้งที่ทุกอย่างที่
+                    // เห็นอยู่ถูก save/publish ไปแล้วจริงๆ ครบถ้วน
+                    setDefaults();
+                },
                 onFinish: () => setPublishing(false),
             },
         );
@@ -1662,7 +1740,7 @@ export default function ProductEdit({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Edit Product | SKU: ${data.sku}`} />
+            <Head title={t('editProductHeading', { sku: data.sku })} />
             <Box
                 component="form"
                 onSubmit={submit}
@@ -1677,8 +1755,8 @@ export default function ProductEdit({
                     }}
                 >
                     <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsSx}>
-                        <Tab label="General" />
-                        {canViewHistory && <Tab label="History" />}
+                        <Tab label={t('generalTitle')} />
+                        {canViewHistory && <Tab label={t('historyTab')} />}
                     </Tabs>
                 </Box>
 
@@ -1692,11 +1770,17 @@ export default function ProductEdit({
                                 ฝั่งขวาคู่กับ Save เหมือนเดิม ไม่ได้เปลี่ยนตาม */}
                             <Tooltip title={t('back')}>
                                 <IconButton component={Link} href="/catalog/products" size="small">
-                                    <ArrowBackIcon fontSize="small" />
+                                    <ArrowBackIcon
+                                        fontSize="small"
+                                        sx={{
+                                            stroke: "currentColor",
+                                            strokeWidth: 1
+                                        }}
+                                    />
                                 </IconButton>
                             </Tooltip>
                             <Typography variant="h5" fontWeight={700} color="text.primary">
-                                Edit Product | SKU: {data.sku}
+                                {t('editProductHeading', { sku: data.sku })}
                             </Typography>
                         </Stack>
 
@@ -2010,9 +2094,46 @@ export default function ProductEdit({
                                         <ToggleButton value="required">{t('filterRequired')}</ToggleButton>
                                         <ToggleButton value="locale">{t('filterLocaleBased')}</ToggleButton>
                                         <ToggleButton value="channel">{t('filterChannelBased')}</ToggleButton>
+                                        {/* โผล่เฉพาะตอนหน้านี้เปิดมาจากปุ่มแก้ไขในหน้า Products Mapping ของ
+                                        marketplace ไหนสักตัว (?platform=, ดู Props.platformContext) — ตัวกรองนี้
+                                        ไม่มีความหมายอะไรเลยถ้าไม่มี platform ให้เทียบ เพราะ attr.platform_field_mapping
+                                        จะเป็น null ทุกตัวอยู่แล้ว (ดู ProductController::platformFieldMappingsFor()) */}
+                                        {platformContext && (
+                                            <ToggleButton value="platformMapped">
+                                                {t('mappedToPlatformPayloadChip', { platform: PLATFORM_DISPLAY_NAMES[platformContext] })}
+                                            </ToggleButton>
+                                        )}
                                     </ToggleButtonGroup>
-                                    {attributeFilters.length > 0 && (
-                                        <Button size="small" onClick={() => setAttributeFilters([])} sx={{ textTransform: 'none' }}>
+                                    <TextField
+                                        size="small"
+                                        value={attributeSearchQuery}
+                                        onChange={(e) => setAttributeSearchQuery(e.target.value)}
+                                        placeholder={t('searchAttributes')}
+                                        sx={{ width: 300, height: 32, '& .MuiInputBase-input': { py: 0.5 } }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                                                </InputAdornment>
+                                            ),
+                                            endAdornment: attributeSearchQuery && (
+                                                <InputAdornment position="end">
+                                                    <IconButton size="small" onClick={() => setAttributeSearchQuery('')}>
+                                                        <CloseIcon fontSize="small" />
+                                                    </IconButton>
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                    />
+                                    {(attributeFilters.length > 0 || attributeSearchQuery.length > 0) && (
+                                        <Button
+                                            size="small"
+                                            onClick={() => {
+                                                setAttributeFilters([]);
+                                                setAttributeSearchQuery('');
+                                            }}
+                                            sx={{ textTransform: 'none' }}
+                                        >
                                             {t('clearFilter')}
                                         </Button>
                                     )}
@@ -2069,15 +2190,22 @@ export default function ProductEdit({
                                             // จริงของกลุ่ม) ไม่ใช่ visibleAttrs ที่โดนกรองไปแล้ว ไม่งั้นกลุ่มที่มี
                                             // field จริงแต่ไม่ตรงตัวกรองที่เลือกไว้จะขึ้นข้อความผิดว่า "ไม่มี
                                             // attribute" ทั้งที่จริงๆ มี แค่ถูกซ่อนเพราะตัวกรอง
-                                            const visibleAttrs =
-                                                attributeFilters.length === 0
-                                                    ? assignedAttrs
-                                                    : assignedAttrs.filter(
-                                                          (attr) =>
-                                                              (attributeFilters.includes('required') && attr.is_required) ||
-                                                              (attributeFilters.includes('locale') && attr.is_locale_based) ||
-                                                              (attributeFilters.includes('channel') && attr.is_channel_based),
-                                                      );
+                                            const searchQueryNormalized = attributeSearchQuery.trim().toLowerCase();
+                                            const visibleAttrs = assignedAttrs
+                                                .filter(
+                                                    (attr) =>
+                                                        attributeFilters.length === 0 ||
+                                                        (attributeFilters.includes('required') && attr.is_required) ||
+                                                        (attributeFilters.includes('locale') && attr.is_locale_based) ||
+                                                        (attributeFilters.includes('channel') && attr.is_channel_based) ||
+                                                        (attributeFilters.includes('platformMapped') && Boolean(attr.platform_field_mapping)),
+                                                )
+                                                .filter(
+                                                    (attr) =>
+                                                        !searchQueryNormalized ||
+                                                        localizedLabel(attr, activeLocaleId).toLowerCase().includes(searchQueryNormalized) ||
+                                                        attr.code.toLowerCase().includes(searchQueryNormalized),
+                                                );
 
                                             const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
 
@@ -2185,7 +2313,7 @@ export default function ProductEdit({
                                                                 !isGeneral &&
                                                                 !(isSales && data.type.toLowerCase() === 'configurable') && (
                                                                     <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                                        No attributes assigned to this group yet.
+                                                                        {t('noAttributesAssignedToGroup')}
                                                                     </Typography>
                                                                 )}
 
@@ -2218,7 +2346,7 @@ export default function ProductEdit({
                                                                 // ตัวเอง เลยถือเป็นค่า default จริงๆ ไม่ใช่ข้อมูลที่ไม่ได้ใช้
                                                                 const activeChannelName =
                                                                     activeChannelId === null
-                                                                        ? 'Default (All Channels)'
+                                                                        ? t('defaultAllChannelsLabel')
                                                                         : (channels.find((c) => c.id === activeChannelId)?.name ?? undefined);
                                                                 return (
                                                                     <RenderAttributeInput
@@ -2235,6 +2363,7 @@ export default function ProductEdit({
                                                                         sku={data.sku}
                                                                         productId={product.id}
                                                                         masterSources={masterSources}
+                                                                        platformContext={platformContext}
                                                                     />
                                                                 );
                                                             })}
@@ -2249,7 +2378,7 @@ export default function ProductEdit({
                                                                         sx={{ mb: 2 }}
                                                                     >
                                                                         <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-                                                                            ตัวเลือกสินค้าย่อย (Variants List)
+                                                                            {t('variantsListSubtitle')}
                                                                         </Typography>
                                                                         <Stack direction="row" spacing={1}>
                                                                             <Button
@@ -2259,7 +2388,7 @@ export default function ProductEdit({
                                                                                 onClick={openVariantDialog}
                                                                                 sx={fioriDefaultSx}
                                                                             >
-                                                                                {data.variants.length > 0 ? 'แก้ไขชุด Variant' : 'สร้าง Variant'}
+                                                                                {data.variants.length > 0 ? t('editVariantSetButton') : t('createVariantSetButton')}
                                                                             </Button>
                                                                             <Button
                                                                                 size="small"
@@ -2268,7 +2397,7 @@ export default function ProductEdit({
                                                                                 onClick={handleAddBlankVariant}
                                                                                 sx={fioriGhostSx}
                                                                             >
-                                                                                เพิ่มแถวว่าง
+                                                                                {t('addBlankRowButton')}
                                                                             </Button>
                                                                         </Stack>
                                                                     </Stack>
@@ -2279,8 +2408,7 @@ export default function ProductEdit({
                                                                             color="text.secondary"
                                                                             sx={{ fontStyle: 'italic' }}
                                                                         >
-                                                                            ยังไม่มี variant — กด &quot;สร้าง Variant&quot; เพื่อเลือก attribute (เช่น
-                                                                            สี, ไซส์) แล้ว generate ชุดตัวเลือกทั้งหมด
+                                                                            {t('noVariantsEmptyState')}
                                                                         </Typography>
                                                                     ) : (
                                                                         <FioriResponsiveTable
@@ -2308,7 +2436,7 @@ export default function ProductEdit({
                                             ทรง Horizon (สูง 2rem, ขอบเข้ม, hover/focus สีแบรนด์) + border/tint
                                             ตาม value-state ตอน error. อยู่ใน sidebar แคบ เลยไม่ใช้ FioriField
                                             แบบ label-ซ้าย (จะบีบเกินไป) */}
-                                        <FioriFormGroup title="Product Info">
+                                        <FioriFormGroup title={t('productInfo')}>
                                             <Box>
                                                 <Typography
                                                     variant="caption"
@@ -2317,7 +2445,7 @@ export default function ProductEdit({
                                                     display="block"
                                                     sx={{ mb: 0.5 }}
                                                 >
-                                                    Status
+                                                    {t('status')}
                                                 </Typography>
                                                 <Switch
                                                     sx={fioriSwitchSx}
@@ -2400,7 +2528,7 @@ export default function ProductEdit({
 
                                             <Box>
                                                 <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                    Updated At
+                                                    {t('updatedAt')}
                                                 </Typography>
                                                 <TextField
                                                     value={formatLocalDateTime(product.updated_at)}
@@ -2416,7 +2544,7 @@ export default function ProductEdit({
 
                                             <Box>
                                                 <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                                                    Created At
+                                                    {t('createdAt')}
                                                 </Typography>
                                                 <TextField
                                                     value={formatLocalDateTime(product.created_at)}
@@ -2495,6 +2623,7 @@ export default function ProductEdit({
                                                                 sku={data.sku}
                                                                 productId={product.id}
                                                                 masterSources={masterSources}
+                                                                platformContext={platformContext}
                                                             />
                                                         );
                                                     })}
@@ -2575,7 +2704,7 @@ export default function ProductEdit({
                                         {canViewHistory && (
                                             <Paper sx={{ ...fioriCardSx, p: 3 }}>
                                                 <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                    Timeline
+                                                    {t('timelineTitle')}
                                                 </Typography>
                                                 <Box sx={{ maxHeight: 480, overflowY: 'auto', pr: 0.5 }}>
                                                     <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
@@ -2589,293 +2718,293 @@ export default function ProductEdit({
                                         (ปิด Save + ปิด interaction ทั้งหมดในแผงด้วย pointerEvents แทนที่จะ
                                         ไล่แก้ทีละ onClick เพราะแผงนี้มีปุ่ม/checkbox ซ้อนกันหลายชั้นมาก) */}
                                         {canViewSalesChannels && (
-                                        <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                            <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                    Sales Channels
-                                                </Typography>
-                                                {canEditSalesChannels &&
-                                                    sectionSaveButton('channels', () =>
-                                                        saveSection('channels', { published_shop_ids: data.published_shop_ids }),
-                                                    )}
-                                            </Stack>
-                                            <Stack spacing={0.5} sx={!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
-                                                {/* การแก้ไขตรงนี้ (activeChannelId = null) คือการตั้งค่า fallback ของ
+                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
+                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                                        {t('salesChannels')}
+                                                    </Typography>
+                                                    {canEditSalesChannels &&
+                                                        sectionSaveButton('channels', () =>
+                                                            saveSection('channels', { published_shop_ids: data.published_shop_ids }),
+                                                        )}
+                                                </Stack>
+                                                <Stack spacing={0.5} sx={!canEditSalesChannels ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+                                                    {/* การแก้ไขตรงนี้ (activeChannelId = null) คือการตั้งค่า fallback ของ
                                             ฟิลด์ที่เป็น channel-based — channel ไหนด้านล่างที่ไม่มีค่าของตัวเอง
                                             จะใช้ค่านี้แทน เลยไม่ต้องมากรอกซ้ำทีละ channel */}
-                                                <Box
-                                                    onClick={() => handleChannelChange(null)}
-                                                    sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        py: 0.5,
-                                                        px: 1.5,
-                                                        mb: 0.5,
-                                                        borderRadius: 1,
-                                                        cursor: 'pointer',
-                                                        bgcolor: activeChannelId === null ? FIORI.brand : 'transparent',
-                                                        color: activeChannelId === null ? '#fff' : 'text.primary',
-                                                        '&:hover': { bgcolor: activeChannelId === null ? FIORI.brandDark : 'action.hover' },
-                                                    }}
-                                                >
-                                                    <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-                                                        Default (All Channels)
-                                                    </Typography>
-                                                </Box>
-                                                {channelGroups.map((group) => {
-                                                    const isExpanded = expandedPlatforms.has(group.platform);
-                                                    const groupShopIds = group.channels
-                                                        .map((c) => c.shop_id)
-                                                        .filter((id): id is number => id != null);
-                                                    const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
-                                                    const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
-                                                    const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
+                                                    <Box
+                                                        onClick={() => handleChannelChange(null)}
+                                                        sx={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            py: 0.5,
+                                                            px: 1.5,
+                                                            mb: 0.5,
+                                                            borderRadius: 1,
+                                                            cursor: 'pointer',
+                                                            bgcolor: activeChannelId === null ? FIORI.brand : 'transparent',
+                                                            color: activeChannelId === null ? '#fff' : 'text.primary',
+                                                            '&:hover': { bgcolor: activeChannelId === null ? FIORI.brandDark : 'action.hover' },
+                                                        }}
+                                                    >
+                                                        <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                                                            {t('defaultAllChannelsLabel')}
+                                                        </Typography>
+                                                    </Box>
+                                                    {channelGroups.map((group) => {
+                                                        const isExpanded = expandedPlatforms.has(group.platform);
+                                                        const groupShopIds = group.channels
+                                                            .map((c) => c.shop_id)
+                                                            .filter((id): id is number => id != null);
+                                                        const checkedInGroup = groupShopIds.filter((id) => data.published_shop_ids.includes(id)).length;
+                                                        const allInGroupChecked = groupShopIds.length > 0 && checkedInGroup === groupShopIds.length;
+                                                        const someInGroupChecked = checkedInGroup > 0 && !allInGroupChecked;
 
-                                                    return (
-                                                        <Box key={group.platform}>
-                                                            <Box
-                                                                onClick={() => togglePlatform(group.platform)}
-                                                                sx={{
-                                                                    display: 'flex',
-                                                                    alignItems: 'center',
-                                                                    gap: 0.5,
-                                                                    py: 0.75,
-                                                                    px: 1,
-                                                                    borderRadius: 1,
-                                                                    cursor: 'pointer',
-                                                                    '&:hover': { bgcolor: 'action.hover' },
-                                                                }}
-                                                            >
-                                                                {isExpanded ? (
-                                                                    <ExpandMoreIcon fontSize="small" />
-                                                                ) : (
-                                                                    <ChevronRightIcon fontSize="small" />
-                                                                )}
-                                                                {groupShopIds.length > 0 && (
-                                                                    <Checkbox
-                                                                        size="small"
-                                                                        checked={allInGroupChecked}
-                                                                        indeterminate={someInGroupChecked}
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                        onChange={() => {
-                                                                            setData(
-                                                                                'published_shop_ids',
-                                                                                allInGroupChecked
-                                                                                    ? data.published_shop_ids.filter(
-                                                                                        (id) => !groupShopIds.includes(id),
-                                                                                    )
-                                                                                    : Array.from(
-                                                                                        new Set([...data.published_shop_ids, ...groupShopIds]),
-                                                                                    ),
-                                                                            );
-                                                                        }}
-                                                                        sx={{ p: 0.5 }}
-                                                                    />
-                                                                )}
-                                                                <Typography variant="body2" fontWeight={700}>
-                                                                    {group.platform}
-                                                                </Typography>
-                                                                <Chip
-                                                                    label={group.channels.length}
-                                                                    size="small"
-                                                                    sx={{ height: 18, fontSize: '0.7rem' }}
-                                                                />
-                                                                {groupShopIds.length > 0 && (
-                                                                    <Typography variant="caption" color="text.secondary">
-                                                                        ({checkedInGroup}/{groupShopIds.length} published)
+                                                        return (
+                                                            <Box key={group.platform}>
+                                                                <Box
+                                                                    onClick={() => togglePlatform(group.platform)}
+                                                                    sx={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 0.5,
+                                                                        py: 0.75,
+                                                                        px: 1,
+                                                                        borderRadius: 1,
+                                                                        cursor: 'pointer',
+                                                                        '&:hover': { bgcolor: 'action.hover' },
+                                                                    }}
+                                                                >
+                                                                    {isExpanded ? (
+                                                                        <ExpandMoreIcon fontSize="small" />
+                                                                    ) : (
+                                                                        <ChevronRightIcon fontSize="small" />
+                                                                    )}
+                                                                    {groupShopIds.length > 0 && (
+                                                                        <Checkbox
+                                                                            size="small"
+                                                                            checked={allInGroupChecked}
+                                                                            indeterminate={someInGroupChecked}
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                            onChange={() => {
+                                                                                setData(
+                                                                                    'published_shop_ids',
+                                                                                    allInGroupChecked
+                                                                                        ? data.published_shop_ids.filter(
+                                                                                            (id) => !groupShopIds.includes(id),
+                                                                                        )
+                                                                                        : Array.from(
+                                                                                            new Set([...data.published_shop_ids, ...groupShopIds]),
+                                                                                        ),
+                                                                                );
+                                                                            }}
+                                                                            sx={{ p: 0.5 }}
+                                                                        />
+                                                                    )}
+                                                                    <Typography variant="body2" fontWeight={700}>
+                                                                        {group.platform}
                                                                     </Typography>
-                                                                )}
-                                                            </Box>
-                                                            <Collapse in={isExpanded}>
-                                                                <Stack sx={{ pl: 4 }}>
-                                                                    {group.channels.map((ch) => {
-                                                                        const active = activeChannelId === ch.id;
-                                                                        const isShop = ch.shop_id != null;
-                                                                        const published =
-                                                                            isShop && data.published_shop_ids.includes(ch.shop_id as number);
-                                                                        // Push/Deactivate จะไปดู published_shop_ids ที่ *บันทึกไว้จริงๆ*
-                                                                        // ฝั่ง backend (product->platformShops() จะอัปเดตก็ต่อเมื่อกด Save
-                                                                        // Product เท่านั้น) — แต่ `published` ด้านบนสะท้อนสถานะ checkbox
-                                                                        // ที่ยังไม่ได้ save ในเครื่อง ถ้าโชว์ปุ่ม action ทันทีที่ติ๊กเสร็จ
-                                                                        // ก่อน save ผู้ใช้จะติ๊กร้านแล้วกด Push ได้ทันที ซึ่ง backend จะ
-                                                                        // ปฏิเสธด้วย "not marked as published" เพราะยังไม่ได้บันทึกอะไร
-                                                                        // เลย เลยต้องโชว์ action ก็ต่อเมื่อสถานะ checkbox ตรงกับที่บันทึก
-                                                                        // ไว้จริงเท่านั้น
-                                                                        const savedPublished =
-                                                                            isShop && publishedShopIds.includes(ch.shop_id as number);
-                                                                        // เฉพาะ platform ที่เชื่อมต่อจริง (มีอยู่ใน PLATFORM_ROUTES)
-                                                                        // เท่านั้นถึงจะมี Push/Deactivate — ร้านบน platform ที่ยังไม่ได้
-                                                                        // เชื่อมต่อ (หรือจะเชื่อมในอนาคต) ก็ยังตั้ง "published" ได้
-                                                                        // (แค่ติ๊ก checkbox) โดยไม่มี API จริงให้ push
-                                                                        // แยกสิทธิ์ push/deactivate ต่อแพลตฟอร์มแล้ว (marketplace_{platform}.
-                                                                        // push_products_{platform} — ดู ProductController::buildProductFormProps())
-                                                                        // คนละสิทธิ์กับ canEditSalesChannels ที่คุมแค่การติ๊ก/บันทึก published
-                                                                        // ข้างบน — role ที่แก้ published_shop_ids ได้ อาจ push ได้แค่บาง
-                                                                        // แพลตฟอร์มเท่านั้นก็ได้
-                                                                        const canPushThisPlatform = Boolean(
-                                                                            canPushProducts[group.platform.toLowerCase() as keyof typeof canPushProducts],
-                                                                        );
-                                                                        const canPushOrDeactivate =
-                                                                            published &&
-                                                                            savedPublished &&
-                                                                            group.platform.toLowerCase() in PLATFORM_ROUTES &&
-                                                                            canPushThisPlatform;
-                                                                        // มีแค่ทิศทาง "ติ๊กแล้วแต่ยังไม่ได้ save" เท่านั้นที่ควรมี hint เตือน
-                                                                        // — เพราะเป็นเคสเดียวที่ปุ่ม push/deactivate จะดูเหมือนใช้ได้แต่จริงๆ
-                                                                        // ยังใช้ไม่ได้ ส่วนทิศทางตรงข้าม (ติ๊กออก) ไม่มี action ไหนถูกบล็อก
-                                                                        // อยู่ แค่รอ save เฉยๆ
-                                                                        const hasUnsavedPublishChange = published && !savedPublished;
-                                                                        return (
-                                                                            <Box
-                                                                                key={ch.id}
-                                                                                onClick={() => handleChannelChange(ch.id)}
-                                                                                sx={{
-                                                                                    display: 'flex',
-                                                                                    alignItems: 'center',
-                                                                                    py: 0.25,
-                                                                                    pr: 1.5,
-                                                                                    pl: isShop ? 0.5 : 1.5,
-                                                                                    borderRadius: 1,
-                                                                                    cursor: 'pointer',
-                                                                                    bgcolor: active ? FIORI.brand : 'transparent',
-                                                                                    color: active ? '#fff' : 'text.primary',
-                                                                                    '&:hover': { bgcolor: active ? FIORI.brandDark : 'action.hover' },
-                                                                                }}
-                                                                            >
-                                                                                {isShop && (
-                                                                                    <Checkbox
-                                                                                        size="small"
-                                                                                        checked={published}
-                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                        onChange={() => toggleShopPublished(ch.shop_id as number)}
-                                                                                        sx={{
-                                                                                            color: active ? '#fff' : undefined,
-                                                                                            '&.Mui-checked': { color: active ? '#fff' : undefined },
-                                                                                        }}
-                                                                                    />
-                                                                                )}
-                                                                                <Typography variant="body2" sx={{ flex: 1 }}>
-                                                                                    {ch.name || ch.code}
-                                                                                </Typography>
-                                                                                {ch.is_live && (
-                                                                                    <Chip
-                                                                                        label="Live"
-                                                                                        size="small"
-                                                                                        title={
-                                                                                            ch.live_synced_at
-                                                                                                ? `Confirmed live as of ${new Date(ch.live_synced_at).toLocaleString()}`
-                                                                                                : 'Confirmed live on last sync'
-                                                                                        }
-                                                                                        sx={{
-                                                                                            ...mappedChipSx,
-                                                                                            height: 20,
-                                                                                            fontSize: '0.65rem',
-                                                                                            mr: 1,
-                                                                                        }}
-                                                                                    />
-                                                                                )}
-                                                                                {hasUnsavedPublishChange && (
-                                                                                    <Typography
-                                                                                        variant="caption"
-                                                                                        sx={{
-                                                                                            color: active
-                                                                                                ? 'rgba(255,255,255,0.8)'
-                                                                                                : 'text.secondary',
-                                                                                            fontStyle: 'italic',
-                                                                                            whiteSpace: 'nowrap',
-                                                                                        }}
-                                                                                    >
-                                                                                        Save first
+                                                                    <Chip
+                                                                        label={group.channels.length}
+                                                                        size="small"
+                                                                        sx={{ height: 18, fontSize: '0.7rem' }}
+                                                                    />
+                                                                    {groupShopIds.length > 0 && (
+                                                                        <Typography variant="caption" color="text.secondary">
+                                                                            ({t('publishedCountLabel', { checked: checkedInGroup, total: groupShopIds.length })})
+                                                                        </Typography>
+                                                                    )}
+                                                                </Box>
+                                                                <Collapse in={isExpanded}>
+                                                                    <Stack sx={{ pl: 4 }}>
+                                                                        {group.channels.map((ch) => {
+                                                                            const active = activeChannelId === ch.id;
+                                                                            const isShop = ch.shop_id != null;
+                                                                            const published =
+                                                                                isShop && data.published_shop_ids.includes(ch.shop_id as number);
+                                                                            // Push/Deactivate จะไปดู published_shop_ids ที่ *บันทึกไว้จริงๆ*
+                                                                            // ฝั่ง backend (product->platformShops() จะอัปเดตก็ต่อเมื่อกด Save
+                                                                            // Product เท่านั้น) — แต่ `published` ด้านบนสะท้อนสถานะ checkbox
+                                                                            // ที่ยังไม่ได้ save ในเครื่อง ถ้าโชว์ปุ่ม action ทันทีที่ติ๊กเสร็จ
+                                                                            // ก่อน save ผู้ใช้จะติ๊กร้านแล้วกด Push ได้ทันที ซึ่ง backend จะ
+                                                                            // ปฏิเสธด้วย "not marked as published" เพราะยังไม่ได้บันทึกอะไร
+                                                                            // เลย เลยต้องโชว์ action ก็ต่อเมื่อสถานะ checkbox ตรงกับที่บันทึก
+                                                                            // ไว้จริงเท่านั้น
+                                                                            const savedPublished =
+                                                                                isShop && publishedShopIds.includes(ch.shop_id as number);
+                                                                            // เฉพาะ platform ที่เชื่อมต่อจริง (มีอยู่ใน PLATFORM_ROUTES)
+                                                                            // เท่านั้นถึงจะมี Push/Deactivate — ร้านบน platform ที่ยังไม่ได้
+                                                                            // เชื่อมต่อ (หรือจะเชื่อมในอนาคต) ก็ยังตั้ง "published" ได้
+                                                                            // (แค่ติ๊ก checkbox) โดยไม่มี API จริงให้ push
+                                                                            // แยกสิทธิ์ push/deactivate ต่อแพลตฟอร์มแล้ว (marketplace_{platform}.
+                                                                            // push_products_{platform} — ดู ProductController::buildProductFormProps())
+                                                                            // คนละสิทธิ์กับ canEditSalesChannels ที่คุมแค่การติ๊ก/บันทึก published
+                                                                            // ข้างบน — role ที่แก้ published_shop_ids ได้ อาจ push ได้แค่บาง
+                                                                            // แพลตฟอร์มเท่านั้นก็ได้
+                                                                            const canPushThisPlatform = Boolean(
+                                                                                canPushProducts[group.platform.toLowerCase() as keyof typeof canPushProducts],
+                                                                            );
+                                                                            const canPushOrDeactivate =
+                                                                                published &&
+                                                                                savedPublished &&
+                                                                                group.platform.toLowerCase() in PLATFORM_ROUTES &&
+                                                                                canPushThisPlatform;
+                                                                            // มีแค่ทิศทาง "ติ๊กแล้วแต่ยังไม่ได้ save" เท่านั้นที่ควรมี hint เตือน
+                                                                            // — เพราะเป็นเคสเดียวที่ปุ่ม push/deactivate จะดูเหมือนใช้ได้แต่จริงๆ
+                                                                            // ยังใช้ไม่ได้ ส่วนทิศทางตรงข้าม (ติ๊กออก) ไม่มี action ไหนถูกบล็อก
+                                                                            // อยู่ แค่รอ save เฉยๆ
+                                                                            const hasUnsavedPublishChange = published && !savedPublished;
+                                                                            return (
+                                                                                <Box
+                                                                                    key={ch.id}
+                                                                                    onClick={() => handleChannelChange(ch.id)}
+                                                                                    sx={{
+                                                                                        display: 'flex',
+                                                                                        alignItems: 'center',
+                                                                                        py: 0.25,
+                                                                                        pr: 1.5,
+                                                                                        pl: isShop ? 0.5 : 1.5,
+                                                                                        borderRadius: 1,
+                                                                                        cursor: 'pointer',
+                                                                                        bgcolor: active ? FIORI.brand : 'transparent',
+                                                                                        color: active ? '#fff' : 'text.primary',
+                                                                                        '&:hover': { bgcolor: active ? FIORI.brandDark : 'action.hover' },
+                                                                                    }}
+                                                                                >
+                                                                                    {isShop && (
+                                                                                        <Checkbox
+                                                                                            size="small"
+                                                                                            checked={published}
+                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                            onChange={() => toggleShopPublished(ch.shop_id as number)}
+                                                                                            sx={{
+                                                                                                color: active ? '#fff' : undefined,
+                                                                                                '&.Mui-checked': { color: active ? '#fff' : undefined },
+                                                                                            }}
+                                                                                        />
+                                                                                    )}
+                                                                                    <Typography variant="body2" sx={{ flex: 1 }}>
+                                                                                        {ch.name || ch.code}
                                                                                     </Typography>
-                                                                                )}
-                                                                                {canPushOrDeactivate && (
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        title={`Push to ${group.platform}`}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            setPushConfirmShop({
-                                                                                                id: ch.shop_id as number,
-                                                                                                name: ch.name || ch.code,
-                                                                                                platform: group.platform,
-                                                                                            });
-                                                                                            checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                        }}
-                                                                                        sx={{ color: active ? '#fff' : FIORI.textSecondary }}
-                                                                                    >
-                                                                                        <PublishIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                )}
-                                                                                {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
+                                                                                    {ch.is_live && (
+                                                                                        <Chip
+                                                                                            label={t('liveLabel')}
+                                                                                            size="small"
+                                                                                            title={
+                                                                                                ch.live_synced_at
+                                                                                                    ? t('confirmedLiveAsOf', { date: new Date(ch.live_synced_at).toLocaleString() })
+                                                                                                    : t('confirmedLiveOnLastSync')
+                                                                                            }
+                                                                                            sx={{
+                                                                                                ...mappedChipSx,
+                                                                                                height: 20,
+                                                                                                fontSize: '0.65rem',
+                                                                                                mr: 1,
+                                                                                            }}
+                                                                                        />
+                                                                                    )}
+                                                                                    {hasUnsavedPublishChange && (
+                                                                                        <Typography
+                                                                                            variant="caption"
+                                                                                            sx={{
+                                                                                                color: active
+                                                                                                    ? 'rgba(255,255,255,0.8)'
+                                                                                                    : 'text.secondary',
+                                                                                                fontStyle: 'italic',
+                                                                                                whiteSpace: 'nowrap',
+                                                                                            }}
+                                                                                        >
+                                                                                            {t('saveFirstHint')}
+                                                                                        </Typography>
+                                                                                    )}
+                                                                                    {canPushOrDeactivate && (
+                                                                                        <IconButton
+                                                                                            size="small"
+                                                                                            title={t('pushToPlatformIconTooltip', { platform: group.platform })}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setPushConfirmShop({
+                                                                                                    id: ch.shop_id as number,
+                                                                                                    name: ch.name || ch.code,
+                                                                                                    platform: group.platform,
+                                                                                                });
+                                                                                                checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                            }}
+                                                                                            sx={{ color: active ? '#fff' : FIORI.textSecondary }}
+                                                                                        >
+                                                                                            <PublishIcon fontSize="small" />
+                                                                                        </IconButton>
+                                                                                    )}
+                                                                                    {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
                                                                             หรืออัปเดต) ปุ่ม Deactivate จะมีความหมายก็ต่อเมื่อมีของ
                                                                             live อยู่จริงให้เอาลงเท่านั้น ถ้าไม่มีเช็ค ch.is_live
                                                                             ปุ่มนี้จะโผล่มาแค่เพราะ "ติ๊กว่าจะ publish" เฉยๆ พอกดกับ
                                                                             ร้านที่ติ๊กไว้แต่ไม่เคย push สำเร็จจริง ก็จะไปเจอ error
                                                                             "never been pushed — nothing to deactivate" จาก
                                                                             backend แทนที่จะไม่โชว์ปุ่มไปเลยตั้งแต่แรก */}
-                                                                                {canPushOrDeactivate && ch.is_live && (
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        title={`Deactivate on ${group.platform}`}
-                                                                                        onClick={(e) => {
-                                                                                            e.stopPropagation();
-                                                                                            setDeactivateConfirmShop({
-                                                                                                id: ch.shop_id as number,
-                                                                                                name: ch.name || ch.code,
-                                                                                                platform: group.platform,
-                                                                                            });
-                                                                                            checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                        }}
-                                                                                        sx={{ color: active ? '#fff' : 'text.secondary' }}
-                                                                                    >
-                                                                                        <UnpublishedIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                )}
-                                                                                {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
+                                                                                    {canPushOrDeactivate && ch.is_live && (
+                                                                                        <IconButton
+                                                                                            size="small"
+                                                                                            title={t('deactivateOnPlatformIconTooltip', { platform: group.platform })}
+                                                                                            onClick={(e) => {
+                                                                                                e.stopPropagation();
+                                                                                                setDeactivateConfirmShop({
+                                                                                                    id: ch.shop_id as number,
+                                                                                                    name: ch.name || ch.code,
+                                                                                                    platform: group.platform,
+                                                                                                });
+                                                                                                checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                            }}
+                                                                                            sx={{ color: active ? '#fff' : 'text.secondary' }}
+                                                                                        >
+                                                                                            <UnpublishedIcon fontSize="small" />
+                                                                                        </IconButton>
+                                                                                    )}
+                                                                                    {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
                                                                             PLATFORM_ROUTES กับ ShopeeProductSyncService::delete()) —
                                                                             แยกให้ดูต่างจาก Push/Deactivate ชัดๆ (สีแดง ไอคอนคนละแบบ)
                                                                             เพราะเป็น action ที่อันตรายกว่าชัดเจน: ต่างจาก Deactivate
                                                                             ตรงที่ย้อนกลับไม่ได้เลยแม้จะ push ใหม่ก็ตาม ต้องสร้าง
                                                                             listing ใหม่ทั้งหมดเท่านั้น ใช้เงื่อนไข ch.is_live เดียวกับ
                                                                             Deactivate ด้วยเหตุผลเดียวกัน (ไม่มีของ live ก็ไม่มีอะไรให้ลบ) */}
-                                                                                {canPushOrDeactivate &&
-                                                                                    ch.is_live &&
-                                                                                    group.platform.toLowerCase() === 'shopee' && (
-                                                                                        <IconButton
-                                                                                            size="small"
-                                                                                            title={t('deleteListingButton') + ` — ${group.platform}`}
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                setDeleteListingConfirmShop({
-                                                                                                    id: ch.shop_id as number,
-                                                                                                    name: ch.name || ch.code,
-                                                                                                    platform: group.platform,
-                                                                                                });
-                                                                                                checkPlatformStatus(
-                                                                                                    ch.shop_id as number,
-                                                                                                    group.platform,
-                                                                                                );
-                                                                                            }}
-                                                                                            sx={{ color: active ? '#fff' : 'error.main' }}
-                                                                                        >
-                                                                                            <DeleteForeverIcon fontSize="small" />
-                                                                                        </IconButton>
-                                                                                    )}
-                                                                            </Box>
-                                                                        );
-                                                                    })}
-                                                                </Stack>
-                                                            </Collapse>
-                                                        </Box>
-                                                    );
-                                                })}
-                                                {channelGroups.length === 0 && (
-                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                        No sales channels available.
-                                                    </Typography>
-                                                )}
-                                            </Stack>
-                                        </Paper>
+                                                                                    {canPushOrDeactivate &&
+                                                                                        ch.is_live &&
+                                                                                        group.platform.toLowerCase() === 'shopee' && (
+                                                                                            <IconButton
+                                                                                                size="small"
+                                                                                                title={t('deleteListingButton') + ` — ${group.platform}`}
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setDeleteListingConfirmShop({
+                                                                                                        id: ch.shop_id as number,
+                                                                                                        name: ch.name || ch.code,
+                                                                                                        platform: group.platform,
+                                                                                                    });
+                                                                                                    checkPlatformStatus(
+                                                                                                        ch.shop_id as number,
+                                                                                                        group.platform,
+                                                                                                    );
+                                                                                                }}
+                                                                                                sx={{ color: active ? '#fff' : 'error.main' }}
+                                                                                            >
+                                                                                                <DeleteForeverIcon fontSize="small" />
+                                                                                            </IconButton>
+                                                                                        )}
+                                                                                </Box>
+                                                                            );
+                                                                        })}
+                                                                    </Stack>
+                                                                </Collapse>
+                                                            </Box>
+                                                        );
+                                                    })}
+                                                    {channelGroups.length === 0 && (
+                                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                            {t('noSalesChannelsAvailableEdit')}
+                                                        </Typography>
+                                                    )}
+                                                </Stack>
+                                            </Paper>
                                         )}
                                     </Stack>
                                 </Grid>
@@ -2888,130 +3017,91 @@ export default function ProductEdit({
             </Box>
 
             {/* Dialog ยืนยันการทำสำเนา (Duplicate) — ยิงจากเมนู "More" */}
-            <Dialog open={duplicateConfirmOpen} onClose={() => setDuplicateConfirmOpen(false)}>
-                <DialogTitle>{t('confirmDuplication')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDuplicateMessage')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDuplicateConfirmOpen(false)} color="inherit" disabled={duplicating}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={duplicateProduct}
-                        variant="contained"
-                        disabled={duplicating}
-                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('duplicateProduct')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={duplicateConfirmOpen}
+                onCancel={() => setDuplicateConfirmOpen(false)}
+                onConfirm={() => duplicateProduct()}
+                title={t('confirmDuplication')}
+                severity="confirm"
+                confirmLabel={t('duplicateProduct')}
+                cancelLabel={t('cancel')}
+                confirmLoading={duplicating}
+            >
+                {t('confirmDuplicateMessage')}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันการลบ — ยิงจากเมนู "More" */}
-            <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteMessage')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteConfirmOpen(false)} color="inherit" disabled={deleting}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={deleteProduct}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteConfirmOpen}
+                onCancel={() => setDeleteConfirmOpen(false)}
+                onConfirm={deleteProduct}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteMessage')}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันก่อน Publish — สรุปให้ชัดว่าจะเปิดใช้งานสินค้า +
                 push ไปร้านไหนบ้าง (หรือไม่ push เลยถ้ายังไม่ได้ติ๊กร้านไหนไว้) */}
-            <Dialog open={publishConfirmOpen} onClose={() => setPublishConfirmOpen(false)}>
-                <DialogTitle>{t('confirmSaveAndPublish')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tickedShopsForPublish.length > 0
-                            ? t('confirmPublishMessageWithChannels')
-                            : t('confirmPublishMessageNoChannels')}
-                    </DialogContentText>
-                    {tickedShopsForPublish.length > 0 ? (
-                        <Stack component="ul" spacing={0.5} sx={{ mt: 1, mb: 0, pl: 3 }}>
-                            {tickedShopsForPublish.map((shop) => (
-                                <Typography key={shop.name} component="li" variant="body2">
-                                    {shop.name} <Typography component="span" variant="caption" color="text.secondary">({shop.platform})</Typography>
-                                </Typography>
-                            ))}
-                        </Stack>
-                    ) : (
-                        <DialogContentText sx={{ mt: 1 }}>{t('confirmPublishNoChannelsTicked')}</DialogContentText>
-                    )}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setPublishConfirmOpen(false)} color="inherit" disabled={publishing || processing}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={saveAndPublish}
-                        variant="contained"
-                        disabled={publishing || processing}
-                        startIcon={publishing || processing ? <CircularProgress size={16} color="inherit" /> : <PublishIcon fontSize="small" />}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('saveAndPublish')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={publishConfirmOpen}
+                onCancel={() => setPublishConfirmOpen(false)}
+                onConfirm={saveAndPublish}
+                title={t('confirmSaveAndPublish')}
+                severity="confirm"
+                confirmLabel={t('saveAndPublish')}
+                cancelLabel={t('cancel')}
+                confirmLoading={publishing || processing}
+            >
+                <Typography variant="body2">
+                    {tickedShopsForPublish.length > 0
+                        ? t('confirmPublishMessageWithChannels')
+                        : t('confirmPublishMessageNoChannels')}
+                </Typography>
+                {tickedShopsForPublish.length > 0 ? (
+                    <Stack component="ul" spacing={0.5} sx={{ mt: 1, mb: 0, pl: 3 }}>
+                        {tickedShopsForPublish.map((shop) => (
+                            <Typography key={shop.name} component="li" variant="body2">
+                                {shop.name} <Typography component="span" variant="caption" color="text.secondary">({shop.platform})</Typography>
+                            </Typography>
+                        ))}
+                    </Stack>
+                ) : (
+                    <Typography variant="body2" sx={{ mt: 1 }}>{t('confirmPublishNoChannelsTicked')}</Typography>
+                )}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันก่อน Save Draft — ดู saveDraft()'s docblock */}
-            <Dialog open={saveDraftConfirmOpen} onClose={() => setSaveDraftConfirmOpen(false)}>
-                <DialogTitle>{t('confirmSaveDraft')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmSaveDraftMessage')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setSaveDraftConfirmOpen(false)} color="inherit" disabled={processing}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={saveDraft}
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <DraftsIcon fontSize="small" />}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('saveDraft')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={saveDraftConfirmOpen}
+                onCancel={() => setSaveDraftConfirmOpen(false)}
+                onConfirm={saveDraft}
+                title={t('confirmSaveDraft')}
+                severity="confirm"
+                confirmLabel={t('saveDraft')}
+                cancelLabel={t('cancel')}
+                confirmLoading={processing}
+            >
+                {t('confirmSaveDraftMessage')}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันก่อน Save as Template — ดู saveAsTemplate()'s docblock */}
-            <Dialog open={saveAsTemplateConfirmOpen} onClose={() => setSaveAsTemplateConfirmOpen(false)}>
-                <DialogTitle>{t('confirmSaveAsTemplate')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmSaveAsTemplateMessage')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setSaveAsTemplateConfirmOpen(false)} color="inherit" disabled={processing || duplicating}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={saveAsTemplate}
-                        variant="contained"
-                        disabled={processing || duplicating}
-                        startIcon={processing || duplicating ? <CircularProgress size={16} color="inherit" /> : <ContentCopyIcon fontSize="small" />}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('saveAsTemplate')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={saveAsTemplateConfirmOpen}
+                onCancel={() => setSaveAsTemplateConfirmOpen(false)}
+                onConfirm={saveAsTemplate}
+                title={t('confirmSaveAsTemplate')}
+                severity="confirm"
+                confirmLabel={t('saveAsTemplate')}
+                cancelLabel={t('cancel')}
+                confirmLoading={processing || duplicating}
+            >
+                {t('confirmSaveAsTemplateMessage')}
+            </FioriMessageBox>
 
             <Dialog open={pushConfirmShop !== null} onClose={closePushDialog}>
                 <DialogTitle>{t('pushToChannelTitle', { platform: pushConfirmShop?.platform })}</DialogTitle>
@@ -3238,23 +3328,23 @@ export default function ProductEdit({
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={pendingSimpleConfirm} onClose={() => setPendingSimpleConfirm(false)}>
-                <DialogTitle>เปลี่ยนเป็น Simple?</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        สินค้านี้มี <strong>{data.variants.length}</strong> variant อยู่ — เปลี่ยน Product Type เป็น Simple แล้วกด Save จะ
-                        <strong>ลบ variant ทั้งหมด</strong>ออกจากระบบ การกระทำนี้ย้อนกลับไม่ได้
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setPendingSimpleConfirm(false)} sx={fioriGhostSx}>
-                        ยกเลิก
-                    </Button>
-                    <Button onClick={confirmSwitchToSimple} variant="outlined" sx={fioriNegativeSx}>
-                        ยืนยัน เปลี่ยนเป็น Simple
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={pendingSimpleConfirm}
+                onCancel={() => setPendingSimpleConfirm(false)}
+                onConfirm={confirmSwitchToSimple}
+                title={t('confirmSwitchToSimpleTitle')}
+                severity="warning"
+                destructive
+                confirmLabel={t('confirmSwitchToSimpleButton')}
+                cancelLabel={t('cancel')}
+            >
+                <Trans
+                    t={t}
+                    i18nKey="confirmSwitchToSimpleMessage"
+                    values={{ count: data.variants.length }}
+                    components={{ strong: <strong /> }}
+                />
+            </FioriMessageBox>
 
             <Dialog
                 open={variantDialogOpen}
@@ -3265,7 +3355,7 @@ export default function ProductEdit({
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={700}>
-                        เลือก Attribute สำหรับสร้าง Variant
+                        {t('selectVariantAttributesTitle')}
                     </Typography>
                     <IconButton onClick={() => setVariantDialogOpen(false)} size="small">
                         <CloseIcon />
@@ -3279,8 +3369,7 @@ export default function ProductEdit({
                     )}
                     {data.variants.length > 0 && (
                         <FioriMessageStrip severity="warning" sx={{ mb: 2 }}>
-                            การสร้างใหม่จะแทนที่ตารางตัวเลือกสินค้าปัจจุบัน — ตัวเลือกที่ยังคงอยู่ (attribute/ค่าเดิม) จะเก็บ SKU/ราคา/สต๊อกเดิมไว้ให้
-                            ส่วนตัวเลือกที่ไม่ได้อยู่ในชุดที่ generate ใหม่จะถูกลบออกเมื่อกด Save
+                            {t('regenerateVariantsWarning')}
                         </FioriMessageStrip>
                     )}
                     <Autocomplete
@@ -3294,15 +3383,15 @@ export default function ProductEdit({
                                 <Chip label={option.name || option.code} {...getTagProps({ index })} key={option.id} sx={mappedChipSx} />
                             ))
                         }
-                        renderInput={(params) => <TextField {...params} placeholder="เลือก attribute เช่น สี, ไซส์" variant="outlined" />}
+                        renderInput={(params) => <TextField {...params} placeholder={t('selectAttributesForVariantPlaceholder')} variant="outlined" />}
                     />
                 </DialogContent>
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'flex-end', gap: 1 }}>
                     <Button onClick={() => setVariantDialogOpen(false)} sx={fioriGhostSx}>
-                        ยกเลิก
+                        {t('cancel')}
                     </Button>
                     <Button onClick={applyVariantGeneration} variant="contained" sx={fioriEmphasizedSx}>
-                        Generate
+                        {t('generateButton')}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -3436,6 +3525,7 @@ const SelectControl = memo(function SelectControl({
     value: string;
     disabled: boolean;
 }) {
+    const { t } = useTranslation('catalog');
     const selectedOption = options.find((opt) => optionValue(opt) === value) ?? null;
     // ตัวเลือกที่ถูกปิดใช้งาน (is_active === false) ไม่ควรโชว์เป็นตัวเลือกใหม่ให้เลือก
     // แต่ถ้าสินค้านี้เลือกค่านั้นไว้อยู่แล้วต้องยังคงโชว์ต่อไป ไม่งั้นค่าที่มีอยู่จะหายไปจาก dropdown
@@ -3454,7 +3544,7 @@ const SelectControl = memo(function SelectControl({
             onChange={(_, newValue) => onValueChange(attributeId, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
             sx={fioriComboBoxSx('none')}
             slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-            renderInput={(params) => <TextField {...params} placeholder="Select option" />}
+            renderInput={(params) => <TextField {...params} placeholder={t('selectOption')} />}
         />
     );
 });
@@ -3509,6 +3599,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     sku,
     productId,
     masterSources = [],
+    platformContext = null,
 }: {
     attr: AttributeItem;
     value: AttributeValue;
@@ -3522,6 +3613,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     sku: string;
     productId: number;
     masterSources?: MasterSourceOption[];
+    platformContext?: 'shopee' | 'lazada' | 'tiktok' | 'woocommerce' | null;
 }) {
     const { t } = useTranslation('catalog');
     // ใช้กับทุกประเภทฟิลด์ด้านล่าง ยกเว้น SelectControl / RichTextControl ที่
@@ -3572,7 +3664,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.500', color: '#fff', fontWeight: 700 }}
                         />
                         <Tooltip
-                            title='This field can have a different value per sales channel. It currently shows the value for the channel selected under "Sales Channels" (or the Default value, used by any channel with no value of its own). Switch channels there to edit another one.'
+                            title={t('channelValueTooltip')}
                             arrow
                         >
                             <InfoOutlinedIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
@@ -3581,7 +3673,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 ) : (
                     <>
                         <Chip
-                            label="DEFAULT"
+                            label={t('defaultChipLabel')}
                             size="small"
                             sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.200', color: 'text.primary', fontWeight: 600 }}
                         />
@@ -3592,7 +3684,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 )}
                 {isReadOnly && (
                     <Chip
-                        label="READ ONLY"
+                        label={t('readOnlyChipLabel')}
                         size="small"
                         sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'grey.900', color: '#fff', fontWeight: 700 }}
                     />
@@ -3616,13 +3708,38 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                         />
                     </Tooltip>
                 )}
-                {attr.lazada_mandatory && (
+                {platformContext && attr.platform_field_mapping && (
                     <Tooltip
-                        title="Lazada บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ Lazada ที่สินค้านี้ผูกอยู่ — ถ้าปล่อยว่าง การ push/sync ไป Lazada จะถูกปฏิเสธ"
+                        title={t('mappedToPlatformPayloadTooltip', {
+                            platform: PLATFORM_DISPLAY_NAMES[platformContext],
+                            field: attr.platform_field_mapping.is_custom
+                                ? attr.platform_field_mapping.label
+                                : t(PAYLOAD_FIELD_LABEL_KEYS[attr.platform_field_mapping.target_field] ?? attr.platform_field_mapping.target_field),
+                        })}
                         arrow
                     >
                         <Chip
-                            label="Lazada required"
+                            icon={<PublishIcon sx={{ fontSize: 13, color: `${FIORI.success} !important` }} />}
+                            label={t('mappedToPlatformPayloadChip', { platform: PLATFORM_DISPLAY_NAMES[platformContext] })}
+                            size="small"
+                            sx={{
+                                height: 18,
+                                fontSize: '0.65rem',
+                                bgcolor: FIORI.successBg,
+                                color: FIORI.success,
+                                fontWeight: 700,
+                                '& .MuiChip-icon': { ml: '4px' },
+                            }}
+                        />
+                    </Tooltip>
+                )}
+                {attr.lazada_mandatory && (
+                    <Tooltip
+                        title={t('lazadaRequiredTooltip')}
+                        arrow
+                    >
+                        <Chip
+                            label={t('lazadaRequiredChip')}
                             size="small"
                             sx={{
                                 height: 18,
@@ -3636,11 +3753,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 )}
                 {attr.shopee_mandatory && (
                     <Tooltip
-                        title="Shopee บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ Shopee ที่สินค้านี้ผูกอยู่ (หรือเป็นแบรนด์ ซึ่ง Shopee บังคับเสมอ) — ถ้าปล่อยว่าง การ push/sync ไป Shopee จะถูกปฏิเสธ"
+                        title={t('shopeeRequiredTooltip')}
                         arrow
                     >
                         <Chip
-                            label="Shopee required"
+                            label={t('shopeeRequiredChip')}
                             size="small"
                             sx={{
                                 height: 18,
@@ -3654,11 +3771,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 )}
                 {attr.tiktok_mandatory && (
                     <Tooltip
-                        title="TikTok บังคับให้ต้องกรอกฟิลด์นี้สำหรับหมวดหมู่ TikTok ที่สินค้านี้ผูกอยู่ (หรือเป็นแบรนด์ ซึ่ง TikTok บังคับเสมอ) — ถ้าปล่อยว่าง การ push/sync ไป TikTok จะถูกปฏิเสธ"
+                        title={t('tiktokRequiredTooltip')}
                         arrow
                     >
                         <Chip
-                            label="TikTok required"
+                            label={t('tiktokRequiredChip')}
                             size="small"
                             sx={{
                                 height: 18,
@@ -3698,7 +3815,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     {canAddOptions && !isReadOnly && (
                         <IconButton
                             size="small"
-                            title={`Add option to "${label}"`}
+                            title={t('addOptionToFieldTooltip', { label })}
                             onClick={() => setAddOptionOpen(true)}
                             sx={{ border: '1px solid #cbd5e1', borderRadius: 1 }}
                         >
@@ -3741,7 +3858,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     channelKey={channelKey}
                     localeKey={localeKey}
                     value={stringValue}
-                    placeholder={`Enter ${label.toLowerCase()}`}
+                    placeholder={t('enterFieldPlaceholder', { label: label.toLowerCase() })}
                     readOnly={isReadOnly}
                     productId={productId}
                     onValueChange={onValueChange}
@@ -3790,7 +3907,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     disabled={isReadOnly}
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
-                    placeholder={`Enter ${label.toLowerCase()}`}
+                    placeholder={t('enterFieldPlaceholder', { label: label.toLowerCase() })}
                     sx={fioriFieldStateSx('none')}
                 />
             </Box>
@@ -3906,7 +4023,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             const remainingSlots = MAX_GALLERY_IMAGES - items.length;
 
             if (remainingSlots <= 0) {
-                setGalleryError(`You can upload up to ${MAX_GALLERY_IMAGES} images.`);
+                setGalleryError(t('galleryUploadLimitError', { max: MAX_GALLERY_IMAGES }));
                 return;
             }
 
@@ -3925,8 +4042,8 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
 
                 if (rejectedByDimension > 0 || skippedByLimit > 0) {
                     const messages = [];
-                    if (skippedByLimit > 0) messages.push(`up to ${MAX_GALLERY_IMAGES} images allowed`);
-                    if (rejectedByDimension > 0) messages.push(`image must be at least ${MIN_GALLERY_DIMENSION}x${MIN_GALLERY_DIMENSION}px`);
+                    if (skippedByLimit > 0) messages.push(t('galleryLimitAllowedError', { max: MAX_GALLERY_IMAGES }));
+                    if (rejectedByDimension > 0) messages.push(t('galleryMinDimensionError', { dim: MIN_GALLERY_DIMENSION }));
                     setGalleryError(messages.join(' — '));
                 }
 
@@ -3945,8 +4062,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     {renderChips()}
                 </Stack>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Up to {MAX_GALLERY_IMAGES} images ({items.length}/{MAX_GALLERY_IMAGES}) · Minimum size {MIN_GALLERY_DIMENSION}×
-                    {MIN_GALLERY_DIMENSION}px
+                    {t('galleryHelperText', { max: MAX_GALLERY_IMAGES, count: items.length, dim: MIN_GALLERY_DIMENSION })}
                 </Typography>
                 {items.length > 0 && (
                     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
@@ -3962,7 +4078,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 )}
                 <Box sx={{ maxWidth: 420 }}>
                     <FioriFileUploader
-                        placeholder={atLimit ? `Maximum ${MAX_GALLERY_IMAGES} images reached` : 'Browse or drop images'}
+                        placeholder={atLimit ? t('galleryMaxReached', { max: MAX_GALLERY_IMAGES }) : t('browseOrDropImages')}
                         accept="image/*"
                         multiple
                         disabled={isReadOnly || atLimit}
@@ -3997,11 +4113,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             setVideoError(null);
 
             if (file.type !== 'video/mp4') {
-                setVideoError('Only MP4 videos are supported.');
+                setVideoError(t('onlyMp4VideosSupported'));
                 return;
             }
             if (file.size > MAX_VIDEO_BYTES) {
-                setVideoError('Video must be 100MB or smaller.');
+                setVideoError(t('videoTooLargeError'));
                 return;
             }
 
@@ -4011,18 +4127,18 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
             probe.onloadedmetadata = () => {
                 URL.revokeObjectURL(probeUrl);
                 if (probe.duration > 300) {
-                    setVideoError('Video must be 5 minutes or shorter.');
+                    setVideoError(t('videoTooLongError'));
                     return;
                 }
                 if (probe.videoWidth < 480 || probe.videoHeight < 480) {
-                    setVideoError('Video must be at least 480x480px.');
+                    setVideoError(t('videoTooSmallError'));
                     return;
                 }
                 onChange(file);
             };
             probe.onerror = () => {
                 URL.revokeObjectURL(probeUrl);
-                setVideoError('Could not read this video file.');
+                setVideoError(t('videoUnreadableError'));
             };
             probe.src = probeUrl;
         };
@@ -4046,11 +4162,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     )}
                     <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
                         <FioriFileUploader
-                            placeholder="Browse or drop an MP4 video"
+                            placeholder={t('browseOrDropMp4')}
                             accept="video/mp4"
                             disabled={isReadOnly}
                             onSelect={(fl) => handleVideoSelect(fl[0])}
-                            valueLabel={selectedName || (existingLabel ? `Current: ${existingLabel}` : null)}
+                            valueLabel={selectedName || (existingLabel ? t('currentFileLabel', { name: existingLabel }) : null)}
                             onClear={selectedName ? () => onChange('') : undefined}
                             error={videoError ?? undefined}
                         />
@@ -4117,11 +4233,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     )}
                     <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
                         <FioriFileUploader
-                            placeholder={isImage ? 'Browse or drop an image' : 'Browse or drop a file'}
+                            placeholder={isImage ? t('browseOrDropImage') : t('browseOrDropFile')}
                             accept={isImage ? 'image/*' : undefined}
                             disabled={isReadOnly}
                             onSelect={(fl) => onChange(fl[0])}
-                            valueLabel={selectedName || (existingLabel ? `Current: ${existingLabel}` : null)}
+                            valueLabel={selectedName || (existingLabel ? t('currentFileLabel', { name: existingLabel }) : null)}
                             onClear={selectedName ? () => onChange('') : undefined}
                         />
                     </Box>
@@ -4156,7 +4272,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 disabled={isReadOnly}
                 value={stringValue}
                 onChange={(e) => onChange(e.target.value)}
-                placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : `Enter ${label.toLowerCase()}`}
+                placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : t('enterFieldPlaceholder', { label: label.toLowerCase() })}
                 sx={fioriFieldStateSx('none')}
             />
         </Box>

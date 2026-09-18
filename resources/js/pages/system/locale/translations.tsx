@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { useFioriConfirm } from '@/components/fiori-message-box';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const CONTENT_NAMESPACE = 'content';
@@ -73,6 +74,10 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
         { title: `${tSystem('translationsTitle')}: ${localeModel.display_name || localeModel.code}`, href: '#' },
     ];
 
+    // Fiori Message Box แทน window.confirm() ของเบราว์เซอร์ (ดู switchNamespace()
+    // ด้านล่าง) — {confirmElement} ต้อง render ไว้ในต้นไม้ JSX ของหน้านี้ด้วย
+    const { confirm, confirmElement } = useFioriConfirm();
+
     const original = useMemo(() => Object.fromEntries(entries.map((entry) => [entry.path, entry.value])), [entries]);
     const [values, setValues] = useState<Record<string, string>>(original);
     const [search, setSearch] = useState('');
@@ -111,13 +116,20 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
         );
     }, [entries, search, values]);
 
-    const switchNamespace = (namespace: string) => {
+    const switchNamespace = async (namespace: string) => {
         if (namespace === activeNamespace) {
             return;
         }
 
-        if (dirtyCount > 0 && !window.confirm(tSystem('unsavedTranslationsCount', { count: dirtyCount }) + ' — discard?')) {
-            return;
+        if (dirtyCount > 0) {
+            const confirmed = await confirm({
+                title: 'Discard unsaved changes?',
+                message: `${tSystem('unsavedTranslationsCount', { count: dirtyCount })} — discard?`,
+                severity: 'warning',
+                confirmLabel: 'Discard',
+                destructive: true,
+            });
+            if (!confirmed) return;
         }
 
         setSwitchingTab(true);
@@ -322,6 +334,7 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                 message={tSystem('saveTranslations')}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             />
+            {confirmElement}
         </AppLayout>
     );
 }

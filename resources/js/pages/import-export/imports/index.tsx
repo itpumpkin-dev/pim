@@ -6,15 +6,15 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination, Chip } from '@mui/material';
+import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Pagination, Chip } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     fioriCardSx,
     fioriEmphasizedSx,
-    fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
@@ -236,35 +236,27 @@ export default function ImportIndex({ configs, filters }: Props) {
                 )}
             </Box>
 
-            <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteImport')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteId !== null) {
-                                setDeleting(true);
-                                router.delete(`/import-export/imports/${deleteId}`, {
-                                    onSuccess: () => setDeleteId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteId !== null}
+                onCancel={() => setDeleteId(null)}
+                onConfirm={() => {
+                    if (deleteId !== null) {
+                        setDeleting(true);
+                        router.delete(`/import-export/imports/${deleteId}`, {
+                            onSuccess: () => setDeleteId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteImport')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

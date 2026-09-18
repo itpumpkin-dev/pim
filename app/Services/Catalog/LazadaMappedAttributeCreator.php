@@ -172,6 +172,10 @@ class LazadaMappedAttributeCreator
             'code' => $code,
             'name' => $lazadaAttribute->label,
             'type' => $pimType,
+            // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
+            // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
+            // docblock ของ migration add_auto_created_platform_to_attributes_table
+            'auto_created_platform' => 'lazada',
             'is_required' => false,
             'is_unique' => false,
             'is_locale_based' => false,

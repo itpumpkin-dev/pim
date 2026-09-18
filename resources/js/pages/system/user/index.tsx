@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Box, Button, CircularProgress, InputAdornment, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, InputAdornment, TextField, Typography, IconButton } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -10,10 +10,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import CreateUserDialog from '@/components/system/create-user-dialog';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
-    fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
@@ -209,28 +209,27 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                     emptyMessage={t('noDataFound')}
                 />
             </Box>
-        <Dialog open={deleteUserId !== null} onClose={() => setDeleteUserId(null)}>
-            <DialogTitle>{tSystem('confirmDeletionTitle')}</DialogTitle>
-            <DialogContent>
-                <DialogContentText>
-                    {tSystem('confirmDeleteUserMessage')}
-                </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={() => setDeleteUserId(null)} color="inherit" disabled={deleting} sx={fioriDefaultSx}>{t('cancel')}</Button>
-                <Button onClick={() => {
-                    if (deleteUserId !== null) {
-                        setDeleting(true);
-                        router.delete(`/system/user/${deleteUserId}`, {
-                            onSuccess: () => setDeleteUserId(null),
-                            onFinish: () => setDeleting(false),
-                        });
-                    }
-                }} color="error" variant="contained" disabled={deleting} startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined} sx={{ textTransform: 'none', borderRadius: '8px' }}>
-                    {t('delete')}
-                </Button>
-            </DialogActions>
-        </Dialog>
+        <FioriMessageBox
+            open={deleteUserId !== null}
+            onCancel={() => setDeleteUserId(null)}
+            onConfirm={() => {
+                if (deleteUserId !== null) {
+                    setDeleting(true);
+                    router.delete(`/system/user/${deleteUserId}`, {
+                        onSuccess: () => setDeleteUserId(null),
+                        onFinish: () => setDeleting(false),
+                    });
+                }
+            }}
+            title={tSystem('confirmDeletionTitle')}
+            severity="warning"
+            destructive
+            confirmLabel={t('delete')}
+            cancelLabel={t('cancel')}
+            confirmLoading={deleting}
+        >
+            {tSystem('confirmDeleteUserMessage')}
+        </FioriMessageBox>
         </AppLayout>
     );
 }

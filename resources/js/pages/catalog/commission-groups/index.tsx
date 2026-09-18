@@ -12,12 +12,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     Paper,
@@ -29,8 +23,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx, fioriNegativeSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 import { formatDateRange } from '@/lib/format';
 
 interface CommissionGroupItem {
@@ -263,34 +258,28 @@ export default function CommissionGroupIndex({ commissionGroups, filters }: Prop
                 </Stack>
             </Box>
 
-            <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteCommissionGroup')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/commission-groups/${deleteId}`, {
-                                    preserveScroll: true,
-                                    onSuccess: () => setDeleteId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        variant="outlined"
-                        disabled={deleting}
-                        sx={fioriNegativeSx}
-                    >
-                        {deleting ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteId !== null}
+                onCancel={() => setDeleteId(null)}
+                onConfirm={() => {
+                    if (deleteId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/commission-groups/${deleteId}`, {
+                            preserveScroll: true,
+                            onSuccess: () => setDeleteId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteCommissionGroup')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

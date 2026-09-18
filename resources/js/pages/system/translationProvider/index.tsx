@@ -14,11 +14,6 @@ import {
     Box,
     Button,
     CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Divider,
     IconButton,
     InputAdornment,
@@ -31,6 +26,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
@@ -261,35 +257,27 @@ export default function TranslationProviderIndex({ gridData, filters }: Props) {
                 </Paper>
             </Box>
 
-            <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{tSystem('confirmDeleteTranslationProviderMessage')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} color="inherit" disabled={deleting} sx={fioriDefaultSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteId !== null) {
-                                setDeleting(true);
-                                router.delete(`/system/translationProviders/${deleteId}`, {
-                                    onSuccess: () => setDeleteId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteId !== null}
+                onCancel={() => setDeleteId(null)}
+                onConfirm={() => {
+                    if (deleteId !== null) {
+                        setDeleting(true);
+                        router.delete(`/system/translationProviders/${deleteId}`, {
+                            onSuccess: () => setDeleteId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tSystem('confirmDeleteTranslationProviderMessage')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

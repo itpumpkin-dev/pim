@@ -16,7 +16,6 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogContentText,
     DialogTitle,
     Divider,
     FormControlLabel,
@@ -34,6 +33,7 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
@@ -555,65 +555,49 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                 </Box>
             </Dialog>
 
-            <Dialog open={deletePlatformId !== null} onClose={() => setDeletePlatformId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeletePlatform')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeletePlatformId(null)} sx={fioriGhostSx} disabled={deletingPlatform}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deletePlatformId !== null) {
-                                setDeletingPlatform(true);
-                                router.delete(`/catalog/sales-platforms/${deletePlatformId}`, {
-                                    onSuccess: () => setDeletePlatformId(null),
-                                    onFinish: () => setDeletingPlatform(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={deletingPlatform}
-                        startIcon={deletingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deletePlatformId !== null}
+                onCancel={() => setDeletePlatformId(null)}
+                onConfirm={() => {
+                    if (deletePlatformId !== null) {
+                        setDeletingPlatform(true);
+                        router.delete(`/catalog/sales-platforms/${deletePlatformId}`, {
+                            onSuccess: () => setDeletePlatformId(null),
+                            onFinish: () => setDeletingPlatform(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deletingPlatform}
+            >
+                {t('confirmDeletePlatform')}
+            </FioriMessageBox>
 
-            <Dialog open={deleteShopId !== null} onClose={() => setDeleteShopId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteShop')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteShopId(null)} sx={fioriGhostSx} disabled={deletingShop}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteShopId !== null) {
-                                setDeletingShop(true);
-                                router.delete(`/catalog/sales-platforms/shops/${deleteShopId}`, {
-                                    onSuccess: () => setDeleteShopId(null),
-                                    onFinish: () => setDeletingShop(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={deletingShop}
-                        startIcon={deletingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteShopId !== null}
+                onCancel={() => setDeleteShopId(null)}
+                onConfirm={() => {
+                    if (deleteShopId !== null) {
+                        setDeletingShop(true);
+                        router.delete(`/catalog/sales-platforms/shops/${deleteShopId}`, {
+                            onSuccess: () => setDeleteShopId(null),
+                            onFinish: () => setDeletingShop(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deletingShop}
+            >
+                {t('confirmDeleteShop')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

@@ -14,12 +14,6 @@ import {
     Box,
     Button,
     Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     Paper,
@@ -31,14 +25,13 @@ import {
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import {
     FIORI,
     FioriStatus,
     fioriEmphasizedSx,
-    fioriGhostSx,
     fioriIconButtonSx,
-    fioriNegativeSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
 
@@ -300,44 +293,38 @@ export default function BaseUnitIndex({ baseUnits, attributeId, filters }: Props
                 </Stack>
             </Box>
 
-            <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteBaseUnit')}</DialogContentText>
-                    {(() => {
-                        const target = baseUnits.data.find((b) => b.id === deleteId);
-                        const count = target?.products_count ?? 0;
-                        if (count === 0) return null;
-                        return (
-                            <Alert severity="warning" sx={{ mt: 1.5 }}>
-                                {t('deleteBaseUnitProductWarning', { count })}
-                            </Alert>
-                        );
-                    })()}
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/base-units/${deleteId}`, {
-                                    preserveScroll: true,
-                                    onSuccess: () => setDeleteId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        variant="outlined"
-                        disabled={deleting}
-                        sx={fioriNegativeSx}
-                    >
-                        {deleting ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteId !== null}
+                onCancel={() => setDeleteId(null)}
+                onConfirm={() => {
+                    if (deleteId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/base-units/${deleteId}`, {
+                            preserveScroll: true,
+                            onSuccess: () => setDeleteId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteBaseUnit')}
+                {(() => {
+                    const target = baseUnits.data.find((b) => b.id === deleteId);
+                    const count = target?.products_count ?? 0;
+                    if (count === 0) return null;
+                    return (
+                        <Alert severity="warning" sx={{ mt: 1.5 }}>
+                            {t('deleteBaseUnitProductWarning', { count })}
+                        </Alert>
+                    );
+                })()}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

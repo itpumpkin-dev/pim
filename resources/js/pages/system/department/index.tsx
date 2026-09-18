@@ -4,12 +4,6 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Divider,
     InputAdornment,
     Paper,
@@ -24,11 +18,11 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
     fioriCardSx,
-    fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
@@ -221,29 +215,19 @@ export default function DepartmentIndex({ gridConfig, gridData, filters }: Depar
                 </Paper>
             </Box>
 
-            <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-                <DialogTitle>{tSystem('deleteDepartmentTitle')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tSystem('confirmDeleteDepartmentMessage', { name: deleteTarget?.name })}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button variant="outlined" onClick={() => setDeleteTarget(null)} disabled={deleting} sx={fioriDefaultSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={confirmDelete}
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={Boolean(deleteTarget)}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title={tSystem('deleteDepartmentTitle')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tSystem('confirmDeleteDepartmentMessage', { name: deleteTarget?.name })}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

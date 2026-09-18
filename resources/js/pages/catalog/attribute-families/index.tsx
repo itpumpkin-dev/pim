@@ -13,12 +13,6 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Divider,
     IconButton,
     InputAdornment,
@@ -33,6 +27,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import {
     FIORI,
@@ -288,69 +283,49 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
             </Box>
 
             {/* ไดอะล็อกยืนยันการลบ */}
-            <Dialog open={deleteFamilyId !== null} onClose={() => setDeleteFamilyId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tCatalog('confirmDeleteAttributeFamilyMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteFamilyId(null)} color="inherit" disabled={deleting} sx={{ textTransform: 'none' }}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteFamilyId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/attributeFamilies/${deleteFamilyId}`, {
-                                    onSuccess: () => setDeleteFamilyId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteFamilyId !== null}
+                onCancel={() => setDeleteFamilyId(null)}
+                onConfirm={() => {
+                    if (deleteFamilyId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/attributeFamilies/${deleteFamilyId}`, {
+                            onSuccess: () => setDeleteFamilyId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tCatalog('confirmDeleteAttributeFamilyMessage')}
+            </FioriMessageBox>
 
             {/* ไดอะล็อกยืนยันการทำสำเนา */}
-            <Dialog open={duplicateFamilyId !== null} onClose={() => setDuplicateFamilyId(null)}>
-                <DialogTitle>{tCatalog('confirmDuplication')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tCatalog('confirmDuplicateAttributeFamilyMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDuplicateFamilyId(null)} color="inherit" disabled={duplicating} sx={{ textTransform: 'none' }}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (duplicateFamilyId !== null) {
-                                setDuplicating(true);
-                                router.post(`/catalog/attributeFamilies/${duplicateFamilyId}/duplicate`, {}, {
-                                    onSuccess: () => setDuplicateFamilyId(null),
-                                    onFinish: () => setDuplicating(false),
-                                });
-                            }
-                        }}
-                        variant="contained"
-                        disabled={duplicating}
-                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {t('rowActions.duplicate')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={duplicateFamilyId !== null}
+                onCancel={() => setDuplicateFamilyId(null)}
+                onConfirm={() => {
+                    if (duplicateFamilyId !== null) {
+                        setDuplicating(true);
+                        router.post(`/catalog/attributeFamilies/${duplicateFamilyId}/duplicate`, {}, {
+                            onSuccess: () => setDuplicateFamilyId(null),
+                            onFinish: () => setDuplicating(false),
+                        });
+                    }
+                }}
+                title={tCatalog('confirmDuplication')}
+                severity="confirm"
+                confirmLabel={t('rowActions.duplicate')}
+                cancelLabel={t('cancel')}
+                confirmLoading={duplicating}
+            >
+                {tCatalog('confirmDuplicateAttributeFamilyMessage')}
+            </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

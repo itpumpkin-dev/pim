@@ -10,10 +10,11 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Box, Button, InputAdornment, MenuItem, Paper, Select, Stack, TextField, Typography, IconButton } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocale } from '@/hooks/use-locale';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
@@ -21,7 +22,6 @@ import {
     FioriStatus,
     fioriDefaultSx,
     fioriEmphasizedSx,
-    fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
@@ -293,37 +293,27 @@ export default function CategoryFieldIndex({ fields, filters, filterColumns }: P
                 />
             </Box>
 
-            <Dialog open={deleteFieldId !== null} onClose={() => setDeleteFieldId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Are you sure you want to delete this category field?
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteFieldId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteFieldId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/categoryFields/${deleteFieldId}`, {
-                                    onSuccess: () => setDeleteFieldId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 700 }}
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteFieldId !== null}
+                onCancel={() => setDeleteFieldId(null)}
+                onConfirm={() => {
+                    if (deleteFieldId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/categoryFields/${deleteFieldId}`, {
+                            onSuccess: () => setDeleteFieldId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                Are you sure you want to delete this category field?
+            </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

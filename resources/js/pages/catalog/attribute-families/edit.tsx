@@ -1,4 +1,5 @@
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
+import { useFioriConfirm } from '@/components/fiori-message-box';
 import { HistoryPanel } from '@/components/history-panel';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
@@ -110,6 +111,11 @@ export default function AttributeFamilyEdit({
         code: family.code || '',
         translations: translations || {},
     });
+
+    // Fiori Message Box แทน window.confirm() ของเบราว์เซอร์ (ดู
+    // setAsDefaultForAllGroups() ด้านล่าง) — {confirmElement} ต้อง render ไว้ใน
+    // ต้นไม้ JSX ของหน้านี้ด้วย
+    const { confirm, confirmElement } = useFioriConfirm();
 
     const [attrSearch, setAttrSearch] = useState('');
     // ค้นหาแอตทริบิวต์ในคอลัมน์หลัก (กลุ่มที่จัดไว้แล้ว) — คนละช่องกับ attrSearch
@@ -317,8 +323,13 @@ export default function AttributeFamilyEdit({
     };
 
     const [settingDefault, setSettingDefault] = useState(false);
-    const setAsDefaultForAllGroups = () => {
-        if (!window.confirm(t('setDefaultForAllGroupsConfirm', { name: family.name || family.code }))) return;
+    const setAsDefaultForAllGroups = async () => {
+        const confirmed = await confirm({
+            title: t('setDefaultForAllGroups'),
+            message: t('setDefaultForAllGroupsConfirm', { name: family.name || family.code }),
+            severity: 'warning',
+        });
+        if (!confirmed) return;
 
         setSettingDefault(true);
         router.post(
@@ -835,6 +846,7 @@ export default function AttributeFamilyEdit({
                     {t('noAttributeGroupsWarning')}
                 </Alert>
             </Snackbar>
+            {confirmElement}
         </AppLayout>
     );
 }

@@ -24,10 +24,14 @@ use App\Models\ProductAssociation;
 use App\Models\ProductMarketplaceSyncJob;
 use App\Models\ProductValue;
 use App\Models\SalesPlatformShop;
+use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeCategoryAttribute;
+use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokCategoryAttribute;
+use App\Models\WooCommerceAttribute;
+use App\Models\WooCommerceAttributeMapping;
 use App\Services\AppNotifier;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
@@ -85,6 +89,16 @@ class ProductController extends Controller
     // ระดับเดียวกัน (ดู ProductCategoryLinker::LEGACY_CODE_LEVELS) และ 'pcatname'
     // คือตัวที่ระบบอื่น (WooCommerceConverter ฯลฯ) ใช้จริง
     private const MASTER_CATEGORY_ATTRIBUTE_CODES = ['pcatname', 'psubcatname', 'productgroupname'];
+
+    // แพลตฟอร์มที่ปุ่มแก้ไขในหน้า Products Mapping ของตัวเอง (resources/js/
+    // pages/catalog/marketplace/{platform}-products.tsx — รวม WooCommerce
+    // ด้วย แม้จะไม่มีหน้า Object Page แบบเต็มเหมือน 3 ตัวแรกก็ตาม เพราะปุ่ม
+    // แก้ไขที่ตารางรายการยังส่ง ?platform=woocommerce มาเหมือนกัน) ส่ง
+    // ?platform= มาให้ edit() — ใช้ตรวจสอบค่านี้ทั้งใน buildProductFormProps()
+    // (platformContext/platform_field_mapping สำหรับ chip "Mapped to..." บน
+    // ฟอร์ม) และตอน redirect กลับมาหลัง save (ต้องส่งค่านี้กลับไปด้วย ไม่งั้น
+    // chip จะหายไปเงียบๆ ทุกครั้งที่กด Save — ดู update())
+    private const VALID_PLATFORM_CONTEXTS = ['shopee', 'lazada', 'tiktok', 'woocommerce'];
 
     // Attribute code ของแอตทริบิวต์ "Product Type" (Customer Brand / Hand
     // Tools / ... — ดู ProductTypeController) ที่ผูก master_source =
@@ -1601,9 +1615,20 @@ class ProductController extends Controller
         }
     }
 
-    public function edit(Product $product): Response
+    /**
+     * `?platform=` (optional) มาจากปุ่มแก้ไขในหน้า Products Mapping ของแต่ละ
+     * marketplace (resources/js/pages/catalog/marketplace/{platform}-products.tsx
+     * — ดูคอมเมนต์ตรงปุ่มแก้ไขในไฟล์นั้น) เพื่อให้หน้า Edit นี้รู้ว่าแอดมินกำลัง
+     * โฟกัสอยู่ที่ platform ไหน แล้วโชว์ chip บอกว่าฟิลด์ไหนถูก map เข้ากับ payload
+     * ของ platform นั้นบ้าง (ดู platformFieldMappingsFor() ด้านล่าง) ไม่ส่งมาก็ยัง
+     * ทำงานปกติทุกอย่างเหมือนเดิม แค่ไม่มี chip นี้โผล่มาเฉยๆ
+     */
+    public function edit(Request $request, Product $product): Response
     {
-        return Inertia::render('catalog/products/edit', $this->buildProductFormProps($product));
+        return Inertia::render(
+            'catalog/products/edit',
+            $this->buildProductFormProps($product, $request->query('platform')),
+        );
     }
 
     /**
@@ -1737,6 +1762,27 @@ class ProductController extends Controller
      */
     private function relinkMasterCategoryCodes(Product $product, array $oldCodes, array $newCodes, array $protectedCategoryIds = []): void
     {
+        // ผู้ใช้ล้าง Category/Subcategory/Product Group ออกหมดตั้งใจ (ทั้ง 3
+        // ช่องว่างพร้อมกัน) — ถอดหมวดหมู่ที่ผูกกับสินค้านี้อยู่ตอนนี้ *ทั้งหมด*
+        // ไม่ใช่แค่ตัวที่ตรงกับ $oldCodes (ค่าที่เคย save ไว้ "ล่าสุดครั้งเดียว")
+        // เท่านั้น เพราะ ProductCategoryLinker::linkFromCodes() เป็น additive-only
+        // มาตลอด (ดู docblock เมธอดนี้ด้านบน) การเทียบแค่ oldCodes vs newCodes
+        // ของรอบ save นี้รอบเดียวจะจับได้แค่ของที่เพิ่งถูกแทนที่ล่าสุด ส่วน
+        // หมวดหมู่ที่ตกค้างมาจากการเปลี่ยนกลุ่มสินค้าหลายรอบก่อนหน้า (หรือจาก
+        // import) จะไม่ถูกถอดออกเลย ทำให้ attribute family ของหมวดหมู่ตกค้าง
+        // เหล่านั้นยังโผล่ในหน้า Edit Product อยู่ ทั้งที่ล้าง Master Categories
+        // ไปหมดแล้วดูจากหน้าจอ — บั๊กจริงที่ผู้ใช้เจอ (ยืนยันจากข้อมูลจริง: สินค้า
+        // ตัวหนึ่งมี category เก่าค้างอยู่ 2 ตัวที่ pcatname/psubcatname/
+        // productgroupname ไม่มีตัวไหนอ้างถึงแล้ว แต่ยังผูก family อยู่)
+        if (empty($newCodes)) {
+            $categoryIds = $product->categories()->pluck('categories.id')->diff($protectedCategoryIds);
+            if ($categoryIds->isNotEmpty()) {
+                $product->categories()->detach($categoryIds);
+            }
+
+            return;
+        }
+
         $removedCodes = array_diff($oldCodes, $newCodes);
         if (! empty($removedCodes)) {
             $removedCategoryIds = Category::whereIn('code', $removedCodes)->pluck('id')->diff($protectedCategoryIds);
@@ -1745,9 +1791,7 @@ class ProductController extends Controller
             }
         }
 
-        if (! empty($newCodes)) {
-            ProductCategoryLinker::linkFromCodes($product, $newCodes);
-        }
+        ProductCategoryLinker::linkFromCodes($product, $newCodes);
     }
 
     /**
@@ -2075,7 +2119,7 @@ class ProductController extends Controller
      * therefore what a save through update() actually persists) considers
      * "this product's full data".
      */
-    private function buildProductFormProps(Product $product): array
+    private function buildProductFormProps(Product $product, ?string $platform = null): array
     {
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
@@ -2109,6 +2153,7 @@ class ProductController extends Controller
         $lazadaMandatoryAttributeIds = $this->lazadaMandatoryAttributeIds($product);
         $shopeeMandatoryAttributeIds = $this->shopeeMandatoryAttributeIds($product);
         $tiktokMandatoryAttributeIds = $this->tiktokMandatoryAttributeIds($product);
+        $platformFieldMappings = $this->platformFieldMappingsFor($platform);
 
         // จัดกลุ่ม attribute แบบไดนามิกตาม attributeGroup
         $groupsData = [];
@@ -2160,6 +2205,7 @@ class ProductController extends Controller
             $attr->lazada_mandatory = in_array($attr->id, $lazadaMandatoryAttributeIds, true);
             $attr->shopee_mandatory = in_array($attr->id, $shopeeMandatoryAttributeIds, true);
             $attr->tiktok_mandatory = in_array($attr->id, $tiktokMandatoryAttributeIds, true);
+            $attr->platform_field_mapping = $platformFieldMappings[$attr->id] ?? null;
             $this->decorateOptionsWithMappedPlatforms($attr);
             $groupsData[$groupId]['attributes'][] = $attr;
         }
@@ -2211,11 +2257,12 @@ class ProductController extends Controller
                 $allAttributes = $allAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
 
-            $allAttributes->each(function ($attr) use ($user, $lazadaMandatoryAttributeIds, $shopeeMandatoryAttributeIds, $tiktokMandatoryAttributeIds) {
+            $allAttributes->each(function ($attr) use ($user, $lazadaMandatoryAttributeIds, $shopeeMandatoryAttributeIds, $tiktokMandatoryAttributeIds, $platformFieldMappings) {
                 $attr->editable = $this->canUserEditAttribute($user, $attr);
                 $attr->lazada_mandatory = in_array($attr->id, $lazadaMandatoryAttributeIds, true);
                 $attr->shopee_mandatory = in_array($attr->id, $shopeeMandatoryAttributeIds, true);
                 $attr->tiktok_mandatory = in_array($attr->id, $tiktokMandatoryAttributeIds, true);
+                $attr->platform_field_mapping = $platformFieldMappings[$attr->id] ?? null;
                 $this->decorateOptionsWithMappedPlatforms($attr);
             });
 
@@ -2514,7 +2561,80 @@ class ProductController extends Controller
             // ที่ frontend แทนที่จะแปลที่นี่ เพื่อให้สลับภาษาได้ทันทีโดยไม่ต้อง
             // round-trip)
             'masterSources' => MasterAttributeOptionSync::pickerOptions(),
+            // platform ที่มาจาก ?platform= ของ edit() ด้านบน (null ถ้าไม่ได้มาจาก
+            // หน้า Products Mapping ของ marketplace ไหนเลย) — ให้ frontend ใช้ขึ้น
+            // ข้อความ chip "Mapped to {{platform}} payload" คู่กับ
+            // attribute.platform_field_mapping ที่ decorate ไว้ในทุก attribute
+            // ด้านบนแล้ว (ดู platformFieldMappingsFor())
+            'platformContext' => in_array($platform, self::VALID_PLATFORM_CONTEXTS, true) ? $platform : null,
         ];
+    }
+
+    /**
+     * Attribute mapping ระดับ global (ไม่ผูกกับหมวดหมู่ ต่างจาก
+     * shopeeMandatoryAttributeIds()/ฯลฯ ด้านบน) ของ platform ที่ระบุ — คืน
+     * [attribute_id => ['target_field' => ..., 'label' => ..., 'is_custom' => bool]]
+     * เฉพาะ attribute ที่มี mapping จริงเท่านั้น (target_field ไม่ null) ใช้
+     * แสดง chip บนฟิลด์ในหน้า Edit Product ว่าฟิลด์ไหนป้อนเข้า payload ของ
+     * platform ที่แอดมินกำลังโฟกัสอยู่ (มาจากหน้า Products Mapping) — 'label'
+     * คือชื่อ field ที่จะเอาไป t() ฝั่ง frontend (ตรงกับ catalog.json key ตัวเดียว
+     * กับ name/price/qty/weight/length/width/height/description/video ที่มีอยู่
+     * แล้ว) หรือชื่อ platform attribute เฉพาะตัว (เมื่อ is_custom = true, เช่น
+     * map เข้ากับ attribute_list ของ Shopee ไม่ใช่ field ตายตัว)
+     */
+    private function platformFieldMappingsFor(?string $platform): array
+    {
+        if (! in_array($platform, self::VALID_PLATFORM_CONTEXTS, true)) {
+            return [];
+        }
+
+        $mappings = match ($platform) {
+            'shopee' => ShopeeAttributeMapping::cachedList(),
+            'lazada' => LazadaAttributeMapping::cachedList(),
+            'tiktok' => TikTokAttributeMapping::cachedList(),
+            'woocommerce' => WooCommerceAttributeMapping::cachedList(),
+        };
+
+        // ค่า target_field ของกลุ่ม custom-attribute ในแต่ละแพลตฟอร์ม — ใช้ค่าเดียวกับ
+        // MarketplaceAttributeMappingController::CUSTOM_TARGET_FIELD แทนพิมพ์ซ้ำ
+        $customTargetField = MarketplaceAttributeMappingController::CUSTOM_TARGET_FIELD[$platform];
+
+        // ชื่อ platform attribute เฉพาะตัว (สำหรับ target_field แบบ custom
+        // เท่านั้น) — Lazada เก็บชื่อไว้ในตัว mapping เองแล้ว (lazada_attribute_name)
+        // ไม่ต้อง lookup เพิ่ม ส่วนอีกสามแพลตฟอร์มเก็บแค่ id เลย pluck ชื่อจาก
+        // cachedList() ของ platform attribute นั้นมาจับคู่
+        $customLabelsById = match ($platform) {
+            'shopee' => ShopeeAttribute::cachedList()->pluck('name', 'id'),
+            'tiktok' => TikTokAttribute::cachedList()->pluck('name', 'id'),
+            'woocommerce' => WooCommerceAttribute::cachedList()->pluck('name', 'id'),
+            default => collect(),
+        };
+        $customIdField = [
+            'shopee' => 'shopee_attribute_id',
+            'tiktok' => 'tiktok_attribute_id',
+            'woocommerce' => 'woocommerce_attribute_id',
+        ][$platform] ?? null;
+
+        return $mappings
+            ->whereNotNull('target_field')
+            ->keyBy('attribute_id')
+            ->map(function ($mapping) use ($platform, $customTargetField, $customLabelsById, $customIdField) {
+                $isCustom = $mapping->target_field === $customTargetField;
+                $label = $mapping->target_field;
+                if ($isCustom) {
+                    $label = $platform === 'lazada'
+                        ? $mapping->lazada_attribute_name
+                        : ($customLabelsById[$mapping->{$customIdField}] ?? null);
+                }
+
+                return [
+                    'target_field' => $mapping->target_field,
+                    'is_custom' => $isCustom,
+                    'label' => $label,
+                ];
+            })
+            ->filter(fn ($row) => $row['label'] !== null)
+            ->all();
     }
 
     public function history(Product $product): JsonResponse
@@ -3222,7 +3342,26 @@ class ProductController extends Controller
                 ->map(fn ($attributeId) => $values[$attributeId]['global']['default'] ?? null)
                 ->filter(fn ($code) => is_string($code) && $code !== '')
                 ->all();
-            $this->relinkMasterCategoryCodes($product, $oldMasterCategoryCodes, $masterCategoryCodes, $newCategoryIds);
+            // ไม่ส่ง $newCategoryIds เป็น $protectedCategoryIds อีกต่อไป (ต่างจาก
+            // เดิม) — เหตุผลเดิมของ guard นี้คือกันไม่ให้ไปถอด category ที่ผู้ใช้
+            // เพิ่งติ๊กเลือกไว้ใน category_ids picker (แบบ multi-select) ใน
+            // คำขอเดียวกันนี้เอง แต่หน้า Edit Product นี้ไม่มี UI ให้แก้ไข
+            // category_ids เลยตั้งแต่เอาแผง "Categories" เดิมออก (ดู
+            // resources/js/Pages/catalog/products/edit.tsx — data.category_ids
+            // แค่ initialize จาก prop แล้วส่งกลับเดิมทุกครั้ง ไม่เคยถูก setData()
+            // เปลี่ยนเลย) — $newCategoryIds จึงเป็นแค่ค่าที่โหลดมาตอนเปิดหน้า
+            // สะท้อนกลับไปเฉยๆ ไม่ใช่การกระทำที่ตั้งใจของผู้ใช้ในคำขอนี้อีกต่อไป
+            // พอ Master Categories (pcatname/psubcatname/productgroupname)
+            // ถูกลบออกหมด $oldMasterCategoryCodes ทุกตัวจะตรงกับ category ใน
+            // $newCategoryIds นี้เป๊ะ (เพราะเป็นชุดเดียวกันมาตั้งแต่ต้น) ทำให้
+            // "protected" ครอบคลุมทุกตัวที่ควรจะถูกถอดออกพอดี — detach()
+            // กลายเป็น no-op เงียบๆ ทุกครั้ง หมวดหมู่เก่าเลยค้างอยู่ตลอด (บั๊กจริง
+            // ที่ผู้ใช้เจอ: ลบ Category/Subcategory/Product Group ออกหมดแล้ว
+            // กด Save Product แต่ field ที่ผูกกับ attribute family เดิมยังโชว์
+            // อยู่เหมือนเดิมทุกอย่าง) — updateMasterCategories() (ปุ่ม Save ของ
+            // แผงนี้เอง) ไม่มีปัญหานี้อยู่แล้ว เพราะไม่เคยส่ง protectedCategoryIds
+            // มาตั้งแต่แรก
+            $this->relinkMasterCategoryCodes($product, $oldMasterCategoryCodes, $masterCategoryCodes);
 
             // Only NOW is the PIM category assignment truly settled for this
             // request — categories()->sync() above and relinkMasterCategoryCodes()
@@ -3652,10 +3791,24 @@ class ProductController extends Controller
             $this->recordProductValueChanges($product, $oldVariantValues, $newVariantValues, 'variant_values_updated');
         });
 
-        // ไปหน้า Read (แสดงข้อมูลที่เพิ่งบันทึกแบบ read-only) แทนที่จะกลับไปหน้า
-        // รายการสินค้า — ให้ผู้แก้ไขเห็นทันทีว่าสิ่งที่กรอกไปถูกบันทึกไว้ครบถ้วน
-        // ถูกต้องจริงๆ ก่อนออกจากหน้านี้
-        $redirect = to_route('catalog.products.show', $product);
+        // กลับไปหน้า Edit เดิม (ไม่ใช่หน้า Read แบบก่อนหน้านี้) — ผู้ใช้ขอให้บันทึก
+        // แบบปกติแล้วอยู่หน้าแก้ไขต่อเลย ไม่ต้องเด้งไปหาหน้า view เพื่อกลับมาแก้ต่อ
+        // เอง สินค้าที่บันทึกไปแล้วยังดูได้ตามปกติจากปุ่ม "View Product" ในเมนู More
+        //
+        // ต้องส่ง ?platform= (ถ้ามี) กลับไปด้วย ไม่งั้น edit()'s platformContext/
+        // attr.platform_field_mapping (chip "Mapped to {platform} payload" —
+        // ดู platformFieldMappingsFor()) จะหายไปเงียบๆ ทุกครั้งที่กด Save เพราะ
+        // ค่านี้มาจาก query string ของ request ตอนเปิดหน้าเท่านั้น ไม่ได้เก็บไว้
+        // ที่ไหนถาวรเลย — บั๊กจริงที่เจอจาก code review: redirect เดิมทิ้ง query
+        // string ไปหมด ทำให้ chip นี้ใช้ได้แค่ตอนเพิ่งกดแก้ไขมาจากหน้า Products
+        // Mapping เท่านั้น พอกด Save ครั้งแรกก็หายไปเลย ทั้งที่ยังแก้ไขต่ออยู่ที่
+        // สินค้าตัวเดิม แพลตฟอร์มเดิม
+        $redirect = to_route('catalog.products.edit', array_filter([
+            'product' => $product,
+            'platform' => in_array($request->query('platform'), self::VALID_PLATFORM_CONTEXTS, true)
+                ? $request->query('platform')
+                : null,
+        ]));
 
         // $lostPlatformMappings (from reconcilePlatformCategoryOverrides(),
         // via the transaction closure above) — surfaced here as a 'warning'

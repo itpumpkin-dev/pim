@@ -12,12 +12,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     Paper,
@@ -28,8 +22,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx, fioriNegativeSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface BomItem {
     id: number;
@@ -201,34 +196,28 @@ export default function BomIndex({ boms, filters }: Props) {
                 </Stack>
             </Box>
 
-            <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('confirmDeleteBom')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/bom/${deleteId}`, {
-                                    preserveScroll: true,
-                                    onSuccess: () => setDeleteId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        variant="outlined"
-                        disabled={deleting}
-                        sx={fioriNegativeSx}
-                    >
-                        {deleting ? <CircularProgress size={16} color="inherit" /> : tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteId !== null}
+                onCancel={() => setDeleteId(null)}
+                onConfirm={() => {
+                    if (deleteId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/bom/${deleteId}`, {
+                            preserveScroll: true,
+                            onSuccess: () => setDeleteId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteBom')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

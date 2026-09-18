@@ -6,10 +6,11 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FilterListIcon from '@mui/icons-material/FilterList';
-import { Box, Button, CircularProgress, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Pagination } from '@mui/material';
+import { Box, Button, Divider, InputAdornment, Paper, TextField, Typography, IconButton, Pagination } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import {
@@ -17,7 +18,6 @@ import {
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
-    fioriGhostSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
@@ -228,37 +228,27 @@ export default function ChannelIndex({ channels, filters, filterColumns }: Props
                 )}
             </Box>
 
-            <Dialog open={deleteChannelId !== null} onClose={() => setDeleteChannelId(null)}>
-                <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {t('confirmDeleteChannel')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteChannelId(null)} sx={fioriGhostSx} disabled={deleting}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteChannelId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/channels/${deleteChannelId}`, {
-                                    onSuccess: () => setDeleteChannelId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {tGrid('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteChannelId !== null}
+                onCancel={() => setDeleteChannelId(null)}
+                onConfirm={() => {
+                    if (deleteChannelId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/channels/${deleteChannelId}`, {
+                            onSuccess: () => setDeleteChannelId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={tGrid('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={tGrid('delete')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteChannel')}
+            </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

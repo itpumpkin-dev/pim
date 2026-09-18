@@ -1,8 +1,9 @@
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn } from '@/components/grid-filter-drawer';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, FioriStatus, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FIORI, FioriStatus, fioriDefaultSx, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
@@ -18,12 +19,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     MenuItem,
@@ -489,50 +484,42 @@ export default function CategoryIndex({ categories, parentCategory, filters, fil
                     />
                 </Box>
 
-                <Dialog open={deleteCategoryId !== null} onClose={() => setDeleteCategoryId(null)}>
-                    <DialogTitle>{tGrid('confirmDeletion')}</DialogTitle>
-                    <DialogContent>
-                        <DialogContentText>{t('confirmDeleteCategory')}</DialogContentText>
-                        {(() => {
-                            const target = categories.data.find((c) => c.id === deleteCategoryId);
-                            if (!target) return null;
-                            const childCount = target.children_count ?? 0;
-                            const productCount = target.products_count ?? 0;
-                            if (childCount === 0 && productCount === 0) return null;
+                <FioriMessageBox
+                    open={deleteCategoryId !== null}
+                    onCancel={() => setDeleteCategoryId(null)}
+                    onConfirm={() => {
+                        if (deleteCategoryId !== null) {
+                            setDeleting(true);
+                            router.delete(`/catalog/categories/${deleteCategoryId}`, {
+                                onSuccess: () => setDeleteCategoryId(null),
+                                onFinish: () => setDeleting(false),
+                            });
+                        }
+                    }}
+                    title={tGrid('confirmDeletion')}
+                    severity="warning"
+                    destructive
+                    confirmLabel={tGrid('delete')}
+                    cancelLabel={tGrid('cancel')}
+                    confirmLoading={deleting}
+                >
+                    {t('confirmDeleteCategory')}
+                    {(() => {
+                        const target = categories.data.find((c) => c.id === deleteCategoryId);
+                        if (!target) return null;
+                        const childCount = target.children_count ?? 0;
+                        const productCount = target.products_count ?? 0;
+                        if (childCount === 0 && productCount === 0) return null;
 
-                            return (
-                                <DialogContentText color="error" sx={{ mt: 1.5, fontWeight: 600 }}>
-                                    {childCount > 0 && t('deleteCategoryChildWarning', { count: childCount })}
-                                    {childCount > 0 && productCount > 0 && ' '}
-                                    {productCount > 0 && t('deleteCategoryProductWarning', { count: productCount })}
-                                </DialogContentText>
-                            );
-                        })()}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setDeleteCategoryId(null)} sx={fioriGhostSx} disabled={deleting}>
-                            {tGrid('cancel')}
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                if (deleteCategoryId !== null) {
-                                    setDeleting(true);
-                                    router.delete(`/catalog/categories/${deleteCategoryId}`, {
-                                        onSuccess: () => setDeleteCategoryId(null),
-                                        onFinish: () => setDeleting(false),
-                                    });
-                                }
-                            }}
-                            color="error"
-                            variant="contained"
-                            sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 700 }}
-                            disabled={deleting}
-                            startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        >
-                            {tGrid('delete')}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                        return (
+                            <Typography color="error" variant="body2" sx={{ mt: 1.5, fontWeight: 600 }}>
+                                {childCount > 0 && t('deleteCategoryChildWarning', { count: childCount })}
+                                {childCount > 0 && productCount > 0 && ' '}
+                                {productCount > 0 && t('deleteCategoryProductWarning', { count: productCount })}
+                            </Typography>
+                        );
+                    })()}
+                </FioriMessageBox>
                 <GridFilterDrawer
                     open={filterDrawerOpen}
                     onClose={() => setFilterDrawerOpen(false)}

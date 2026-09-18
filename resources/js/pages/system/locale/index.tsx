@@ -15,12 +15,6 @@ import {
     Box,
     Button,
     Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     IconButton,
     InputAdornment,
     LinearProgress,
@@ -37,6 +31,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
@@ -455,37 +450,27 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
             </Box>
 
             {/* Delete Dialog */}
-            <Dialog open={deleteLocaleId !== null} onClose={() => setDeleteLocaleId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tSystem('confirmDeleteLocaleMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteLocaleId(null)} disabled={deleting} sx={fioriGhostSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteLocaleId !== null) {
-                                setDeleting(true);
-                                router.delete(`/system/locales/${deleteLocaleId}`, {
-                                    onSuccess: () => setDeleteLocaleId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteLocaleId !== null}
+                onCancel={() => setDeleteLocaleId(null)}
+                onConfirm={() => {
+                    if (deleteLocaleId !== null) {
+                        setDeleting(true);
+                        router.delete(`/system/locales/${deleteLocaleId}`, {
+                            onSuccess: () => setDeleteLocaleId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tSystem('confirmDeleteLocaleMessage')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

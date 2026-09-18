@@ -1,5 +1,6 @@
 import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category-panel';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
+import { FioriMessageBox, useFioriConfirm } from '@/components/fiori-message-box';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import { TikTokBrandMappingPanel } from '@/components/catalog/tiktok-brand-mapping-panel';
@@ -35,6 +36,7 @@ import LastPageIcon from '@mui/icons-material/LastPage';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import CloseIcon from '@mui/icons-material/Close';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import PublishIcon from '@mui/icons-material/Publish';
 import SearchIcon from '@mui/icons-material/Search';
@@ -254,6 +256,11 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
     // เพราะเป็นคนละ permission group กัน (ดู routes/catalog.php: products.edit)
     const { auth } = usePage<SharedData>().props;
     const canEditProducts = (auth.permissions || []).includes('products.edit_products');
+
+    // Fiori Message Box แทน window.confirm() ของเบราว์เซอร์ (ดู
+    // clearCategoryMapping()/clearAllAttributeMappings() ด้านล่าง) — {confirmElement}
+    // ต้อง render ไว้ในต้นไม้ JSX ของหน้านี้ด้วย ไม่งั้น dialog จะไม่โผล่มาเลย
+    const { confirm, confirmElement } = useFioriConfirm();
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
@@ -499,6 +506,7 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
     // Category mapping section state
     const [selectedTikTokCatId, setSelectedTikTokCatId] = useState<number | null>(null);
     const [savingCatMap, setSavingCatMap] = useState(false);
+    const [clearingCatMap, setClearingCatMap] = useState(false);
     // "Sync Categories" — ดึงต้นไม้หมวดหมู่ทั้งหมดจาก TikTok จริงมา refresh
     // แคช tiktok_categories (คนละอย่างกับ saveCategoryMapping ด้านล่าง ซึ่งแค่
     // "เลือก" จากที่ sync ไว้แล้ว) — เดิมปุ่มนี้อยู่ที่หน้า
@@ -523,6 +531,12 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
     const [loadingAttributes, setLoadingAttributes] = useState(false);
     const [savingAttributeId, setSavingAttributeId] = useState<string | null>(null);
     const [syncingAttributes, setSyncingAttributes] = useState(false);
+    // ล้าง Category Attributes mapping (ตาราง "2. Attribute Mapping") ทั้งหมด
+    // ในครั้งเดียว — คนละปุ่มกับ clearingCatMap ด้านบน (ล้าง Category Mapping)
+    // ไม่แตะ Payload TikTok (ฟิลด์ตายตัว name/price/qty/... — Section ถัดไป)
+    // ตามที่ user ขอ ดู clearAllAttributeMappings() ด้านล่าง
+    const [clearingAttributeMappings, setClearingAttributeMappings] = useState(false);
+    const [clearAttributeMappingsError, setClearAttributeMappingsError] = useState<string | null>(null);
     // "สร้าง/อัปเดต Attribute Family" — auto-generate ตระกูลแอตทริบิวต์จาก PIM
     // attribute ที่แมปไว้แล้ว แล้วผูกกับ PIM Category นี้ ให้ฟิลด์โผล่ในหน้า Edit
     // Product ทันที (ดู TikTokAttributeFamilyGenerator ฝั่ง backend)
@@ -723,6 +737,59 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
         );
     };
 
+    // ล้าง Category Mapping ทิ้ง — ยิง tiktok_category_id: null ไปที่ endpoint
+    // เดียวกับตอนบันทึก (bulkMapMarketplaceCategory ฝั่ง backend รองรับ null
+    // อยู่แล้ว ดู CategoryController.php — mirror ของ lazada-products.tsx's
+    // clearCategoryMapping() เป๊ะ) เพราะ mapping ผูกกับ Master Category ไม่ใช่
+    // ตัวสินค้า การล้างจึงมีผลกับสินค้าทุกตัวในหมวดเดียวกัน และทำให้ push ไป
+    // TikTok ไม่ได้จนกว่าจะแมปใหม่ — เตือนก่อนเสมอ
+    const clearCategoryMapping = async () => {
+        if (!activeProduct || !activeProduct.master_category) return;
+
+        const confirmed = await confirm({
+            title: 'ล้าง Category Mapping',
+            message:
+                'การล้าง Category Mapping นี้จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกัน และจะทำให้สินค้ากลุ่มนี้ Push ไป TikTok ไม่ได้จนกว่าจะแมปใหม่ ต้องการดำเนินการต่อหรือไม่?',
+            severity: 'warning',
+            confirmLabel: 'ล้าง Category Mapping',
+            destructive: true,
+        });
+        if (!confirmed) return;
+
+        setClearingCatMap(true);
+
+        // ส่ง product_id ไม่ใช่ category_id ตรงๆ — endpoint นี้ (ต่างจาก
+        // categories/tiktok-mapping ปกติที่ใช้ตอนบันทึก) จะไปหาเองว่าหมวดหมู่
+        // ไหนในสายของสินค้านี้ผูก mapping ไว้จริง แล้วล้างให้ครบทุกตัว ไม่ใช่
+        // แค่ master_category.id (ตัวที่ลึกที่สุด สำหรับแสดงผลเท่านั้น) ซึ่งอาจ
+        // ไม่ใช่ตัวที่ผูก mapping จริงถ้าข้อมูลมาจากที่อื่น — ดู
+        // CategoryController::clearProductMarketplaceCategory()'s docblock
+        // เต็มๆ ว่าทำไมถึงเคยกดล้างแล้ว field ที่ TikTok บังคับยังโชว์อยู่ใน
+        // หน้า Edit Product เหมือนเดิมทุกอย่าง
+        router.post(
+            '/catalog/categories/tiktok-mapping/clear-for-product',
+            { product_id: activeProduct.id },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setClearingCatMap(false);
+                    setSelectedTikTokCatId(null);
+                    setTikTokAttributes(null);
+                    setActiveProduct((prev) =>
+                        prev
+                            ? {
+                                  ...prev,
+                                  category_mapped: false,
+                                  tiktok_category: null,
+                              }
+                            : prev,
+                    );
+                },
+                onError: () => setClearingCatMap(false),
+            },
+        );
+    };
+
     const syncCategoryTree = () => {
         setSyncingCategoryTree(true);
         setCategorySyncMessage(null);
@@ -760,11 +827,15 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
             .finally(() => setSyncingAttributes(false));
     };
 
-    const syncAttributeFamily = () => {
+    const syncAttributeFamily = async () => {
         if (!activeProduct?.master_category) return;
-        if (!window.confirm('การกดปุ่มนี้อาจสร้าง PIM Attribute ใหม่หลายตัวสำหรับ TikTok attribute ที่ยังไม่มีใครแมป ต้องการดำเนินการต่อหรือไม่?')) {
-            return;
-        }
+        const confirmed = await confirm({
+            title: 'สร้าง/อัปเดต Attribute Family',
+            message: 'การกดปุ่มนี้อาจสร้าง PIM Attribute ใหม่หลายตัวสำหรับ TikTok attribute ที่ยังไม่มีใครแมป ต้องการดำเนินการต่อหรือไม่?',
+            severity: 'warning',
+            confirmLabel: 'ดำเนินการต่อ',
+        });
+        if (!confirmed) return;
 
         setSyncingFamily(true);
         setFamilySyncResult(null);
@@ -841,6 +912,59 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                 setTikTokAttributes((prev) => (prev ? prev.map((a) => (a.id === tiktokAttributeId ? { ...a, mapped: null } : a)) : prev));
             })
             .finally(() => setSavingAttributeId(null));
+    };
+
+    // ล้าง mapping ของทุกแถวใน "2. Attribute Mapping" (product_attributes ของ
+    // TikTok) ที่กำลังโชว์อยู่ตอนนี้ในครั้งเดียว — ต่างจาก clearAttribute()
+    // ด้านบนที่ล้างทีละแถว ส่ง mappings หลายรายการไปพร้อมกันได้ในคำขอเดียว (ดู
+    // TikTokAttributeMappingController::update() — validate เป็น array อยู่แล้ว)
+    // ไม่แตะ Payload TikTok (ฟิลด์ตายตัว name/price/qty/... จัดการแยกด้วย
+    // clearPayloadField()) เพราะเป็นคนละกลุ่มกันตามที่ user ขอ — mapping พวกนี้
+    // เป็นระดับ global ต่อ PIM attribute ไม่ผูกกับหมวดหมู่ไหนเป็นการเฉพาะ (ดู
+    // docblock ของ clearCategoryMapping() ด้านบน) การล้างจากตรงนี้จึงหมายถึง
+    // ล้างเฉพาะรายการที่กำลังแมปอยู่ในตารางของหมวดหมู่ที่สินค้านี้ผูกอยู่เท่านั้น
+    // ไม่ใช่ mapping ทั้งระบบ
+    const clearAllAttributeMappings = async () => {
+        const mappedRows = (tiktokAttributes ?? []).filter((a) => a.mapped);
+        if (mappedRows.length === 0) return;
+
+        const confirmed = await confirm({
+            title: 'ล้าง Attribute Mapping',
+            message: `ล้างการแมป PIM attribute ออกจาก TikTok attribute ทั้งหมด ${mappedRows.length} รายการที่แมปไว้ในหมวดหมู่นี้? mapping เป็นระดับ global เลยจะมีผลกับสินค้าทุกตัวที่ใช้ attribute เหล่านี้ ต้องแมปใหม่เองทีละตัว ต้องการดำเนินการต่อหรือไม่?`,
+            severity: 'warning',
+            confirmLabel: 'ล้าง Attribute Mapping',
+            destructive: true,
+        });
+        if (!confirmed) return;
+
+        setClearingAttributeMappings(true);
+        setClearAttributeMappingsError(null);
+        fetch('/catalog/attributes/tiktok-mapping', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+            body: JSON.stringify({
+                mappings: mappedRows.map((a) => ({
+                    attribute_id: a.mapped!.id,
+                    target_field: null,
+                    tiktok_attribute_id: null,
+                    sort_order: 0,
+                })),
+            }),
+        })
+            .then((res) => {
+                // ต่างจาก clearAttribute()/assignAttribute() ทีละแถวด้านบน
+                // (เงียบๆ ปล่อยผ่านตอน error เหมือนกัน) — ตัวนี้เป็น bulk action
+                // ล้างได้หลายสิบรายการพร้อมกัน เงียบไปเฉยๆ ตอน error (session
+                // หลุด/500) จะทำให้ดูเหมือนล้างสำเร็จทั้งที่ไม่มีอะไรถูกล้างเลย
+                // แม้แต่รายการเดียว เลยต้องมี error banner บอกจริงๆ
+                if (!res.ok) {
+                    setClearAttributeMappingsError('ล้าง Attribute Mapping ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+                    return;
+                }
+                setTikTokAttributes((prev) => (prev ? prev.map((a) => (a.mapped ? { ...a, mapped: null } : a)) : prev));
+            })
+            .catch(() => setClearAttributeMappingsError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง'))
+            .finally(() => setClearingAttributeMappings(false));
     };
 
     const assignPayloadField = (field: PayloadTargetField, pimAttribute: PimAttributeOption, previousAttributeId: number | null) => {
@@ -957,7 +1081,7 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                     sx={fioriIconButtonSx}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.visit(`/catalog/products/${row.id}/edit`);
+                                        router.visit(`/catalog/products/${row.id}/edit?platform=tiktok`);
                                     }}
                                 >
                                     <EditIcon fontSize="inherit" />
@@ -1130,9 +1254,22 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                 >
                                     กลับไปหน้ารายการ
                                 </Button>
-                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                    {activeProduct.name}
-                                </Typography>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                        {activeProduct.name}
+                                    </Typography>
+                                    {canEditProducts && (
+                                        <Tooltip title="แก้ไขสินค้า">
+                                            <IconButton
+                                                size="small"
+                                                sx={fioriIconButtonSx}
+                                                onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=tiktok`)}
+                                            >
+                                                <EditIcon fontSize="inherit" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </Stack>
                                 <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
                                     SKU: {activeProduct.sku}
                                 </Typography>
@@ -1296,17 +1433,30 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                         )}
                                     </Box>
 
-                                    <Box>
+                                    <Stack direction="row" spacing={1.5}>
                                         <Button
                                             variant="contained"
-                                            disabled={!selectedTikTokCatId || savingCatMap}
+                                            disabled={!selectedTikTokCatId || savingCatMap || clearingCatMap}
                                             onClick={saveCategoryMapping}
                                             startIcon={savingCatMap ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon fontSize="small" />}
                                             sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                                         >
                                             บันทึก Category Mapping & ดำเนินการต่อ
                                         </Button>
-                                    </Box>
+
+                                        {activeProduct.category_mapped && (
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                disabled={savingCatMap || clearingCatMap}
+                                                onClick={clearCategoryMapping}
+                                                startIcon={clearingCatMap ? <CircularProgress size={16} color="inherit" /> : <DeleteOutlineIcon fontSize="small" />}
+                                                sx={fioriDefaultSx}
+                                            >
+                                                ล้าง Category Mapping
+                                            </Button>
+                                        )}
+                                    </Stack>
                                 </Stack>
                             </Paper>
 
@@ -1365,6 +1515,25 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                                 >
                                                     Sync Attributes
                                                 </Button>
+                                                {(tiktokAttributes ?? []).some((a) => a.mapped) && (
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        color="error"
+                                                        disabled={clearingAttributeMappings}
+                                                        startIcon={
+                                                            clearingAttributeMappings ? (
+                                                                <CircularProgress size={14} color="inherit" />
+                                                            ) : (
+                                                                <DeleteOutlineIcon fontSize="small" />
+                                                            )
+                                                        }
+                                                        onClick={clearAllAttributeMappings}
+                                                        sx={fioriDefaultSx}
+                                                    >
+                                                        ล้าง Attribute Mapping
+                                                    </Button>
+                                                )}
                                             </Stack>
                                         </Stack>
 
@@ -1380,6 +1549,11 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                         {familySyncError && (
                                             <Alert severity="error" onClose={() => setFamilySyncError(null)}>
                                                 {familySyncError}
+                                            </Alert>
+                                        )}
+                                        {clearAttributeMappingsError && (
+                                            <Alert severity="error" onClose={() => setClearAttributeMappingsError(null)}>
+                                                {clearAttributeMappingsError}
                                             </Alert>
                                         )}
 
@@ -1662,6 +1836,7 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                         }}
                     />
                 )}
+                {confirmElement}
             </AppLayout>
         );
     }
@@ -1923,9 +2098,22 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                                     }}
                                 />
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: FIORI.textPrimary, lineHeight: 1.3 }}>
-                                        {detailData?.name ?? '...'}
-                                    </Typography>
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                        <Typography variant="subtitle1" fontWeight={700} sx={{ color: FIORI.textPrimary, lineHeight: 1.3 }}>
+                                            {detailData?.name ?? '...'}
+                                        </Typography>
+                                        {canEditProducts && (
+                                            <Tooltip title="แก้ไขสินค้า">
+                                                <IconButton
+                                                    size="small"
+                                                    sx={fioriIconButtonSx}
+                                                    onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=tiktok`)}
+                                                >
+                                                    <EditIcon fontSize="inherit" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        )}
+                                    </Stack>
                                     <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
                                         {detailData?.sku}
                                         {detailData && detailData.variants_count > 0 ? ` · ${detailData.variants_count} variants` : ''}
@@ -2202,9 +2390,13 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                             alignItems="center"
                             sx={{ p: 2, bgcolor: FIORI.surface, borderTop: `1px solid ${FIORI.border}` }}
                         >
-                            <Button size="small" onClick={() => router.visit(`/catalog/products/${detailProductId}/edit`)} sx={fioriGhostSx}>
-                                แก้ไข
-                            </Button>
+                            {canEditProducts ? (
+                                <Button size="small" onClick={() => router.visit(`/catalog/products/${detailProductId}/edit?platform=tiktok`)} sx={fioriGhostSx}>
+                                    แก้ไข
+                                </Button>
+                            ) : (
+                                <Box />
+                            )}
                             <Button size="small" onClick={closeDetail} sx={fioriGhostSx}>
                                 ปิด
                             </Button>
@@ -2397,44 +2589,36 @@ export default function TikTokProductsMapping({ products, stats, filters, tiktok
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={bulkPushDialogOpen} onClose={() => setBulkPushDialogOpen(false)}>
-                <DialogTitle>Push {selectedRows.length} รายการที่เลือกไป TikTok?</DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ mb: 2 }}>
-                        เลือกร้าน TikTok ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish ให้อัตโนมัติก่อน push
-                    </DialogContentText>
-                    <Select
-                        fullWidth
-                        size="small"
-                        displayEmpty
-                        value={bulkPushShopId}
-                        onChange={(e) => setBulkPushShopId(e.target.value === '' ? '' : Number(e.target.value))}
-                    >
-                        <MenuItem value="" disabled>
-                            เลือกร้าน...
+            <FioriMessageBox
+                open={bulkPushDialogOpen}
+                onCancel={() => setBulkPushDialogOpen(false)}
+                onConfirm={confirmBulkPush}
+                title={`Push ${selectedRows.length} รายการที่เลือกไป TikTok?`}
+                severity="confirm"
+                confirmLabel={bulkPushing ? 'กำลังส่ง...' : 'Push'}
+                cancelLabel="ยกเลิก"
+                confirmLoading={bulkPushing}
+                confirmDisabled={!bulkPushShopId}
+            >
+                เลือกร้าน TikTok ที่จะ push สินค้าทั้ง {selectedRows.length} รายการไปด้วยกัน — สินค้าที่ยังไม่ได้ publish ไว้กับร้านนี้จะถูก publish ให้อัตโนมัติก่อน push
+                <Select
+                    fullWidth
+                    size="small"
+                    displayEmpty
+                    value={bulkPushShopId}
+                    onChange={(e) => setBulkPushShopId(e.target.value === '' ? '' : Number(e.target.value))}
+                    sx={{ mt: 2 }}
+                >
+                    <MenuItem value="" disabled>
+                        เลือกร้าน...
+                    </MenuItem>
+                    {tiktokShops.map((shop) => (
+                        <MenuItem key={shop.id} value={shop.id}>
+                            {shop.name}
                         </MenuItem>
-                        {tiktokShops.map((shop) => (
-                            <MenuItem key={shop.id} value={shop.id}>
-                                {shop.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setBulkPushDialogOpen(false)} sx={fioriGhostSx}>
-                        ยกเลิก
-                    </Button>
-                    <Button
-                        onClick={confirmBulkPush}
-                        variant="contained"
-                        disabled={!bulkPushShopId || bulkPushing}
-                        startIcon={bulkPushing ? <CircularProgress size={14} color="inherit" /> : undefined}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {bulkPushing ? 'กำลังส่ง...' : 'Push'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                    ))}
+                </Select>
+            </FioriMessageBox>
         </AppLayout>
     );
 }

@@ -25,7 +25,6 @@ import {
     Dialog,
     DialogActions,
     DialogContent,
-    DialogContentText,
     DialogTitle,
     Divider,
     IconButton,
@@ -44,6 +43,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, type FioriColumnPriority, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
 import {
     ProductFilterDrawer,
@@ -1109,60 +1109,41 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             />
 
             {/* Dialog ยืนยันการลบ */}
-            <Dialog open={deleteProductId !== null} onClose={() => setDeleteProductId(null)}>
-                <DialogTitle>{t('confirmDeletion')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {t('confirmDeleteMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteProductId(null)} color="inherit" disabled={deleting}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            if (deleteProductId !== null) {
-                                setDeleting(true);
-                                router.delete(`/catalog/products/${deleteProductId}`, {
-                                    onSuccess: () => setDeleteProductId(null),
-                                    onFinish: () => setDeleting(false),
-                                });
-                            }
-                        }}
-                        color="error"
-                        variant="contained"
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={deleteProductId !== null}
+                onCancel={() => setDeleteProductId(null)}
+                onConfirm={() => {
+                    if (deleteProductId !== null) {
+                        setDeleting(true);
+                        router.delete(`/catalog/products/${deleteProductId}`, {
+                            onSuccess: () => setDeleteProductId(null),
+                            onFinish: () => setDeleting(false),
+                        });
+                    }
+                }}
+                title={t('confirmDeletion')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {t('confirmDeleteMessage')}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันการทำสำเนา (Duplicate) */}
-            <Dialog open={duplicateProductId !== null} onClose={() => setDuplicateProductId(null)}>
-                <DialogTitle>{t('confirmDuplication')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {t('confirmDuplicateMessage')}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDuplicateProductId(null)} color="inherit" disabled={duplicating}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        onClick={duplicateProduct}
-                        variant="contained"
-                        disabled={duplicating}
-                        startIcon={duplicating ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {t('duplicateProduct')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={duplicateProductId !== null}
+                onCancel={() => setDuplicateProductId(null)}
+                onConfirm={duplicateProduct}
+                title={t('confirmDuplication')}
+                severity="confirm"
+                confirmLabel={t('duplicateProduct')}
+                cancelLabel={t('cancel')}
+                confirmLoading={duplicating}
+            >
+                {t('confirmDuplicateMessage')}
+            </FioriMessageBox>
             <ProductFilterDrawer
                 open={filterDrawerOpen}
                 onClose={() => setFilterDrawerOpen(false)}

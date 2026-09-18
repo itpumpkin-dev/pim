@@ -4,12 +4,6 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     InputAdornment,
     TextField,
     Typography,
@@ -22,10 +16,10 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
-    fioriDefaultSx,
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
@@ -216,29 +210,19 @@ export default function UserGroupIndex({ gridConfig, gridData, filters }: UserGr
                 </Box>
             </Box>
 
-            <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
-                <DialogTitle>{tSystem('deleteGroupTitle')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        {tSystem('confirmDeleteGroupMessage', { name: deleteTarget?.name })}
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button variant="outlined" color="inherit" onClick={() => setDeleteTarget(null)} disabled={deleting} sx={fioriDefaultSx}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={confirmDelete}
-                        disabled={deleting}
-                        startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ textTransform: 'none', borderRadius: '8px' }}
-                    >
-                        {t('delete')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={Boolean(deleteTarget)}
+                onCancel={() => setDeleteTarget(null)}
+                onConfirm={confirmDelete}
+                title={tSystem('deleteGroupTitle')}
+                severity="warning"
+                destructive
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
+                confirmLoading={deleting}
+            >
+                {tSystem('confirmDeleteGroupMessage', { name: deleteTarget?.name })}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

@@ -7,12 +7,6 @@ import DownloadIcon from '@mui/icons-material/Download';
 import {
     Box,
     Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogContentText,
-    DialogTitle,
     Grid,
     LinearProgress,
     Paper,
@@ -22,6 +16,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FioriMessageBox } from '@/components/fiori-message-box';
 import {
     FIORI,
     FioriStatus,
@@ -29,7 +24,6 @@ import {
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
-    fioriGhostSx,
 } from '@/lib/fiori-style';
 
 interface UserSummary {
@@ -322,27 +316,19 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                 </Paper>
             </Box>
 
-            <Dialog open={cancelDialogOpen} onClose={() => (cancelling ? null : setCancelDialogOpen(false))}>
-                <DialogTitle>{t('cancelJob')}</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>{t('cancelJobConfirm')}</DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setCancelDialogOpen(false)} sx={fioriGhostSx} disabled={cancelling}>
-                        {tGrid('cancel')}
-                    </Button>
-                    <Button
-                        onClick={handleCancel}
-                        color="error"
-                        variant="contained"
-                        sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                        disabled={cancelling}
-                        startIcon={cancelling ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    >
-                        {t('cancelJob')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+            <FioriMessageBox
+                open={cancelDialogOpen}
+                onCancel={() => setCancelDialogOpen(false)}
+                onConfirm={handleCancel}
+                title={t('cancelJob')}
+                severity="warning"
+                destructive
+                confirmLabel={t('cancelJob')}
+                cancelLabel={tGrid('cancel')}
+                confirmLoading={cancelling}
+            >
+                {t('cancelJobConfirm')}
+            </FioriMessageBox>
         </AppLayout>
     );
 }

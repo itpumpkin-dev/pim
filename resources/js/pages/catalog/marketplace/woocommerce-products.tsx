@@ -577,7 +577,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                     sx={fioriIconButtonSx}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        router.visit(`/catalog/products/${row.id}/edit`);
+                                        router.visit(`/catalog/products/${row.id}/edit?platform=woocommerce`);
                                     }}
                                 >
                                     <EditIcon fontSize="inherit" />

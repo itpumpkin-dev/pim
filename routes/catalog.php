@@ -167,6 +167,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributes/shopee-mapping/attribute-family', [ShopeeAttributeMappingController::class, 'syncAttributeFamily'])->name('attributes.shopeeSyncAttributeFamily')->middleware('permission:marketplace_shopee,edit_attribute_mapping_shopee');
     Route::get('attributes/shopee-mapping/timeline', [ShopeeAttributeMappingController::class, 'timeline'])->name('attributes.shopeeMappingTimeline')->middleware('permission:marketplace_shopee,view_attribute_mapping_history_shopee');
     Route::get('attributes/search-pim', [ShopeeAttributeMappingController::class, 'searchPimAttributes'])->name('attributes.searchPim')->middleware('permission:attributes,edit_attributes');
+    // ปุ่ม "ดู attributes ทั้งหมด" ใน PimAttributePicker — ดู
+    // ShopeeAttributeMappingController::listAllPimAttributes()'s docblock
+    Route::get('attributes/list-all-pim', [ShopeeAttributeMappingController::class, 'listAllPimAttributes'])->name('attributes.listAllPim')->middleware('permission:attributes,edit_attributes');
     Route::post('attributes/lazada-mapping', [LazadaAttributeMappingController::class, 'update'])->name('attributes.saveLazadaMapping')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
     Route::post('attributes/lazada-mapping/sync', [LazadaAttributeMappingController::class, 'syncLazadaAttributes'])->name('attributes.syncLazadaAttributes')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
     Route::post('attributes/lazada-mapping/options', [LazadaAttributeMappingController::class, 'updateOptionMappings'])->name('attributes.saveLazadaOptionMapping')->middleware('permission:marketplace_lazada,edit_attribute_mapping_lazada');
@@ -425,6 +428,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/{category}/products', [CategoryController::class, 'categoryProducts'])->name('categories.products')->middleware('permission:categories,edit_categories');
     Route::get('categories/lazada-mapping', [CategoryController::class, 'lazadaMapping'])->name('categories.lazadaMapping')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
     Route::post('categories/lazada-mapping', [CategoryController::class, 'bulkMapLazada'])->name('categories.bulkMapLazada')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
+    // ปุ่ม "ล้าง Category Mapping" ในหน้า lazada-products.tsx's Object Page —
+    // รับ product_id แทน category_id ตรงๆ (ดู CategoryController::
+    // clearProductMarketplaceCategory()'s docblock ว่าทำไมถึงต้องแยกจาก
+    // bulkMapLazada() ด้านบน)
+    Route::post('categories/lazada-mapping/clear-for-product', [CategoryController::class, 'clearProductLazadaMapping'])->name('categories.lazadaMapping.clearForProduct')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
     // BrandController::lazadaBrandsList()) — เช็คสิทธิ์ด้วย brands,edit_brands
     // แทนที่จะเป็น categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์
@@ -441,6 +449,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/search-shopee', [CategoryController::class, 'searchShopeeCategories'])->name('categories.searchShopee')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
     Route::get('categories/shopee-mapping', [CategoryController::class, 'shopeeMapping'])->name('categories.shopeeMapping')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
     Route::post('categories/shopee-mapping', [CategoryController::class, 'bulkMapShopee'])->name('categories.bulkMapShopee')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
+    // เหมือนกับ categories.lazadaMapping.clearForProduct ด้านบน แต่ใช้กับ Shopee
+    Route::post('categories/shopee-mapping/clear-for-product', [CategoryController::class, 'clearProductShopeeMapping'])->name('categories.shopeeMapping.clearForProduct')->middleware('permission:marketplace_shopee,edit_category_mapping_shopee');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ BrandController
     // สำหรับสอง route นี้) — เช็คสิทธิ์ด้วย brands,edit_brands แทนที่จะเป็น
     // categories,edit_categories เพราะมันอ่าน/เขียนข้อมูลแบรนด์ แม้ว่าจะถูกเรียก
@@ -454,6 +464,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('categories/search-tiktok', [CategoryController::class, 'searchTikTokCategories'])->name('categories.searchTiktok')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
     Route::get('categories/tiktok-mapping', [CategoryController::class, 'tiktokMapping'])->name('categories.tiktokMapping')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
     Route::post('categories/tiktok-mapping', [CategoryController::class, 'bulkMapTiktok'])->name('categories.bulkMapTiktok')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
+    // เหมือนกับ categories.lazadaMapping.clearForProduct ด้านบน แต่ใช้กับ TikTok
+    Route::post('categories/tiktok-mapping/clear-for-product', [CategoryController::class, 'clearProductTiktokMapping'])->name('categories.tiktokMapping.clearForProduct')->middleware('permission:marketplace_tiktok,edit_category_mapping_tiktok');
     // action ฝั่งแบรนด์ที่ฝังอยู่ในหน้าเดียวกัน (ดู docblock ของ
     // BrandController::tiktokBrandsList()) — ไม่ได้ผูกกับ category
     // (เหมือนของ Lazada/WooCommerce ต่างจากของ Shopee) เลยไม่มี
