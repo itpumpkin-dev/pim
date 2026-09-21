@@ -28,11 +28,11 @@ test('excludes a category log unrelated to woocommerce (e.g. only the name chang
     expect($this->builder->build($category))->toBeEmpty();
 });
 
-test('excludes a category log that only touched attribute_family_id (unlike the marketplace-platform timeline builders, this one has no family/attribute scope at all)', function () {
+test('includes a category log whose new_values sets attribute_family_id (WooCommerceAttributeFamilyGenerator::attachFamilyToCategory() logs against the Category itself, same as the other 3 platforms)', function () {
     $category = Category::create(['code' => 'cat_'.uniqid(), 'name' => 'Test']);
-    logFor($category, 'shopee_family_attached_to_category', null, ['attribute_family_id' => 5]);
+    $log = logFor($category, 'woocommerce_family_attached_to_category', null, ['attribute_family_id' => 5]);
 
-    expect($this->builder->build($category))->toBeEmpty();
+    expect($this->builder->build($category)->pluck('id')->all())->toBe([$log->id]);
 });
 
 test('logs for a different category are never included', function () {

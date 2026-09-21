@@ -11,7 +11,9 @@ use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
 use App\Models\LazadaCategoryAttribute;
 use App\Models\Locale;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * "สร้าง/อัปเดต Attribute Family" ที่ section 2 ของ lazada-products.tsx (Object
@@ -117,13 +119,47 @@ class LazadaMappedAttributeCreator
         $mapping->target_field = 'lazada_attribute';
         $mapping->lazada_attribute_name = $lazadaAttribute->name;
         $mapping->sort_order = 0;
-        $mapping->save();
+
+        if (!$this->trySaveMapping($mapping)) {
+            return false;
+        }
 
         if (in_array($pimType, self::SELECT_TYPES, true)) {
             $this->createOptionsAndMappings($lazadaAttribute, $attribute, $mapping);
         }
 
         return true;
+    }
+
+    /**
+     * @return bool false on the exact same race ->exists() above guards
+     *              against — another concurrent request already saved a
+     *              mapping for this attribute_id first (unique on
+     *              lazada_attribute_mappings) in the gap between this
+     *              method's own firstOrNew() query and this save() call.
+     *              Split out from createAndMapOne() so it's directly
+     *              testable: a caller can construct a $mapping that never
+     *              queried the DB itself (so it doesn't know a row already
+     *              exists) and prove save() fails safely instead of
+     *              throwing an unhandled 500.
+     *
+     *              Runs inside its own nested DB::transaction() for the
+     *              same reason createAttributeAt() does (see that
+     *              method's docblock) — without it, a real violation
+     *              here would abort the whole outer transaction under
+     *              Postgres, and every query the *next* iteration of
+     *              createMissingForCategory()'s loop makes would fail
+     *              too, not just this one.
+     */
+    private function trySaveMapping(LazadaAttributeMapping $mapping): bool
+    {
+        try {
+            DB::transaction(fn () => $mapping->save());
+
+            return true;
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
     }
 
     /**
@@ -168,22 +204,69 @@ class LazadaMappedAttributeCreator
             $code = $this->disambiguateCode($code);
         }
 
-        $attribute = Attribute::create([
-            'code' => $code,
-            'name' => $lazadaAttribute->label,
-            'type' => $pimType,
-            // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
-            // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
-            // docblock ของ migration add_auto_created_platform_to_attributes_table
-            'auto_created_platform' => 'lazada',
-            'is_required' => false,
-            'is_unique' => false,
-            'is_locale_based' => false,
-            'is_channel_based' => false,
-            'is_filterable' => false,
-        ]);
+        return $this->createAttributeAt($code, $pimType, $lazadaAttribute->label);
+    }
 
-        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $lazadaAttribute->label);
+    /**
+     * Actually inserts the new Attribute row at $code — split out of
+     * findOrCreateAttribute() so it can retry under a fresh disambiguated
+     * code if a concurrent request wins the exact same insert first
+     * (attributes.code is unique, and two requests processing the same
+     * marketplace attribute for the first time compute the identical
+     * sanitized $code before either has committed — a real race, not
+     * hypothetical, given createMissingForCategory()'s $unmapped list is
+     * read once up front and then iterated without any per-row locking).
+     * Reuses the winner outright if its type already matches (same
+     * "identical code = same meaning" assumption findOrCreateAttribute()
+     * makes above); otherwise treats the collision like any other
+     * type-mismatched one and retries under a new disambiguated code.
+     * Bounded to a handful of attempts — a code collision this deep would
+     * mean something is badly wrong, not just an ordinary race.
+     *
+     * The insert itself runs inside its own nested DB::transaction() —
+     * required for the catch below to be safe at all under Postgres:
+     * unlike MySQL, a Postgres transaction is aborted outright the moment
+     * any statement inside it errors, and refuses every further query
+     * ("current transaction is aborted") until it's rolled back — so
+     * catching the violation and then just querying again (the fallback
+     * below) would itself throw a second, unrelated error without this.
+     * Laravel's DB::transaction() already turns into a SAVEPOINT/ROLLBACK
+     * TO SAVEPOINT when called while already inside a transaction (this
+     * method always is — createMissingForCategory() wraps its whole loop
+     * in one), so only this one insert's work is undone, not the
+     * transaction this call is nested in.
+     */
+    private function createAttributeAt(string $code, string $pimType, string $label, int $attemptsLeft = 5): Attribute
+    {
+        try {
+            $attribute = DB::transaction(fn () => Attribute::create([
+                'code' => $code,
+                'name' => $label,
+                'type' => $pimType,
+                // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
+                // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
+                // docblock ของ migration add_auto_created_platform_to_attributes_table
+                'auto_created_platform' => 'lazada',
+                'is_required' => false,
+                'is_unique' => false,
+                'is_locale_based' => false,
+                'is_channel_based' => false,
+                'is_filterable' => false,
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            $winner = Attribute::where('code', $code)->first();
+            if ($winner && $winner->type === $pimType) {
+                return $winner;
+            }
+
+            if ($attemptsLeft <= 1) {
+                throw new RuntimeException("Could not create a uniquely-coded attribute for '{$label}' after several concurrent attempts.");
+            }
+
+            return $this->createAttributeAt($this->disambiguateCode($code), $pimType, $label, $attemptsLeft - 1);
+        }
+
+        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $label);
 
         return $attribute;
     }

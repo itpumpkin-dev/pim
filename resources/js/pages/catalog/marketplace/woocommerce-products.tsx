@@ -1,4 +1,5 @@
 import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category-panel';
+import { useFioriConfirm } from '@/components/fiori-message-box';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
@@ -23,6 +24,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
 import EditIcon from '@mui/icons-material/Edit';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
 import LastPageIcon from '@mui/icons-material/LastPage';
@@ -39,6 +41,7 @@ import {
     Divider,
     IconButton,
     InputAdornment,
+    Link,
     MenuItem,
     Paper,
     Select,
@@ -160,6 +163,8 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
     const { auth } = usePage<SharedData>().props;
     const canEditProducts = (auth.permissions || []).includes('products.edit_products');
 
+    const { confirm, confirmElement } = useFioriConfirm();
+
     const [search, setSearch] = useState(filters.search ?? '');
     const [filter, setFilter] = useState<ProductFilter>(filters.filter ?? 'all');
     const [perPage, setPerPage] = useState<number>(products.per_page ?? 25);
@@ -179,13 +184,24 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
 
     // Attribute mapping section state — WooCommerce attribute เป็น global
     // ทั้งหมด ไม่ผูก category (ต่างจาก Lazada/Shopee/TikTok) เลยโหลดได้ทันทีไม่
-    // ต้องรอ Category Mapping (section 1) เสร็จก่อน และไม่มีปุ่ม "สร้าง/อัปเดต
-    // Attribute Family"/checkbox "แสดงเฉพาะที่บังคับ"/ปุ่ม "จับคู่ตัวเลือก" เลย
-    // (ไม่มี concept เหล่านี้จริงสำหรับ WooCommerce)
+    // ต้องรอ Category Mapping (section 1) เสร็จก่อน และไม่มีcheckbox "แสดงเฉพาะ
+    // ที่บังคับ"/ปุ่ม "จับคู่ตัวเลือก" เลย (ไม่มี concept เหล่านี้จริงสำหรับ
+    // WooCommerce) — "สร้าง/อัปเดต Attribute Family" มีได้ (ดู
+    // syncAttributeFamily() ด้านล่าง) auto-create PIM attribute ใหม่ให้
+    // WooCommerce attribute ที่ยังไม่มีใครแมปด้วย แล้วรวมทุก PIM attribute ที่
+    // แมปไว้ (global ทั้งระบบ) เป็น family เดียว ไม่ใช่ต่อ category แบบ 3
+    // platform อื่น
     const [wooAttributes, setWooAttributes] = useState<WooCommerceAttributeRow[] | null>(null);
     const [loadingAttributes, setLoadingAttributes] = useState(false);
     const [savingAttributeId, setSavingAttributeId] = useState<number | null>(null);
     const [syncingAttributes, setSyncingAttributes] = useState(false);
+    // "สร้าง/อัปเดต Attribute Family" — auto-generate ตระกูลแอตทริบิวต์จาก PIM
+    // attribute ที่แมปไว้แล้วทั้งหมด (global) แล้วผูกกับ PIM Category นี้ ให้
+    // ฟิลด์โผล่ในหน้า Edit Product ทันที (ดู WooCommerceAttributeFamilyGenerator
+    // ฝั่ง backend) — mirror ของ lazada-products.tsx เป๊ะ
+    const [syncingFamily, setSyncingFamily] = useState(false);
+    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(null);
+    const [familySyncError, setFamilySyncError] = useState<string | null>(null);
 
     // Payload WooCommerce section state (section 3) — ฟิลด์ payload ตายตัวของ
     // WooCommerce เอง ไม่ผูกกับหมวดหมู่ไหนเลย เลยโหลดครั้งเดียวตอนเปิดสินค้า
@@ -254,6 +270,57 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             .then((res) => (res.ok ? res.json() : { data: [] }))
             .then((body: { data: PayloadFieldRow[] }) => setPayloadFields(body.data))
             .finally(() => setLoadingPayloadFields(false));
+    };
+
+    // สร้าง/อัปเดต Attribute Family จาก PIM attribute ที่แมปไว้แล้วทั้งหมด
+    // (global — ไม่ใช่แค่ของหมวดหมู่นี้ เพราะ WooCommerce attribute ไม่ผูก
+    // category) — ผูกกับ PIM Category นี้ผ่าน category_attribute_family
+    // (backend เป็นคน sync ให้ ไม่ทับตระกูลอื่นที่ผูกอยู่ก่อนหน้า) แล้วโชว์ลิงก์
+    // ให้ไปตรวจสอบเอง — mirror ของ lazada-products.tsx's syncAttributeFamily()
+    // เต็มรูปแบบแล้ว: ปุ่มนี้ auto-create PIM Attribute ใหม่ให้ WooCommerce
+    // attribute ที่ยังไม่มีใครแมปด้วย (ดู WooCommerceMappedAttributeCreator
+    // ฝั่ง backend) — เตือนก่อนเสมอเหมือนกัน เพราะเป็นการเขียน schema จริง
+    // ถาวรกว่าจัดกลุ่มเฉยๆ
+    const syncAttributeFamily = async () => {
+        if (!activeProduct?.master_category) return;
+
+        const confirmed = await confirm({
+            title: 'สร้าง/อัปเดต Attribute Family',
+            message:
+                'การกดปุ่มนี้อาจสร้าง PIM Attribute ใหม่หลายตัวสำหรับ WooCommerce attribute ที่ยังไม่มีใครแมป แล้วรวมทุก attribute ที่แมปไว้ (ทั้งระบบ) เข้าเป็น Attribute Family เดียว ผูกกับหมวดหมู่นี้ ต้องการดำเนินการต่อหรือไม่?',
+            severity: 'warning',
+            confirmLabel: 'ดำเนินการต่อ',
+        });
+        if (!confirmed) return;
+
+        setSyncingFamily(true);
+        setFamilySyncResult(null);
+        setFamilySyncError(null);
+
+        fetch('/catalog/attributes/woocommerce-mapping/attribute-family', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+            body: JSON.stringify({ category_id: activeProduct.master_category.id }),
+        })
+            .then(async (res) => {
+                const body = await res.json();
+                if (res.ok) {
+                    setFamilySyncResult({
+                        name: body.family.name,
+                        count: body.attribute_count,
+                        newlyCreatedCount: body.newly_created_count,
+                        editUrl: body.edit_url,
+                    });
+                    // มี attribute ใหม่เกิดขึ้นจริง — reload ลิสต์ให้เห็นว่า "mapped" แล้ว
+                    if (body.newly_created_count > 0) {
+                        loadAttributes();
+                    }
+                } else {
+                    setFamilySyncError(body.message || 'เกิดข้อผิดพลาด ไม่สามารถสร้าง/อัปเดต Attribute Family ได้');
+                }
+            })
+            .catch(() => setFamilySyncError('เกิดข้อผิดพลาด ไม่สามารถสร้าง/อัปเดต Attribute Family ได้'))
+            .finally(() => setSyncingFamily(false));
     };
 
     const scrollToSection = (idx: number) => {
@@ -678,9 +745,22 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                 >
                                     กลับไปหน้ารายการ
                                 </Button>
-                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                    {activeProduct.name}
-                                </Typography>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+                                        {activeProduct.name}
+                                    </Typography>
+                                    {canEditProducts && (
+                                        <Tooltip title="แก้ไขสินค้า">
+                                            <IconButton
+                                                size="small"
+                                                sx={fioriIconButtonSx}
+                                                onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=woocommerce`)}
+                                            >
+                                                <EditIcon fontSize="inherit" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </Stack>
                                 <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
                                     SKU: {activeProduct.sku}
                                 </Typography>
@@ -825,17 +905,44 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                                 Attribute ของ WooCommerce ไม่ผูกกับหมวดหมู่ — แมปที่นี่มีผลกับสินค้าทุกตัวในระบบ ไม่ใช่แค่ตัวนี้
                                             </Typography>
                                         </Box>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            disabled={syncingAttributes}
-                                            startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                            onClick={syncAttributes}
-                                            sx={fioriDefaultSx}
-                                        >
-                                            Sync Attributes
-                                        </Button>
+                                        <Stack direction="row" spacing={1}>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                disabled={syncingFamily || !activeProduct.master_category || (wooAttributes ?? []).length === 0}
+                                                startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                onClick={syncAttributeFamily}
+                                                sx={fioriDefaultSx}
+                                            >
+                                                สร้าง/อัปเดต Attribute Family
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                disabled={syncingAttributes}
+                                                startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                                onClick={syncAttributes}
+                                                sx={fioriDefaultSx}
+                                            >
+                                                Sync Attributes
+                                            </Button>
+                                        </Stack>
                                     </Stack>
+
+                                    {familySyncResult && (
+                                        <Alert severity="success" onClose={() => setFamilySyncResult(null)}>
+                                            สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count} attributes
+                                            {familySyncResult.newlyCreatedCount > 0 && `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`}) —{' '}
+                                            <Link href={familySyncResult.editUrl} target="_blank" rel="noopener noreferrer">
+                                                เปิดหน้าตรวจสอบ
+                                            </Link>
+                                        </Alert>
+                                    )}
+                                    {familySyncError && (
+                                        <Alert severity="error" onClose={() => setFamilySyncError(null)}>
+                                            {familySyncError}
+                                        </Alert>
+                                    )}
 
                                     {loadingAttributes ? (
                                         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -1057,6 +1164,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                         </Stack>
                     </Box>
                 </Box>
+                {confirmElement}
             </AppLayout>
         );
     }

@@ -167,3 +167,59 @@ test('malformed option entries (not an array, or missing an id) are skipped defe
     $attribute = Attribute::where('code', 'color')->first();
     expect(AttributeOption::where('attribute_id', $attribute->id)->count())->toBe(1);
 });
+
+// --- race conditions: two concurrent syncs processing the same unmapped attribute ---
+
+test('a concurrent attribute-code collision (same type) reuses the winner instead of crashing', function () {
+    // Simulates another request's Attribute::create() already landing for
+    // this exact code, in the gap between our own check and our own
+    // insert attempt — createAttributeAt() itself has no pre-check, so
+    // calling it directly against a code that already exists exercises
+    // the real unique-constraint race, not just a mocked one.
+    $winner = Attribute::create(['code' => 'newfield', 'type' => 'text']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->id)->toBe($winner->id);
+    expect(Attribute::where('code', 'newfield')->count())->toBe(1);
+});
+
+test('a concurrent attribute-code collision (different type) disambiguates and retries instead of crashing', function () {
+    Attribute::create(['code' => 'newfield', 'type' => 'select']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->code)->toBe('newfield_2');
+    expect($result->type)->toBe('text');
+});
+
+test('a concurrent mapping-save collision on attribute_id returns false instead of crashing', function () {
+    $attribute = Attribute::create(['code' => 'material', 'type' => 'text']);
+    makeLazadaCategoryAttribute(100, 'Material', 'text');
+    // Simulates another request's mapping already having been saved for
+    // this exact attribute_id first (attribute_id is unique on
+    // lazada_attribute_mappings).
+    LazadaAttributeMapping::create(['attribute_id' => $attribute->id, 'target_field' => 'lazada_attribute', 'lazada_attribute_name' => 'Material', 'sort_order' => 0]);
+
+    // A *fresh* instance that never queried the DB itself (unlike
+    // firstOrNew(), which would find the row above and short-circuit via
+    // ->exists() before ever reaching save()) — this is what
+    // createAndMapOne()'s own mapping would look like if another
+    // process's insert landed in the gap between its SELECT and INSERT.
+    $racingMapping = new LazadaAttributeMapping();
+    $racingMapping->attribute_id = $attribute->id;
+    $racingMapping->target_field = 'lazada_attribute';
+    $racingMapping->lazada_attribute_name = 'Material';
+    $racingMapping->sort_order = 0;
+
+    $method = new ReflectionMethod($this->creator, 'trySaveMapping');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, $racingMapping);
+
+    expect($result)->toBeFalse();
+    expect(LazadaAttributeMapping::where('attribute_id', $attribute->id)->count())->toBe(1);
+});

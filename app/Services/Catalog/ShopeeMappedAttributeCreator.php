@@ -11,7 +11,9 @@ use App\Models\ShopeeAttribute;
 use App\Models\ShopeeAttributeMapping;
 use App\Models\ShopeeAttributeOptionMapping;
 use App\Models\ShopeeCategoryAttribute;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Mirror ของ LazadaMappedAttributeCreator เป๊ะ — ดูตัวนั้นๆ docblock สำหรับ
@@ -106,13 +108,32 @@ class ShopeeMappedAttributeCreator
         $mapping->target_field = 'shopee_attribute';
         $mapping->shopee_attribute_id = $shopeeAttribute->id;
         $mapping->sort_order = 0;
-        $mapping->save();
+
+        if (!$this->trySaveMapping($mapping)) {
+            return false;
+        }
 
         if (in_array($pimType, self::SELECT_TYPES, true)) {
             $this->createOptionsAndMappings($shopeeAttribute, $attribute, $mapping);
         }
 
         return true;
+    }
+
+    /**
+     * Mirror ของ LazadaMappedAttributeCreator::trySaveMapping() เป๊ะ — ดู
+     * ตัวนั้นๆ docblock สำหรับเหตุผลเต็มๆ (ทำไมต้อง wrap ด้วย
+     * DB::transaction() nested — จำเป็นเพื่อให้ปลอดภัยจริงบน Postgres)
+     */
+    private function trySaveMapping(ShopeeAttributeMapping $mapping): bool
+    {
+        try {
+            DB::transaction(fn () => $mapping->save());
+
+            return true;
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
     }
 
     /**
@@ -135,22 +156,47 @@ class ShopeeMappedAttributeCreator
             $code = $this->disambiguateCode($code);
         }
 
-        $attribute = Attribute::create([
-            'code' => $code,
-            'name' => $shopeeAttribute->name,
-            'type' => $pimType,
-            // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
-            // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
-            // docblock ของ migration add_auto_created_platform_to_attributes_table
-            'auto_created_platform' => 'shopee',
-            'is_required' => false,
-            'is_unique' => false,
-            'is_locale_based' => false,
-            'is_channel_based' => false,
-            'is_filterable' => false,
-        ]);
+        return $this->createAttributeAt($code, $pimType, $shopeeAttribute->name);
+    }
 
-        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $shopeeAttribute->name);
+    /**
+     * Mirror ของ LazadaMappedAttributeCreator::createAttributeAt() เป๊ะ —
+     * ดูตัวนั้นๆ docblock สำหรับเหตุผลเต็มๆ (retry ภายใต้ disambiguated code
+     * ใหม่เมื่อ request คู่แข่งชนะ insert เดียวกันไปก่อน — race จริง ไม่ใช่
+     * สมมติฐาน เพราะ createMissingForCategory() อ่าน $unmapped list ครั้งเดียว
+     * แล้ววนซ้ำโดยไม่มี per-row lock ใดๆ)
+     */
+    private function createAttributeAt(string $code, string $pimType, string $label, int $attemptsLeft = 5): Attribute
+    {
+        try {
+            $attribute = DB::transaction(fn () => Attribute::create([
+                'code' => $code,
+                'name' => $label,
+                'type' => $pimType,
+                // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
+                // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
+                // docblock ของ migration add_auto_created_platform_to_attributes_table
+                'auto_created_platform' => 'shopee',
+                'is_required' => false,
+                'is_unique' => false,
+                'is_locale_based' => false,
+                'is_channel_based' => false,
+                'is_filterable' => false,
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            $winner = Attribute::where('code', $code)->first();
+            if ($winner && $winner->type === $pimType) {
+                return $winner;
+            }
+
+            if ($attemptsLeft <= 1) {
+                throw new RuntimeException("Could not create a uniquely-coded attribute for '{$label}' after several concurrent attempts.");
+            }
+
+            return $this->createAttributeAt($this->disambiguateCode($code), $pimType, $label, $attemptsLeft - 1);
+        }
+
+        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $label);
 
         return $attribute;
     }

@@ -170,3 +170,46 @@ test('malformed option entries (not an array, or missing an id) are skipped defe
     $attribute = Attribute::where('code', 'color')->first();
     expect(AttributeOption::where('attribute_id', $attribute->id)->count())->toBe(1);
 });
+
+// --- race conditions: two concurrent syncs processing the same unmapped attribute ---
+
+test('a concurrent attribute-code collision (same type) reuses the winner instead of crashing', function () {
+    $winner = Attribute::create(['code' => 'newfield', 'type' => 'text']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->id)->toBe($winner->id);
+    expect(Attribute::where('code', 'newfield')->count())->toBe(1);
+});
+
+test('a concurrent attribute-code collision (different type) disambiguates and retries instead of crashing', function () {
+    Attribute::create(['code' => 'newfield', 'type' => 'select']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->code)->toBe('newfield_2');
+    expect($result->type)->toBe('text');
+});
+
+test('a concurrent mapping-save collision on attribute_id returns false instead of crashing', function () {
+    $attribute = Attribute::create(['code' => 'material', 'type' => 'text']);
+    makeTikTokCategoryAttribute(100, 'attr_material', 'Material', isCustomizable: true);
+    TikTokAttributeMapping::create(['attribute_id' => $attribute->id, 'target_field' => 'tiktok_attribute', 'tiktok_attribute_id' => 'attr_material', 'sort_order' => 0]);
+
+    $racingMapping = new TikTokAttributeMapping();
+    $racingMapping->attribute_id = $attribute->id;
+    $racingMapping->target_field = 'tiktok_attribute';
+    $racingMapping->tiktok_attribute_id = 'attr_material';
+    $racingMapping->sort_order = 0;
+
+    $method = new ReflectionMethod($this->creator, 'trySaveMapping');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, $racingMapping);
+
+    expect($result)->toBeFalse();
+    expect(TikTokAttributeMapping::where('attribute_id', $attribute->id)->count())->toBe(1);
+});

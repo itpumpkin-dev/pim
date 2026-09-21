@@ -12,6 +12,8 @@ use App\Models\ProductValue;
 use App\Models\WooCommerceAttribute;
 use App\Models\WooCommerceAttributeMapping;
 use App\Models\WooCommerceCategory;
+use App\Services\Catalog\WooCommerceAttributeFamilyGenerator;
+use App\Services\Catalog\WooCommerceMappedAttributeCreator;
 use App\Services\Catalog\WooCommerceMappingTimelineBuilder;
 use App\Services\WooCommerce\WooCommerceClient;
 use Illuminate\Http\JsonResponse;
@@ -334,6 +336,41 @@ class WooCommerceAttributeMappingController extends Controller
         });
 
         return response()->json(['data' => $data->values()]);
+    }
+
+    /**
+     * "สร้าง/อัปเดต Attribute Family" ของ Section 2 — mirror ของ
+     * LazadaAttributeMappingController::syncAttributeFamily() เต็มรูปแบบ
+     * แล้ว: เรียก WooCommerceMappedAttributeCreator::createMissingAttributes()
+     * ก่อนเสมอ (auto-create PIM Attribute ใหม่ให้ WooCommerce attribute ที่
+     * ยังไม่มีใครแมปเลย แล้วแมปให้ทันที) แล้วค่อย syncForCategory() — attribute
+     * ที่เพิ่งสร้าง/แมปใหม่ตรงนี้จะได้ถูกดึงเข้า Family ในรอบเดียวกันเลย ไม่ต้อง
+     * กดปุ่มสองรอบ เหมือน 3 platform อื่น
+     */
+    public function syncAttributeFamily(
+        Request $request,
+        WooCommerceMappedAttributeCreator $attributeCreator,
+        WooCommerceAttributeFamilyGenerator $familyGenerator,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'category_id' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $category = Category::findOrFail($validated['category_id']);
+
+        try {
+            $newlyCreatedCount = $attributeCreator->createMissingAttributes();
+            $result = $familyGenerator->syncForCategory($category);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'family' => ['id' => $result['family']->id, 'name' => $result['family']->name],
+            'attribute_count' => $result['attribute_count'],
+            'newly_created_count' => $newlyCreatedCount,
+            'edit_url' => "/catalog/attributeFamilies/{$result['family']->id}/edit",
+        ]);
     }
 
     /**

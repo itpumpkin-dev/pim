@@ -135,7 +135,17 @@ class LazadaAttributeFamilyGenerator
             $family->name = "Lazada — {$category->name}";
 
             try {
-                $family->save();
+                // Nested DB::transaction() (becomes a SAVEPOINT since
+                // syncForCategory() already wraps this whole method in one)
+                // — required for the catch below to be safe under
+                // Postgres, which aborts the *entire* enclosing transaction
+                // the instant any statement inside it errors, and refuses
+                // every further query until that's rolled back. Without
+                // this, catching the violation and then just querying again
+                // (the firstOrFail() below) would itself throw a second,
+                // unrelated "current transaction is aborted" error instead
+                // of the graceful fallback this is trying to provide.
+                DB::transaction(fn () => $family->save());
             } catch (UniqueConstraintViolationException) {
                 // แข่งกับ request อื่นที่ insert lazada_category_id เดียวกันไป
                 // ก่อนแล้ว (บั๊กจริงที่เจอจาก code review: firstOrNew()+save()

@@ -11,12 +11,14 @@
         "unique": "Único",
         "localeBased": "Basado en Idioma",
         "channelBased": "Basado en Canal",
+        "aiTranslate": "Traducción por IA",
         "employeeId": "Identificación del Empleado",
         "username": "Nombre de Usuario",
         "firstName": "Nombre",
         "lastName": "Apellidos",
         "displayName": "Nombre para Mostrar",
-        "sku": "SKU"
+        "sku": "SKU",
+        "isGuest": "Rol de Invitado"
     },
     "rowActions": {
         "edit": "Editar",
@@ -26,8 +28,8 @@
     "actionsHeader": "Acciones",
     "active": "Activo",
     "inactive": "Inactivo",
-    "enabled": "Enable",
-    "disabled": "Disabled",
+    "enabled": "Habilitado",
+    "disabled": "Deshabilitado",
     "yes": "Sí",
     "no": "No",
     "filter": "Filtrar",

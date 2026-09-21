@@ -1,5 +1,5 @@
 {
-    "overview": "VISTEO",
+    "overview": "RESUMEN",
     "dashboard": "Tablero",
     "products": "Total Producto",
     "categories": "Total Categoría",
@@ -11,7 +11,7 @@
     "channels": "Canal Total",
     "moreInfo": "Más información",
     "systemConsole": "Consola del Sistema & Registros",
-    "welcomeMessage": "Bienvenido al sistema de Administración de Información del Producto (PIM). Los metrículas clave y las configuraciones se han centralizado en este panel.",
+    "welcomeMessage": "Bienvenido al sistema de Administración de Información del Producto (PIM). Las métricas clave y las configuraciones se han centralizado en este panel.",
     "manageProducts": "Administrar Productos",
     "operations": "OPERACIONES",
     "recentActivity": "Actividad Reciente",

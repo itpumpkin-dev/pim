@@ -115,7 +115,11 @@ class TikTokAttributeFamilyGenerator
             $family->name = "TikTok — {$category->name}";
 
             try {
-                $family->save();
+                // Nested DB::transaction() (SAVEPOINT) — required under
+                // Postgres for the catch below to be safe at all; see
+                // LazadaAttributeFamilyGenerator::findOrCreateFamily()'s
+                // docblock for why.
+                DB::transaction(fn () => $family->save());
             } catch (UniqueConstraintViolationException) {
                 $family = AttributeFamily::where('tiktok_category_id', $tiktokCategoryId)->firstOrFail();
                 $isNew = false;

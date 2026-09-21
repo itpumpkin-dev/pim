@@ -1,11 +1,12 @@
 {
     "profileInformation": "Información del perfil",
     "profileInformationDesc": "Actualiza tu nombre y dirección de correo electrónico",
-    "username": "Username",
+    "username": "Nombre de usuario",
     "firstName": "Nombre",
     "lastName": "Apellido",
     "emailAddress": "Dirección de correo electrónico",
     "save": "Guardar",
+    "saving": "Guardando...",
     "saved": "Guardado",
     "emailUnverified": "Tu dirección de correo electrónico no está verificada.",
     "resendVerification": "Haz clic aquí para reenviar el correo de verificación.",

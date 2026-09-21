@@ -174,3 +174,46 @@ test('malformed option entries (not an array, or missing a value id) are skipped
     $attribute = Attribute::where('code', 'color')->first();
     expect(AttributeOption::where('attribute_id', $attribute->id)->count())->toBe(1);
 });
+
+// --- race conditions: two concurrent syncs processing the same unmapped attribute ---
+
+test('a concurrent attribute-code collision (same type) reuses the winner instead of crashing', function () {
+    $winner = Attribute::create(['code' => 'newfield', 'type' => 'text']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->id)->toBe($winner->id);
+    expect(Attribute::where('code', 'newfield')->count())->toBe(1);
+});
+
+test('a concurrent attribute-code collision (different type) disambiguates and retries instead of crashing', function () {
+    Attribute::create(['code' => 'newfield', 'type' => 'select']);
+
+    $method = new ReflectionMethod($this->creator, 'createAttributeAt');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, 'newfield', 'text', 'New Field');
+
+    expect($result->code)->toBe('newfield_2');
+    expect($result->type)->toBe('text');
+});
+
+test('a concurrent mapping-save collision on attribute_id returns false instead of crashing', function () {
+    $attribute = Attribute::create(['code' => 'material', 'type' => 'text']);
+    makeShopeeAttribute(100, 1, 'Material', inputType: 3);
+    ShopeeAttributeMapping::create(['attribute_id' => $attribute->id, 'target_field' => 'shopee_attribute', 'shopee_attribute_id' => 1, 'sort_order' => 0]);
+
+    $racingMapping = new ShopeeAttributeMapping();
+    $racingMapping->attribute_id = $attribute->id;
+    $racingMapping->target_field = 'shopee_attribute';
+    $racingMapping->shopee_attribute_id = 1;
+    $racingMapping->sort_order = 0;
+
+    $method = new ReflectionMethod($this->creator, 'trySaveMapping');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->creator, $racingMapping);
+
+    expect($result)->toBeFalse();
+    expect(ShopeeAttributeMapping::where('attribute_id', $attribute->id)->count())->toBe(1);
+});

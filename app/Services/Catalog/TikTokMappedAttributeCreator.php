@@ -11,7 +11,9 @@ use App\Models\TikTokAttribute;
 use App\Models\TikTokAttributeMapping;
 use App\Models\TikTokAttributeOptionMapping;
 use App\Models\TikTokCategoryAttribute;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * Mirror ของ ShopeeMappedAttributeCreator เป๊ะ — ดูตัวนั้นๆ docblock สำหรับ
@@ -90,13 +92,31 @@ class TikTokMappedAttributeCreator
         $mapping->target_field = 'tiktok_attribute';
         $mapping->tiktok_attribute_id = $tiktokAttribute->id;
         $mapping->sort_order = 0;
-        $mapping->save();
+
+        if (!$this->trySaveMapping($mapping)) {
+            return false;
+        }
 
         if (in_array($pimType, self::SELECT_TYPES, true)) {
             $this->createOptionsAndMappings($tiktokAttribute, $attribute, $mapping);
         }
 
         return true;
+    }
+
+    /**
+     * Mirror ของ LazadaMappedAttributeCreator::trySaveMapping() เป๊ะ — ดู
+     * ตัวนั้นๆ docblock สำหรับเหตุผลเต็มๆ
+     */
+    private function trySaveMapping(TikTokAttributeMapping $mapping): bool
+    {
+        try {
+            DB::transaction(fn () => $mapping->save());
+
+            return true;
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
     }
 
     /**
@@ -134,22 +154,47 @@ class TikTokMappedAttributeCreator
             $code = $this->disambiguateCode($code);
         }
 
-        $attribute = Attribute::create([
-            'code' => $code,
-            'name' => $tiktokAttribute->name,
-            'type' => $pimType,
-            // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
-            // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
-            // docblock ของ migration add_auto_created_platform_to_attributes_table
-            'auto_created_platform' => 'tiktok',
-            'is_required' => false,
-            'is_unique' => false,
-            'is_locale_based' => false,
-            'is_channel_based' => false,
-            'is_filterable' => false,
-        ]);
+        return $this->createAttributeAt($code, $pimType, $tiktokAttribute->name);
+    }
 
-        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $tiktokAttribute->name);
+    /**
+     * Mirror ของ LazadaMappedAttributeCreator::createAttributeAt() เป๊ะ —
+     * ดูตัวนั้นๆ docblock สำหรับเหตุผลเต็มๆ (retry ภายใต้ disambiguated code
+     * ใหม่เมื่อ request คู่แข่งชนะ insert เดียวกันไปก่อน — race จริง ไม่ใช่
+     * สมมติฐาน เพราะ createMissingForCategory() อ่าน $unmapped list ครั้งเดียว
+     * แล้ววนซ้ำโดยไม่มี per-row lock ใดๆ)
+     */
+    private function createAttributeAt(string $code, string $pimType, string $label, int $attemptsLeft = 5): Attribute
+    {
+        try {
+            $attribute = DB::transaction(fn () => Attribute::create([
+                'code' => $code,
+                'name' => $label,
+                'type' => $pimType,
+                // ให้ PimAttributePicker โชว์ chip บอกที่มา — set เฉพาะตอนสร้างใหม่
+                // จริงๆ ตรงนี้เท่านั้น (ไม่แตะตอน reuse attribute เดิมด้านบน) ดู
+                // docblock ของ migration add_auto_created_platform_to_attributes_table
+                'auto_created_platform' => 'tiktok',
+                'is_required' => false,
+                'is_unique' => false,
+                'is_locale_based' => false,
+                'is_channel_based' => false,
+                'is_filterable' => false,
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            $winner = Attribute::where('code', $code)->first();
+            if ($winner && $winner->type === $pimType) {
+                return $winner;
+            }
+
+            if ($attemptsLeft <= 1) {
+                throw new RuntimeException("Could not create a uniquely-coded attribute for '{$label}' after several concurrent attempts.");
+            }
+
+            return $this->createAttributeAt($this->disambiguateCode($code), $pimType, $label, $attemptsLeft - 1);
+        }
+
+        $this->setDefaultLocaleLabel(AttributeTranslation::class, 'attribute_id', $attribute->id, $label);
 
         return $attribute;
     }
