@@ -33,6 +33,7 @@ interface Attribute {
     is_ai_translate: boolean;
     is_channel_based: boolean;
     is_filterable: boolean;
+    is_shared: boolean;
 }
 
 interface MasterSourceOption {
@@ -51,6 +52,7 @@ interface AttributeForm {
     is_ai_translate: boolean;
     is_channel_based: boolean;
     is_filterable: boolean;
+    is_shared: boolean;
     translations: Record<string, string>;
     [key: string]: string | boolean | Record<string, string>;
 }
@@ -107,6 +109,7 @@ export default function AttributeEdit({ attribute, translations, options = [], m
         is_ai_translate: Boolean(attribute.is_ai_translate),
         is_channel_based: Boolean(attribute.is_channel_based),
         is_filterable: Boolean(attribute.is_filterable),
+        is_shared: Boolean(attribute.is_shared),
         translations: translations || {},
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
@@ -239,7 +242,11 @@ export default function AttributeEdit({ attribute, translations, options = [], m
                                 <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />
                                 <FormControlLabel control={<Checkbox checked={data.is_channel_based} onChange={(event) => setData('is_channel_based', event.target.checked)} />} label={t('valuePerChannel')} />
                                 <FormControlLabel control={<Checkbox checked={data.is_filterable} onChange={(event) => setData('is_filterable', event.target.checked)} />} label={t('isFilterable')} />
+                                <FormControlLabel control={<Checkbox checked={data.is_shared} onChange={(event) => setData('is_shared', event.target.checked)} />} label={t('isShared')} />
                             </Stack>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                {t('isSharedHelp')}
+                            </Typography>
                         </FioriField>
                     </FioriFormGroup>
 

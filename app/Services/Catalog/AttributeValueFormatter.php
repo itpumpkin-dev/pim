@@ -33,7 +33,20 @@ class AttributeValueFormatter
             return array_map(fn ($path) => self::resolveStorageUrl($path), $paths);
         }
 
-        if (in_array($attribute->type, ['image', 'file', 'video'], true)) {
+        if ($attribute->type === 'video') {
+            // video เพิ่งมาเป็น array ทีหลัง (เดิมเป็น path string เดี่ยวๆ มาตลอด
+            // ต่างจาก gallery ที่เป็น JSON array มาตั้งแต่ต้น) — ค่าเก่าที่มีอยู่
+            // แล้วในระบบตอนนี้ "ไม่ใช่" JSON เลย ห่อเป็น array ตัวเดียวแทนที่จะ
+            // ปล่อยให้ json_decode คืน null (=> กลายเป็น [] ว่างๆ ทำให้วิดีโอเก่า
+            // หายไปจากทุกที่ที่อ่านผ่าน formatter นี้ — ต่างจาก gallery ด้านบนที่
+            // JSON เพี้ยนถือว่าไม่มีรูปจริงๆ ปลอดภัยที่จะคืน [] ว่าง)
+            $decoded = json_decode($rawValue, true);
+            $paths = is_array($decoded) ? $decoded : [$rawValue];
+
+            return array_map(fn ($path) => self::resolveStorageUrl($path), $paths);
+        }
+
+        if (in_array($attribute->type, ['image', 'file'], true)) {
             return self::resolveStorageUrl($rawValue);
         }
 

@@ -88,7 +88,18 @@ class AttributeFamilyController extends Controller
     public function create(): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
+        // ตระกูลใหม่ยังไม่มี attribute เป็นของตัวเองเลยสักตัว — เลยไม่ต้องเช็ค
+        // "เป็นของ family นี้อยู่แล้ว" เหมือน edit() ด้านล่าง แค่ตัด attribute
+        // ที่ถูกผูกกับ family อื่นไปแล้ว (ไม่ว่าจะกี่ family ก็ตาม) ออกจากตัวเลือก
+        // ทั้งหมด กัน "แย่ง" attribute ที่ family อื่นใช้อยู่แล้วไปโดยไม่รู้ตัว —
+        // ยกเว้น attribute ที่ติ๊ก is_shared ไว้ (อนุญาตให้ใช้ซ้ำข้าม family ได้
+        // โดยเจตนา) ยังคงโชว์เป็นตัวเลือกได้เสมอ ไม่ว่าจะถูกผูกกับ family ไหน
+        // ไปแล้วกี่ตัวก็ตาม — ดู docblock เดียวกันที่ edit()
+        $attributes = Attribute::select('id', 'code', 'name', 'type', 'is_shared')
+            ->where(function ($query) {
+                $query->whereDoesntHave('families')->orWhere('is_shared', true);
+            })
+            ->get();
 
         return Inertia::render('catalog/attribute-families/create', [
             'groups' => $groups,
@@ -148,7 +159,22 @@ class AttributeFamilyController extends Controller
     public function edit(AttributeFamily $attributeFamily): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
+        // attribute หนึ่งตัวผูกได้หลาย family พร้อมกันจริงๆ (family_attributes
+        // ใช้ primary key แบบผสม (family_id, attribute_id) ไม่ได้บังคับ
+        // exclusive) แต่ user ไม่ต้องการให้หน้านี้เสนอ attribute ที่ถูกผูกกับ
+        // family อื่นไปแล้วเป็นตัวเลือก "ที่ยังไม่ได้ใช้" ให้หยิบมาเพิ่มอีก
+        // (กันแย่ง attribute ของ family อื่นโดยไม่รู้ตัว) เว้นแต่ติ๊ก is_shared
+        // ไว้ (อนุญาตให้ใช้ซ้ำข้าม family โดยเจตนา) — เลยกรองเหลือแค่ attribute
+        // ที่ยังไม่มี family เลย, ติ๊ก is_shared ไว้, หรือเป็นของ family นี้เอง
+        // (ต้องรวมของ family นี้ไว้ด้วย ไม่งั้น attribute ที่ assign อยู่แล้ว
+        // จะหายไปจากตัวเลือกที่ frontend ใช้ประกอบ "assigned" chip ด้วย)
+        $attributes = Attribute::select('id', 'code', 'name', 'type', 'is_shared')
+            ->where(function ($query) use ($attributeFamily) {
+                $query->whereDoesntHave('families')
+                    ->orWhere('is_shared', true)
+                    ->orWhereHas('families', fn ($q) => $q->where('family_id', $attributeFamily->id));
+            })
+            ->get();
 
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
             ->where('family_id', $attributeFamily->id)

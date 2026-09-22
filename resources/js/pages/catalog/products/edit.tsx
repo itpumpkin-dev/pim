@@ -3608,6 +3608,54 @@ function GalleryThumb({ item, disabled, onRemove }: { item: string | File; disab
     );
 }
 
+// render preview วิดีโอทีละไฟล์ — เหมือน GalleryThumb ด้านบนทุกประการ แค่เปลี่ยน
+// <img> เป็น <video controls> (แคบกว่าเพราะวิดีโอมักเป็นแนวนอน) — ไม่ว่าจะเป็น
+// path ที่เก็บไว้อยู่แล้วหรือ File ที่เพิ่งเลือกในเครื่องรอ upload พร้อมปุ่มลบ
+function VideoThumb({ item, disabled, onRemove }: { item: string | File; disabled?: boolean; onRemove: () => void }) {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (typeof item === 'string') {
+            setPreviewUrl(null);
+            return undefined;
+        }
+        const url = URL.createObjectURL(item);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [item]);
+
+    const src = typeof item === 'string' ? (/^https?:\/\//.test(item) || item.startsWith('/') ? item : `/storage/${item}`) : previewUrl;
+
+    return (
+        <Box sx={{ position: 'relative', width: 160 }}>
+            {src ? (
+                <Box component="video" src={src} controls sx={{ width: 160, maxHeight: 100, borderRadius: 1, border: '1px solid #e2e8f0' }} />
+            ) : (
+                <Box sx={{ width: 160, height: 100, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
+            )}
+            {!disabled && (
+                <IconButton
+                    size="small"
+                    onClick={onRemove}
+                    aria-label="Remove video"
+                    sx={{
+                        position: 'absolute',
+                        top: -8,
+                        right: -8,
+                        bgcolor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        width: 20,
+                        height: 20,
+                        '&:hover': { bgcolor: '#fee2e2' },
+                    }}
+                >
+                    <CloseIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+            )}
+        </Box>
+    );
+}
+
 // component ที่ render form control ให้เหมาะกับ attribute นั้นๆ แบบไดนามิก
 // ตาม definition จริงของระบบ เป็น pure function ไม่มี state เลยแยกออกมาไว้
 // นอก RenderAttributeInput แทนที่จะสร้างใหม่ทุกครั้งที่ render — SelectControl
@@ -3749,7 +3797,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     const [galleryError, setGalleryError] = useState<string | null>(null);
 
     useEffect(() => {
-        if ((attr.type === 'image' || attr.type === 'video' || attr.type === 'file') && value instanceof File) {
+        if ((attr.type === 'image' || attr.type === 'file') && value instanceof File) {
             const url = URL.createObjectURL(value);
             setFilePreviewUrl(url);
             return () => URL.revokeObjectURL(url);
@@ -4208,56 +4256,89 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     }
 
     if (attr.type === 'video') {
+        // video รองรับได้หลายไฟล์แบบเดียวกับ gallery แล้ว (array ของ path/File
+        // เดียวกัน — ดู parseGalleryItems()/ProductController::update()) เพดาน
+        // ตั้งไว้ต่ำกว่า gallery มาก (ดู MAX_VIDEO_COUNT ฝั่ง backend) เพราะไฟล์
+        // นึงใหญ่ได้ถึง 100MB
         const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+        const MAX_VIDEO_COUNT = 3;
 
-        const selectedName = value instanceof File ? value.name : '';
+        const items = parseGalleryItems(value);
+        const atLimit = items.length >= MAX_VIDEO_COUNT;
 
-        let existingLabel = '';
-        let existingVideoUrl = '';
-        if (!selectedName && stringValue) {
-            existingLabel = stringValue.split('/').pop() || stringValue;
-            existingVideoUrl = /^https?:\/\//.test(stringValue) || stringValue.startsWith('/') ? stringValue : `/storage/${stringValue}`;
-        }
+        const removeAt = (index: number) => {
+            setVideoError(null);
+            onChange(items.filter((_, i) => i !== index));
+        };
 
-        const previewSrc = filePreviewUrl || existingVideoUrl;
+        // เช็ค type/ขนาดแบบ sync ก่อน แล้วค่อย probe duration/resolution แบบ
+        // async ทีละไฟล์ (ต้องรอ <video> โหลด metadata) — ทำงานคล้ายการเช็ค
+        // getID3 ฝั่ง server ใน ProductController::validateVideoConstraints()
+        // เป็นด่านที่เร็ว ไม่ต้อง round-trip ไปเซิร์ฟเวอร์ ช่วยดักไฟล์เสียส่วนใหญ่
+        // ได้ก่อนที่จะเริ่ม upload 100MB ด้วยซ้ำ ส่วนการเช็คฝั่ง server คือด่านที่
+        // request ที่ยิงตรงไปที่ endpoint เอง (ข้าม UI นี้ไปเลย) จะผ่านไปไม่ได้
+        const probeVideo = (file: File) =>
+            new Promise<{ file: File; ok: boolean; error?: string }>((resolve) => {
+                if (file.type !== 'video/mp4') {
+                    resolve({ file, ok: false, error: t('onlyMp4VideosSupported') });
+                    return;
+                }
+                if (file.size > MAX_VIDEO_BYTES) {
+                    resolve({ file, ok: false, error: t('videoTooLargeError') });
+                    return;
+                }
 
-        // ทำงานคล้ายการเช็ค getID3 ฝั่ง server ใน ProductController
-        // (validateVideoConstraints()) — เป็นด่านที่เร็ว ไม่ต้อง round-trip
-        // ไปเซิร์ฟเวอร์ ช่วยดักไฟล์เสียส่วนใหญ่ได้ก่อนที่จะเริ่ม upload 100MB ด้วยซ้ำ
-        // ส่วนการเช็คฝั่ง server คือด่านที่ request ที่ยิงตรงไปที่ endpoint เอง
-        // (ข้าม UI นี้ไปเลย) จะผ่านไปไม่ได้
-        const handleVideoSelect = (file: File) => {
+                const probeUrl = URL.createObjectURL(file);
+                const probe = document.createElement('video');
+                probe.preload = 'metadata';
+                probe.onloadedmetadata = () => {
+                    URL.revokeObjectURL(probeUrl);
+                    if (probe.duration > 300) {
+                        resolve({ file, ok: false, error: t('videoTooLongError') });
+                        return;
+                    }
+                    if (probe.videoWidth < 480 || probe.videoHeight < 480) {
+                        resolve({ file, ok: false, error: t('videoTooSmallError') });
+                        return;
+                    }
+                    resolve({ file, ok: true });
+                };
+                probe.onerror = () => {
+                    URL.revokeObjectURL(probeUrl);
+                    resolve({ file, ok: false, error: t('videoUnreadableError') });
+                };
+                probe.src = probeUrl;
+            });
+
+        const addFiles = (fileList: FileList) => {
             setVideoError(null);
 
-            if (file.type !== 'video/mp4') {
-                setVideoError(t('onlyMp4VideosSupported'));
-                return;
-            }
-            if (file.size > MAX_VIDEO_BYTES) {
-                setVideoError(t('videoTooLargeError'));
+            const incoming = Array.from(fileList);
+            const remainingSlots = MAX_VIDEO_COUNT - items.length;
+
+            if (remainingSlots <= 0) {
+                setVideoError(t('videoUploadLimitError', { max: MAX_VIDEO_COUNT }));
                 return;
             }
 
-            const probeUrl = URL.createObjectURL(file);
-            const probe = document.createElement('video');
-            probe.preload = 'metadata';
-            probe.onloadedmetadata = () => {
-                URL.revokeObjectURL(probeUrl);
-                if (probe.duration > 300) {
-                    setVideoError(t('videoTooLongError'));
-                    return;
+            const accepted = incoming.slice(0, remainingSlots);
+            const skippedByLimit = incoming.length - accepted.length;
+
+            Promise.all(accepted.map(probeVideo)).then((results) => {
+                const valid = results.filter((r) => r.ok).map((r) => r.file);
+                const firstError = results.find((r) => !r.ok)?.error;
+
+                if (firstError || skippedByLimit > 0) {
+                    const messages = [];
+                    if (skippedByLimit > 0) messages.push(t('videoLimitAllowedError', { max: MAX_VIDEO_COUNT }));
+                    if (firstError) messages.push(firstError);
+                    setVideoError(messages.join(' — '));
                 }
-                if (probe.videoWidth < 480 || probe.videoHeight < 480) {
-                    setVideoError(t('videoTooSmallError'));
-                    return;
+
+                if (valid.length > 0) {
+                    onChange([...items, ...valid]);
                 }
-                onChange(file);
-            };
-            probe.onerror = () => {
-                URL.revokeObjectURL(probeUrl);
-                setVideoError(t('videoUnreadableError'));
-            };
-            probe.src = probeUrl;
+            });
         };
 
         return (
@@ -4268,27 +4349,31 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap">
-                    {previewSrc && (
-                        <Box
-                            component="video"
-                            src={previewSrc}
-                            controls
-                            sx={{ width: 160, maxHeight: 100, borderRadius: 1, border: '1px solid #e2e8f0' }}
-                        />
-                    )}
-                    <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
-                        <FioriFileUploader
-                            placeholder={t('browseOrDropMp4')}
-                            accept="video/mp4"
-                            disabled={isReadOnly}
-                            onSelect={(fl) => handleVideoSelect(fl[0])}
-                            valueLabel={selectedName || (existingLabel ? t('currentFileLabel', { name: existingLabel }) : null)}
-                            onClear={selectedName ? () => onChange('') : undefined}
-                            error={videoError ?? undefined}
-                        />
-                    </Box>
-                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    {t('videoHelperText', { max: MAX_VIDEO_COUNT, count: items.length })}
+                </Typography>
+                {items.length > 0 && (
+                    <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ mb: 1 }}>
+                        {items.map((item, index) => (
+                            <VideoThumb
+                                key={`${index}-${typeof item === 'string' ? item : item.name}`}
+                                item={item}
+                                disabled={isReadOnly}
+                                onRemove={() => removeAt(index)}
+                            />
+                        ))}
+                    </Stack>
+                )}
+                <Box sx={{ maxWidth: 420 }}>
+                    <FioriFileUploader
+                        placeholder={atLimit ? t('videoMaxReached', { max: MAX_VIDEO_COUNT }) : t('browseOrDropVideos')}
+                        accept="video/mp4"
+                        multiple
+                        disabled={isReadOnly || atLimit}
+                        onSelect={(fl) => addFiles(fl)}
+                        error={videoError ?? undefined}
+                    />
+                </Box>
             </Box>
         );
     }

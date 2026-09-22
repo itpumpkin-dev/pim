@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Catalog\ProductController;
+use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductValue;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -114,4 +117,98 @@ test('duplicate as a template ("Save as Template") produces an empty structure w
     expect($template->enabled)->toBeFalse();
     expect($template->categories()->count())->toBe(0);
     expect(ProductValue::where('product_id', $template->id)->count())->toBe(0);
+});
+
+test('update stores multiple videos for a "video" attribute as a JSON array, like gallery', function () {
+    Storage::fake('public');
+
+    $product = Product::create(['sku' => 'VIDEO-PRODUCT', 'type' => 'simple', 'enabled' => false]);
+    $videoAttr = Attribute::create(['code' => 'promo_video', 'type' => 'video']);
+
+    $file1 = UploadedFile::fake()->create('clip1.mp4', 1024, 'video/mp4');
+    $file2 = UploadedFile::fake()->create('clip2.mp4', 1024, 'video/mp4');
+
+    $request = Request::create(
+        "/catalog/products/{$product->id}",
+        'PUT',
+        [
+            'sku' => $product->sku,
+            'type' => 'simple',
+            'enabled' => false,
+            'values' => [$videoAttr->id => ['global' => ['default' => []]]],
+        ],
+        [],
+        ['values' => [$videoAttr->id => ['global' => ['default' => [$file1, $file2]]]]]
+    );
+
+    pcController()->update($request, $product);
+
+    $stored = ProductValue::where('product_id', $product->id)
+        ->where('attribute_id', $videoAttr->id)
+        ->value('value');
+    $paths = json_decode($stored, true);
+
+    expect($paths)->toBeArray()->toHaveCount(2);
+    foreach ($paths as $path) {
+        Storage::disk('public')->assertExists($path);
+    }
+});
+
+test('update rejects more videos than MAX_VIDEO_COUNT (3) for a "video" attribute', function () {
+    Storage::fake('public');
+
+    $product = Product::create(['sku' => 'VIDEO-OVERFLOW', 'type' => 'simple', 'enabled' => false]);
+    $videoAttr = Attribute::create(['code' => 'promo_video2', 'type' => 'video']);
+
+    $files = collect(range(1, 4))->map(fn ($i) => UploadedFile::fake()->create("clip{$i}.mp4", 512, 'video/mp4'))->all();
+
+    $request = Request::create(
+        "/catalog/products/{$product->id}",
+        'PUT',
+        [
+            'sku' => $product->sku,
+            'type' => 'simple',
+            'enabled' => false,
+            'values' => [$videoAttr->id => ['global' => ['default' => []]]],
+        ],
+        [],
+        ['values' => [$videoAttr->id => ['global' => ['default' => $files]]]]
+    );
+
+    expect(fn () => pcController()->update($request, $product))->toThrow(ValidationException::class);
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $videoAttr->id)->exists())->toBeFalse();
+});
+
+test('update removing one of two existing videos deletes only the removed file from storage', function () {
+    Storage::fake('public');
+
+    $product = Product::create(['sku' => 'VIDEO-REMOVE-ONE', 'type' => 'simple', 'enabled' => false]);
+    $videoAttr = Attribute::create(['code' => 'promo_video3', 'type' => 'video']);
+
+    $keptPath = UploadedFile::fake()->create('kept.mp4', 512, 'video/mp4')->store('product-attributes', 'public');
+    $removedPath = UploadedFile::fake()->create('removed.mp4', 512, 'video/mp4')->store('product-attributes', 'public');
+
+    ProductValue::create([
+        'product_id' => $product->id,
+        'attribute_id' => $videoAttr->id,
+        'channel_id' => null,
+        'locale_id' => null,
+        'value' => json_encode([$keptPath, $removedPath]),
+    ]);
+
+    $request = Request::create(
+        "/catalog/products/{$product->id}",
+        'PUT',
+        [
+            'sku' => $product->sku,
+            'type' => 'simple',
+            'enabled' => false,
+            'values' => [$videoAttr->id => ['global' => ['default' => [$keptPath]]]],
+        ]
+    );
+
+    pcController()->update($request, $product);
+
+    Storage::disk('public')->assertExists($keptPath);
+    Storage::disk('public')->assertMissing($removedPath);
 });

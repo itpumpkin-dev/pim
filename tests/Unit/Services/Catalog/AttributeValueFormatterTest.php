@@ -39,14 +39,29 @@ test('an image/file/video attribute resolves a relative path to a public disk UR
     expect($url)->toContain('attributes/photo.jpg');
 });
 
-test('file and video types resolve the same way as image', function () {
+test('file resolves the same way as image', function () {
     Storage::fake('public');
 
     expect(AttributeValueFormatter::format(makeAttribute('file'), 'docs/manual.pdf'))
         ->toBe(Storage::disk('public')->url('docs/manual.pdf'));
+});
+
+test('a video attribute now resolves like gallery — array-valued, one URL per stored video', function () {
+    Storage::fake('public');
+
+    $raw = json_encode(['video/a.mp4', 'video/b.mp4']);
+
+    expect(AttributeValueFormatter::format(makeAttribute('video'), $raw))->toBe([
+        Storage::disk('public')->url('video/a.mp4'),
+        Storage::disk('public')->url('video/b.mp4'),
+    ]);
+});
+
+test('a legacy single-path (non-JSON) video value is wrapped into a one-item array instead of being lost', function () {
+    Storage::fake('public');
 
     expect(AttributeValueFormatter::format(makeAttribute('video'), 'media/clip.mp4'))
-        ->toBe(Storage::disk('public')->url('media/clip.mp4'));
+        ->toBe([Storage::disk('public')->url('media/clip.mp4')]);
 });
 
 test('an already-absolute URL passes through untouched instead of being re-based under the public disk', function () {

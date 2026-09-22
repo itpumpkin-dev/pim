@@ -153,6 +153,20 @@ function parseGalleryPaths(raw: string): string[] {
     }
 }
 
+// video เพิ่งมาเป็น array ทีหลัง (เดิมเป็น path string เดี่ยวๆ มาตลอด ต่างจาก
+// gallery ที่เป็น JSON array มาตั้งแต่ต้น) — ค่าเก่าที่มีอยู่แล้วในระบบตอนนี้
+// "ไม่ใช่" JSON เลย ห่อเป็น array ตัวเดียวแทนที่จะคืน [] ว่าง (ไม่งั้นวิดีโอเก่าทุก
+// ตัวจะหายไปจากหน้านี้ทันทีที่ deploy ฟีเจอร์นี้)
+function parseVideoPaths(raw: string): string[] {
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === 'string' && p !== '') : [raw];
+    } catch {
+        return [raw];
+    }
+}
+
 /** Empty-value placeholder — same wording used everywhere else this file shows "nothing entered". */
 function EmptyValue() {
     return (
@@ -222,9 +236,16 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
     }
 
     if (attr.type === 'video') {
+        const paths = parseVideoPaths(value);
+        if (paths.length === 0) return <EmptyValue />;
+
         return (
-            // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video controls src={resolveStorageUrl(value)} style={{ maxWidth: 320, maxHeight: 200, borderRadius: 4 }} />
+            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                {paths.map((path, i) => (
+                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                    <video key={i} controls src={resolveStorageUrl(path)} style={{ maxWidth: 320, maxHeight: 200, borderRadius: 4 }} />
+                ))}
+            </Stack>
         );
     }
 

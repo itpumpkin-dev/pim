@@ -61,7 +61,7 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
 
     public function mediaPaths(ExportConfig $config): iterable
     {
-        $mediaAttributeIds = Attribute::whereIn('type', ['image', 'file', 'gallery'])->pluck('id');
+        $mediaAttributeIds = Attribute::whereIn('type', ['image', 'file', 'gallery', 'video'])->pluck('id');
         if ($mediaAttributeIds->isEmpty()) {
             return;
         }

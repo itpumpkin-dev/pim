@@ -81,6 +81,14 @@ class ProductController extends Controller
     // ด้านบน
     private const MIN_IMAGE_DIMENSION = 300;
 
+    // attribute type `video` เก็บได้หลายไฟล์แบบเดียวกับ gallery แล้ว (array JSON
+    // ใน product_values.value เดียวกัน — ดู deleteRemovedAttributeFiles()) แต่
+    // ไฟล์นึงใหญ่ได้ถึง 100MB (ดู mimes:mp4/max:102400 ด้านล่าง) เพดานเลยตั้งไว้
+    // ต่ำกว่า MAX_GALLERY_IMAGES มาก กัน storage บวมและอัปโหลดนานเกินไป —
+    // marketplace sync (ResolvesProductAttributeValues::attributeValue()) ใช้
+    // แค่ไฟล์แรกอยู่แล้วเพราะทุกแพลตฟอร์มรับวิดีโอต่อสินค้าได้ตัวเดียว
+    private const MAX_VIDEO_COUNT = 3;
+
     // Attribute ที่ผูกกับ Master หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้าโดยตรง (options
     // mirror ต้นไม้ categories มาเป๊ะๆ ผ่าน categories.code — ดู
     // ProductCategoryLinker) ไม่ได้ผูกกับ attribute_family ไหนเลย (ดู
@@ -1228,17 +1236,28 @@ class ProductController extends Controller
     /**
      * ลบไฟล์บน public disk ที่ถูกตัดออกจากการเปลี่ยนแปลงค่าจริงๆ
      * ค่าแบบ image/file เป็น path string เดี่ยวๆ ดังนั้นแค่มีการเปลี่ยนค่าก็ลบ
-     * ไฟล์เก่าทิ้งไปเลย ส่วนค่าแบบ gallery เป็น array ของ path เข้ารหัสแบบ JSON
-     * และตอนนี้ frontend เปิดให้ผู้ใช้เก็บรูปเดิมส่วนใหญ่ไว้ พร้อมเพิ่ม/ลบทีละรูป
-     * ได้ — เลยจะลบเฉพาะ path ที่มีอยู่ใน $oldValue แต่ไม่มีใน $newValue เท่านั้น
+     * ไฟล์เก่าทิ้งไปเลย ส่วนค่าแบบ gallery/video เป็น array ของ path เข้ารหัสแบบ
+     * JSON (video รองรับหลายไฟล์เหมือน gallery แล้ว — ดู MAX_VIDEO_COUNT) และ
+     * frontend เปิดให้ผู้ใช้เก็บของเดิมส่วนใหญ่ไว้ พร้อมเพิ่ม/ลบทีละไฟล์ได้ — เลย
+     * จะลบเฉพาะ path ที่มีอยู่ใน $oldValue แต่ไม่มีใน $newValue เท่านั้น
      * แทนที่จะลบชุดเก่าทั้งหมด
      */
     private function deleteRemovedAttributeFiles(Attribute $attribute, string $oldValue, ?string $newValue): void
     {
-        if ($attribute->type === 'gallery') {
+        if (in_array($attribute->type, ['gallery', 'video'], true)) {
+            // video เพิ่งมาเป็น array ทีหลัง (เดิมเป็น path string เดี่ยวๆ มาตลอด)
+            // — ค่าเก่าที่มีอยู่แล้วในระบบตอนนี้เลย "ไม่ใช่" JSON เลย ห่อเป็น
+            // array ตัวเดียวแทนที่จะปล่อยให้ json_decode คืน null (=> ไม่ลบไฟล์
+            // เก่าเลยตอนแก้ไขครั้งแรกหลังอัปเดตฟีเจอร์นี้)
             $oldPaths = json_decode($oldValue, true);
+            if (! is_array($oldPaths)) {
+                $oldPaths = $oldValue !== '' ? [$oldValue] : [];
+            }
             $newPaths = $newValue !== null ? json_decode($newValue, true) : [];
-            $removedPaths = array_diff((array) $oldPaths, (array) $newPaths);
+            if (! is_array($newPaths)) {
+                $newPaths = $newValue ? [$newValue] : [];
+            }
+            $removedPaths = array_diff($oldPaths, $newPaths);
 
             foreach ($removedPaths as $path) {
                 if ($path) {
@@ -3528,26 +3547,30 @@ class ProductController extends Controller
                         if (is_array($localeFiles)) {
                             foreach ($localeFiles as $localeKey => $file) {
                                 if (is_array($file)) {
-                                    // Gallery: ตอนนี้ frontend ส่ง path เดิมที่ยังเก็บไว้
+                                    // Gallery/Video: ตอนนี้ frontend ส่ง path เดิมที่ยังเก็บไว้
                                     // (เป็น string) ปนมากับไฟล์ใหม่ที่เพิ่งเลือก โดยอยู่ใน
                                     // index เดียวกันของ array คำขอแบบ multipart จะแยก
                                     // ไฟล์อัปโหลดกับ field ธรรมดาออกจากกันเสมอแม้อยู่ใน
                                     // array เดียวกัน ดังนั้น string ที่เก็บไว้จึงรอดมาอยู่ใน
                                     // $values ผ่านการอ่าน input() ด้านบนอยู่แล้ว — ให้เอา
                                     // path ของไฟล์ใหม่ที่เพิ่งอัปโหลดมารวมกลับเข้าไปแทนที่จะ
-                                    // ทิ้งไป (เมื่อก่อนอัปโหลดใหม่ทีนึงจะทับ gallery ทั้งหมด)
+                                    // ทิ้งไป (เมื่อก่อนอัปโหลดใหม่ทีนึงจะทับ gallery/video ทั้งหมด)
                                     $keptPaths = array_values(array_filter(
                                         (array) ($values[$attributeId][$channelKey][$localeKey] ?? []),
                                         fn ($v) => is_string($v) && $v !== ''
                                     ));
                                     $incomingFiles = array_values(array_filter($file));
 
+                                    $isVideo = $attribute->type === 'video';
+                                    $maxCount = $isVideo ? self::MAX_VIDEO_COUNT : self::MAX_GALLERY_IMAGES;
+                                    $noun = $isVideo ? 'videos' : 'images';
+
                                     // เช็คก่อนที่จะเก็บไฟล์ที่ส่งเข้ามาแม้แต่ไฟล์เดียว
                                     // (ไม่ใช่เช็คทีหลัง) เพื่อไม่ให้คำขอที่เกิน limit
                                     // ทิ้งไฟล์กำพร้าไว้บน disk โดยไม่มี product_values
                                     // row ไหนอ้างอิงถึงเลย
-                                    if (count($keptPaths) + count($incomingFiles) > self::MAX_GALLERY_IMAGES) {
-                                        $valueErrors["values.{$attributeId}"] = "{$attribute->name}: You can upload up to ".self::MAX_GALLERY_IMAGES.' images.';
+                                    if (count($keptPaths) + count($incomingFiles) > $maxCount) {
+                                        $valueErrors["values.{$attributeId}"] = "{$attribute->name}: You can upload up to {$maxCount} {$noun}.";
 
                                         continue;
                                     }

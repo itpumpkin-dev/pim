@@ -220,7 +220,7 @@ class AttributeController extends Controller
         return Inertia::render('catalog/attributes/edit', [
             'attribute' => $attribute->only([
                 'id', 'code', 'name', 'type', 'swatch_type', 'master_source', 'is_required', 'is_unique',
-                'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable',
+                'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable', 'is_shared',
             ]),
             'masterSources' => MasterAttributeOptionSync::pickerOptions(),
             'translations' => $attribute->translations()->get()
@@ -261,6 +261,7 @@ class AttributeController extends Controller
             'is_ai_translate' => ['boolean'],
             'is_channel_based' => ['boolean'],
             'is_filterable' => ['boolean'],
+            'is_shared' => ['boolean'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
         ]);
@@ -284,6 +285,7 @@ class AttributeController extends Controller
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'is_channel_based' => $request->boolean('is_channel_based'),
             'is_filterable' => $request->boolean('is_filterable'),
+            'is_shared' => $request->boolean('is_shared'),
             'created_by' => $request->user()->id,
             'updated_by' => $request->user()->id,
         ]));
@@ -319,6 +321,7 @@ class AttributeController extends Controller
             'is_ai_translate' => ['boolean'],
             'is_channel_based' => ['boolean'],
             'is_filterable' => ['boolean'],
+            'is_shared' => ['boolean'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
         ]);
@@ -341,6 +344,7 @@ class AttributeController extends Controller
             'is_ai_translate' => $request->boolean('is_ai_translate'),
             'is_channel_based' => $request->boolean('is_channel_based'),
             'is_filterable' => $request->boolean('is_filterable'),
+            'is_shared' => $request->boolean('is_shared'),
             'updated_by' => $request->user()->id,
         ]);
 
