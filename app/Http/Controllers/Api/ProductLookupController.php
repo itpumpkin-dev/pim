@@ -109,7 +109,12 @@ class ProductLookupController extends Controller
             ->orderBy('sort_order')
             ->get()
             ->pluck('attribute')
-            ->filter();
+            ->filter()
+            // .unique('id') — 1 attribute อยู่ได้หลาย group ของ family เดียวกัน
+            // แล้ว (คนละแถวใน family_attributes) แต่ list นี้แค่ต้องการรายชื่อ
+            // attribute ของ family นั้น ไม่สนจำนวน placement — กันไม่ให้ขึ้นซ้ำ
+            ->unique('id')
+            ->values();
     }
 
     private function present(Product $product, Collection $attributes, Collection $valuesByAttribute, Collection $locales, Collection $channels): array

@@ -616,3 +616,66 @@ test('syncMasterProductList pages through every offset until total_products is e
     expect($result['synced'])->toBe(2);
     expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->count())->toBe(2);
 });
+
+test('syncMasterProductList deletes a cached listing that is no longer returned by Lazada at all', function () {
+    $shop = lpsShop();
+    LazadaProduct::create([
+        'sales_platform_shop_id' => $shop->id, 'item_id' => 999, 'seller_sku' => 'REMOVED-FROM-LAZADA',
+    ]);
+
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 1,
+        'products' => [['item_id' => 1, 'skus' => [['SellerSku' => 'STILL-THERE']]]],
+    ]], 200)]);
+
+    $this->service->syncMasterProductList($shop);
+
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'REMOVED-FROM-LAZADA')->exists())->toBeFalse();
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'STILL-THERE')->exists())->toBeTrue();
+});
+
+test('syncMasterProductList keeps a merely deactivated listing (still returned under filter=all with status=inactive)', function () {
+    $shop = lpsShop();
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 1,
+        'products' => [['item_id' => 1, 'skus' => [['SellerSku' => 'DEACTIVATED-SKU', 'Status' => 'inactive']]]],
+    ]], 200)]);
+
+    $this->service->syncMasterProductList($shop);
+
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'DEACTIVATED-SKU')->value('status'))->toBe('inactive');
+});
+
+test('syncMasterProductList does not wipe the whole shop cache when Lazada reports products but every sku fails to parse', function () {
+    $shop = lpsShop();
+    LazadaProduct::create([
+        'sales_platform_shop_id' => $shop->id, 'item_id' => 999, 'seller_sku' => 'PRE-EXISTING-SKU',
+    ]);
+
+    // total_products > 0 แต่ sku ของทุก product ไม่มี SellerSku เลย (ข้อมูลผิดปกติ
+    // ไม่ใช่ "ร้านนี้ไม่มีสินค้าจริงๆ") — ต้องไม่ลบ cache เดิมทิ้งทั้งร้าน
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 1,
+        'products' => [['item_id' => 1, 'skus' => [['SellerSku' => '']]]],
+    ]], 200)]);
+
+    $this->service->syncMasterProductList($shop);
+
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'PRE-EXISTING-SKU')->exists())->toBeTrue();
+});
+
+test('syncMasterProductList wipes the shop cache when Lazada legitimately reports zero products', function () {
+    $shop = lpsShop();
+    LazadaProduct::create([
+        'sales_platform_shop_id' => $shop->id, 'item_id' => 999, 'seller_sku' => 'SHOP-NOW-EMPTY',
+    ]);
+
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 0,
+        'products' => [],
+    ]], 200)]);
+
+    $this->service->syncMasterProductList($shop);
+
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->count())->toBe(0);
+});

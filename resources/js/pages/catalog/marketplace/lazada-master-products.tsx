@@ -1,8 +1,8 @@
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { FIORI, fioriCardSx, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx, fioriTableRowSx } from '@/lib/fiori-style';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import FirstPageIcon from '@mui/icons-material/FirstPage';
@@ -73,6 +73,12 @@ interface Props {
  * ดู LazadaMasterProductsController's docblock
  */
 export default function LazadaMasterProducts({ products, shops, filters, totalCached }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    // ปุ่ม sync เขียนข้อมูล (permission แยกจาก list_marketplace_lazada ที่ใช้เปิด
+    // หน้านี้ได้ — ดู routes/catalog.php) เมื่อก่อนโชว์ให้ทุกคนที่เข้าหน้านี้ได้เห็น
+    // ปุ่มเสมอ แม้ role จะไม่มีสิทธิ์ sync ก็ตาม กดแล้วเจอ 403 เงียบๆ โดยไม่รู้สาเหตุ
+    // — ซ่อนปุ่มไปเลยถ้าไม่มีสิทธิ์จริง เหมือนปุ่มเขียนข้อมูลอื่นๆ ในระบบนี้
+    const canSync = (auth.permissions || []).includes('marketplace_lazada.sync_master_products_lazada');
     const [search, setSearch] = useState(filters.search ?? '');
     const [shopId, setShopId] = useState<number | ''>(filters.shop_id ?? '');
     const [perPage, setPerPage] = useState<number>(filters.per_page ?? 25);
@@ -241,15 +247,17 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
                             สินค้าที่จริงๆ อยู่บน Lazada ทุกร้าน (cache ไว้ดู ไม่ผูกกับสินค้าใน PIM)
                         </Typography>
                     </Box>
-                    <Button
-                        variant="contained"
-                        disabled={syncing}
-                        startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon fontSize="small" />}
-                        onClick={syncNow}
-                        sx={fioriEmphasizedSx}
-                    >
-                        {syncing ? 'กำลัง Sync...' : 'Sync ทุกร้านตอนนี้'}
-                    </Button>
+                    {canSync && (
+                        <Button
+                            variant="contained"
+                            disabled={syncing}
+                            startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon fontSize="small" />}
+                            onClick={syncNow}
+                            sx={fioriEmphasizedSx}
+                        >
+                            {syncing ? 'กำลัง Sync...' : 'Sync ทุกร้านตอนนี้'}
+                        </Button>
+                    )}
                 </Stack>
 
                 <Paper elevation={0} sx={fioriCardSx}>
@@ -328,7 +336,9 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
                     {totalCached === 0 ? (
                         <Box sx={{ p: 4 }}>
                             <Alert severity="info">
-                                ยังไม่มีข้อมูล Master Product List เลย — กด &quot;Sync ทุกร้านตอนนี้&quot; เพื่อดึงข้อมูลจาก Lazada มาเก็บไว้ครั้งแรก
+                                {canSync
+                                    ? 'ยังไม่มีข้อมูล Master Product List เลย — กด "Sync ทุกร้านตอนนี้" เพื่อดึงข้อมูลจาก Lazada มาเก็บไว้ครั้งแรก'
+                                    : 'ยังไม่มีข้อมูล Master Product List เลย — ให้ผู้มีสิทธิ์ sync ดึงข้อมูลจาก Lazada มาเก็บไว้ก่อน'}
                             </Alert>
                         </Box>
                     ) : (

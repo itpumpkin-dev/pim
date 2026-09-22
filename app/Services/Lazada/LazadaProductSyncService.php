@@ -742,6 +742,7 @@ class LazadaProductSyncService
         $synced = 0;
         $total = 0;
         $now = now();
+        $seenSellerSkus = [];
 
         do {
             $response = $this->client->getAllProducts($offset, $limit);
@@ -779,6 +780,7 @@ class LazadaProductSyncService
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
+                    $seenSellerSkus[] = $sellerSku;
                 }
             }
 
@@ -798,6 +800,26 @@ class LazadaProductSyncService
                 usleep(300_000);
             }
         } while ($offset < $total);
+
+        // Anything cached for this shop but not seen anywhere in this sync is
+        // a listing that was genuinely removed from Lazada entirely (a merely
+        // *deactivated* listing still comes back under filter='all' with
+        // status='inactive' and gets upserted above) — unlike syncLiveStatus()
+        // above, there is no other meaning attached to this row's mere
+        // existence, so it's deleted outright rather than reset in place.
+        //
+        // Guarded by ($total === 0 || $seenSellerSkus !== []) on purpose: if
+        // Lazada reported this shop as having products (`$total > 0`) but
+        // every single one of them failed to yield a usable SellerSku (e.g. a
+        // response-shape surprise this defensive parsing didn't expect), skip
+        // the wipe entirely rather than delete every cached row for the shop
+        // off the back of what's more likely a parsing gap than a real "the
+        // seller emptied their entire shop" event.
+        if ($total === 0 || $seenSellerSkus !== []) {
+            LazadaProduct::where('sales_platform_shop_id', $shop->id)
+                ->whereNotIn('seller_sku', $seenSellerSkus)
+                ->delete();
+        }
 
         return ['synced' => $synced, 'total' => $total];
     }

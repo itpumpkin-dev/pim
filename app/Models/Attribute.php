@@ -47,7 +47,6 @@ class Attribute extends Model
         'is_ai_translate',
         'is_channel_based',
         'is_filterable',
-        'is_shared',
         'created_by',
         'updated_by',
     ];
@@ -61,7 +60,6 @@ class Attribute extends Model
             'is_ai_translate' => 'boolean',
             'is_channel_based' => 'boolean',
             'is_filterable' => 'boolean',
-            'is_shared' => 'boolean',
         ];
     }
 

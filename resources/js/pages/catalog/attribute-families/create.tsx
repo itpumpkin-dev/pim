@@ -11,6 +11,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import {
     Alert,
     Box,
@@ -29,6 +30,7 @@ import {
     ListItem,
     ListItemIcon,
     ListItemText,
+    Menu,
     MenuItem,
     Paper,
     Select,
@@ -87,8 +89,16 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
     const [assignedGroups, setAssignedGroups] = useState<AssignedGroup[]>([]);
     const [unassignedAttrs, setUnassignedAttrs] = useState<AttributeItem[]>(attributes);
-    const [draggedAttr, setDraggedAttr] = useState<AttributeItem | null>(null);
+    // sourceGroupId: null = ลากมาจากคอลัมน์ "ยังไม่ได้จัดกลุ่ม" (การวางครั้งแรก),
+    // ไม่ null = ลากมาจาก group นั้นๆ อยู่แล้ว (ย้ายจาก group เดิมไป group ใหม่ —
+    // ต้องรู้ต้นทางเพราะตอนนี้ 1 attribute อยู่ได้หลาย group พร้อมกัน การลากจึง
+    // "ย้าย" แค่ตำแหน่งที่ลากมาเท่านั้น ไม่ใช่ล้างออกจากทุก group เหมือนเมื่อก่อน)
+    const [draggedAttr, setDraggedAttr] = useState<{ attr: AttributeItem; sourceGroupId: number | null } | null>(null);
     const [noGroupWarningOpen, setNoGroupWarningOpen] = useState(false);
+    // เมนู "เพิ่มเข้าอีกกลุ่ม" — เปิดจากปุ่ม + บนแถวแอตทริบิวต์ที่ถูกจัดกลุ่มแล้ว
+    // ต่างจากการลาก (ที่ "ย้าย") ตรงที่ปุ่มนี้ "เพิ่มสำเนาตำแหน่ง" โดยไม่เอาออกจาก
+    // group เดิมเลย — เป็นทางเดียวที่จะทำให้ 1 attribute อยู่ 2+ group พร้อมกันได้
+    const [addToGroupMenu, setAddToGroupMenu] = useState<{ element: HTMLElement; attr: AttributeItem; currentGroupId: number } | null>(null);
 
     // ข้อมูลการจับคู่กลุ่ม/แอตทริบิวต์ เก็บไว้ใน local state (assignedGroups) ด้านบน
     // ไม่ได้อยู่ใน data ของ useForm ดังนั้นถ้าเช็คแค่ isDirty อย่างเดียวจะจับการเปลี่ยนแปลง
@@ -150,42 +160,98 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
     // เฉพาะกลุ่มที่ยังไม่ถูกกำหนด — กันไม่ให้เลือกซ้ำจากใน dropdown
     const assignableGroups = groups.filter((g) => !assignedGroups.some((a) => a.id === g.id));
 
-    const handleMoveAttributeToGroup = (attr: AttributeItem, targetGroupId: number) => {
+    // การวาง "ครั้งแรก" จากคอลัมน์ Unassigned เข้า group ใดก็ได้ — ตัดออกจาก pool
+    // แล้วใส่เข้า group ปลายทางตัวเดียว (ยังไม่มีที่อื่นให้ "ย้ายจาก" เพราะเพิ่ง
+    // หยิบมาจาก Unassigned)
+    const handlePlaceFromUnassigned = (attr: AttributeItem, targetGroupId: number) => {
         setUnassignedAttrs((prev) => prev.filter((a) => a.id !== attr.id));
         setAssignedGroups((prev) =>
+            prev.map((g) =>
+                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id)
+                    ? { ...g, attributes: [...g.attributes, attr] }
+                    : g
+            )
+        );
+    };
+
+    // ลากแอตทริบิวต์ที่ถูกจัดกลุ่มอยู่แล้ว (sourceGroupId) ไปวางที่ group อื่น —
+    // "ย้าย" เฉพาะตำแหน่งที่ลากออกมาเท่านั้น ไม่แตะตำแหน่งอื่นที่ attribute
+    // ตัวเดียวกันอาจถูกวางไว้ในอีก group ก็ได้ (ต่างจากพฤติกรรมเดิมที่ล้างออกจาก
+    // "ทุก" group ก่อนค่อยใส่ใหม่ที่เดียว)
+    const handleMoveAttributeBetweenGroups = (attr: AttributeItem, sourceGroupId: number, targetGroupId: number) => {
+        if (sourceGroupId === targetGroupId) return;
+        setAssignedGroups((prev) =>
             prev.map((g) => {
-                const cleanAttrs = g.attributes.filter((a) => a.id !== attr.id);
-                if (g.id === targetGroupId) {
-                    return { ...g, attributes: [...cleanAttrs, attr] };
+                if (g.id === sourceGroupId) {
+                    return { ...g, attributes: g.attributes.filter((a) => a.id !== attr.id) };
                 }
-                return { ...g, attributes: cleanAttrs };
+                if (g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id)) {
+                    return { ...g, attributes: [...g.attributes, attr] };
+                }
+                return g;
             })
         );
     };
 
-    const handleMoveAttributeToUnassigned = (attr: AttributeItem) => {
+    // เพิ่ม "อีกตำแหน่ง" ให้ attribute ที่จัดกลุ่มอยู่แล้ว โดยไม่เอาออกจาก group
+    // เดิมเลย — ทางเดียวที่จะทำให้ 1 attribute อยู่ได้มากกว่า 1 group พร้อมกัน
+    // (เปิดจากปุ่ม + บนแถวแอตทริบิวต์ ดู addToGroupMenu ด้านล่าง)
+    const handleAddAttributeToGroup = (attr: AttributeItem, targetGroupId: number) => {
         setAssignedGroups((prev) =>
-            prev.map((g) => ({
-                ...g,
-                attributes: g.attributes.filter((a) => a.id !== attr.id),
-            }))
+            prev.map((g) =>
+                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id)
+                    ? { ...g, attributes: [...g.attributes, attr] }
+                    : g
+            )
         );
-        setUnassignedAttrs((prev) => {
-            if (prev.some((a) => a.id === attr.id)) return prev;
-            return [...prev, attr];
-        });
+    };
+
+    // เอาแอตทริบิวต์ออกจาก group ที่ระบุเพียง group เดียว — กลับไป Unassigned
+    // ก็ต่อเมื่อนี่คือตำแหน่งสุดท้ายที่เหลืออยู่เท่านั้น (ถ้ายังถูกวางไว้ที่ group
+    // อื่นอยู่ ให้ยังคงอยู่ที่นั่นต่อไปตามปกติ ไม่ต้องกลับไป Unassigned)
+    const handleRemoveAttributeFromGroup = (attr: AttributeItem, groupId: number) => {
+        const stillPlacedElsewhere = assignedGroups.some(
+            (g) => g.id !== groupId && g.attributes.some((a) => a.id === attr.id)
+        );
+
+        setAssignedGroups((prev) =>
+            prev.map((g) => (g.id === groupId ? { ...g, attributes: g.attributes.filter((a) => a.id !== attr.id) } : g))
+        );
+
+        if (!stillPlacedElsewhere) {
+            setUnassignedAttrs((prev) => (prev.some((a) => a.id === attr.id) ? prev : [...prev, attr]));
+        }
     };
 
     const handleRemoveGroup = (groupId: number) => {
         const groupToRemove = assignedGroups.find((g) => g.id === groupId);
         if (groupToRemove) {
-            setUnassignedAttrs((prev) => [...prev, ...groupToRemove.attributes]);
+            const remainingGroups = assignedGroups.filter((g) => g.id !== groupId);
+            // แอตทริบิวต์ที่ยังมีตำแหน่งเหลืออยู่ใน group อื่น ไม่ต้องกลับไป
+            // Unassigned — กลับเฉพาะตัวที่ group นี้เป็นที่อยู่แห่งสุดท้ายจริงๆ
+            const orphaned = groupToRemove.attributes.filter(
+                (attr) => !remainingGroups.some((g) => g.attributes.some((a) => a.id === attr.id))
+            );
+            if (orphaned.length > 0) {
+                setUnassignedAttrs((prev) => [...prev, ...orphaned]);
+            }
         }
         setAssignedGroups((prev) => prev.filter((g) => g.id !== groupId));
     };
 
     const handleDeleteAllGroups = () => {
-        const allAssigned = assignedGroups.flatMap((g) => g.attributes);
+        // ตัด id ซ้ำออกก่อนคืนกลับ Unassigned — attribute ตัวเดียวกันอาจถูกวางไว้
+        // มากกว่า 1 group พร้อมกันได้แล้ว ถ้าไม่ตัดซ้ำจะไปโผล่ซ้ำในคอลัมน์ Unassigned
+        const seenIds = new Set<number>();
+        const allAssigned: AttributeItem[] = [];
+        assignedGroups.forEach((g) => {
+            g.attributes.forEach((attr) => {
+                if (!seenIds.has(attr.id)) {
+                    seenIds.add(attr.id);
+                    allAssigned.push(attr);
+                }
+            });
+        });
         setUnassignedAttrs((prev) => [...prev, ...allAssigned]);
         setAssignedGroups([]);
     };
@@ -304,7 +370,11 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                         onDrop={(e) => {
                                                             e.preventDefault();
                                                             if (draggedAttr) {
-                                                                handleMoveAttributeToGroup(draggedAttr, group.id);
+                                                                if (draggedAttr.sourceGroupId === null) {
+                                                                    handlePlaceFromUnassigned(draggedAttr.attr, group.id);
+                                                                } else {
+                                                                    handleMoveAttributeBetweenGroups(draggedAttr.attr, draggedAttr.sourceGroupId, group.id);
+                                                                }
                                                                 setDraggedAttr(null);
                                                             }
                                                         }}
@@ -349,39 +419,65 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                         {/* รายการแอตทริบิวต์ในกลุ่ม */}
                                                         <Collapse in={group.expanded} timeout="auto" unmountOnExit>
                                                             <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
-                                                                {group.attributes.map((attr) => (
-                                                                    <Stack
-                                                                        key={attr.id}
-                                                                        draggable
-                                                                        onDragStart={() => setDraggedAttr(attr)}
-                                                                        direction="row"
-                                                                        alignItems="center"
-                                                                        justifyContent="space-between"
-                                                                        sx={{
-                                                                            py: 0.5,
-                                                                            px: 1,
-                                                                            borderRadius: 1,
-                                                                            cursor: 'grab',
-                                                                            bgcolor: FIORI.surface,
-                                                                            border: `1px solid ${FIORI.border}`,
-                                                                            '&:hover': { bgcolor: FIORI.hover },
-                                                                        }}
-                                                                    >
-                                                                        <Stack direction="row" alignItems="center" spacing={1}>
-                                                                            <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.border, fontSize: 16 }} />
-                                                                            <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.85rem' }}>
-                                                                                {attr.name || attr.code}
-                                                                            </Typography>
-                                                                        </Stack>
-                                                                        <IconButton
-                                                                            size="small"
-                                                                            onClick={() => handleMoveAttributeToUnassigned(attr)}
-                                                                            sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.error } }}
+                                                                {group.attributes.map((attr) => {
+                                                                    const placedGroupCount = assignedGroups.filter((g) =>
+                                                                        g.attributes.some((a) => a.id === attr.id)
+                                                                    ).length;
+
+                                                                    return (
+                                                                        <Stack
+                                                                            key={attr.id}
+                                                                            draggable
+                                                                            onDragStart={() => setDraggedAttr({ attr, sourceGroupId: group.id })}
+                                                                            direction="row"
+                                                                            alignItems="center"
+                                                                            justifyContent="space-between"
+                                                                            sx={{
+                                                                                py: 0.5,
+                                                                                px: 1,
+                                                                                borderRadius: 1,
+                                                                                cursor: 'grab',
+                                                                                bgcolor: FIORI.surface,
+                                                                                border: `1px solid ${FIORI.border}`,
+                                                                                '&:hover': { bgcolor: FIORI.hover },
+                                                                            }}
                                                                         >
-                                                                            <RemoveCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
-                                                                        </IconButton>
-                                                                    </Stack>
-                                                                ))}
+                                                                            <Stack direction="row" alignItems="center" spacing={1}>
+                                                                                <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.border, fontSize: 16 }} />
+                                                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.85rem' }}>
+                                                                                    {attr.name || attr.code}
+                                                                                </Typography>
+                                                                                {placedGroupCount > 1 && (
+                                                                                    <Typography
+                                                                                        variant="caption"
+                                                                                        title={t('attributeInMultipleGroups', { count: placedGroupCount })}
+                                                                                        sx={{ color: FIORI.brand, fontWeight: 600, fontSize: '0.7rem' }}
+                                                                                    >
+                                                                                        ×{placedGroupCount}
+                                                                                    </Typography>
+                                                                                )}
+                                                                            </Stack>
+                                                                            <Stack direction="row" alignItems="center" spacing={0.25}>
+                                                                                <IconButton
+                                                                                    size="small"
+                                                                                    title={t('addToAnotherGroup')}
+                                                                                    onClick={(e) => setAddToGroupMenu({ element: e.currentTarget, attr, currentGroupId: group.id })}
+                                                                                    sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.brand } }}
+                                                                                >
+                                                                                    <AddCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                                                                </IconButton>
+                                                                                <IconButton
+                                                                                    size="small"
+                                                                                    title={t('removeFromThisGroup')}
+                                                                                    onClick={() => handleRemoveAttributeFromGroup(attr, group.id)}
+                                                                                    sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.error } }}
+                                                                                >
+                                                                                    <RemoveCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                                                                </IconButton>
+                                                                            </Stack>
+                                                                        </Stack>
+                                                                    );
+                                                                })}
                                                                 {group.attributes.length === 0 && (
                                                                     <Typography variant="caption" color="text.secondary" sx={{ pl: 1, fontStyle: 'italic' }}>
                                                                         {t('dropAttributeHere')}
@@ -423,10 +519,10 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={(e) => {
                                             e.preventDefault();
-                                            if (draggedAttr) {
-                                                handleMoveAttributeToUnassigned(draggedAttr);
-                                                setDraggedAttr(null);
+                                            if (draggedAttr && draggedAttr.sourceGroupId !== null) {
+                                                handleRemoveAttributeFromGroup(draggedAttr.attr, draggedAttr.sourceGroupId);
                                             }
+                                            setDraggedAttr(null);
                                         }}
                                         sx={{
                                             minHeight: 400,
@@ -449,7 +545,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                             e.preventDefault();
                                                             return;
                                                         }
-                                                        setDraggedAttr(attr);
+                                                        setDraggedAttr({ attr, sourceGroupId: null });
                                                     }}
                                                     sx={{
                                                         py: 0.8,
@@ -463,7 +559,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                                     }}
                                                     onClick={() => {
                                                         if (requireGroupBeforeAssigning()) return;
-                                                        handleMoveAttributeToGroup(attr, assignedGroups[0].id);
+                                                        handlePlaceFromUnassigned(attr, assignedGroups[0].id);
                                                     }}
                                                 >
                                                     <ListItemIcon sx={{ minWidth: 28, color: FIORI.border }}>
@@ -599,6 +695,33 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                     {t('noAttributeGroupsWarning')}
                 </Alert>
             </Snackbar>
+
+            {/* เมนู "เพิ่มเข้าอีกกลุ่ม" — เปิดจากปุ่ม + บนแถวแอตทริบิวต์ที่ถูกจัดกลุ่ม
+                แล้ว โชว์เฉพาะกลุ่มที่ attribute ตัวนี้ "ยังไม่ได้" อยู่ (กันเพิ่มซ้ำ) */}
+            <Menu anchorEl={addToGroupMenu?.element ?? null} open={Boolean(addToGroupMenu)} onClose={() => setAddToGroupMenu(null)}>
+                {addToGroupMenu &&
+                    (() => {
+                        const otherGroups = assignedGroups.filter(
+                            (g) => g.id !== addToGroupMenu.currentGroupId && !g.attributes.some((a) => a.id === addToGroupMenu.attr.id)
+                        );
+
+                        if (otherGroups.length === 0) {
+                            return <MenuItem disabled>{t('noOtherGroupsAvailable')}</MenuItem>;
+                        }
+
+                        return otherGroups.map((g) => (
+                            <MenuItem
+                                key={g.id}
+                                onClick={() => {
+                                    handleAddAttributeToGroup(addToGroupMenu.attr, g.id);
+                                    setAddToGroupMenu(null);
+                                }}
+                            >
+                                {g.name}
+                            </MenuItem>
+                        ));
+                    })()}
+            </Menu>
         </AppLayout>
     );
 }

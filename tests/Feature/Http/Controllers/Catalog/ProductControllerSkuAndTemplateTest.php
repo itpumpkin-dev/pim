@@ -89,6 +89,76 @@ test('update grandfathers a legacy sku that predates the character rule as long 
     expect($product->fresh()->sku)->toBe('LEGACY SKU/OLD');
 });
 
+test('update grandfathers a legacy sku with stray whitespace AND a disallowed character (trim-asymmetry regression)', function () {
+    // Bug: $skuChanged เคยเทียบ trim(request) กับ DB ดิบๆ (ไม่ trim) — SKU เก่าที่
+    // มีทั้งช่องว่างติดมาด้วย "และ" มีอักขระอื่นปนอยู่ (เช่น "/") จะโดนตีความว่า
+    // "เปลี่ยนแล้ว" ทุกครั้งที่ save (เพราะ trim(request) !== ค่าดิบใน DB เสมอ) ทั้งที่
+    // ผู้ใช้ไม่ได้แตะ SKU เลย (ฟิลด์ถูก disabled) แล้วก็จะไปบังคับ regex กับ SKU
+    // เดิมที่มีอักขระต้องห้ามอยู่แล้ว ทำให้ save ไม่ผ่านไปตลอดกาล เพราะแก้ SKU เอง
+    // ไม่ได้อีกต่อไป
+    $product = Product::create(['sku' => 'BAD SKU/1 ', 'type' => 'simple', 'enabled' => false]);
+
+    $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => 'BAD SKU/1 ',
+        'type' => 'simple',
+        'enabled' => true,
+    ]);
+
+    pcController()->update($request, $product);
+
+    expect($product->fresh()->enabled)->toBeTrue();
+});
+
+test('update grandfathers an unchanged legacy variant sku that predates the character rule', function () {
+    $product = Product::create(['sku' => 'CONFIG-PARENT', 'type' => 'configurable', 'enabled' => false]);
+    $variant = Product::create(['sku' => 'BAD VARIANT/1', 'parent_id' => $product->id, 'type' => 'simple', 'enabled' => false]);
+
+    $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => $product->sku,
+        'type' => 'configurable',
+        'enabled' => true,
+        'variants' => [
+            ['id' => $variant->id, 'sku' => 'BAD VARIANT/1'],
+        ],
+    ]);
+
+    pcController()->update($request, $product);
+
+    expect($product->fresh()->enabled)->toBeTrue();
+});
+
+test('update rejects a genuinely changed variant sku with disallowed characters', function () {
+    $product = Product::create(['sku' => 'CONFIG-PARENT-2', 'type' => 'configurable', 'enabled' => false]);
+    $variant = Product::create(['sku' => 'OLD-VARIANT-SKU', 'parent_id' => $product->id, 'type' => 'simple', 'enabled' => false]);
+
+    $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => $product->sku,
+        'type' => 'configurable',
+        'enabled' => true,
+        'variants' => [
+            ['id' => $variant->id, 'sku' => 'new variant sku!'],
+        ],
+    ]);
+
+    expect(fn () => pcController()->update($request, $product))->toThrow(ValidationException::class);
+    expect($variant->fresh()->sku)->toBe('OLD-VARIANT-SKU');
+});
+
+test('update rejects a brand-new variant (no id yet) with a disallowed-character sku', function () {
+    $product = Product::create(['sku' => 'CONFIG-PARENT-3', 'type' => 'configurable', 'enabled' => false]);
+
+    $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => $product->sku,
+        'type' => 'configurable',
+        'enabled' => true,
+        'variants' => [
+            ['sku' => 'brand new bad sku!'],
+        ],
+    ]);
+
+    expect(fn () => pcController()->update($request, $product))->toThrow(ValidationException::class);
+});
+
 test('duplicate as a plain copy carries over attribute values and categories (unchanged existing behavior)', function () {
     $source = Product::create(['sku' => 'SRC-SKU', 'type' => 'simple', 'enabled' => true]);
     $category = Category::create(['code' => 'cat-'.uniqid(), 'name' => 'Test Category']);
@@ -211,4 +281,35 @@ test('update removing one of two existing videos deletes only the removed file f
 
     Storage::disk('public')->assertExists($keptPath);
     Storage::disk('public')->assertMissing($removedPath);
+});
+
+test('update rejects more than MAX_VIDEO_COUNT kept paths even when no new file is uploaded in the request', function () {
+    // Bug: the per-attribute count cap only ran inside the file-upload merge
+    // loop, which only visits an attribute when $request->file('values') has
+    // a real UploadedFile for it — a request carrying only 4+ kept path
+    // strings (no new file at all, e.g. a direct API/devtools request that
+    // bypasses the UI's own client-side cap) skipped that loop entirely and
+    // sailed straight through to being saved, uncapped.
+    Storage::fake('public');
+
+    $product = Product::create(['sku' => 'VIDEO-BYPASS', 'type' => 'simple', 'enabled' => false]);
+    $videoAttr = Attribute::create(['code' => 'promo_video4', 'type' => 'video']);
+
+    $keptPaths = collect(range(1, 4))
+        ->map(fn ($i) => UploadedFile::fake()->create("kept{$i}.mp4", 256, 'video/mp4')->store('product-attributes', 'public'))
+        ->all();
+
+    $request = Request::create(
+        "/catalog/products/{$product->id}",
+        'PUT',
+        [
+            'sku' => $product->sku,
+            'type' => 'simple',
+            'enabled' => false,
+            'values' => [$videoAttr->id => ['global' => ['default' => $keptPaths]]],
+        ]
+    );
+
+    expect(fn () => pcController()->update($request, $product))->toThrow(ValidationException::class);
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $videoAttr->id)->exists())->toBeFalse();
 });

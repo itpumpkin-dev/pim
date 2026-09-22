@@ -210,7 +210,10 @@ class ProductController extends Controller
             ->whereIn('family_id', $familyIds)
             ->get(['family_id', 'attribute_id'])
             ->groupBy('family_id')
-            ->map(fn ($rows) => $rows->pluck('attribute_id'));
+            // .unique() — attribute ตัวเดียวกันอาจมีหลายแถวต่อ family เดียวกันได้
+            // แล้ว (คนละ group) นับถ้าไม่ตัดซ้ำ % ความสมบูรณ์ด้านล่างจะเพี้ยน
+            // (attribute ที่ซ้ำจะไปมีน้ำหนักในทั้งตัวเศษและตัวส่วนมากกว่าที่ควร)
+            ->map(fn ($rows) => $rows->pluck('attribute_id')->unique());
 
         $productIds = $gridData->getCollection()->pluck('id');
         $parentIds = $gridData->getCollection()->pluck('parent_id')->filter()->unique();
@@ -868,7 +871,10 @@ class ProductController extends Controller
             ->whereIn('attribute_id', $localeBasedAttributeIds)
             ->get(['family_id', 'attribute_id'])
             ->groupBy('family_id')
-            ->map(fn ($rows) => $rows->pluck('attribute_id')->all());
+            // .unique() — ด้านล่างวนคำนวณ % ความครบถ้วนของคำแปลจาก list นี้ตรงๆ
+            // (ไม่ใช่แค่เช็ค membership) attribute ที่ซ้ำ (คนละ group ของ family
+            // เดียวกัน) จะไปถูกนับ 2 ครั้งทำให้ % เพี้ยนถ้าไม่ตัดซ้ำก่อน
+            ->map(fn ($rows) => $rows->pluck('attribute_id')->unique()->all());
         $familiesWithAnyAssignment = FamilyAttribute::whereIn('family_id', $familyIds)->pluck('family_id')->unique()->all();
 
         $rowsByProductAttribute = [];
@@ -1805,6 +1811,44 @@ class ProductController extends Controller
     }
 
     /**
+     * รวม family_attributes ของทุก family ที่มีผลกับสินค้า ($effectiveFamilyIds
+     * จาก effectiveFamilyIds() — เรียงตามลำดับความสำคัญ) เข้าเป็นชุดเดียว — ถ้า
+     * attribute ตัวเดียวกันถูกผูกอยู่ในมากกว่าหนึ่ง family ให้ family ที่มาก่อน
+     * "ชนะ" ทั้งหมด (ทุกแถว/ทุก group ของ attribute นั้นใน family นั้น) ส่วน
+     * family ที่มาทีหลังจะถูกข้าม attribute ตัวนั้นไปเลย
+     *
+     * ต่างจากการทำแค่ ->unique('attribute_id') เฉยๆ ตรงที่ยังคง "ทุกแถว" ของ
+     * attribute ที่ family ผู้ชนะผูกไว้เอง แทนที่จะเหลือแค่แถวแรกที่เจอ — จำเป็น
+     * ตั้งแต่ 1 attribute อยู่ได้หลาย group ภายใน family เดียวกันแล้ว (ดู migration
+     * 2026_09_22_000002_allow_same_family_multi_group_family_attributes) ไม่งั้น
+     * attribute ที่ตั้งใจใส่ไว้ 2 group ของ family เดียวกันจะโดนตัดเหลือ group เดียว
+     *
+     * @param  array<int, int>  $effectiveFamilyIds
+     * @param  array<int, string>  $with  relation ให้ eager-load บน FamilyAttribute
+     */
+    private function resolveEffectiveFamilyAttributes(array $effectiveFamilyIds, array $with = []): \Illuminate\Support\Collection
+    {
+        $familyAttributesByFamily = FamilyAttribute::with($with)
+            ->whereIn('family_id', $effectiveFamilyIds)
+            ->orderBy('sort_order')
+            ->get()
+            ->groupBy('family_id');
+
+        $resolved = collect();
+        $claimedAttributeIds = [];
+
+        foreach ($effectiveFamilyIds as $familyId) {
+            $rowsForFamily = $familyAttributesByFamily->get($familyId, collect())
+                ->reject(fn (FamilyAttribute $row) => in_array($row->attribute_id, $claimedAttributeIds, true));
+
+            $resolved = $resolved->merge($rowsForFamily);
+            $claimedAttributeIds = array_merge($claimedAttributeIds, $rowsForFamily->pluck('attribute_id')->unique()->all());
+        }
+
+        return $resolved->values();
+    }
+
+    /**
      * pcatname/psubcatname/productgroupname (แผง "Master Categories") เป็น
      * ฟิลด์แบบเลือกได้ค่าเดียวต่อระดับ (ไม่ใช่ multi-select เหมือน category_ids)
      * — ProductCategoryLinker::linkFromCodes() เองตั้งใจให้เป็น additive-only
@@ -2189,30 +2233,11 @@ class ProductController extends Controller
         $families = AttributeFamily::select('id', 'code', 'name')->get();
 
         // ดึง pivot family_attributes ของ "ทุก" ตระกูลที่มีผลกับสินค้านี้ตอนนี้
-        // (ดู effectiveFamilyIds()) เรียงตามลำดับความสำคัญของตระกูล แล้วค่อย
-        // sort_order ภายในตระกูลนั้น — ถ้า attribute ตัวเดียวกันถูกผูกซ้ำใน
-        // มากกว่าหนึ่งตระกูล ให้ตัวจากตระกูลที่มาก่อนชนะ (unique('attribute_id')
-        // เก็บตัวที่เจอก่อนไว้)
+        // (ดู effectiveFamilyIds()) — resolveEffectiveFamilyAttributes() จัดการ
+        // เรื่องลำดับความสำคัญของตระกูล + คงทุก group ของ attribute ที่ family
+        // ผู้ชนะผูกไว้เอง (รวมเป็น query เดียว ไม่ยิงแยกทีละ family กัน N+1) ไว้แล้ว
         $effectiveFamilyIds = $this->effectiveFamilyIds($product);
-        // รวมเป็น query เดียวแล้ว groupBy family_id แทนที่จะยิง
-        // FamilyAttribute::where('family_id', ...)->get() แยกทีละ family ในลูป
-        // ข้างล่าง — เดิมทำแบบนั้นจะกลายเป็น N+1 query (family ละ ~7 query จาก
-        // eager load ของ attribute/options/translations/group) สำหรับสินค้าที่
-        // effective family หลายตัว เหมือน pattern เดียวกับที่ variants loop
-        // ด้านล่างเลี่ยงไว้แล้ว orderBy('sort_order') ก่อน groupBy() ยังคงลำดับ
-        // sort_order ภายในแต่ละ family ไว้เหมือนเดิม ส่วนลำดับความสำคัญของ
-        // family (family ไหนมาก่อนใน $effectiveFamilyIds ชนะตอน unique() ด้านล่าง)
-        // มาจากการวน merge ตามลำดับ $effectiveFamilyIds เอง
-        $familyAttributesByFamily = FamilyAttribute::with(['attribute.options', 'attributeGroup'])
-            ->whereIn('family_id', $effectiveFamilyIds)
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('family_id');
-        $familyAttributes = collect();
-        foreach ($effectiveFamilyIds as $familyId) {
-            $familyAttributes = $familyAttributes->merge($familyAttributesByFamily->get($familyId, collect()));
-        }
-        $familyAttributes = $familyAttributes->unique('attribute_id')->values();
+        $familyAttributes = $this->resolveEffectiveFamilyAttributes($effectiveFamilyIds, ['attribute.options', 'attributeGroup']);
 
         $user = auth()->user();
         $lazadaMandatoryAttributeIds = $this->lazadaMandatoryAttributeIds($product);
@@ -3269,7 +3294,14 @@ class ProductController extends Controller
         // request ตรงๆ (เช่น API/devtools) เฉพาะตอนค่าที่ส่งมาจริงๆ ต่างจากค่าเดิม
         // ในระบบเท่านั้นถึงจะบังคับ regex — ป้องกันไม่ให้ SKU เก่าที่เคยกรอกไว้ก่อน
         // มีกฎนี้ (อาจมีอักขระอื่นปนอยู่) ทำให้ save ฟิลด์อื่นไม่ผ่านไปด้วย
-        $skuChanged = $request->input('sku') !== $product->sku;
+        //
+        // เทียบกับค่าที่ trim() แล้วทั้งสองฝั่ง (ไม่ใช่แค่ฝั่ง request) — ไม่งั้น
+        // ถ้า SKU เดิมใน DB มีช่องว่างหน้า/หลังติดมาด้วย (ข้อมูลเก่าก่อนมี trim
+        // ฝั่งนี้) ค่าที่ trim แล้วจาก trimSkuInputs() ด้านบนจะเทียบไม่ตรงกับค่าเดิม
+        // ที่ยังไม่ได้ trim เสมอ ทำให้ระบบเข้าใจผิดว่า "เปลี่ยนแล้ว" ทั้งที่ผู้ใช้ไม่ได้
+        // แตะฟิลด์นี้เลย (มันถูก disabled อยู่) แล้วไปบังคับ regex ใหม่กับ SKU เก่าที่
+        // มีอักขระอื่นปนอยู่ด้วย จน save ไม่ผ่านอีกเลยตลอดกาล เพราะแก้ฟิลด์นี้เองไม่ได้
+        $skuChanged = $request->input('sku') !== trim((string) $product->sku);
 
         $validator = Validator::make($request->all(), [
             'sku' => [
@@ -3323,7 +3355,13 @@ class ProductController extends Controller
         // ต้อง grandfather เหมือนฟิลด์ sku หลักด้านบน — บังคับ regex เฉพาะแถวที่
         // ค่าจริงๆ เปลี่ยนไปจากเดิม (หรือเป็นแถว variant ใหม่ที่ยังไม่มี id)
         // เท่านั้น ไม่งั้น save สินค้าเก่าที่มี variant SKU ไม่ตรง pattern จะพังไปด้วย
-        $existingVariantSkus = Product::where('parent_id', $product->id)->pluck('sku', 'id');
+        // — ต้อง trim() ค่าที่ดึงมาจาก DB ด้วย (ไม่ใช่แค่ค่าที่ส่งมาจาก request)
+        // ไม่งั้น variant SKU เก่าที่มีช่องว่างติดมาด้วยจะเทียบไม่ตรงกับค่าที่ trim
+        // แล้วเสมอ ทำให้ระบบเข้าใจผิดว่า "เปลี่ยนแล้ว" ทั้งที่ผู้ใช้ไม่ได้แก้อะไรเลย
+        // (บั๊กเดียวกับที่เจอใน $skuChanged ของฟิลด์ sku หลักด้านบน)
+        $existingVariantSkus = Product::where('parent_id', $product->id)
+            ->pluck('sku', 'id')
+            ->map(fn ($sku) => trim((string) $sku));
 
         $validator->after(function ($validator) use ($request) {
             $validAttributeIds = null;
@@ -3618,20 +3656,28 @@ class ProductController extends Controller
             // ตอน render หน้าแก้ไข — ไม่งั้น attribute ที่มาจากตระกูลที่ 2 (ผูก
             // เพิ่มทีหลังที่กลุ่มสินค้า) จะหา group ไม่เจอตรงนี้ แล้วเผลอข้ามการเช็ค
             // สิทธิ์ระดับ group ไปแบบเงียบๆ
+            //
+            // groupBy() ไม่ใช่ keyBy() — 1 attribute อยู่ได้หลาย group พร้อมกันแล้ว
+            // (ทั้งภายใน family เดียวกัน และข้าม family ถ้า effective มากกว่าหนึ่ง
+            // family) ต้องเช็คทุก group ที่ attribute นั้นสังกัดอยู่ ไม่ใช่แค่ group
+            // เดียวที่เจอล่าสุด — ถ้า group ไหน group หนึ่ง read-only ก็ต้องปฏิเสธ
+            // (deny-if-any-restricted เหมือนที่ AttributeAccessPolicy ใช้อยู่แล้ว)
             $attributeGroupsById = FamilyAttribute::with('attributeGroup')
                 ->whereIn('family_id', $this->effectiveFamilyIds($product))
                 ->whereIn('attribute_id', $touchedAttributeIds)
                 ->get()
-                ->keyBy('attribute_id')
-                ->map(fn ($fa) => $fa->attributeGroup);
+                ->groupBy('attribute_id')
+                ->map(fn ($rows) => $rows->pluck('attributeGroup')->filter());
 
             $canEditTouchedAttribute = function ($attribute) use ($user, $attributeGroupsById) {
                 if (! $user) {
                     return true;
                 }
-                $group = $attributeGroupsById->get($attribute->id);
-                if ($group && ! $this->canUserEditAttributeGroup($user, $group)) {
-                    return false;
+                $groups = $attributeGroupsById->get($attribute->id, collect());
+                foreach ($groups as $group) {
+                    if (! $this->canUserEditAttributeGroup($user, $group)) {
+                        return false;
+                    }
                 }
 
                 return $this->canUserEditAttribute($user, $attribute);
@@ -3682,6 +3728,41 @@ class ProductController extends Controller
                                 if ($taken) {
                                     $valueErrors["values.{$attributeId}"] = "{$attribute->name} value \"{$stringVal}\" is already in use.";
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // เพดานจำนวนไฟล์ของ gallery/video (MAX_GALLERY_IMAGES/MAX_VIDEO_COUNT)
+            // เมื่อก่อนถูกบังคับแค่ในลูปอัปโหลดไฟล์ด้านบน ซึ่งวนแค่ entry ของ
+            // $request->file('values') ที่มีไฟล์ใหม่จริงๆ ปนมาเท่านั้น — request
+            // ที่ส่งมาแค่ path เดิมที่เก็บไว้ล้วนๆ (ไม่มีไฟล์ใหม่เลย เช่น ยิงตรงไป
+            // ที่ endpoint ข้าม UI ที่บังคับ limit ไว้แล้ว) จะไม่ผ่านลูปนั้นเลย เลย
+            // หลุด limit ไปได้ — เช็คซ้ำอีกชั้นตรงนี้กับค่าสุดท้ายที่จะบันทึกจริงๆ
+            // (หลังลูปไฟล์ด้านบน merge เสร็จแล้ว) ให้ authoritative จริง ไม่ใช่แค่ฝั่ง client
+            if (is_array($values)) {
+                foreach ($values as $attributeId => $channelValues) {
+                    if (! is_array($channelValues)) {
+                        continue;
+                    }
+
+                    $attribute = Attribute::find($attributeId);
+                    if (! $attribute || ! in_array($attribute->type, ['gallery', 'video'], true)) {
+                        continue;
+                    }
+
+                    $maxCount = $attribute->type === 'video' ? self::MAX_VIDEO_COUNT : self::MAX_GALLERY_IMAGES;
+                    $noun = $attribute->type === 'video' ? 'videos' : 'images';
+
+                    foreach ($channelValues as $localeValues) {
+                        if (! is_array($localeValues)) {
+                            continue;
+                        }
+
+                        foreach ($localeValues as $val) {
+                            if (is_array($val) && count($val) > $maxCount) {
+                                $valueErrors["values.{$attributeId}"] = "{$attribute->name}: You can upload up to {$maxCount} {$noun}.";
                             }
                         }
                     }
@@ -4467,12 +4548,12 @@ class ProductController extends Controller
     {
         // effectiveFamilyIds() ตัวเดียวกับ buildProductFormProps() — ต้อง sync
         // กันเสมอ ไม่งั้นการสลับ channel/locale จะดึงค่าของ attribute จากตระกูล
-        // ที่หน้าแก้ไข (ซึ่งใช้ตัวนี้ตอน render) ไม่ได้แสดงไว้ด้วยซ้ำ
+        // ที่หน้าแก้ไข (ซึ่งใช้ตัวนี้ตอน render) ไม่ได้แสดงไว้ด้วยซ้ำ —
+        // resolveEffectiveFamilyAttributes() ตัวเดียวกับที่นั่นใช้ (คง "ทุกแถว"
+        // ของ attribute ที่ family ผู้ชนะผูกไว้ ไม่ใช่แค่แถวแรกที่เจอ — จำเป็นตั้งแต่
+        // 1 attribute อยู่ได้หลาย group ภายใน family เดียวกันแล้ว)
         $effectiveFamilyIds = $this->effectiveFamilyIds($product);
-        $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
-            ->whereIn('family_id', $effectiveFamilyIds)
-            ->get()
-            ->unique('attribute_id');
+        $familyAttributes = $this->resolveEffectiveFamilyAttributes($effectiveFamilyIds, ['attribute', 'attributeGroup']);
 
         if ($familyAttributes->isNotEmpty()) {
             $attributes = $familyAttributes
@@ -4495,7 +4576,11 @@ class ProductController extends Controller
 
                     return ! $user || $this->canUserViewAttribute($user, $attr);
                 })
-                ->map(fn ($fa) => $fa->attribute);
+                // .unique('id') — attribute ตัวเดียวกันอาจผ่าน filter มาได้มากกว่า
+                // 1 ครั้งตอนนี้ (คนละ group ของ family เดียวกันที่ทั้งคู่มองเห็นได้)
+                // ต้องการแค่รายชื่อ attribute ที่ scope ได้ ไม่สนจำนวน placement
+                ->map(fn ($fa) => $fa->attribute)
+                ->unique('id');
         } elseif (! empty($effectiveFamilyIds)) {
             // ยังไม่มี family attribute ให้ใช้เลย (แต่ resolve family ได้จริง) —
             // edit() จะ fallback ไปโชว์ system attribute ทั้งหมดใต้หมวด "General"

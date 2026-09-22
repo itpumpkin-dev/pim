@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -88,18 +89,7 @@ class AttributeFamilyController extends Controller
     public function create(): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        // ตระกูลใหม่ยังไม่มี attribute เป็นของตัวเองเลยสักตัว — เลยไม่ต้องเช็ค
-        // "เป็นของ family นี้อยู่แล้ว" เหมือน edit() ด้านล่าง แค่ตัด attribute
-        // ที่ถูกผูกกับ family อื่นไปแล้ว (ไม่ว่าจะกี่ family ก็ตาม) ออกจากตัวเลือก
-        // ทั้งหมด กัน "แย่ง" attribute ที่ family อื่นใช้อยู่แล้วไปโดยไม่รู้ตัว —
-        // ยกเว้น attribute ที่ติ๊ก is_shared ไว้ (อนุญาตให้ใช้ซ้ำข้าม family ได้
-        // โดยเจตนา) ยังคงโชว์เป็นตัวเลือกได้เสมอ ไม่ว่าจะถูกผูกกับ family ไหน
-        // ไปแล้วกี่ตัวก็ตาม — ดู docblock เดียวกันที่ edit()
-        $attributes = Attribute::select('id', 'code', 'name', 'type', 'is_shared')
-            ->where(function ($query) {
-                $query->whereDoesntHave('families')->orWhere('is_shared', true);
-            })
-            ->get();
+        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
 
         return Inertia::render('catalog/attribute-families/create', [
             'groups' => $groups,
@@ -109,7 +99,7 @@ class AttributeFamilyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -117,6 +107,8 @@ class AttributeFamilyController extends Controller
             'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id'],
             'group_attributes.*.attribute_group_id' => ['required', 'exists:attribute_groups,id'],
         ]);
+        $this->guardAgainstDuplicateGroupAssignment($validator, $request);
+        $validated = $validator->validate();
 
         $translations = $validated['translations'] ?? [];
         $name = $this->resolveName($translations, $validated['name'] ?? null);
@@ -159,22 +151,7 @@ class AttributeFamilyController extends Controller
     public function edit(AttributeFamily $attributeFamily): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        // attribute หนึ่งตัวผูกได้หลาย family พร้อมกันจริงๆ (family_attributes
-        // ใช้ primary key แบบผสม (family_id, attribute_id) ไม่ได้บังคับ
-        // exclusive) แต่ user ไม่ต้องการให้หน้านี้เสนอ attribute ที่ถูกผูกกับ
-        // family อื่นไปแล้วเป็นตัวเลือก "ที่ยังไม่ได้ใช้" ให้หยิบมาเพิ่มอีก
-        // (กันแย่ง attribute ของ family อื่นโดยไม่รู้ตัว) เว้นแต่ติ๊ก is_shared
-        // ไว้ (อนุญาตให้ใช้ซ้ำข้าม family โดยเจตนา) — เลยกรองเหลือแค่ attribute
-        // ที่ยังไม่มี family เลย, ติ๊ก is_shared ไว้, หรือเป็นของ family นี้เอง
-        // (ต้องรวมของ family นี้ไว้ด้วย ไม่งั้น attribute ที่ assign อยู่แล้ว
-        // จะหายไปจากตัวเลือกที่ frontend ใช้ประกอบ "assigned" chip ด้วย)
-        $attributes = Attribute::select('id', 'code', 'name', 'type', 'is_shared')
-            ->where(function ($query) use ($attributeFamily) {
-                $query->whereDoesntHave('families')
-                    ->orWhere('is_shared', true)
-                    ->orWhereHas('families', fn ($q) => $q->where('family_id', $attributeFamily->id));
-            })
-            ->get();
+        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
 
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
             ->where('family_id', $attributeFamily->id)
@@ -200,7 +177,7 @@ class AttributeFamilyController extends Controller
 
     public function update(Request $request, AttributeFamily $attributeFamily): RedirectResponse
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -208,6 +185,8 @@ class AttributeFamilyController extends Controller
             'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id'],
             'group_attributes.*.attribute_group_id' => ['required', 'exists:attribute_groups,id'],
         ]);
+        $this->guardAgainstDuplicateGroupAssignment($validator, $request);
+        $validated = $validator->validate();
 
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($attributeFamily);
@@ -322,6 +301,43 @@ class AttributeFamilyController extends Controller
 
         return to_route('catalog.attributeFamilies.edit', $duplicate)
             ->with('success', "Duplicated as \"{$duplicate->code}\". Review and update before use.");
+    }
+
+    /**
+     * 1 attribute อยู่ได้หลาย group ภายใน family เดียวกันแล้ว (ดู migration
+     * 2026_09_22_000002_allow_same_family_multi_group_family_attributes) แต่
+     * คู่ (attribute_id, attribute_group_id) เดียวกันเป๊ะๆ ห้ามซ้ำ — มี unique
+     * constraint คุมไว้ที่ DB อยู่แล้ว แต่ปล่อยให้ FamilyAttribute::create()
+     * ชนเองจะกลายเป็น raw exception (500) แทนที่จะเป็น validation error ที่
+     * อ่านรู้เรื่อง เช็คตรงนี้ก่อนเพื่อให้ error friendly เหมือนจุดอื่นๆ ในฟอร์มนี้
+     * (ปกติ frontend เองก็กันไม่ให้ส่งคู่ซ้ำอยู่แล้ว — นี่คือด่านสุดท้ายเผื่อ
+     * request ยิงตรงมาที่ endpoint เอง ข้าม UI ไปเลย)
+     */
+    private function guardAgainstDuplicateGroupAssignment($validator, Request $request): void
+    {
+        $validator->after(function ($validator) use ($request) {
+            $seenPairs = [];
+
+            foreach ((array) $request->input('group_attributes', []) as $index => $item) {
+                $attributeId = $item['attribute_id'] ?? null;
+                $groupId = $item['attribute_group_id'] ?? null;
+                if ($attributeId === null || $groupId === null) {
+                    continue;
+                }
+
+                $pairKey = $attributeId.'-'.$groupId;
+                if (isset($seenPairs[$pairKey])) {
+                    $validator->errors()->add(
+                        "group_attributes.{$index}.attribute_id",
+                        'This attribute is already assigned to this same group.'
+                    );
+
+                    continue;
+                }
+
+                $seenPairs[$pairKey] = true;
+            }
+        });
     }
 
     private function resolveName(array $translations, ?string $name, ?string $code = null): string

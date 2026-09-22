@@ -3544,9 +3544,17 @@ function parseGalleryItems(value: AttributeValue): (string | File)[] {
     if (typeof value === 'string' && value) {
         try {
             const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) {
-                return parsed.filter((p): p is string => typeof p === 'string' && p !== '');
-            }
+            // สำคัญกับ video โดยเฉพาะ (ใช้ฟังก์ชันนี้ร่วมกับ gallery แล้ว — ดู
+            // attr.type === 'video' ด้านล่าง) เพราะ video เพิ่งมาเป็น array
+            // ทีหลัง ค่าเก่าที่มีอยู่แล้วในระบบเป็น path string เดี่ยวๆ มาตลอด —
+            // บางเส้นทางบังเอิญ parse เป็น JSON ที่ถูกต้องได้เฉยๆ (เช่น path ที่
+            // ดันเป็นตัวเลขล้วนๆ) โดยไม่ throw แต่ผลลัพธ์ไม่ใช่ array เลยต้องห่อ
+            // เป็น array เดียวกันกับตอน parse fail ด้านล่าง (ไม่งั้นวิดีโอ/รูปเก่า
+            // จะหายไปเงียบๆ แทนที่จะโชว์เป็น 1 รายการ) — เหมือน parseVideoPaths()
+            // ของ show.tsx เป๊ะ
+            return Array.isArray(parsed)
+                ? parsed.filter((p): p is string => typeof p === 'string' && p !== '')
+                : [value];
         } catch {
             // ไม่ใช่ JSON — เป็น string path เดี่ยวๆ แบบเก่า ให้ถือว่าเป็นรูปที่มีอยู่แล้วหนึ่งรูป
             return [value];

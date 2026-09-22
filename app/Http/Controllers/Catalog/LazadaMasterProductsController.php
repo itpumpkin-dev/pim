@@ -37,7 +37,21 @@ class LazadaMasterProductsController extends Controller
             $perPage = 25;
         }
 
-        $query = LazadaProduct::query()->with('shop:id,name');
+        // เฉพาะร้านที่ role ของผู้ใช้คนนี้เข้าถึงได้ — mirror ของ
+        // LazadaAttributeMappingController::lazadaProducts() เป๊ะ (ดู
+        // User::canAccessShop()) เมื่อก่อนหน้านี้หน้านี้ไม่มี guard นี้เลย ทำให้
+        // user ที่ role ถูกจำกัดไว้แค่บางร้าน (ผ่าน role_sales_platform_restrictions)
+        // ยังเห็น/ค้นหาข้อมูลของทุกร้านได้หมด (แม้แต่ระบุ shop_id ของร้านที่ตัวเอง
+        // ไม่มีสิทธิ์ตรงๆ ทาง URL ก็ยังได้)
+        $shops = SalesPlatformShop::whereNotNull('lazada_seller_account_id')
+            ->orderBy('name')
+            ->get(['id', 'name', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
+        $allowedShopIds = $shops->pluck('id');
+
+        $query = LazadaProduct::query()->with('shop:id,name')
+            ->whereIn('sales_platform_shop_id', $allowedShopIds);
 
         if ($shopId) {
             $query->where('sales_platform_shop_id', $shopId);
@@ -51,6 +65,7 @@ class LazadaMasterProductsController extends Controller
         }
 
         $products = $query->orderByDesc('last_synced_at')
+            ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString()
             ->through(fn (LazadaProduct $product) => [
@@ -68,34 +83,33 @@ class LazadaMasterProductsController extends Controller
                 'shop' => $product->shop ? ['id' => $product->shop->id, 'name' => $product->shop->name] : null,
             ]);
 
-        // ทุกร้าน Lazada ที่มีในระบบ (ไม่ใช่แค่ร้านที่มี lazada_products อยู่แล้ว)
-        // — ให้ dropdown filter/ปุ่ม sync เห็นครบ แม้ร้านนั้นยังไม่เคย sync เลย
-        $shops = SalesPlatformShop::whereNotNull('lazada_seller_account_id')
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
         return Inertia::render('catalog/marketplace/lazada-master-products', [
             'products' => $products,
-            'shops' => $shops,
+            'shops' => $shops->map(fn (SalesPlatformShop $shop) => ['id' => $shop->id, 'name' => $shop->name])->values(),
             'filters' => [
                 'search' => $search,
                 'shop_id' => $shopId ? (int) $shopId : null,
                 'per_page' => $perPage,
             ],
-            'totalCached' => LazadaProduct::count(),
+            'totalCached' => LazadaProduct::whereIn('sales_platform_shop_id', $allowedShopIds)->count(),
         ]);
     }
 
     /**
-     * Sync ทุกร้าน Lazada ในคำขอเดียว — mirror ของ
+     * Sync ทุกร้าน Lazada ที่ผู้ใช้คนนี้มีสิทธิ์เข้าถึงในคำขอเดียว — mirror ของ
      * SalesPlatformController::syncLiveStatus() เป๊ะ (per-shop try/catch,
-     * ร้านหนึ่งพังไม่ทำให้ร้านอื่นหยุด, usleep ระหว่างร้านกัน rate limit)
+     * ร้านหนึ่งพังไม่ทำให้ร้านอื่นหยุด, usleep ระหว่างร้านกัน rate limit) บวก
+     * กรองด้วย canAccessShop() เหมือน index() ด้านบน — ไม่งั้น user ที่ role
+     * ถูกจำกัดไว้แค่บางร้านจะ trigger sync ของร้านอื่นที่ตัวเองไม่มีสิทธิ์ได้ด้วย
      */
-    public function sync(): RedirectResponse
+    public function sync(Request $request): RedirectResponse
     {
         set_time_limit(300);
 
-        $shops = SalesPlatformShop::whereNotNull('lazada_seller_account_id')->get();
+        $shops = SalesPlatformShop::whereNotNull('lazada_seller_account_id')
+            ->get(['id', 'name', 'lazada_seller_account_id', 'sales_platform_id'])
+            ->filter(fn (SalesPlatformShop $shop) => $request->user()?->canAccessShop($shop))
+            ->values();
 
         $totalSynced = 0;
         $failed = 0;

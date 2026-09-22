@@ -53,7 +53,6 @@ interface AttributeForm {
     is_ai_translate: boolean;
     is_channel_based: boolean;
     is_filterable: boolean;
-    is_shared: boolean;
     translations: Record<string, string>;
     [key: string]: string | boolean | Record<string, string>;
 }
@@ -90,7 +89,6 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
         is_ai_translate: true,
         is_channel_based: false,
         is_filterable: false,
-        is_shared: false,
         translations: {},
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
@@ -205,11 +203,7 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
                                 <FormControlLabel control={<Checkbox checked={data.is_ai_translate} onChange={(event) => setData('is_ai_translate', event.target.checked)} />} label={t('aiTranslate')} />
                                 <FormControlLabel control={<Checkbox checked={data.is_channel_based} onChange={(event) => setData('is_channel_based', event.target.checked)} />} label={t('valuePerChannel')} />
                                 <FormControlLabel control={<Checkbox checked={data.is_filterable} onChange={(event) => setData('is_filterable', event.target.checked)} />} label={t('isFilterable')} />
-                                <FormControlLabel control={<Checkbox checked={data.is_shared} onChange={(event) => setData('is_shared', event.target.checked)} />} label={t('isShared')} />
                             </Stack>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                {t('isSharedHelp')}
-                            </Typography>
                         </FioriField>
                     </FioriFormGroup>
 
