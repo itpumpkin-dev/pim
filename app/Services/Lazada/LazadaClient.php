@@ -115,7 +115,25 @@ class LazadaClient
      */
     public function getLiveProducts(int $offset = 0, int $limit = 50): array
     {
-        return $this->request('/products/get', ['filter' => 'live', 'offset' => $offset, 'limit' => $limit, 'options' => 1], requiresAccessToken: true);
+        return $this->fetchProducts('live', $offset, $limit);
+    }
+
+    /**
+     * เหมือน getLiveProducts() เป๊ะ แต่ `filter: 'all'` — เห็นทั้ง listing ที่
+     * active และ inactive (confirmed live แล้วว่า filter นี้ใช้ได้จริงผ่าน
+     * findProductBySku() ด้านล่าง ซึ่งใช้ตัวเดียวกันนี้อยู่แล้ว) ใช้โดย
+     * LazadaProductSyncService::syncMasterProductList() ที่ต้องการเห็น
+     * "ทุกอย่างที่จริงๆ อยู่บน Lazada ตอนนี้" เป็น ground truth ไม่ใช่แค่ตัวที่
+     * live อยู่ ณ ขณะนี้เท่านั้น (ต่างจาก syncLiveStatus() ที่สนใจแค่ live)
+     */
+    public function getAllProducts(int $offset = 0, int $limit = 50): array
+    {
+        return $this->fetchProducts('all', $offset, $limit);
+    }
+
+    private function fetchProducts(string $filter, int $offset, int $limit): array
+    {
+        return $this->request('/products/get', ['filter' => $filter, 'offset' => $offset, 'limit' => $limit, 'options' => 1], requiresAccessToken: true);
     }
 
     /**

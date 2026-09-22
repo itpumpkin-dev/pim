@@ -7,6 +7,7 @@ use App\Models\LazadaAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
 use App\Models\LazadaBrand;
+use App\Models\LazadaProduct;
 use App\Models\Product;
 use App\Models\SalesPlatformShop;
 use App\Services\Marketplace\ResolvesProductAttributeValues;
@@ -708,6 +709,97 @@ class LazadaProductSyncService
             ->update(['status' => null, 'last_synced_at' => $now]);
 
         return ['matched' => $productIdBySku->count(), 'total_live' => count($liveItemIdBySku)];
+    }
+
+    /**
+     * "Master Product List" ที่การ์ดใหม่ใน platform-hub.tsx (Lazada เท่านั้น
+     * ตอนนี้) เปิดไปหา — sync ทุก listing ที่จริงๆ อยู่บน Lazada ของร้านนี้
+     * (`filter='all'` ผ่าน LazadaClient::getAllProducts() — เห็นทั้ง
+     * active/inactive ไม่ใช่แค่ live แบบ syncLiveStatus() ด้านบน) ลงมาเก็บไว้
+     * ใน lazada_products แบบ 1 แถว = 1 SellerSku ไม่ว่าจะ match กับ PIM
+     * Product ตัวไหนได้หรือไม่ก็ตาม — ต่างจาก syncLiveStatus() ที่เขียนแค่
+     * product_platform_shops ซึ่งต้อง match SKU กับ PIM ได้ก่อนถึงจะมีแถวเลย
+     * (ดู creating migration ของ lazada_products สำหรับเหตุผลเต็มๆ)
+     *
+     * Pagination/pacing เหมือน syncLiveStatus() เป๊ะ (offset/limit=50,
+     * usleep(300_000) กันโดน rate limit "901: too frequent") ต่างกันที่ upsert
+     * เป็น chunk ทุกหน้าทันที (mirror ของ SyncLazadaBrandsJob's ทีละหน้า) ไม่ใช่
+     * รวบรวมไว้ทำท้ายสุดแบบ CategoryController::syncLazadaCategories() —
+     * เพราะจำนวนหน้าที่ต้องวนอาจมากพอที่ไม่อยากเสียของที่ดึงมาแล้วเปล่าๆถ้าหน้า
+     * ท้ายๆ ล้มเหลว/timeout ระหว่างทาง
+     *
+     * ชื่อสินค้า (`name`) อ่านแบบ defensive จาก `attributes.name` — ยังไม่เคย
+     * ยืนยัน live ว่า Lazada คืนคีย์นี้กลับมาจริงหรือไม่ (สิ่งที่ยืนยันแล้วจาก
+     * getLiveProducts()'s docblock ครอบคลุมแค่ item_id/images/skus) เผื่อไม่มี
+     * จะได้เป็น null เงียบๆ ไม่ throw
+     *
+     * @return array{synced: int, total: int}
+     */
+    public function syncMasterProductList(SalesPlatformShop $shop): array
+    {
+        $offset = 0;
+        $limit = 50;
+        $synced = 0;
+        $total = 0;
+        $now = now();
+
+        do {
+            $response = $this->client->getAllProducts($offset, $limit);
+            $products = $response['data']['products'] ?? [];
+
+            $rows = [];
+            foreach ($products as $liveProduct) {
+                $itemId = $liveProduct['item_id'] ?? null;
+                if (!$itemId) {
+                    continue;
+                }
+
+                $imageUrl = $liveProduct['images'][0] ?? null;
+                $name = $liveProduct['attributes']['name'] ?? null;
+
+                foreach ($liveProduct['skus'] ?? [] as $sku) {
+                    $sellerSku = $sku['SellerSku'] ?? null;
+                    if ($sellerSku === null || $sellerSku === '') {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'sales_platform_shop_id' => $shop->id,
+                        'item_id' => $itemId,
+                        'sku_id' => $sku['SkuId'] ?? null,
+                        'seller_sku' => $sellerSku,
+                        'shop_sku' => $sku['ShopSku'] ?? null,
+                        'name' => $name,
+                        'status' => $sku['Status'] ?? null,
+                        'quantity' => $sku['quantity'] ?? null,
+                        'price' => $sku['price'] ?? null,
+                        'image_url' => $imageUrl,
+                        'lazada_url' => $sku['Url'] ?? null,
+                        'last_synced_at' => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+
+            foreach (array_chunk($rows, 500) as $chunk) {
+                LazadaProduct::upsert(
+                    $chunk,
+                    ['sales_platform_shop_id', 'seller_sku'],
+                    ['item_id', 'sku_id', 'shop_sku', 'name', 'status', 'quantity', 'price', 'image_url', 'lazada_url', 'last_synced_at', 'updated_at']
+                );
+            }
+
+            $synced += count($rows);
+            $total = (int) ($response['data']['total_products'] ?? 0);
+            $offset += $limit;
+
+            if ($offset < $total) {
+                usleep(300_000);
+            }
+        } while ($offset < $total);
+
+        return ['synced' => $synced, 'total' => $total];
     }
 
     /**

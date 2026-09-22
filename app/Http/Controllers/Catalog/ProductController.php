@@ -111,6 +111,11 @@ class ProductController extends Controller
     // ดู buildProductFormProps()
     private const PRODUCT_TYPE_ATTRIBUTE_CODE = 'producttype';
 
+    // อักขระที่ SKU (ทั้งของสินค้าหลักและ variant) อนุญาตให้มีได้ — ตัวอักษร
+    // A-Z (ไม่สนตัวพิมพ์เล็ก/ใหญ่), ตัวเลข, ขีดกลาง(-), ขีดล่าง(_) เท่านั้น
+    // (ตามที่ user ยืนยัน) ดู trimSkuInputs()/store()/update() ด้านล่าง
+    private const SKU_REGEX = '/^[A-Za-z0-9_-]+$/';
+
     // Category code ของสาย "หมวดหมู่" วัตถุดิบ (v -> v001 -> v001001 — ดู
     // rawMaterialCategoryIds()) ใช้แทนกลไก flag Product.is_raw_material เดิม
     // (ดู migration add_is_raw_material_to_products_table) ที่ต้องไปติ๊กเลือก
@@ -1353,12 +1358,30 @@ class ProductController extends Controller
         ]);
     }
 
+    /**
+     * Trim ค่า sku ทั้งของสินค้าหลักและทุก variant ก่อน validate — กันช่องว่าง
+     * หน้า/หลังที่หลุดมาจาก copy-paste (ฝั่ง frontend เองก็ trim ตอน blur แล้ว
+     * แต่ backend ต้อง trim ซ้ำเผื่อมี request ตรงๆ ที่ไม่ผ่าน UI นี้)
+     */
+    private function trimSkuInputs(Request $request): void
+    {
+        $request->merge(['sku' => trim((string) $request->input('sku', ''))]);
+
+        $variants = (array) $request->input('variants', []);
+        foreach ($variants as $index => $variant) {
+            $variants[$index]['sku'] = trim((string) ($variant['sku'] ?? ''));
+        }
+        $request->merge(['variants' => $variants]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $productTypeAttributeId = Attribute::where('code', self::PRODUCT_TYPE_ATTRIBUTE_CODE)->value('id');
 
+        $this->trimSkuInputs($request);
+
         $validator = Validator::make($request->all(), [
-            'sku' => ['required', 'string', 'max:100', 'unique:products,sku'],
+            'sku' => ['required', 'string', 'max:100', 'regex:'.self::SKU_REGEX, 'unique:products,sku'],
             // ไม่มี family_id/category_id ให้เลือกตอนสร้างสินค้าแล้ว (เอาออกตาม
             // ที่ user ขอ) — สินค้าใหม่จะยังไม่มีตระกูล/กลุ่มสินค้าจนกว่าจะไปเลือก
             // กลุ่มสินค้าที่หน้าแก้ไข (ผ่านแอตทริบิวต์ productgroupname ในแผง
@@ -1387,6 +1410,7 @@ class ProductController extends Controller
                 'required_if:type,configurable',
                 'string',
                 'max:100',
+                'regex:'.self::SKU_REGEX,
                 'distinct',
                 'unique:products,sku',
                 Rule::notIn([$request->input('sku')]),
@@ -1394,6 +1418,9 @@ class ProductController extends Controller
             'variants.*.price' => ['nullable', 'numeric'],
             'variants.*.qty' => ['nullable', 'integer'],
             'variants.*.attributes' => ['nullable', 'array'],
+        ], [
+            'sku.regex' => 'SKU may only contain letters, numbers, dashes (-) and underscores (_).',
+            'variants.*.sku.regex' => 'SKU may only contain letters, numbers, dashes (-) and underscores (_).',
         ]);
 
         // variants.*.attributes เป็น associative map ที่ key คือ attribute id
@@ -1532,7 +1559,14 @@ class ProductController extends Controller
      */
     public function duplicate(Request $request, Product $product): RedirectResponse
     {
-        $duplicate = DB::transaction(function () use ($product, $request) {
+        // "Save as Template" (products/edit.tsx) เรียก endpoint เดียวกันนี้ด้วย
+        // as_template=true — ต่างจาก Duplicate ปกติตรงที่ไม่ copy ค่า attribute/
+        // หมวดหมู่ใดๆ มาจากต้นฉบับเลย (ดู copyValues ที่ copyProductData()
+        // ด้านล่าง) ได้แค่ "โครงสร้างเปล่าๆ" (family/type/configurable_attributes
+        // — กำหนดว่ามีฟิลด์ไหนให้กรอกบ้าง) ไม่ใช่ "สำเนาที่มีข้อมูลติดมาด้วย"
+        $asTemplate = $request->boolean('as_template');
+
+        $duplicate = DB::transaction(function () use ($product, $request, $asTemplate) {
             $newProduct = CodeGenerator::createWithRetry(
                 'products',
                 $product->sku.'-copy',
@@ -1548,7 +1582,7 @@ class ProductController extends Controller
                 column: 'sku',
             );
 
-            $this->copyProductData($product, $newProduct);
+            $this->copyProductData($product, $newProduct, copyValues: ! $asTemplate);
 
             if (strtolower($product->type) === 'configurable') {
                 foreach (Product::where('parent_id', $product->id)->get() as $variant) {
@@ -1567,7 +1601,7 @@ class ProductController extends Controller
                         column: 'sku',
                     );
 
-                    $this->copyProductData($variant, $newVariant);
+                    $this->copyProductData($variant, $newVariant, copyValues: ! $asTemplate);
                 }
             }
 
@@ -1577,10 +1611,14 @@ class ProductController extends Controller
         AuditLog::record('duplicated', $duplicate, null, [
             'duplicated_from_id' => $product->id,
             'duplicated_from_sku' => $product->sku,
+            'as_template' => $asTemplate,
         ]);
 
-        return to_route('catalog.products.edit', $duplicate)
-            ->with('success', "Duplicated as \"{$duplicate->sku}\" (disabled). Review and update before enabling.");
+        $message = $asTemplate
+            ? "Created template \"{$duplicate->sku}\" (empty structure, disabled). Fill in the details before enabling."
+            : "Duplicated as \"{$duplicate->sku}\" (disabled). Review and update before enabling.";
+
+        return to_route('catalog.products.edit', $duplicate)->with('success', $message);
     }
 
     /**
@@ -1591,10 +1629,18 @@ class ProductController extends Controller
      * เดียวกัน) หรือผิดไปเลยก็ตาม ส่วน `pid` จะซ่อมตัวเองผ่าน applySmartDefaults()
      * (เรียกก่อน เพื่อให้การ copy ค่าที่ไม่ unique อย่าง `pname` ในขั้นตอนถัดไป
      * ยังเขียนทับค่าเริ่มต้น "= SKU" ของมันด้วยชื่อจริงจากต้นฉบับได้)
+     *
+     * $copyValues = false (ใช้โดย "Save as Template") ข้าม ProductValue/หมวดหมู่
+     * ทั้งหมด เหลือแค่ applySmartDefaults() (pid/pname ของตัวมันเอง) — ได้
+     * โครงสร้างเปล่าๆ ตาม family/type เดิม โดยไม่มีข้อมูลจริงติดมาจากต้นฉบับเลย
      */
-    private function copyProductData(Product $source, Product $target): void
+    private function copyProductData(Product $source, Product $target, bool $copyValues = true): void
     {
         $target->applySmartDefaults();
+
+        if (! $copyValues) {
+            return;
+        }
 
         ProductValue::where('product_id', $source->id)
             ->whereHas('attribute', fn ($q) => $q->where('is_unique', false))
@@ -3197,8 +3243,21 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): RedirectResponse
     {
+        $this->trimSkuInputs($request);
+
+        // ฟิลด์ SKU ถูก disabled ไว้แล้วในหน้าแก้ไข (products/edit.tsx) เลยไม่ควร
+        // เปลี่ยนค่าได้ผ่าน UI ปกติ — แต่ยังกันไว้ฝั่ง backend อีกชั้นเผื่อมีการยิง
+        // request ตรงๆ (เช่น API/devtools) เฉพาะตอนค่าที่ส่งมาจริงๆ ต่างจากค่าเดิม
+        // ในระบบเท่านั้นถึงจะบังคับ regex — ป้องกันไม่ให้ SKU เก่าที่เคยกรอกไว้ก่อน
+        // มีกฎนี้ (อาจมีอักขระอื่นปนอยู่) ทำให้ save ฟิลด์อื่นไม่ผ่านไปด้วย
+        $skuChanged = $request->input('sku') !== $product->sku;
+
         $validator = Validator::make($request->all(), [
-            'sku' => ['required', 'string', 'max:100', 'unique:products,sku,'.$product->id],
+            'sku' => [
+                'required', 'string', 'max:100',
+                'unique:products,sku,'.$product->id,
+                ...($skuChanged ? ['regex:'.self::SKU_REGEX] : []),
+            ],
             // ไม่บังคับแล้ว (เอาช่อง Family ออกจากหน้าแก้ไขไปแล้ว — เลือกกลุ่มสินค้า
             // ที่แผง "Master Categories" แทน) สินค้าที่สร้างใหม่ทุกตัวตอนนี้ไม่มี
             // family_id ติดมาตั้งแต่ต้นด้วยซ้ำ (ดู store()) ถ้ายังบังคับ required
@@ -3234,11 +3293,19 @@ class ProductController extends Controller
             'variants.*.price' => ['nullable', 'numeric'],
             'variants.*.qty' => ['nullable', 'integer'],
             'variants.*.attributes' => ['nullable', 'array'],
+        ], [
+            'sku.regex' => 'SKU may only contain letters, numbers, dashes (-) and underscores (_).',
         ]);
 
         // เช็คกันแบบเดียวกับตอน store() เรื่อง "attribute id ใน variants.*.attributes
         // ที่ไม่รู้จัก" — ดูคอมเมนต์ตรงนั้นได้เลย เมื่อก่อน update() ไม่มีการเช็ค field
         // นี้เลย ปล่อยผ่านแบบไม่ validate อะไรเลย
+        // variant SKU เก่าที่มีอยู่แล้วก่อนกฎ regex นี้ (อาจมีอักขระอื่นปนอยู่)
+        // ต้อง grandfather เหมือนฟิลด์ sku หลักด้านบน — บังคับ regex เฉพาะแถวที่
+        // ค่าจริงๆ เปลี่ยนไปจากเดิม (หรือเป็นแถว variant ใหม่ที่ยังไม่มี id)
+        // เท่านั้น ไม่งั้น save สินค้าเก่าที่มี variant SKU ไม่ตรง pattern จะพังไปด้วย
+        $existingVariantSkus = Product::where('parent_id', $product->id)->pluck('sku', 'id');
+
         $validator->after(function ($validator) use ($request) {
             $validAttributeIds = null;
 
@@ -3253,6 +3320,25 @@ class ProductController extends Controller
 
                 foreach ($unknown as $badId) {
                     $validator->errors()->add("variants.{$index}.attributes", "Unknown attribute id \"{$badId}\".");
+                }
+            }
+        });
+
+        $validator->after(function ($validator) use ($request, $existingVariantSkus) {
+            foreach ((array) $request->input('variants', []) as $index => $variant) {
+                $sku = trim((string) ($variant['sku'] ?? ''));
+                if ($sku === '') {
+                    continue;
+                }
+
+                $variantId = $variant['id'] ?? null;
+                $oldSku = $variantId ? ($existingVariantSkus[$variantId] ?? null) : null;
+
+                if ($sku !== $oldSku && ! preg_match(self::SKU_REGEX, $sku)) {
+                    $validator->errors()->add(
+                        "variants.{$index}.sku",
+                        'SKU may only contain letters, numbers, dashes (-) and underscores (_).'
+                    );
                 }
             }
         });

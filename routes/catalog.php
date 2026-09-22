@@ -22,6 +22,7 @@ use App\Http\Controllers\Catalog\RawMaterialController;
 use App\Http\Controllers\Catalog\SubcategoryController;
 use App\Http\Controllers\Catalog\SalesPlatformController;
 use App\Http\Controllers\Catalog\LazadaAttributeMappingController;
+use App\Http\Controllers\Catalog\LazadaMasterProductsController;
 use App\Http\Controllers\Catalog\MarketplaceAttributeMappingController;
 use App\Http\Controllers\Catalog\TikTokAttributeMappingController;
 use App\Http\Controllers\Catalog\ShopeeAttributeMappingController;
@@ -142,6 +143,10 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // สิทธิ์เดียวกับที่ใช้บันทึกการแมป (categories,edit_categories) เพราะเป็น
     // ส่วนหนึ่งของ workflow เดียวกัน ไม่ใช่แค่ดูข้อมูล
     Route::get('marketplace/lazada/products/{product}/category-suggestions', [LazadaAttributeMappingController::class, 'categorySuggestions'])->name('marketplace.lazada.products.categorySuggestions')->middleware('permission:marketplace_lazada,edit_category_mapping_lazada');
+    // "Master Product List" — การ์ดที่ 4 ของ platform-hub.tsx (Lazada เท่านั้น
+    // ตอนนี้) — ดู LazadaMasterProductsController's docblock
+    Route::get('marketplace/lazada/master-products', [LazadaMasterProductsController::class, 'index'])->name('marketplace.lazada.masterProducts')->middleware('permission:marketplace_lazada,list_marketplace_lazada');
+    Route::post('marketplace/lazada/master-products/sync', [LazadaMasterProductsController::class, 'sync'])->name('marketplace.lazada.masterProducts.sync')->middleware('permission:marketplace_lazada,sync_master_products_lazada');
     Route::get('marketplace/shopee/products', [ShopeeAttributeMappingController::class, 'shopeeProducts'])->name('marketplace.shopee.products')->middleware('permission:products,list_products');
     Route::get('marketplace/shopee/products/{product}/detail', [ShopeeAttributeMappingController::class, 'productDetail'])->name('marketplace.shopee.products.detail')->middleware('permission:products,list_products');
     // ปุ่ม "แนะนำหมวดหมู่จาก Shopee" ของ Section 1 (Category Mapping) — mirror

@@ -124,6 +124,17 @@ test('getLiveProducts filters by live status with the given offset/limit', funct
     });
 });
 
+test('getAllProducts filters by "all" status (unlike getLiveProducts\' "live") with the given offset/limit', function () {
+    Http::fake(['*' => Http::response(['code' => '0', 'data' => []], 200)]);
+    (new LazadaClient(makeLazadaAccount()))->getAllProducts(20, 10);
+
+    Http::assertSent(function ($request) {
+        $params = lazadaRequestParams($request);
+
+        return $params['filter'] === 'all' && $params['offset'] === '20' && $params['limit'] === '10';
+    });
+});
+
 test('findProductBySku filters by "all" status (not "live", which would hide inactive items) and JSON-encodes the sku list', function () {
     Http::fake(['*' => Http::response(['code' => '0', 'data' => []], 200)]);
     (new LazadaClient(makeLazadaAccount()))->findProductBySku('SKU-1');

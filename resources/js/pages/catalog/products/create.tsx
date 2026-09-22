@@ -153,13 +153,15 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
         const selectedAttrs = attributes.filter((attr) => selectedAttrIds.includes(attr.id));
 
         const optionSets = selectedAttrs.map((attr) => {
-            return (attr.options || []).map((opt) => ({
-                attribute_id: attr.id,
-                attribute_code: attr.code,
-                option_id: opt.id,
-                option_code: opt.code || opt.admin_label || String(opt.id),
-                label: opt.admin_label || opt.code || String(opt.id),
-            }));
+            return (attr.options || [])
+                .filter((opt) => opt.is_active !== false)
+                .map((opt) => ({
+                    attribute_id: attr.id,
+                    attribute_code: attr.code,
+                    option_id: opt.id,
+                    option_code: opt.code || opt.admin_label || String(opt.id),
+                    label: opt.admin_label || opt.code || String(opt.id),
+                }));
         });
 
         if (optionSets.length === 0) {
@@ -239,6 +241,7 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                     required
                     value={row.sku}
                     onChange={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value)}
+                    onBlur={(e) => handleVariantFieldChange(row.__index, 'sku', e.target.value.trim())}
                     error={Boolean(errors[`variants.${row.__index}.sku` as keyof typeof errors])}
                     helperText={errors[`variants.${row.__index}.sku` as keyof typeof errors]}
                 />
@@ -406,6 +409,7 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                                 size="small"
                                 value={data.sku}
                                 onChange={(e) => setData('sku', e.target.value)}
+                                onBlur={(e) => setData('sku', e.target.value.trim())}
                                 placeholder={t('skuPlaceholder')}
                                 sx={fioriFieldStateSx(valueStateOf(errors.sku))}
                             />

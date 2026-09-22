@@ -7,6 +7,7 @@ use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaAttributeOptionMapping;
 use App\Models\LazadaBrand;
 use App\Models\LazadaCategory;
+use App\Models\LazadaProduct;
 use App\Models\LazadaSellerAccount;
 use App\Models\Locale;
 use App\Models\Product;
@@ -505,4 +506,113 @@ test('syncLiveStatus marks matched SKUs live and resets any previously-live row 
     expect(DB::table('product_platform_shops')->where('product_id', $stillLiveProduct->id)->value('status'))->toBe('live');
     expect(DB::table('product_platform_shops')->where('product_id', $stillLiveProduct->id)->value('platform_item_id'))->toBe('999');
     expect(DB::table('product_platform_shops')->where('product_id', $noLongerLiveProduct->id)->value('status'))->toBeNull();
+});
+
+// --- syncMasterProductList() ---
+
+test('syncMasterProductList calls getAllProducts (filter=all), not getLiveProducts, so inactive listings are seen too', function () {
+    $shop = lpsShop();
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => ['total_products' => 0, 'products' => []]], 200)]);
+
+    $this->service->syncMasterProductList($shop);
+
+    Http::assertSent(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $params);
+
+        return ($params['filter'] ?? null) === 'all';
+    });
+});
+
+test('syncMasterProductList caches one row per SellerSku, scoped to this shop', function () {
+    $shop = lpsShop();
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 1,
+        'products' => [
+            [
+                'item_id' => 555,
+                'images' => ['https://img.lazada.co.th/1.jpg'],
+                'attributes' => ['name' => 'Widget'],
+                'skus' => [
+                    ['SkuId' => 111, 'SellerSku' => 'SKU-A', 'ShopSku' => 'shop-a', 'Status' => 'active', 'quantity' => 10, 'price' => '199.00', 'Url' => 'https://lazada.co.th/a'],
+                    ['SkuId' => 112, 'SellerSku' => 'SKU-B', 'ShopSku' => 'shop-b', 'Status' => 'inactive', 'quantity' => 0, 'price' => '299.00', 'Url' => 'https://lazada.co.th/b'],
+                ],
+            ],
+        ],
+    ]], 200)]);
+
+    $result = $this->service->syncMasterProductList($shop);
+
+    expect($result)->toBe(['synced' => 2, 'total' => 1]);
+
+    $rowA = LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'SKU-A')->first();
+    expect($rowA)->not->toBeNull();
+    expect($rowA->item_id)->toBe(555);
+    expect($rowA->sku_id)->toBe(111);
+    expect($rowA->shop_sku)->toBe('shop-a');
+    expect($rowA->name)->toBe('Widget');
+    expect($rowA->status)->toBe('active');
+    expect($rowA->quantity)->toBe(10);
+    expect((string) $rowA->price)->toBe('199.00');
+    expect($rowA->image_url)->toBe('https://img.lazada.co.th/1.jpg');
+    expect($rowA->lazada_url)->toBe('https://lazada.co.th/a');
+
+    $rowB = LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'SKU-B')->first();
+    expect($rowB)->not->toBeNull();
+    expect($rowB->item_id)->toBe(555); // same product, second variant
+    expect($rowB->status)->toBe('inactive');
+});
+
+test('syncMasterProductList skips a sku with no SellerSku at all', function () {
+    $shop = lpsShop();
+    Http::fake(['*/products/get*' => Http::response(['code' => '0', 'data' => [
+        'total_products' => 1,
+        'products' => [
+            ['item_id' => 555, 'skus' => [['SkuId' => 1, 'SellerSku' => '']]],
+        ],
+    ]], 200)]);
+
+    $result = $this->service->syncMasterProductList($shop);
+
+    expect($result)->toBe(['synced' => 0, 'total' => 1]);
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->count())->toBe(0);
+});
+
+test('syncMasterProductList re-syncing the same SellerSku updates the existing row instead of duplicating it', function () {
+    $shop = lpsShop();
+    $callCount = 0;
+    Http::fake(function () use (&$callCount) {
+        $callCount++;
+        $status = $callCount === 1 ? 'active' : 'inactive';
+        $quantity = $callCount === 1 ? 5 : 0;
+
+        return Http::response(['code' => '0', 'data' => [
+            'total_products' => 1,
+            'products' => [['item_id' => 555, 'skus' => [['SellerSku' => 'SKU-A', 'Status' => $status, 'quantity' => $quantity]]]],
+        ]], 200);
+    });
+    $this->service->syncMasterProductList($shop);
+    $this->service->syncMasterProductList($shop);
+
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'SKU-A')->count())->toBe(1);
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->where('seller_sku', 'SKU-A')->value('status'))->toBe('inactive');
+});
+
+test('syncMasterProductList pages through every offset until total_products is exhausted', function () {
+    $shop = lpsShop();
+    $callCount = 0;
+    Http::fake(function () use (&$callCount) {
+        $callCount++;
+        $sku = $callCount === 1 ? 'SKU-PAGE-1' : 'SKU-PAGE-2';
+
+        return Http::response(['code' => '0', 'data' => [
+            'total_products' => 51,
+            'products' => [['item_id' => $callCount, 'skus' => [['SellerSku' => $sku]]]],
+        ]], 200);
+    });
+
+    $result = $this->service->syncMasterProductList($shop);
+
+    expect($callCount)->toBe(2);
+    expect($result['synced'])->toBe(2);
+    expect(LazadaProduct::where('sales_platform_shop_id', $shop->id)->count())->toBe(2);
 });

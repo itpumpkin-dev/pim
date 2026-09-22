@@ -804,12 +804,18 @@ export default function ProductEdit({
     const applyVariantGeneration = () => {
         const selectedAttrs = familyScopedVariantAttributes.filter((attr) => pendingVariantAttrIds.includes(attr.id));
 
-        const optionSets = selectedAttrs.map((attr) =>
-            (attr.options || []).map((opt) => ({
-                attribute_id: attr.id,
-                option_code: opt.code || opt.admin_label || String(opt.id),
-            })),
-        );
+        // เหมือน SelectControl ด้านล่าง — ตัวเลือกที่ถูกปิดใช้งาน (is_active === false)
+        // ไม่ควรถูกเสนอเป็นค่า variant ใหม่ แต่ถ้า variant ที่มีอยู่แล้วใช้ค่านั้นอยู่
+        // ต้องยังคงไว้ใน cartesian ไม่งั้น regenerate จะลบ variant เดิมทิ้งไปเฉยๆ
+        const optionSets = selectedAttrs.map((attr) => {
+            const usedCodes = new Set(data.variants.map((v) => v.attributes?.[attr.id]).filter((code): code is string => code !== undefined));
+            return (attr.options || [])
+                .filter((opt) => opt.is_active !== false || usedCodes.has(opt.code || opt.admin_label || String(opt.id)))
+                .map((opt) => ({
+                    attribute_id: attr.id,
+                    option_code: opt.code || opt.admin_label || String(opt.id),
+                }));
+        });
 
         if (optionSets.length === 0) {
             setVariantOverflow(null);
@@ -911,6 +917,14 @@ export default function ProductEdit({
                             setDataRef.current((prev) => {
                                 const updated = [...prev.variants];
                                 updated[index] = { ...updated[index], sku: newSku };
+                                return { ...prev, variants: updated };
+                            });
+                        }}
+                        onBlur={(e) => {
+                            const trimmedSku = e.target.value.trim();
+                            setDataRef.current((prev) => {
+                                const updated = [...prev.variants];
+                                updated[index] = { ...updated[index], sku: trimmedSku };
                                 return { ...prev, variants: updated };
                             });
                         }}
@@ -1552,11 +1566,17 @@ export default function ProductEdit({
     // ต่อ — ได้ "เทมเพลต" ที่เป็นสินค้าจริงตัวหนึ่งในระบบ พร้อมทำสำเนาต่อได้อีก
     // เรื่อยๆ โดยไม่ต้องสร้างตาราง/หน้าจอ "Template" แยกต่างหาก เรียกจากปุ่ม
     // ยืนยันใน dialog เท่านั้น (คลิกที่ MenuItem แค่เปิด dialog ไว้ก่อน)
+    //
+    // asTemplate:true (ต่างจากปุ่ม "ทำสำเนา" ธรรมดา) — บอก backend ไม่ให้ copy
+    // ค่า attribute/หมวดหมู่ใดๆ มาจากต้นฉบับเลย (ดู ProductController::
+    // copyProductData()) เทมเพลตที่ได้เลยเป็นแค่โครงสร้างเปล่าๆ ตาม family/
+    // type เดิม ไม่มีข้อมูลติดมาด้วย ตามที่ user ต้องการ
     const saveAsTemplate = () => {
         setSaveAsTemplateConfirmOpen(false);
         performSave({
             onSuccess: () =>
                 duplicateProduct({
+                    asTemplate: true,
                     errorMessage: (fallback) => t('savedButDuplicateFailedError', { error: fallback }),
                 }),
         });
@@ -1632,11 +1652,11 @@ export default function ProductEdit({
     // saveAsTemplate() นี้) ทำให้ error หายเงียบๆ ไม่มีอะไรบอกผู้ใช้เลยว่าทำไม
     // หน้าไม่ไปไหนต่อ — ใช้ pushResult ตัวเดียวกับ snackbar แจ้งผล push/deactivate
     // อยู่แล้ว แทนที่จะเพิ่ม state ใหม่
-    const duplicateProduct = (options?: { errorMessage?: (fallback: string) => string }) => {
+    const duplicateProduct = (options?: { asTemplate?: boolean; errorMessage?: (fallback: string) => string }) => {
         setDuplicating(true);
         router.post(
             `/catalog/products/${product.id}/duplicate`,
-            {},
+            { as_template: options?.asTemplate ?? false },
             {
                 // สำเร็จแล้ว backend redirect ไปหน้า Edit ของสำเนาใหม่เลย (ดู
                 // ProductController::duplicate()) เลยไม่ต้อง setDuplicateConfirmOpen(false)
@@ -2301,12 +2321,12 @@ export default function ProductEdit({
                                                                     <TextField
                                                                         fullWidth
                                                                         required
+                                                                        disabled
                                                                         size="small"
                                                                         value={data.sku}
-                                                                        onChange={(e) => setData('sku', e.target.value)}
                                                                         error={Boolean(errors.sku)}
                                                                         helperText={errors.sku}
-                                                                        sx={fioriFieldStateSx(valueStateOf(errors.sku))}
+                                                                        sx={fioriFieldStateSx('none')}
                                                                     />
                                                                 </Box>
                                                             )}
