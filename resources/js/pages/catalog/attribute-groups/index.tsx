@@ -88,6 +88,8 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteGroupId, setDeleteGroupId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [deleteUsage, setDeleteUsage] = useState<{ family_count: number; attribute_count: number; product_value_count: number } | null>(null);
+    const [deleteUsageLoading, setDeleteUsageLoading] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const firstRender = useRef(true);
@@ -104,6 +106,33 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
 
         return () => clearTimeout(timeout);
     }, [search]);
+
+    // ดึงจำนวนตระกูล/attribute/สินค้าที่กำลังใช้ group นี้อยู่มาโชว์ในไดอะล็อก
+    // ยืนยันลบก่อนกดยืนยันจริง — family_attributes.attribute_group_id เป็น
+    // cascadeOnDelete() และ product_values.attribute_group_id เป็น
+    // nullOnDelete() (ดู AttributeGroupController::usage()) ลบไปแล้วทั้งความ
+    // ผูกกับทุก family และค่าที่กรอกไว้ในกลุ่มนี้จะกู้คืนไม่ได้
+    useEffect(() => {
+        if (deleteGroupId === null) {
+            setDeleteUsage(null);
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        setDeleteUsageLoading(true);
+        setDeleteUsage(null);
+
+        fetch(`/catalog/attributeGroups/${deleteGroupId}/usage`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json) => setDeleteUsage(json))
+            .catch(() => undefined)
+            .finally(() => setDeleteUsageLoading(false));
+
+        return () => controller.abort();
+    }, [deleteGroupId]);
 
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
@@ -288,8 +317,30 @@ export default function AttributeGroupIndex({ gridConfig, gridData, filters }: P
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 confirmLoading={deleting}
+                confirmDisabled={deleteUsageLoading}
             >
-                {tCatalog('confirmDeleteAttributeGroupMessage')}
+                <Stack spacing={1}>
+                    <Typography variant="body2">{tCatalog('confirmDeleteAttributeGroupMessage')}</Typography>
+                    {deleteUsageLoading && (
+                        <Typography variant="body2" color="text.secondary">
+                            {tCatalog('checkingAttributeGroupUsage')}
+                        </Typography>
+                    )}
+                    {!deleteUsageLoading && deleteUsage && (deleteUsage.family_count > 0 || deleteUsage.product_value_count > 0) && (
+                        <Typography variant="body2" color="error.main" fontWeight={600}>
+                            {tCatalog('attributeGroupInUseWarning', {
+                                families: deleteUsage.family_count,
+                                attributes: deleteUsage.attribute_count,
+                                products: deleteUsage.product_value_count,
+                            })}
+                        </Typography>
+                    )}
+                    {!deleteUsageLoading && deleteUsage && deleteUsage.family_count === 0 && deleteUsage.product_value_count === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                            {tCatalog('attributeGroupNotInUse')}
+                        </Typography>
+                    )}
+                </Stack>
             </FioriMessageBox>
             <GridFilterDrawer
                 open={filterDrawerOpen}

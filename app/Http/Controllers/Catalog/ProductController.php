@@ -35,6 +35,7 @@ use App\Models\WooCommerceAttributeMapping;
 use App\Services\AppNotifier;
 use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\EffectiveFamilyAttributeResolver;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
@@ -136,7 +137,10 @@ class ProductController extends Controller
     // มันต่อจากนี้แล้วเฉยๆ
     private const RAW_MATERIAL_CATEGORY_CODE = 'v';
 
-    public function __construct(private readonly AttributeAccessPolicy $attributeAccess) {}
+    public function __construct(
+        private readonly AttributeAccessPolicy $attributeAccess,
+        private readonly EffectiveFamilyAttributeResolver $familyAttributeResolver,
+    ) {}
 
     /**
      * Category id ทั้งหมดในสายหมวดหมู่ "วัตถุดิบ" (RAW_MATERIAL_CATEGORY_CODE
@@ -592,7 +596,18 @@ class ProductController extends Controller
                     ->cursor()
                 as $value
             ) {
-                $rowsByProductAttribute[$value->product_id][$value->attribute_id][$value->locale_id ?? 'global'] = $value->value;
+                // attribute เดียวกันอาจมีหลายแถวตอนนี้ (คนละ attribute_group_id —
+                // ดู migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+                // รายงานนี้สนใจแค่ระดับ attribute ไม่ได้แยกราย group placement
+                // (ไม่งั้นต้องรื้อ UI ของรายงานใหม่ทั้งหมด) — ถือว่า "มีเนื้อหาใน
+                // ภาษานี้แล้ว" ถ้า placement ไหนก็ได้มีค่าจริง ไม่ใช่ทับกันแบบสุ่ม
+                // ตามลำดับที่ query คืนมา (ซึ่งจะซ่อนเนื้อหาจริงของอีก placement
+                // แบบไม่แน่นอนว่าเมื่อไหร่)
+                $key = $value->locale_id ?? 'global';
+                $existing = $rowsByProductAttribute[$value->product_id][$value->attribute_id][$key] ?? null;
+                if ($existing === null || trim((string) $existing) === '') {
+                    $rowsByProductAttribute[$value->product_id][$value->attribute_id][$key] = $value->value;
+                }
             }
         }
 
@@ -887,7 +902,15 @@ class ProductController extends Controller
                 ->select('product_id', 'attribute_id', 'locale_id', 'value')
                 ->get();
             foreach ($rows as $row) {
-                $rowsByProductAttribute[$row->product_id][$row->attribute_id][$row->locale_id ?? 'global'] = $row->value;
+                // ดู comment เดียวกันใน missingTranslations() — attribute
+                // เดียวกันอาจมีหลายแถวตอนนี้ (คนละ group placement) ถือว่า
+                // "มีเนื้อหาแล้ว" ถ้า placement ไหนก็ได้มีค่าจริง ไม่ทับกัน
+                // แบบสุ่มตามลำดับ query
+                $key = $row->locale_id ?? 'global';
+                $existing = $rowsByProductAttribute[$row->product_id][$row->attribute_id][$key] ?? null;
+                if ($existing === null || trim((string) $existing) === '') {
+                    $rowsByProductAttribute[$row->product_id][$row->attribute_id][$key] = $row->value;
+                }
             }
         }
 
@@ -1669,11 +1692,12 @@ class ProductController extends Controller
 
         ProductValue::where('product_id', $source->id)
             ->whereHas('attribute', fn ($q) => $q->where('is_unique', false))
-            ->get(['attribute_id', 'channel_id', 'locale_id', 'value'])
+            ->get(['attribute_id', 'attribute_group_id', 'channel_id', 'locale_id', 'value'])
             ->each(fn (ProductValue $value) => ProductValue::updateOrCreate(
                 [
                     'product_id' => $target->id,
                     'attribute_id' => $value->attribute_id,
+                    'attribute_group_id' => $value->attribute_group_id,
                     'channel_id' => $value->channel_id,
                     'locale_id' => $value->locale_id,
                 ],
@@ -1800,92 +1824,109 @@ class ProductController extends Controller
     }
 
     /**
-     * ตระกูลแอตทริบิวต์ที่ "มีผลจริง" กับสินค้าตัวนี้ตอนนี้ — แทนที่การอ่านจาก
-     * product.family_id เดิมตรงๆ (ตามที่ user เลือกตอนถูกถาม): มาจากตระกูลที่
-     * ผูกกับกลุ่มสินค้า (categories) ที่สินค้านี้อยู่ทุกตัว (ดู
-     * Category::attributeFamilies() — เรียงตาม sort_order ที่ตั้งไว้ในหน้าแก้ไข
-     * กลุ่มสินค้า) เป็นหลัก เพราะงั้นถ้ามีคนไปเพิ่มตระกูลที่ 2 ให้กลุ่มสินค้าทีหลัง
-     * สินค้าเดิมที่อยู่ในกลุ่มนั้นจะเห็นแอตทริบิวต์ของตระกูลใหม่ทันทีตอนเปิดแก้ไข
-     * โดยไม่ต้องแก้อะไรที่ตัวสินค้าเองเลย
+     * อัปโหลดไฟล์เดี่ยวของ attribute แบบ image/gallery/video/file ทันทีตอนที่ผู้ใช้เลือกไฟล์
+     * บนหน้าแก้ไขสินค้า (ก่อนกด Save ทั้งฟอร์มด้วยซ้ำ) เพื่อให้ frontend โชว์ progress bar
+     * การอัปโหลดจริงต่อไฟล์ (ดู resources/js/hooks/use-file-upload-rows.ts) แทนที่จะรอ
+     * อัปโหลดไปพร้อมกับ multipart ของทั้งฟอร์มตอน submit เหมือนเดิม
      *
-     * ไม่มี fallback กลับไปที่ product.family_id เดิมอีกต่อไป (เคยมีไว้ตอน
-     * migrate จากระบบเก่า — กันสินค้าที่มีอยู่แล้วทุกตัวเจอฟอร์มแอตทริบิวต์ว่างเปล่า
-     * ทันทีตั้งแต่วันที่ deploy ฟีเจอร์นี้ ก่อนแอดมินจะไปผูกตระกูลให้กลุ่มสินค้าจริงๆ
-     * ทีละกลุ่ม — ตอนนี้ผ่านช่วง migrate นั้นมานานแล้ว ตัดออกตามที่ user ขอ) ยังไม่ได้
-     * ผูกกลุ่มสินค้ากับตระกูลไหนเลย = ไม่มีตระกูล ไม่ว่า family_id เดิมจะมีค่าค้างอยู่
-     * หรือไม่ก็ตาม
+     * ใช้กฎ validation เดียวกับ $storeAttributeFile closure ใน update()/store() ทุกอย่าง
+     * (rules ตาม attribute type, validateVideoConstraints, validateImageConstraints) แล้ว
+     * เก็บลง disk เดียวกัน ('product-attributes') คืนแค่ path string กลับไป — ฝั่ง frontend
+     * จะส่ง path นี้กลับมาตอน submit ทั้งฟอร์มเป็น "kept path" ตัวเดิมที่ update() มีโค้ด
+     * รองรับ string ปนกับ File object อยู่แล้ว (ดูคอมเมนต์ของลูป $request->file('values'))
+     * เลยไม่ต้องแก้ logic ฝั่ง save เลยสักบรรทัด
      *
-     * @return array<int, int>  ลำดับที่ใช้ตอนแสดงผล (family ที่มาก่อนในลิสต์นี้
-     *                            แสดงก่อน) รองรับได้มากกว่า 1 ตระกูลพร้อมกันเสมอ —
-     *                            ดู resolveEffectiveFamilyAttributes() สำหรับวิธี
-     *                            รวม attribute ของหลายตระกูลเข้าด้วยกัน
+     * เหมือน uploadDescriptionImage() ด้านบน: ไฟล์จะค้างอยู่บน disk แบบกำพร้าถ้าผู้ใช้ไม่กด
+     * Save ในที่สุด (เลือกไฟล์แล้วปิดแท็บทิ้งไปเฉยๆ) — ยอมรับ tradeoff นี้เหมือนกับรูปที่ฝัง
+     * ใน rich-text description อยู่แล้ว ไม่ได้เป็นพฤติกรรมใหม่ที่ไม่เคยมีมาก่อนในระบบ
      */
-    private function effectiveFamilyIds(Product $product): array
+    public function uploadAttributeFile(Request $request, Product $product, Attribute $attribute): JsonResponse
     {
-        $categoryIds = $product->relationLoaded('categories')
-            ? $product->categories->pluck('id')
-            : $product->categories()->pluck('categories.id');
+        $rules = match (true) {
+            in_array($attribute->type, ['image', 'gallery'], true) => ['image', 'max:4096'],
+            $attribute->type === 'video' => ['file', 'mimes:mp4', 'max:102400'],
+            default => ['file', 'max:10240'],
+        };
 
-        return DB::table('category_attribute_family')
-            ->whereIn('category_id', $categoryIds)
-            ->orderBy('sort_order')
-            ->pluck('family_id')
-            ->unique()
-            ->values()
-            ->all();
+        $validated = $request->validate(['file' => $rules]);
+        $file = $validated['file'];
+
+        if ($attribute->type === 'video') {
+            $videoError = $this->validateVideoConstraints($file);
+            if ($videoError !== null) {
+                throw ValidationException::withMessages(['file' => $videoError]);
+            }
+        }
+
+        if (in_array($attribute->type, ['image', 'gallery'], true)) {
+            $imageError = $this->validateImageConstraints($file);
+            if ($imageError !== null) {
+                throw ValidationException::withMessages(['file' => $imageError]);
+            }
+        }
+
+        $path = $file->store('product-attributes', 'public');
+
+        return response()->json(['path' => $path, 'url' => Storage::url($path)]);
     }
 
     /**
-     * รวม family_attributes ของทุก family ที่มีผลกับสินค้า ($effectiveFamilyIds
-     * จาก effectiveFamilyIds() — เรียงตามลำดับความสำคัญ) เข้าเป็นชุดเดียว
-     *
-     * ตั้งใจให้รองรับ "ตระกูลพื้นฐานได้มากกว่า 1" — ถ้า attribute ตัวเดียวกันถูก
-     * ผูกอยู่ในหลาย family พร้อมกัน (เช่น family "พื้นฐาน" ผูกไว้ใน group ทั่วไป
-     * และ family เฉพาะสินค้าอีกตัวผูกไว้ใน group ของตัวเอง) ทุก family จะได้แสดง
-     * group ของตัวเองครบ ไม่มี family ไหน "ชนะ" แล้วบัง group ของอีก family ทิ้ง
-     * ไปทั้งกลุ่ม (เดิมกันด้วย attribute_id เฉยๆ ทำให้ family ที่มาทีหลังในลำดับ
-     * ความสำคัญเสีย attribute ทั้งตัวไป ถ้า attribute นั้นเป็นตัวเดียวที่มันมี
-     * group ทั้งกลุ่มของ family นั้นก็หายไปด้วย) — ลำดับความสำคัญใน
-     * effectiveFamilyIds() ตอนนี้มีผลแค่ "ลำดับการแสดงผล" เท่านั้น ไม่ได้ใช้ตัดสิน
-     * ว่า family ไหนมีสิทธิ์แสดง attribute นั้นอีกต่อไป
-     *
-     * กันซ้ำแค่ระดับคู่ (attribute_id, attribute_group_id) เดียวกันเป๊ะๆ เท่านั้น
-     * (เผื่อกรณีคนไปตั้ง 2 family ให้ผูก attribute ตัวเดียวกันไว้ใน group เดียวกัน
-     * เป๊ะๆ โดยบังเอิญ — ไม่งั้นจะเห็นฟิลด์เดียวกันซ้ำสองแถวในแผงเดียวกัน) ส่วน
-     * attribute เดียวกันที่อยู่คนละ group (ไม่ว่าจะอยู่ family เดียวกันหรือคนละ
-     * family) ถือเป็นคนละตำแหน่งที่ต้องแสดงทั้งคู่ — ค่าที่กรอกยังคงเป็นค่าเดียวกัน
-     * เสมอเพราะอ้าง attribute_id เดียวกัน (ไม่ได้แยกค่าตาม group)
-     *
-     * @param  array<int, int>  $effectiveFamilyIds
-     * @param  array<int, string>  $with  relation ให้ eager-load บน FamilyAttribute
+     * ตระกูลแอตทริบิวต์ที่ "มีผลจริง" กับสินค้าตัวนี้ตอนนี้ — thin wrapper รอบ
+     * EffectiveFamilyAttributeResolver::effectiveFamilyIds() (ย้ายตรรกะเต็มๆ
+     * ไปไว้ที่นั่นเพื่อให้ที่อื่นนอก controller นี้ เช่น backfill command ใช้ซ้ำได้
+     * — คงชื่อ/signature เดิมไว้ตรงนี้เพื่อไม่ต้องแก้ทุก call site ในไฟล์นี้)
+     */
+    private function effectiveFamilyIds(Product $product): array
+    {
+        return $this->familyAttributeResolver->effectiveFamilyIds($product);
+    }
+
+    /**
+     * thin wrapper รอบ
+     * EffectiveFamilyAttributeResolver::resolveEffectiveFamilyAttributes() —
+     * ดู docblock ที่นั่นสำหรับรายละเอียดตรรกะเต็มๆ
      */
     private function resolveEffectiveFamilyAttributes(array $effectiveFamilyIds, array $with = []): \Illuminate\Support\Collection
     {
-        $familyAttributesByFamily = FamilyAttribute::with($with)
-            ->whereIn('family_id', $effectiveFamilyIds)
-            ->orderBy('sort_order')
-            ->get()
-            ->groupBy('family_id');
+        return $this->familyAttributeResolver->resolveEffectiveFamilyAttributes($effectiveFamilyIds, $with);
+    }
 
-        $resolved = collect();
-        $seenPairs = [];
-
-        foreach ($effectiveFamilyIds as $familyId) {
-            $rowsForFamily = $familyAttributesByFamily->get($familyId, collect())
-                ->reject(function (FamilyAttribute $row) use (&$seenPairs) {
-                    $pairKey = $row->attribute_id.'-'.$row->attribute_group_id;
-                    if (isset($seenPairs[$pairKey])) {
-                        return true;
-                    }
-                    $seenPairs[$pairKey] = true;
-
-                    return false;
-                });
-
-            $resolved = $resolved->merge($rowsForFamily);
+    /**
+     * ยุบ array ที่ frontend ส่งมาซ้อน 4 ชั้น (attribute_id -> groupKey ->
+     * channelKey -> localeKey -> value) ให้เหลือ 3 ชั้น โดยรวม attribute_id
+     * กับ groupKey เข้าเป็น composite key เดียว "attributeId|groupKey" —
+     * ใช้กับทั้ง $request->input('values') และ $request->file('values') ใน
+     * update() เพื่อให้ทุก loop ที่มีอยู่แล้ว (เช็ค required/unique, เพดาน
+     * gallery/video, merge ไฟล์อัปโหลด, บันทึกค่าจริง) ยังวนแบบ 3 ชั้นเดิมได้
+     * โดยไม่ต้องแก้โครงสร้าง loop ทุกจุดให้ลึกขึ้นอีกชั้น — ดู
+     * attributeIdFromCompositeKey()/groupKeyFromCompositeKey() คู่กัน
+     *
+     * @param  array<int|string, mixed>  $nested
+     * @return array<string, mixed>
+     */
+    private function flattenGroupedValues(array $nested): array
+    {
+        $flat = [];
+        foreach ($nested as $attributeId => $groupValues) {
+            if (! is_array($groupValues)) {
+                continue;
+            }
+            foreach ($groupValues as $groupKey => $channelValues) {
+                $flat["{$attributeId}|{$groupKey}"] = $channelValues;
+            }
         }
 
-        return $resolved->values();
+        return $flat;
+    }
+
+    private function attributeIdFromCompositeKey(string $compositeKey): int
+    {
+        return (int) explode('|', $compositeKey, 2)[0];
+    }
+
+    private function groupKeyFromCompositeKey(string $compositeKey): string
+    {
+        return explode('|', $compositeKey, 2)[1] ?? 'ungrouped';
     }
 
     /**
@@ -2505,11 +2546,16 @@ class ProductController extends Controller
             })
             ->get();
 
+        // 4 ชั้น: attribute_id -> groupKey (attribute_group_id เป็น string หรือ
+        // 'ungrouped') -> channelKey -> localeKey -> value — groupKey ตรงนี้ต้อง
+        // สอดคล้องกับ groupKey ที่ edit.tsx ใช้ตอน render แต่ละ group panel เป๊ะๆ
+        // (group.id เป็น string) ไม่งั้นค่าที่ save ไว้จะหาไม่เจอตอนโหลดกลับมา
         $values = [];
         foreach ($rawValues as $val) {
+            $groupKey = $val->attribute_group_id ? (string) $val->attribute_group_id : 'ungrouped';
             $channelKey = $val->channel_id ? (string) $val->channel_id : 'global';
             $localeKey = $val->locale_id ? (string) $val->locale_id : 'default';
-            $values[$val->attribute_id][$channelKey][$localeKey] = $val->value;
+            $values[$val->attribute_id][$groupKey][$channelKey][$localeKey] = $val->value;
         }
 
         $variantsData = [];
@@ -2608,7 +2654,9 @@ class ProductController extends Controller
                 return;
             }
 
-            $currentCode = collect($values[$attr->id] ?? [])
+            // master-category attribute ไม่เคยอยู่ใน family_attributes เลย —
+            // groupKey เป็น 'ungrouped' เสมอ (ดู loop สร้าง $values ด้านบน)
+            $currentCode = collect($values[$attr->id]['ungrouped'] ?? [])
                 ->flatMap(fn ($byLocale) => $byLocale)
                 ->first(fn ($v) => is_string($v) && $v !== '');
             $attr->setRelation(
@@ -3502,11 +3550,18 @@ class ProductController extends Controller
 
             $this->syncAssociations($product, $validated['associations'] ?? []);
 
-            // $values เป็น array ซ้อนกัน: attribute_id -> channelKey ('global' หรือ channel id) -> localeKey ('default' หรือ locale id) -> value
-            // ฝั่ง frontend คำนวณ channelKey/localeKey ของแต่ละ attribute ตามค่า
-            // is_channel_based/is_locale_based ให้แล้ว ดังนั้น loop นี้แค่ต้องแปลง
-            // sentinel key กลับเป็น null สำหรับ scope แบบ global/default เท่านั้น
-            $values = $request->input('values', []);
+            // ฝั่ง frontend ส่ง values เป็น array ซ้อนกัน 4 ชั้น: attribute_id ->
+            // groupKey (attribute_group_id เป็น string หรือ 'ungrouped') ->
+            // channelKey ('global' หรือ channel id) -> localeKey ('default'
+            // หรือ locale id) -> value — flattenGroupedValues() ยุบชั้น
+            // attribute_id/groupKey ทั้งสองเข้าเป็น composite key เดียว
+            // "attributeId|groupKey" ทันที เพื่อให้ทุก loop ด้านล่าง (เช็ค
+            // required/unique, เพดานไฟล์ gallery/video, loop merge ไฟล์อัปโหลด,
+            // loop บันทึกค่าจริง) ยังคงเป็นโครงสร้าง 3 ชั้น (channelKey ->
+            // localeKey -> value) แบบเดิมได้เกือบทั้งหมด แทนที่จะต้องแก้ทุก loop
+            // ให้ลึกขึ้นอีกชั้น — ตัวเดียวกันนี้ยังใช้ flatten
+            // $request->file('values') ด้วย เพราะไฟล์ก็ซ้อนแบบเดียวกัน
+            $values = $this->flattenGroupedValues($request->input('values', []));
 
             // pcatname/psubcatname/productgroupname (แผง "Master Categories" มุมขวา
             // ของหน้าแก้ไข — ดู buildProductFormProps()) เป็น attribute value
@@ -3521,8 +3576,11 @@ class ProductController extends Controller
                 ->pluck('value')
                 ->filter(fn ($code) => is_string($code) && $code !== '')
                 ->all();
+            // pcatname/psubcatname/productgroupname ไม่เคยอยู่ใน family_attributes
+            // เลย (ไม่ได้ผูกกับ group ไหนทั้งนั้น) — groupKey ของฟิลด์พวกนี้เป็น
+            // 'ungrouped' เสมอฝั่ง frontend (ดู renderMasterCategoryField())
             $masterCategoryCodes = $masterCategoryAttributeIds
-                ->map(fn ($attributeId) => $values[$attributeId]['global']['default'] ?? null)
+                ->map(fn ($attributeId) => $values["{$attributeId}|ungrouped"]['global']['default'] ?? null)
                 ->filter(fn ($code) => is_string($code) && $code !== '')
                 ->all();
             // ไม่ส่ง $newCategoryIds เป็น $protectedCategoryIds อีกต่อไป (ต่างจาก
@@ -3614,7 +3672,8 @@ class ProductController extends Controller
                 return $file->store('product-attributes', 'public');
             };
 
-            foreach ($request->file('values', []) as $attributeId => $channelFiles) {
+            foreach ($this->flattenGroupedValues($request->file('values', [])) as $compositeKey => $channelFiles) {
+                $attributeId = $this->attributeIdFromCompositeKey($compositeKey);
                 $attribute = Attribute::find($attributeId);
                 if (! $attribute) {
                     continue;
@@ -3634,7 +3693,7 @@ class ProductController extends Controller
                                     // path ของไฟล์ใหม่ที่เพิ่งอัปโหลดมารวมกลับเข้าไปแทนที่จะ
                                     // ทิ้งไป (เมื่อก่อนอัปโหลดใหม่ทีนึงจะทับ gallery/video ทั้งหมด)
                                     $keptPaths = array_values(array_filter(
-                                        (array) ($values[$attributeId][$channelKey][$localeKey] ?? []),
+                                        (array) ($values[$compositeKey][$channelKey][$localeKey] ?? []),
                                         fn ($v) => is_string($v) && $v !== ''
                                     ));
                                     $incomingFiles = array_values(array_filter($file));
@@ -3657,30 +3716,34 @@ class ProductController extends Controller
                                         fn ($f) => $storeAttributeFile($attribute, $f),
                                         $incomingFiles
                                     )));
-                                    $values[$attributeId][$channelKey][$localeKey] = json_encode(array_merge($keptPaths, $newPaths));
+                                    $values[$compositeKey][$channelKey][$localeKey] = json_encode(array_merge($keptPaths, $newPaths));
                                 } elseif ($file) {
                                     $path = $storeAttributeFile($attribute, $file);
                                     if ($path) {
-                                        $values[$attributeId][$channelKey][$localeKey] = $path;
+                                        $values[$compositeKey][$channelKey][$localeKey] = $path;
                                     }
                                 }
                             }
                         } elseif ($localeFiles) {
                             $path = $storeAttributeFile($attribute, $localeFiles);
                             if ($path) {
-                                $values[$attributeId][$channelKey]['default'] = $path;
+                                $values[$compositeKey][$channelKey]['default'] = $path;
                             }
                         }
                     }
                 } elseif ($channelFiles) {
                     $path = $storeAttributeFile($attribute, $channelFiles);
                     if ($path) {
-                        $values[$attributeId]['global']['default'] = $path;
+                        $values[$compositeKey]['global']['default'] = $path;
                     }
                 }
             }
 
-            $touchedAttributeIds = collect($values)->keys()->filter(fn ($id) => is_numeric($id))->map(fn ($id) => (int) $id)->unique()->values();
+            $touchedAttributeIds = collect($values)->keys()
+                ->filter(fn ($key) => is_numeric(explode('|', $key, 2)[0]))
+                ->map(fn ($key) => $this->attributeIdFromCompositeKey($key))
+                ->unique()
+                ->values();
             $oldProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
 
             $user = $request->user();
@@ -3723,6 +3786,21 @@ class ProductController extends Controller
                 return $this->canUserEditAttribute($user, $attribute);
             };
 
+            // groupKey ที่ส่งมาต้องตรงกับตำแหน่งจริงของ attribute นั้นในบริบทของ
+            // product นี้เท่านั้น ('ungrouped' ถูกเสมอสำหรับ attribute ที่ไม่มี
+            // group เลย — ดู $attributeGroupsById ด้านบน) กันคำขอที่ยิงตรงมาที่
+            // endpoint (ข้าม UI ที่คำนวณ groupKey ให้ถูกต้องอยู่แล้ว) ส่ง groupKey
+            // มั่วๆ เข้ามา ซึ่งจะสร้างแถว product_values ที่ไม่มี group placement
+            // ไหนรองรับจริงเลย (เช่น group ที่เพิ่งถูกถอด attribute นี้ออกไปแล้ว)
+            $isValidGroupKey = function (int $attributeId, string $groupKey) use ($attributeGroupsById) {
+                $realGroupIds = $attributeGroupsById->get($attributeId, collect())->pluck('id')->all();
+                if ($groupKey === 'ungrouped') {
+                    return empty($realGroupIds);
+                }
+
+                return is_numeric($groupKey) && in_array((int) $groupKey, $realGroupIds, true);
+            };
+
             // บังคับ flag is_required/is_unique ของแต่ละ attribute ที่ฝั่ง server —
             // เมื่อก่อนมีแค่เครื่องหมาย "*" สวยๆ บน frontend ไม่มีอะไรกันไม่ให้
             // ค่า "required" ว่างเปล่า หรือค่า "unique" ที่ซ้ำกันถูกบันทึกเข้าไปได้เลย
@@ -3731,12 +3809,19 @@ class ProductController extends Controller
             // สำหรับ attribute ที่ user คนนี้ไม่มีสิทธิ์แก้ไข เหมือนกับที่ loop
             // การบันทึกด้านล่างข้ามไปแบบเงียบๆ เช่นกัน
             if (is_array($values)) {
-                foreach ($values as $attributeId => $channelValues) {
+                foreach ($values as $compositeKey => $channelValues) {
+                    $attributeId = $this->attributeIdFromCompositeKey($compositeKey);
+                    $groupKey = $this->groupKeyFromCompositeKey($compositeKey);
                     $attribute = Attribute::find($attributeId);
                     if (! $attribute || ! is_array($channelValues)) {
                         continue;
                     }
                     if (! $canEditTouchedAttribute($attribute)) {
+                        continue;
+                    }
+                    if (! $isValidGroupKey($attributeId, $groupKey)) {
+                        $valueErrors["values.{$attributeId}"] = "{$attribute->name}: invalid group placement.";
+
                         continue;
                     }
 
@@ -3758,6 +3843,12 @@ class ProductController extends Controller
 
                             if ($attribute->is_unique && ! $isEmpty) {
                                 $stringVal = is_array($val) ? json_encode($val) : (string) $val;
+                                // ไม่กรองด้วย attribute_group_id โดยตั้งใจ — ค่า
+                                // "unique" (เช่น barcode) ต้องไม่ซ้ำข้ามสินค้า
+                                // ไม่ว่าจะอยู่ placement ไหนก็ตาม ถ้าไปกรองด้วย
+                                // group จะกลายเป็นว่าค่าเดียวกันซ้ำได้ตราบใดที่
+                                // ไปโผล่คนละ group placement กัน ซึ่งผิดความหมาย
+                                // ของ "unique" เดิมที่ต้องการจริงๆ
                                 $taken = ProductValue::where('attribute_id', $attributeId)
                                     ->where('channel_id', $channelId)
                                     ->where('locale_id', $localeId)
@@ -3782,11 +3873,12 @@ class ProductController extends Controller
             // หลุด limit ไปได้ — เช็คซ้ำอีกชั้นตรงนี้กับค่าสุดท้ายที่จะบันทึกจริงๆ
             // (หลังลูปไฟล์ด้านบน merge เสร็จแล้ว) ให้ authoritative จริง ไม่ใช่แค่ฝั่ง client
             if (is_array($values)) {
-                foreach ($values as $attributeId => $channelValues) {
+                foreach ($values as $compositeKey => $channelValues) {
                     if (! is_array($channelValues)) {
                         continue;
                     }
 
+                    $attributeId = $this->attributeIdFromCompositeKey($compositeKey);
                     $attribute = Attribute::find($attributeId);
                     if (! $attribute || ! in_array($attribute->type, ['gallery', 'video'], true)) {
                         continue;
@@ -3814,7 +3906,10 @@ class ProductController extends Controller
             }
 
             if (is_array($values)) {
-                foreach ($values as $attributeId => $channelValues) {
+                foreach ($values as $compositeKey => $channelValues) {
+                    $attributeId = $this->attributeIdFromCompositeKey($compositeKey);
+                    $groupKey = $this->groupKeyFromCompositeKey($compositeKey);
+                    $attributeGroupId = $groupKey === 'ungrouped' ? null : (int) $groupKey;
                     $attribute = Attribute::find($attributeId);
                     if (! $attribute || ! is_array($channelValues)) {
                         continue;
@@ -3823,6 +3918,9 @@ class ProductController extends Controller
                     // เช็คว่า user มีสิทธิ์แก้ไข attribute นี้หรือไม่ (รวมถึงเช็คว่า
                     // attribute group ของมันไม่ได้เป็น read-only ด้วย — ดู $canEditTouchedAttribute ด้านบน)
                     if (! $canEditTouchedAttribute($attribute)) {
+                        continue;
+                    }
+                    if (! $isValidGroupKey($attributeId, $groupKey)) {
                         continue;
                     }
 
@@ -3843,6 +3941,7 @@ class ProductController extends Controller
                             $oldStoredValue = $isFileAttribute
                                 ? ProductValue::where('product_id', $product->id)
                                     ->where('attribute_id', $attributeId)
+                                    ->where('attribute_group_id', $attributeGroupId)
                                     ->where('channel_id', $channelId)
                                     ->where('locale_id', $localeId)
                                     ->value('value')
@@ -3861,6 +3960,7 @@ class ProductController extends Controller
                                     [
                                         'product_id' => $product->id,
                                         'attribute_id' => $attributeId,
+                                        'attribute_group_id' => $attributeGroupId,
                                         'channel_id' => $channelId,
                                         'locale_id' => $localeId,
                                     ],
@@ -3873,6 +3973,7 @@ class ProductController extends Controller
 
                                 ProductValue::where('product_id', $product->id)
                                     ->where('attribute_id', $attributeId)
+                                    ->where('attribute_group_id', $attributeGroupId)
                                     ->where('channel_id', $channelId)
                                     ->where('locale_id', $localeId)
                                     ->delete();
@@ -4368,21 +4469,30 @@ class ProductController extends Controller
         $channelId = $request->query('channel_id');
         $localeId = $request->query('locale_id');
 
-        $attributes = $this->scopableAttributesFor($product, $request->user());
+        $placements = $this->scopableAttributesFor($product, $request->user());
 
+        // attributeId -> groupKey -> value — groupKey เดียวกับที่
+        // buildProductFormProps() ใช้ (attribute_group_id เป็น string หรือ
+        // 'ungrouped') ต้อง sync กันเป๊ะๆ ไม่งั้น edit.tsx จะ merge ค่าที่สลับ
+        // channel/locale มาได้ผิด group panel
         $values = [];
-        foreach ($attributes as $attribute) {
-            $values[$attribute->id] = null;
+        foreach ($placements as $placement) {
+            $groupKey = $placement['group_id'] ? (string) $placement['group_id'] : 'ungrouped';
+            $values[$placement['attribute']->id][$groupKey] = null;
         }
 
-        // จัดกลุ่ม attribute ตามรูปแบบ scope ของมัน เพื่อให้แต่ละกลุ่มดึงข้อมูลได้ด้วย
-        // query เดียวรวดเดียว แทนที่จะยิง query แยกทีละ attribute (ปัญหา N+1)
-        $attributes->groupBy(fn ($attribute) => ($attribute->is_channel_based ? '1' : '0').($attribute->is_locale_based ? '1' : '0'))
-            ->each(function ($group) use (&$values, $product, $channelId, $localeId) {
-                $first = $group->first();
+        // จัดกลุ่มตามรูปแบบ scope (channel/locale-based หรือไม่) เพื่อให้แต่ละกลุ่ม
+        // ดึงข้อมูลได้ด้วย query เดียวรวดเดียว แทนที่จะยิง query แยกทีละ attribute
+        // (ปัญหา N+1) — groupBy() ตรงนี้คือ "จัดกลุ่มตาม scope" ไม่เกี่ยวกับ
+        // attribute_group_id เลย (ตั้งใจใช้ชื่อ $scopeGroup ให้ต่างจาก group ของ
+        // attribute เพื่อไม่ให้สับสน)
+        $placements->groupBy(fn ($p) => ($p['attribute']->is_channel_based ? '1' : '0').($p['attribute']->is_locale_based ? '1' : '0'))
+            ->each(function ($scopeGroup) use (&$values, $product, $channelId, $localeId) {
+                $first = $scopeGroup->first()['attribute'];
+                $attributeIds = $scopeGroup->pluck('attribute.id')->unique();
 
                 $query = ProductValue::where('product_id', $product->id)
-                    ->whereIn('attribute_id', $group->pluck('id'))
+                    ->whereIn('attribute_id', $attributeIds)
                     ->where('channel_id', $first->is_channel_based ? $channelId : null);
 
                 if ($first->is_locale_based) {
@@ -4399,13 +4509,15 @@ class ProductController extends Controller
                     $query->whereNull('locale_id');
                 }
 
-                $query->get(['attribute_id', 'value'])
+                $query->get(['attribute_id', 'attribute_group_id', 'value'])
                     ->each(function ($value) use (&$values) {
                         $attributeId = $value->attribute_id;
+                        $groupKey = $value->attribute_group_id ? (string) $value->attribute_group_id : 'ungrouped';
                         // สำหรับ attribute ที่ผูกกับ locale แถวจะเรียงเอา locale ที่ใช้งานอยู่
-                        // ขึ้นก่อนเสมอ ดังนั้นให้เอาแค่แถวแรกที่เจอของแต่ละ attribute เท่านั้น
-                        if ($values[$attributeId] === null) {
-                            $values[$attributeId] = $value->value;
+                        // ขึ้นก่อนเสมอ ดังนั้นให้เอาแค่แถวแรกที่เจอของแต่ละ (attribute, group)
+                        // เท่านั้น
+                        if (($values[$attributeId][$groupKey] ?? null) === null) {
+                            $values[$attributeId][$groupKey] = $value->value;
                         }
                     });
             });
@@ -4490,8 +4602,15 @@ class ProductController extends Controller
 
     /**
      * ค่าปัจจุบันของ attribute ทั้งหมดของสินค้า จำกัดแค่ attribute id
-     * ที่ระบุมา โดย key เป็น label ที่อ่านง่ายแบบ "code[channel:x,locale:y]"
+     * ที่ระบุมา โดย key เป็น label ที่อ่านง่ายแบบ "code[group:g,channel:x,locale:y]"
      * เพื่อให้อ่านรู้เรื่องเวลาไปโชว์ในตาราง diff ของ audit log
+     *
+     * ต้องใส่ group ไว้ใน key ด้วย (ไม่ใช่แค่ channel/locale เหมือนเดิม) ตั้งแต่
+     * attribute เดียวกันมีได้หลายแถวพร้อมกันแล้ว (คนละ attribute_group_id —
+     * ดู migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+     * ไม่งั้น mapWithKeys() ด้านล่างจะชนกันเอง ทำให้ 2 ตำแหน่งของ attribute
+     * เดียวกันเหลือแค่แถวเดียวใน snapshot และการเปลี่ยนแปลงจริงของอีกตำแหน่ง
+     * จะหายไปจาก audit diff แบบเงียบๆ
      */
     private function productValueSnapshot(int $productId, Collection $attributeIds): array
     {
@@ -4507,6 +4626,7 @@ class ProductController extends Controller
             ->mapWithKeys(function (ProductValue $value) use ($codes) {
                 $label = $codes->get($value->attribute_id, "attribute_{$value->attribute_id}");
                 $suffix = array_filter([
+                    $value->attribute_group_id ? "group:{$value->attribute_group_id}" : null,
                     $value->channel_id ? "channel:{$value->channel_id}" : null,
                     $value->locale_id ? "locale:{$value->locale_id}" : null,
                 ]);
@@ -4584,6 +4704,9 @@ class ProductController extends Controller
      * ตามสิทธิ์ที่ $user มองเห็นได้ เพื่อไม่ให้การสลับ channel/locale
      * รั่วไหลค่าของ attribute ที่หน้าเว็บเองก็ซ่อนไว้อยู่แล้ว
      */
+    /**
+     * @return \Illuminate\Support\Collection<int, array{attribute: Attribute, group_id: ?int}>
+     */
     private function scopableAttributesFor(Product $product, $user = null)
     {
         // effectiveFamilyIds() ตัวเดียวกับ buildProductFormProps() — ต้อง sync
@@ -4596,7 +4719,7 @@ class ProductController extends Controller
         $familyAttributes = $this->resolveEffectiveFamilyAttributes($effectiveFamilyIds, ['attribute', 'attributeGroup']);
 
         if ($familyAttributes->isNotEmpty()) {
-            $attributes = $familyAttributes
+            $placements = $familyAttributes
                 ->filter(function ($fa) use ($user) {
                     $group = $fa->attributeGroup;
                     $attr = $fa->attribute;
@@ -4616,17 +4739,18 @@ class ProductController extends Controller
 
                     return ! $user || $this->canUserViewAttribute($user, $attr);
                 })
-                // .unique('id') — attribute ตัวเดียวกันอาจผ่าน filter มาได้มากกว่า
-                // 1 ครั้งตอนนี้ (คนละ group ของ family เดียวกันที่ทั้งคู่มองเห็นได้)
-                // ต้องการแค่รายชื่อ attribute ที่ scope ได้ ไม่สนจำนวน placement
-                ->map(fn ($fa) => $fa->attribute)
-                ->unique('id');
+                // คงเป็นคู่ (attribute, group_id) แยกกันตามตำแหน่งจริง — ไม่ .unique('id')
+                // อีกต่อไป (ต่างจากเดิม) เพราะ attributeValues() ต้องดึงค่าของแต่ละ
+                // group placement แยกกันตั้งแต่ product_values มี attribute_group_id
+                // แล้ว (ดู migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+                ->map(fn ($fa) => ['attribute' => $fa->attribute, 'group_id' => $fa->attribute_group_id]);
         } elseif (! empty($effectiveFamilyIds)) {
             // ยังไม่มี family attribute ให้ใช้เลย (แต่ resolve family ได้จริง) —
             // edit() จะ fallback ไปโชว์ system attribute ทั้งหมดใต้หมวด "General"
             // เลยทำแบบเดียวกันตรงนี้ด้วย (เงื่อนไข !empty($effectiveFamilyIds) กัน
             // เหมือนกับ buildProductFormProps() — สินค้าที่ไม่มีกลุ่มสินค้าที่ผูก
-            // ตระกูลไว้เลย ไม่ควรได้ attribute ทั้งระบบมาด้วย)
+            // ตระกูลไว้เลย ไม่ควรได้ attribute ทั้งระบบมาด้วย) — ไม่มี group เลย
+            // (group_id เป็น null/'ungrouped' เสมอ) เหมือน buildProductFormProps()
             $attributes = Attribute::whereNotIn('code', self::MASTER_CATEGORY_ATTRIBUTE_CODES)
                 ->where('code', '!=', self::PRODUCT_TYPE_ATTRIBUTE_CODE)
                 ->get();
@@ -4634,12 +4758,14 @@ class ProductController extends Controller
             if ($user) {
                 $attributes = $attributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr));
             }
+
+            $placements = $attributes->map(fn ($attr) => ['attribute' => $attr, 'group_id' => null]);
         } else {
-            $attributes = collect();
+            $placements = collect();
         }
 
-        return $attributes
-            ->filter(fn ($attr) => $attr->is_channel_based || $attr->is_locale_based)
+        return $placements
+            ->filter(fn ($p) => $p['attribute']->is_channel_based || $p['attribute']->is_locale_based)
             ->values();
     }
 

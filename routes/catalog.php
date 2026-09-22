@@ -105,6 +105,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('products/{product}/duplicate', [ProductController::class, 'duplicate'])->name('products.duplicate')->middleware('permission:products,create_products');
     Route::get('products/{product}/attribute-values', [ProductController::class, 'attributeValues'])->name('products.attributeValues')->middleware('permission:products,edit_products');
     Route::post('products/{product}/upload-description-image', [ProductController::class, 'uploadDescriptionImage'])->name('products.uploadDescriptionImage')->middleware('permission:products,edit_products');
+    Route::post('products/{product}/attributes/{attribute}/upload', [ProductController::class, 'uploadAttributeFile'])->name('products.uploadAttributeFile')->middleware('permission:products,edit_products');
     Route::get('products/{product}/history', [ProductController::class, 'history'])->name('products.history')->middleware('permission:products,view_history');
     Route::get('products/{product}/timeline', [ProductController::class, 'timeline'])->name('products.timeline')->middleware('permission:products,view_history');
     Route::post('products/{product}/push-lazada/{shop}', [ProductController::class, 'pushToLazada'])->name('products.pushLazada')->middleware('permission:marketplace_lazada,push_products_lazada');
@@ -275,6 +276,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributeGroups', [AttributeGroupController::class, 'store'])->name('attributeGroups.store')->middleware('permission:attribute_groups,create_attribute_groups');
     Route::get('attributeGroups/{attributeGroup}/edit', [AttributeGroupController::class, 'edit'])->name('attributeGroups.edit')->middleware('permission:attribute_groups,edit_attribute_groups');
     Route::put('attributeGroups/{attributeGroup}', [AttributeGroupController::class, 'update'])->name('attributeGroups.update')->middleware('permission:attribute_groups,edit_attribute_groups');
+    Route::get('attributeGroups/{attributeGroup}/usage', [AttributeGroupController::class, 'usage'])->name('attributeGroups.usage')->middleware('permission:attribute_groups,delete_attribute_groups');
     Route::delete('attributeGroups/{attributeGroup}', [AttributeGroupController::class, 'destroy'])->name('attributeGroups.destroy')->middleware('permission:attribute_groups,delete_attribute_groups');
     Route::get('attributeGroups/{attributeGroup}/history', [AttributeGroupController::class, 'history'])->name('attributeGroups.history')->middleware('permission:attribute_groups,view_history');
 

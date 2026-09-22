@@ -12,6 +12,7 @@ use App\Models\ProductValue;
 use App\Models\User;
 use App\Jobs\AutoTranslateProductValueJob;
 use App\Services\Catalog\AttributeAccessPolicy;
+use App\Services\Catalog\EffectiveFamilyAttributeResolver;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\ImportExport\RowImportException;
 
@@ -226,6 +227,15 @@ class ProductRowImporter implements RowImporterInterface
         $unknownColumns = [];
         $restrictedColumns = [];
         $allowedAttributeCodes = $this->allowedAttributeCodes();
+        // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
+        // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // updateOrCreate() ด้านล่างต้องระบุ attribute_group_id ที่แน่นอนด้วย ไม่งั้น
+        // ถ้า attribute นั้นมีมากกว่า 1 แถวอยู่แล้ว (คนละ group) จะไปจับคู่แถวไหน
+        // มาอัปเดตก็ได้แบบสุ่ม (nondeterministic write, ไม่ใช่แค่อ่านค่าเก่าผิด) —
+        // import ยังไม่รองรับคอลัมน์แยกตาม group (v1) เลยเลือก "ตำแหน่งหลัก" แบบ
+        // เดียวกับทุกจุดที่ยังไม่ group-aware (ดู primaryGroupIdFor())
+        $familyAttributeResolver = app(EffectiveFamilyAttributeResolver::class);
+        $effectiveFamilyIds = $familyAttributeResolver->effectiveFamilyIds($product);
         // The permission check below only makes sense for attributes this
         // importer actually supports at all (non-locale/non-channel — see
         // baseAttributeCodes()/the v1-limitation note on columns()).
@@ -257,8 +267,10 @@ class ProductRowImporter implements RowImporterInterface
                 continue;
             }
 
+            $groupId = $familyAttributeResolver->primaryGroupIdFor($attribute->id, $effectiveFamilyIds);
+
             ProductValue::updateOrCreate(
-                ['product_id' => $product->id, 'attribute_id' => $attribute->id, 'channel_id' => null, 'locale_id' => null],
+                ['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => null],
                 ['value' => (string) $value]
             );
 

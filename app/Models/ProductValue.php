@@ -12,6 +12,7 @@ class ProductValue extends Model
     protected $fillable = [
         'product_id',
         'attribute_id',
+        'attribute_group_id',
         'channel_id',
         'locale_id',
         'value',
@@ -25,6 +26,11 @@ class ProductValue extends Model
     public function attribute(): BelongsTo
     {
         return $this->belongsTo(Attribute::class);
+    }
+
+    public function attributeGroup(): BelongsTo
+    {
+        return $this->belongsTo(AttributeGroup::class);
     }
 
     public function channel(): BelongsTo

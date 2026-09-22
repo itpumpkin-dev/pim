@@ -66,6 +66,15 @@ class ProductPresenter
         // คืนแถวไหนมาทีหลังก็ชนะแบบสุ่มๆ
         $defaultLocaleId = Locale::where('code', $localeCode)->value('id');
 
+        // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู migration
+        // 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // attribute อย่าง spec_specifications/spec_features/... (ตัวอย่างเป๊ะๆ ที่
+        // ผู้ใช้เจอปัญหา) อาจมีมากกว่า 1 แถวต่อ locale tier เดียวกันแล้ว — หน้าแรก
+        // สาธารณะนี้ยังไม่รองรับ "หลายค่า" ต่อ attribute (โชว์ได้แค่ค่าเดียวต่อฟิลด์)
+        // เลยต้องเรียงให้แถว "หลัก" (ไม่มี group ก่อน แล้วค่อย group id ต่ำสุด — ดู
+        // primaryGroupIdFor()) ชนะเสมอ เป็นเงื่อนไขรองจาก locale tier เดิม (ที่ยัง
+        // ต้องให้แถวเฉพาะ locale ชนะแถว global เหมือนเดิม) ไม่งั้น mapWithKeys()
+        // ด้านล่างจะให้ DB คืนแถวไหนมาทีหลังก็ชนะแบบสุ่มๆ
         $values = ProductValue::whereIn('product_id', $products->pluck('id'))
             ->whereIn('attribute_id', $attributesByCode->keys())
             ->whereNull('channel_id')
@@ -76,6 +85,7 @@ class ProductPresenter
                 }
             })
             ->orderByRaw('CASE WHEN locale_id IS NULL THEN 0 ELSE 1 END ASC')
+            ->orderByRaw('COALESCE(attribute_group_id, -1) DESC')
             ->get(['product_id', 'attribute_id', 'locale_id', 'value']);
 
         $valuesByProduct = $values->groupBy('product_id')->map(

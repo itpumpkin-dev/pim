@@ -39,9 +39,18 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
         foreach (Product::with('family')->orderBy('id')->cursor() as $product) {
+            // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
+            // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+            // อาจมีมากกว่า 1 แถวต่อ attribute ที่ scope นี้แล้ว — CSV export
+            // ยังไม่รองรับคอลัมน์แยกตาม group (v1) เลยต้องเลือก "ค่าหลัก" แบบ
+            // deterministic เดียวกับ primaryGroupIdFor() (ไม่มี group ก่อน
+            // แล้วค่อย group id ต่ำสุด) — เรียงให้แถวที่ต้องการ "ชนะ" มาท้ายสุด
+            // แล้วอาศัย pluck() ที่ key ซ้ำแล้วแถวหลังทับแถวก่อนหน้าเสมอ แทนที่
+            // จะปล่อยให้ DB คืนแถวไหนมาก่อนก็ได้แบบสุ่ม
             $values = ProductValue::where('product_id', $product->id)
                 ->whereNull('channel_id')
                 ->whereNull('locale_id')
+                ->orderByRaw('(attribute_group_id IS NULL) ASC, attribute_group_id DESC')
                 ->pluck('value', 'attribute_id');
 
             $row = [

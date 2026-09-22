@@ -302,6 +302,9 @@
     "createAttributeGroup": "สร้างกลุ่มแอตทริบิวต์",
     "noAttributeGroupsFound": "ไม่พบกลุ่มแอตทริบิวต์",
     "confirmDeleteAttributeGroupMessage": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่มแอตทริบิวต์นี้?",
+    "checkingAttributeGroupUsage": "กำลังตรวจสอบว่ามีตระกูลแอตทริบิวต์และสินค้ากำลังใช้กลุ่มนี้อยู่กี่รายการ...",
+    "attributeGroupInUseWarning": "กลุ่มนี้กำลังถูกใช้งานโดยตระกูลแอตทริบิวต์ {{families}} ตระกูล, แอตทริบิวต์ {{attributes}} ตัว และมีค่าที่บันทึกไว้ในสินค้า {{products}} รายการ การลบจะทำให้การเชื่อมโยงนี้หายไปและค่าที่บันทึกไว้กลายเป็นข้อมูลกำพร้าทันที",
+    "attributeGroupNotInUse": "กลุ่มนี้ไม่ได้ถูกเชื่อมโยงกับตระกูลแอตทริบิวต์หรือสินค้าใดอยู่ในขณะนี้",
     "addAttributeGroupTitle": "เพิ่มกลุ่มแอตทริบิวต์",
     "codePlaceholder": "โค้ด",
     "saveAttributeGroup": "บันทึกกลุ่มแอตทริบิวต์",
@@ -819,6 +822,8 @@
     "currentFileLabel": "ปัจจุบัน: {{name}}",
     "browseOrDropImage": "เลือกไฟล์หรือลากรูปมาวาง",
     "browseOrDropFile": "เลือกไฟล์หรือลากไฟล์มาวาง",
+    "uploadButtonLabel": "อัปโหลด",
+    "uploadPercentComplete": "อัปโหลดแล้ว {{percent}}%",
     "mappedToPlatformPayloadChip": "แมปเข้ากับ {{platform}}",
     "mappedToPlatformPayloadTooltip": "ฟิลด์นี้จะป้อนเข้าฟิลด์ \"{{field}}\" ของ {{platform}} ตอน push สินค้านี้",
     "productSavedSuccess": "บันทึกสินค้าสำเร็จแล้ว"

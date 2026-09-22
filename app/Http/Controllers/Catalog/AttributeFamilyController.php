@@ -20,6 +20,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,6 +28,23 @@ class AttributeFamilyController extends Controller
 {
     use HasVersionHistory;
 
+    /**
+     * attribute ที่ไม่ควรถูกผูกเข้า group ไหนเลย — mirror ของ
+     * ProductController::MASTER_CATEGORY_ATTRIBUTE_CODES/
+     * PRODUCT_TYPE_ATTRIBUTE_CODE บวก producttype/price/qty (attribute
+     * ควบคุมแกน variant ของสินค้า configurable) แก้คนละที่กันเพราะสอง
+     * controller ไม่ได้ share constant กัน แต่ต้องอัปเดตพร้อมกันถ้ารายชื่อ
+     * เปลี่ยน — ProductController มีแผงของตัวเองสำหรับ attribute พวกนี้แยกจาก
+     * groupsData อยู่แล้ว (Master Categories panel / Product Type field /
+     * variant price-qty) การให้ผูกเข้า family_attributes group เพิ่มอีกที
+     * จะทำให้เห็นฟิลด์เดียวกันซ้ำสองที่ในหน้าแก้ไขสินค้า และ (ตั้งแต่
+     * product_values มี attribute_group_id — migration
+     * 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+     * ทำให้ดีไซน์ "attribute พวกนี้ไม่มี group เสมอ = NULL sentinel" ที่โค้ด
+     * หลายจุดพึ่งพาอยู่ (buildProductFormProps(), attributeValues() ฯลฯ)
+     * ผิดไปด้วย
+     */
+    private const SYSTEM_ATTRIBUTE_CODES = ['pcatname', 'psubcatname', 'productgroupname', 'producttype', 'price', 'qty'];
 
     public function index(Request $request): Response
     {
@@ -90,7 +108,7 @@ class AttributeFamilyController extends Controller
     public function create(): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
+        $attributes = Attribute::select('id', 'code', 'name', 'type')->whereNotIn('code', self::SYSTEM_ATTRIBUTE_CODES)->get();
 
         return Inertia::render('catalog/attribute-families/create', [
             'groups' => $groups,
@@ -105,7 +123,7 @@ class AttributeFamilyController extends Controller
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
             'group_attributes' => ['nullable', 'array'],
-            'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id'],
+            'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id', Rule::notIn(Attribute::whereIn('code', self::SYSTEM_ATTRIBUTE_CODES)->pluck('id'))],
             'group_attributes.*.attribute_group_id' => ['required', 'exists:attribute_groups,id'],
         ]);
         $this->guardAgainstDuplicateGroupAssignment($validator, $request);
@@ -152,7 +170,7 @@ class AttributeFamilyController extends Controller
     public function edit(AttributeFamily $attributeFamily): Response
     {
         $groups = AttributeGroup::select('id', 'code', 'name')->get();
-        $attributes = Attribute::select('id', 'code', 'name', 'type')->get();
+        $attributes = Attribute::select('id', 'code', 'name', 'type')->whereNotIn('code', self::SYSTEM_ATTRIBUTE_CODES)->get();
 
         $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
             ->where('family_id', $attributeFamily->id)
@@ -183,7 +201,7 @@ class AttributeFamilyController extends Controller
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
             'group_attributes' => ['nullable', 'array'],
-            'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id'],
+            'group_attributes.*.attribute_id' => ['required', 'exists:attributes,id', Rule::notIn(Attribute::whereIn('code', self::SYSTEM_ATTRIBUTE_CODES)->pluck('id'))],
             'group_attributes.*.attribute_group_id' => ['required', 'exists:attribute_groups,id'],
         ]);
         $this->guardAgainstDuplicateGroupAssignment($validator, $request);

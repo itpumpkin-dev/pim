@@ -8,6 +8,7 @@ use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Services\Catalog\AttributeValueFormatter;
+use App\Services\Catalog\EffectiveFamilyAttributeResolver;
 
 /**
  * Shared by LazadaProductSyncService and ShopeeProductSyncService — resolving
@@ -33,8 +34,19 @@ trait ResolvesProductAttributeValues
 
         $localeId = $attribute->is_locale_based && $localeCode ? Locale::where('code', $localeCode)->value('id') : null;
 
+        // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
+        // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // ตัวนี้อาจมีมากกว่า 1 แถวต่อ product+channel+locale แล้ว — marketplace
+        // sync ยังไม่รองรับ "หลายค่า" ต่อ attribute เดียว (field mapping เป็น
+        // attribute เดียวตัวเดียวเสมอ) เลยเลือก "ค่าหลัก" แบบ deterministic
+        // เดียวกับทุกจุดที่ยังไม่ group-aware แทนที่จะปล่อยให้ DB สุ่มคืนแถวไหน
+        // มาก่อนก็ได้ — ดู primaryGroupIdFor()
+        $resolver = app(EffectiveFamilyAttributeResolver::class);
+        $groupId = $resolver->primaryGroupIdFor($attribute->id, $resolver->effectiveFamilyIds($product));
+
         $lookup = fn (?int $forChannelId) => ProductValue::where('product_id', $product->id)
             ->where('attribute_id', $attribute->id)
+            ->where('attribute_group_id', $groupId)
             ->where('channel_id', $forChannelId)
             ->where('locale_id', $localeId)
             ->value('value');

@@ -13,6 +13,7 @@ use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -200,6 +201,41 @@ class AttributeGroupController extends Controller
                 ['label' => $label]
             );
         }
+    }
+
+    /**
+     * นับตระกูล/attribute/สินค้าที่กำลังใช้ group นี้อยู่ ให้หน้า index เรียก
+     * ก่อนเปิดไดอะล็อกยืนยันลบ (mirror ของ
+     * AttributeFamilyController::usage()) — family_attributes.attribute_group_id
+     * เป็น cascadeOnDelete() (ดู migration create_family_attributes_table)
+     * ลบ group ปุ๊บ ความผูกกับทุก family ที่ใช้ group นี้หายทันที และตั้งแต่
+     * product_values มี attribute_group_id แล้ว (migration
+     * 2026_09_23_000001_add_attribute_group_id_to_product_values_table,
+     * nullOnDelete) การลบ group ตอนนี้กระทบถึงข้อมูลสินค้าจริงที่กรอกไว้แล้ว
+     * ด้วย ไม่ใช่แค่โครงสร้าง pivot เหมือนเดิมอีกต่อไป — ต่าง blast radius
+     * จาก AttributeFamilyController::usage() ตรงที่ต้องนับ "สินค้าที่มีค่า
+     * กรอกไว้ใน group นี้" แยกจาก "สินค้าที่ family ซึ่งใช้ group นี้ผูกอยู่"
+     * เพราะแม้ family จะถูกถอด group นี้ออกไปแล้ว ค่าเก่าที่เคยกรอกไว้ตอนยัง
+     * ผูกอยู่ก็ยังอยู่ใน product_values (attribute_group_id นี้) เหมือนเดิม
+     */
+    public function usage(AttributeGroup $attributeGroup): JsonResponse
+    {
+        $familyIds = DB::table('family_attributes')
+            ->where('attribute_group_id', $attributeGroup->id)
+            ->pluck('family_id')
+            ->unique();
+
+        return response()->json([
+            'family_count' => $familyIds->count(),
+            'attribute_count' => DB::table('family_attributes')
+                ->where('attribute_group_id', $attributeGroup->id)
+                ->distinct()
+                ->count('attribute_id'),
+            'product_value_count' => DB::table('product_values')
+                ->where('attribute_group_id', $attributeGroup->id)
+                ->distinct()
+                ->count('product_id'),
+        ]);
     }
 
     public function destroy(AttributeGroup $attributeGroup): RedirectResponse

@@ -41,7 +41,7 @@ class ProductLookupController extends Controller
         $channels = Channel::pluck('code', 'id');
 
         $valuesByAttribute = ProductValue::where('product_id', $product->id)
-            ->get(['attribute_id', 'channel_id', 'locale_id', 'value'])
+            ->get(['attribute_id', 'attribute_group_id', 'channel_id', 'locale_id', 'value'])
             ->groupBy('attribute_id');
 
         return response()->json($this->present($product, $attributes, $valuesByAttribute, $locales, $channels));
@@ -77,7 +77,7 @@ class ProductLookupController extends Controller
             ->map(fn ($rows) => $rows->pluck('attribute')->filter());
 
         $valuesByProduct = ProductValue::whereIn('product_id', $productList->pluck('id'))
-            ->get(['product_id', 'attribute_id', 'channel_id', 'locale_id', 'value'])
+            ->get(['product_id', 'attribute_id', 'attribute_group_id', 'channel_id', 'locale_id', 'value'])
             ->groupBy('product_id');
 
         $data = $productList->map(function (Product $product) use ($attributesByFamily, $valuesByProduct, $locales, $channels) {
@@ -149,14 +149,26 @@ class ProductLookupController extends Controller
      */
     private function resolveValue(Attribute $attribute, Collection $rows, Collection $locales, Collection $channels): mixed
     {
+        // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
+        // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // $rows อาจมีมากกว่า 1 แถวต่อ channel/locale scope เดียวกันแล้ว — API
+        // ตัวนี้ยังไม่รองรับ "หลายค่า" ต่อ attribute (response shape เป็น scalar/
+        // map เดียว) เลยต้องเลือก "ตำแหน่งหลัก" แบบ deterministic เดียวกับทุกจุด
+        // ที่ยังไม่ group-aware (ไม่มี group ก่อน แล้วค่อย group id ต่ำสุด — ดู
+        // primaryGroupIdFor()) แทนที่จะปล่อยให้ order ของ query ตัดสิน
+        $groupRank = fn ($r) => $r->attribute_group_id ?? -1;
+
         if (!$attribute->is_locale_based && !$attribute->is_channel_based) {
-            $row = $rows->first(fn ($r) => $r->channel_id === null && $r->locale_id === null);
+            $row = $rows->sortBy($groupRank)->first(fn ($r) => $r->channel_id === null && $r->locale_id === null);
 
             return AttributeValueFormatter::format($attribute, $row?->value);
         }
 
         $result = [];
-        foreach ($rows as $row) {
+        // เรียงให้แถว "หลัก" มาท้ายสุด เพื่อให้ทับ (ชนะ) แถวอื่นที่ scope
+        // channel/locale เดียวกันในลูปด้านล่าง ($result[...] = ... เขียนทับกัน
+        // เองถ้า key ซ้ำ)
+        foreach ($rows->sortByDesc($groupRank) as $row) {
             $formatted = AttributeValueFormatter::format($attribute, $row->value);
             $channelKey = $row->channel_id ? ($channels->get($row->channel_id) ?? (string) $row->channel_id) : 'default';
             $localeKey = $row->locale_id ? ($locales->get($row->locale_id) ?? (string) $row->locale_id) : 'default';

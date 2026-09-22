@@ -302,6 +302,9 @@
     "createAttributeGroup": "Crear grupo de atributos",
     "noAttributeGroupsFound": "No se encontraron grupos de atributos.",
     "confirmDeleteAttributeGroupMessage": "¿Estás seguro de que deseas eliminar este grupo de atributos?",
+    "checkingAttributeGroupUsage": "Comprobando cuántas familias de atributos y productos usan actualmente este grupo...",
+    "attributeGroupInUseWarning": "Este grupo está siendo utilizado actualmente por {{families}} familia(s), {{attributes}} atributo(s), y tiene valores guardados en {{products}} producto(s). Al eliminarlo se quitará ese vínculo y esos valores quedarán huérfanos de inmediato.",
+    "attributeGroupNotInUse": "Este grupo no está vinculado actualmente a ninguna familia de atributos ni producto.",
     "addAttributeGroupTitle": "Agregar grupo de atributos",
     "codePlaceholder": "Código",
     "saveAttributeGroup": "Guardar grupo de atributos",
@@ -819,6 +822,8 @@
     "currentFileLabel": "Actual: {{name}}",
     "browseOrDropImage": "Explorar o soltar una imagen",
     "browseOrDropFile": "Explorar o soltar un archivo",
+    "uploadButtonLabel": "Subir",
+    "uploadPercentComplete": "{{percent}}% completado",
     "mappedToPlatformPayloadChip": "Mapeado a {{platform}}",
     "mappedToPlatformPayloadTooltip": "Este campo alimenta el campo \"{{field}}\" del payload de {{platform}} al enviar este producto.",
     "productSavedSuccess": "Producto guardado correctamente."

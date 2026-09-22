@@ -81,6 +81,15 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     };
 
     const isProducts = data.type === 'products';
+
+    // "มาสเตอร์" ในที่นี้คือทุก type ที่ไม่ใช่ products (categories/attributes/
+    // attribute_families/attribute_options) — ผู้ใช้อยากให้ขั้นตอนแรกถามก่อนว่า
+    // จะนำเข้า "ข้อมูลมาสเตอร์" หรือ "ข้อมูลสินค้า" แล้วค่อยให้เลือกมาสเตอร์ตัว
+    // ที่ต้องการอีกที (เดิมโชว์ปนกันเป็นลิสต์เดียวหมด) ไม่ได้เปลี่ยน schema/
+    // preview ใดๆ เลย แค่จัดกลุ่ม UI ของขั้นตอน "type" ใหม่เท่านั้น
+    const masterTypes = types.filter((type) => type !== 'products');
+    const hasProductType = types.includes('products');
+    const [importKind, setImportKind] = useState<'master' | 'product'>(isProducts ? 'product' : 'master');
     const stepKeys = useMemo(() => (isProducts ? ['type', 'language', 'family', 'review', 'upload'] : ['type', 'review', 'upload']), [isProducts]);
     const steps: WizardStep[] = stepKeys.map((key) => ({
         key,
@@ -141,6 +150,15 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         // Downstream choices no longer apply to the new type.
         setFurthest(0);
         setSchema(null);
+    };
+
+    const changeKind = (kind: 'master' | 'product') => {
+        setImportKind(kind);
+        if (kind === 'product') {
+            if (hasProductType) changeType('products');
+        } else if (!masterTypes.includes(data.type)) {
+            changeType(masterTypes[0] ?? '');
+        }
     };
 
     const sampleHref = (format: 'csv' | 'xlsx') => {
@@ -205,40 +223,121 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
 
                 <Paper elevation={0} sx={{ ...fioriCardSx, p: { xs: 2, md: 3 } }}>
                     {currentKey === 'type' && (
-                        <Stack spacing={2}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('wizardTypeHeading')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('wizardTypeSubtitle')}
-                                </Typography>
-                            </Box>
-                            <RadioGroup value={data.type} onChange={(e) => changeType(e.target.value)}>
-                                <Stack spacing={1.5}>
-                                    {types.map((type) => (
-                                        <Paper
-                                            key={type}
-                                            variant="outlined"
-                                            onClick={() => changeType(type)}
-                                            sx={{
-                                                p: 1.5,
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                borderColor: data.type === type ? FIORI.brand : FIORI.border,
-                                                bgcolor: data.type === type ? FIORI.brandBg : FIORI.surface,
-                                            }}
-                                        >
-                                            <FormControlLabel
-                                                value={type}
-                                                control={<Radio />}
-                                                label={<Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>{typeLabel(type)}</Typography>}
-                                                sx={{ m: 0, width: '100%' }}
-                                            />
-                                        </Paper>
-                                    ))}
+                        <Stack spacing={3}>
+                            <Stack spacing={2}>
+                                <Box>
+                                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                        {t('wizardTypeKindHeading')}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                        {t('wizardTypeKindSubtitle')}
+                                    </Typography>
+                                </Box>
+                                <RadioGroup value={importKind} onChange={(e) => changeKind(e.target.value as 'master' | 'product')}>
+                                    <Stack spacing={1.5}>
+                                        {masterTypes.length > 0 && (
+                                            <Paper
+                                                variant="outlined"
+                                                onClick={() => changeKind('master')}
+                                                sx={{
+                                                    p: 1.5,
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    borderColor: importKind === 'master' ? FIORI.brand : FIORI.border,
+                                                    bgcolor: importKind === 'master' ? FIORI.brandBg : FIORI.surface,
+                                                }}
+                                            >
+                                                <FormControlLabel
+                                                    value="master"
+                                                    control={<Radio />}
+                                                    label={
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                                                                {t('importKindMaster')}
+                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                                                {t('importKindMasterDescription')}
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                    sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+                                                />
+                                            </Paper>
+                                        )}
+                                        {hasProductType && (
+                                            <Paper
+                                                variant="outlined"
+                                                onClick={() => changeKind('product')}
+                                                sx={{
+                                                    p: 1.5,
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    borderColor: importKind === 'product' ? FIORI.brand : FIORI.border,
+                                                    bgcolor: importKind === 'product' ? FIORI.brandBg : FIORI.surface,
+                                                }}
+                                            >
+                                                <FormControlLabel
+                                                    value="product"
+                                                    control={<Radio />}
+                                                    label={
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                                                                {t('importKindProduct')}
+                                                            </Typography>
+                                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                                                {t('importKindProductDescription')}
+                                                            </Typography>
+                                                        </Box>
+                                                    }
+                                                    sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
+                                                />
+                                            </Paper>
+                                        )}
+                                    </Stack>
+                                </RadioGroup>
+                            </Stack>
+
+                            {importKind === 'master' && masterTypes.length > 0 && (
+                                <Stack spacing={2}>
+                                    <Box>
+                                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                            {t('wizardMasterTypeHeading')}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                            {t('wizardMasterTypeSubtitle')}
+                                        </Typography>
+                                    </Box>
+                                    <RadioGroup value={data.type} onChange={(e) => changeType(e.target.value)}>
+                                        <Stack spacing={1.5}>
+                                            {masterTypes.map((type) => (
+                                                <Paper
+                                                    key={type}
+                                                    variant="outlined"
+                                                    onClick={() => changeType(type)}
+                                                    sx={{
+                                                        p: 1.5,
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        borderColor: data.type === type ? FIORI.brand : FIORI.border,
+                                                        bgcolor: data.type === type ? FIORI.brandBg : FIORI.surface,
+                                                    }}
+                                                >
+                                                    <FormControlLabel
+                                                        value={type}
+                                                        control={<Radio />}
+                                                        label={
+                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                                                                {typeLabel(type)}
+                                                            </Typography>
+                                                        }
+                                                        sx={{ m: 0, width: '100%' }}
+                                                    />
+                                                </Paper>
+                                            ))}
+                                        </Stack>
+                                    </RadioGroup>
                                 </Stack>
-                            </RadioGroup>
+                            )}
                         </Stack>
                     )}
 

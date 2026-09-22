@@ -124,6 +124,9 @@
     "createAttributeGroup": "属性グループを作成する",
     "noAttributeGroupsFound": "属性グループが見つかりません。",
     "confirmDeleteAttributeGroupMessage": "この属性グループを削除してもよろしいでしょうか？",
+    "checkingAttributeGroupUsage": "このグループを現在使用している属性ファミリーと商品の数を確認しています...",
+    "attributeGroupInUseWarning": "このグループは現在、{{families}}件の属性ファミリー、{{attributes}}件の属性で使用されており、{{products}}件の商品に保存された値があります。削除するとこのリンクが削除され、これらの値は孤立データになります。",
+    "attributeGroupNotInUse": "このグループは現在、どの属性ファミリーや商品にもリンクされていません。",
     "addAttributeGroupTitle": "属性グループの追加",
     "codePlaceholder": "コード",
     "saveAttributeGroup": "属性グループを保存する",
@@ -266,6 +269,8 @@
     "currentFileLabel": "現在: {{name}}",
     "browseOrDropImage": "画像を選択またはドロップ",
     "browseOrDropFile": "ファイルを選択またはドロップ",
+    "uploadButtonLabel": "アップロード",
+    "uploadPercentComplete": "{{percent}}% 完了",
     "mappedToPlatformPayloadChip": "{{platform}} にマップ済み",
     "mappedToPlatformPayloadTooltip": "この商品をプッシュする際、このフィールドは {{platform}} の「{{field}}」ペイロードフィールドに送られます。",
     "productSavedSuccess": "商品を保存しました。"

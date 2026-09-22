@@ -218,3 +218,27 @@ test('an image value is resolved to a public storage URL via AttributeValueForma
 
     expect($result[0]['image'])->toBe(Storage::disk('public')->url('products/photo.jpg'));
 });
+
+test('a multi-group spec attribute resolves to its primary (lowest id) group value, not whichever row the DB returns last', function () {
+    // spec_specifications/spec_features/... can now be placed in more than
+    // one attribute_group_id (see migration
+    // 2026_09_23_000001_add_attribute_group_id_to_product_values_table) —
+    // this is the exact scenario the user reported (same attribute shown
+    // under two group tabs on the product edit page). The storefront still
+    // only has one "specs" slot per attribute code, so it must pick
+    // deterministically instead of whichever row happens to come back last.
+    $product = Product::create(['sku' => 'SKU-MULTIGROUP']);
+    $attribute = presenterAttr('spec_specifications');
+    $groupLow = \App\Models\AttributeGroup::create(['code' => 'presenter_group_low']);
+    $groupHigh = \App\Models\AttributeGroup::create(['code' => 'presenter_group_high']);
+    expect($groupLow->id)->toBeLessThan($groupHigh->id);
+
+    // Insert the higher group id FIRST so a naive "last row wins" pick would
+    // get this wrong.
+    ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $groupHigh->id, 'value' => 'From higher group']);
+    ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $groupLow->id, 'value' => 'From lower group']);
+
+    $result = ProductPresenter::mapMany(collect([$product]));
+
+    expect($result[0]['specs'])->toHaveKey('ข้อมูลจำเพาะ', 'From lower group');
+});

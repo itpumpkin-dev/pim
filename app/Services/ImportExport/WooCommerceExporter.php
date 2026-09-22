@@ -122,9 +122,17 @@ class WooCommerceExporter
         // reasoning as the Missing Translations report: this can be many
         // thousands of rows for a full-catalog export, and nothing here
         // needs more than the four raw column values.
+        //
+        // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
+        // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // channel/locale เดียวกันอาจมีมากกว่า 1 แถวแล้ว — resolveValue() ด้านล่าง
+        // ใช้ ->first() เลือกแถวที่ตรง scope ตัวแรกที่เจอ เรียงให้แถว "หลัก"
+        // (ไม่มี group ก่อน แล้วค่อย group id ต่ำสุด — เดียวกับ primaryGroupIdFor())
+        // มาก่อนเสมอ แทนที่จะปล่อยให้ DB คืนแถวไหนมาก่อนก็ได้แบบสุ่ม
         $this->valuesByProductAttribute = DB::table('product_values')
             ->whereIn('product_id', $allProducts->pluck('id'))
             ->whereIn('attribute_id', $attributeIds)
+            ->orderByRaw('(attribute_group_id IS NULL) DESC, attribute_group_id ASC')
             ->get(['product_id', 'attribute_id', 'channel_id', 'locale_id', 'value'])
             ->groupBy(fn ($row) => $row->product_id.'-'.$row->attribute_id);
 

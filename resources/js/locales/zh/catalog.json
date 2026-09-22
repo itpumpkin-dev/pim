@@ -125,6 +125,9 @@
     "createAttributeGroup": "创建属性组",
     "noAttributeGroupsFound": "没有找到属性组 .",
     "confirmDeleteAttributeGroupMessage": "您确定要删除此属性组吗 ?",
+    "checkingAttributeGroupUsage": "正在检查当前有多少属性家族和产品在使用此组...",
+    "attributeGroupInUseWarning": "此组目前被 {{families}} 个属性家族、{{attributes}} 个属性使用，并在 {{products}} 个产品中保存了数值。删除后将立即移除该关联并使这些数值成为孤立数据。",
+    "attributeGroupNotInUse": "此组目前未与任何属性家族或产品关联。",
     "addAttributeGroupTitle": "添加属性组",
     "codePlaceholder": "代码",
     "saveAttributeGroup": "保存属性组",
@@ -796,6 +799,8 @@
     "currentFileLabel": "当前：{{name}}",
     "browseOrDropImage": "浏览或拖放图片",
     "browseOrDropFile": "浏览或拖放文件",
+    "uploadButtonLabel": "上传",
+    "uploadPercentComplete": "已完成 {{percent}}%",
     "mappedToPlatformPayloadChip": "已映射到 {{platform}}",
     "mappedToPlatformPayloadTooltip": "推送此产品时，此字段将填入 {{platform}} 的「{{field}}」payload 字段。",
     "productSavedSuccess": "产品已保存成功。"

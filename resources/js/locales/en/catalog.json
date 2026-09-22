@@ -302,6 +302,9 @@
     "createAttributeGroup": "Create Attribute Group",
     "noAttributeGroupsFound": "No attribute groups found.",
     "confirmDeleteAttributeGroupMessage": "Are you sure you want to delete this attribute group?",
+    "checkingAttributeGroupUsage": "Checking how many attribute families and products currently use this group...",
+    "attributeGroupInUseWarning": "This group is currently used by {{families}} family(ies), {{attributes}} attribute(s), and has saved values on {{products}} product(s). Deleting it will remove that link and orphan those values immediately.",
+    "attributeGroupNotInUse": "This group is not currently linked to any attribute family or product.",
     "addAttributeGroupTitle": "Add Attribute Group",
     "codePlaceholder": "Code",
     "saveAttributeGroup": "Save Attribute Group",
@@ -819,6 +822,8 @@
     "currentFileLabel": "Current: {{name}}",
     "browseOrDropImage": "Browse or drop an image",
     "browseOrDropFile": "Browse or drop a file",
+    "uploadButtonLabel": "Upload",
+    "uploadPercentComplete": "{{percent}}% complete",
     "mappedToPlatformPayloadChip": "Mapped to {{platform}}",
     "mappedToPlatformPayloadTooltip": "This field feeds {{platform}}'s \"{{field}}\" payload field when this product is pushed.",
     "productSavedSuccess": "Product saved successfully."

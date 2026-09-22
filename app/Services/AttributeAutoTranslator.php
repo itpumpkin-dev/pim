@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\Locale;
+use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\TranslationProvider;
+use App\Services\Catalog\EffectiveFamilyAttributeResolver;
 use App\Services\Translation\TranslationProviderRegistry;
 use Illuminate\Support\Facades\Log;
 
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\Log;
  */
 class AttributeAutoTranslator
 {
+    public function __construct(private readonly EffectiveFamilyAttributeResolver $familyAttributeResolver) {}
+
     /**
      * @param class-string<\Illuminate\Database\Eloquent\Model> $translationModel
      */
@@ -77,19 +81,38 @@ class AttributeAutoTranslator
      * Treating those as "already covered" (fillMissing()'s normal behavior)
      * would silently skip them forever — every "AI translate" import would
      * report success while never actually translating a single one.
+     *
+     * Since one attribute can now be placed in more than one
+     * attribute_group_id (see migration
+     * 2026_09_23_000001_add_attribute_group_id_to_product_values_table), a
+     * bare product_id+attribute_id lookup could match more than one row —
+     * without picking a specific one, both the read (pluck() collapsing
+     * multiple rows to one) and the write (updateOrCreate() targeting
+     * whichever matching row the DB happens to return first) would become
+     * nondeterministic. This method isn't group-aware itself (it only
+     * translates one "primary" copy — see
+     * EffectiveFamilyAttributeResolver::primaryGroupIdFor()), so any other
+     * group placement of this attribute is left untouched, same as the
+     * marketplace/CSV export/storefront consumers that share this
+     * limitation for now.
      */
     public function fillMissingProductValue(int $productId, int $attributeId, int $sourceLocaleId, string $sourceValue): void
     {
-        $this->translateMissing($sourceLocaleId, $sourceValue, function () use ($productId, $attributeId) {
+        $product = Product::find($productId);
+        $effectiveFamilyIds = $product ? $this->familyAttributeResolver->effectiveFamilyIds($product) : [];
+        $groupId = $this->familyAttributeResolver->primaryGroupIdFor($attributeId, $effectiveFamilyIds);
+
+        $this->translateMissing($sourceLocaleId, $sourceValue, function () use ($productId, $attributeId, $groupId) {
             return ProductValue::where('product_id', $productId)
                 ->where('attribute_id', $attributeId)
+                ->where('attribute_group_id', $groupId)
                 ->whereNull('channel_id')
                 ->whereNotNull('locale_id')
                 ->pluck('value', 'locale_id')
                 ->all();
-        }, function (string $value, Locale $locale) use ($productId, $attributeId) {
+        }, function (string $value, Locale $locale) use ($productId, $attributeId, $groupId) {
             ProductValue::updateOrCreate(
-                ['product_id' => $productId, 'attribute_id' => $attributeId, 'channel_id' => null, 'locale_id' => $locale->id],
+                ['product_id' => $productId, 'attribute_id' => $attributeId, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => $locale->id],
                 ['value' => $value]
             );
         }, ['model' => ProductValue::class, 'product_id' => $productId, 'attribute_id' => $attributeId], retranslateIdenticalCopies: true);

@@ -1,15 +1,16 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
-import { FioriFileUploader } from '@/components/fiori-file-uploader';
 import { FioriFormGroup, FioriMessageStrip, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { FileUploadRowsList, FioriUploadDropzoneTile } from '@/components/fiori-upload-dropzone';
 import { HistoryPanel } from '@/components/history-panel';
 import { type ProductOption } from '@/components/product-picker';
 import RichTextEditor from '@/components/rich-text-editor';
 import { TimelinePanel } from '@/components/timeline-panel';
 import { useLocale } from '@/hooks/use-locale';
 import { useDraftAutosave } from '@/hooks/use-draft-autosave';
+import { useFileUploadRows } from '@/hooks/use-file-upload-rows';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -247,7 +248,9 @@ interface Props {
      * family ตายตัวเหมือนกัน เลยแยก panel field ของตัวเองเหมือน
      * masterCategoryAttributes แทนที่จะปนใน assignedGroups */
     productTypeAttribute?: AttributeItem | null;
-    productValues: Record<number | string, Record<string, Record<string | number, string>>>;
+    // attribute_id -> groupKey (attribute_group_id เป็น string หรือ 'ungrouped') ->
+    // channelKey -> localeKey -> value
+    productValues: Record<number | string, Record<string, Record<string, Record<string | number, string>>>>;
     variants?: VariantItem[];
     configurableAttributes?: AttributeItem[];
     channels?: ChannelOption[];
@@ -276,13 +279,16 @@ interface Props {
 
 type AttributeValue = string | File | (string | File)[];
 
-// values: attribute_id -> channelKey ('global' หรือ channel id) -> localeKey ('default' หรือ locale id) -> value
+// values: attribute_id -> groupKey (attribute_group_id เป็น string หรือ 'ungrouped',
+// เดียวกับ group.id ที่ใช้ render แต่ละ panel — attribute ที่ไม่มี group เลย เช่น
+// Master Categories/Product Type ใช้ 'ungrouped' เสมอ) -> channelKey ('global' หรือ
+// channel id) -> localeKey ('default' หรือ locale id) -> value
 interface ProductForm {
     sku: string;
     family_id: number;
     type: string;
     enabled: boolean;
-    values: Record<string | number, Record<string, Record<string | number, AttributeValue>>>;
+    values: Record<string | number, Record<string, Record<string, Record<string | number, AttributeValue>>>>;
     variants: VariantItem[];
     configurable_attributes: number[];
     category_ids: number[];
@@ -578,18 +584,22 @@ export default function ProductEdit({
     // setDataRef ให้มากที่สุด) แทนที่จะไว้ใกล้จุดใช้งานจริงด้านล่าง เพราะ
     // handleMasterCategoryChange ที่อยู่ก่อนหน้านี้ในไฟล์ต้องใช้ตัวนี้เป็น
     // dependency ของ useCallback ตัวเอง — ต้อง declare ก่อนถึงจะไม่ชน TDZ
-    const setAttributeValue = useCallback((attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
+    const setAttributeValue = useCallback((attributeId: number, groupKey: string, channelKey: string, localeKey: string, val: AttributeValue) => {
         setDataRef.current((prev) => {
             const attrValues = prev.values[attributeId] || {};
+            const groupValues = attrValues[groupKey] || {};
             return {
                 ...prev,
                 values: {
                     ...prev.values,
                     [attributeId]: {
                         ...attrValues,
-                        [channelKey]: {
-                            ...(attrValues[channelKey] || {}),
-                            [localeKey]: val,
+                        [groupKey]: {
+                            ...groupValues,
+                            [channelKey]: {
+                                ...(groupValues[channelKey] || {}),
+                                [localeKey]: val,
+                            },
                         },
                     },
                 },
@@ -638,7 +648,7 @@ export default function ProductEdit({
     const selectedMasterCategoryCode = (attr?: AttributeItem): string => {
         if (!attr) return '';
         const { channelKey, localeKey } = getValueKeys(attr);
-        const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? '';
+        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? '';
         return typeof val === 'string' ? val : '';
     };
 
@@ -670,7 +680,7 @@ export default function ProductEdit({
     // เดียวกันเป๊ะ — กันไม่ให้ปุ่มแก้ไขนี้ต้องเขียนซ้ำสองที่แล้วเผลอเบี้ยวกันทีหลัง
     const renderMasterCategoryField = (attr: AttributeItem) => {
         const { channelKey, localeKey } = getValueKeys(attr);
-        const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
+        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.['ungrouped']?.[channelKey]?.['default'] ?? '';
         const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
         const isProductGroupField = attr.code === 'productgroupname';
         const selectedCode = isProductGroupField ? selectedMasterCategoryCode(attr) : '';
@@ -680,6 +690,7 @@ export default function ProductEdit({
                 key={attr.id}
                 attr={attr}
                 value={val}
+                groupKey="ungrouped"
                 channelKey={channelKey}
                 localeKey={localeKey}
                 onValueChange={handleMasterCategoryChange}
@@ -813,14 +824,14 @@ export default function ProductEdit({
     // เอง เพราะถูกส่งเป็น onValueChange ให้ RenderAttributeInput ที่ memo ไว้ด้วย
     // (masterCategoryAttributes เป็น prop ไม่ใช่ state เลย identity คงที่อยู่แล้ว)
     const handleMasterCategoryChange = useCallback(
-        (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => {
-            setAttributeValue(attributeId, channelKey, localeKey, val);
+        (attributeId: number, groupKey: string, channelKey: string, localeKey: string, val: AttributeValue) => {
+            setAttributeValue(attributeId, groupKey, channelKey, localeKey, val);
 
             const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
             const clear = (attr?: AttributeItem) => {
                 if (!attr) return;
                 const keys = getValueKeys(attr);
-                setAttributeValue(attr.id, keys.channelKey, keys.localeKey, '');
+                setAttributeValue(attr.id, 'ungrouped', keys.channelKey, keys.localeKey, '');
             };
             if (attributeId === categoryAttr?.id) {
                 clear(subcatAttr);
@@ -1496,22 +1507,34 @@ export default function ProductEdit({
             .then((json) => {
                 if (!json?.values) return;
 
-                const allAttributes = assignedGroups.flatMap((g) => g.attributes);
+                // json.values: attributeId -> groupKey -> value (channel/locale ตายตัว
+                // อยู่แล้วจาก query param ด้านบน) — ต้อง merge ทีละ group ของ attribute
+                // นั้นๆ แยกกัน ไม่ใช่แค่ attributeId เฉยๆ เหมือนเดิม เพราะ attribute
+                // เดียวกันตอนนี้แสดงได้หลาย group พร้อมกัน แต่ละ group ต้องได้ค่าของ
+                // placement ตัวเองเท่านั้น ไม่ใช่ทุก group ได้ค่าเดียวกันหมด
+                const serverValues = json.values as Record<string, Record<string, string | null> | undefined>;
 
                 setData((prev) => {
                     const nextValues = { ...prev.values };
-                    Object.entries(json.values as Record<string, string | null>).forEach(([attributeId, value]) => {
-                        if (value === null) return;
-                        const attr = allAttributes.find((a) => String(a.id) === attributeId);
-                        if (!attr) return;
-                        const { channelKey, localeKey } = getValueKeys(attr);
-                        nextValues[attributeId] = {
-                            ...(nextValues[attributeId] || {}),
-                            [channelKey]: {
-                                ...((nextValues[attributeId] || {})[channelKey] || {}),
-                                [localeKey]: value,
-                            },
-                        };
+                    assignedGroups.forEach((g) => {
+                        const groupKey = g.id === 0 ? 'ungrouped' : String(g.id);
+                        g.attributes.forEach((attr) => {
+                            const value = serverValues[attr.id]?.[groupKey];
+                            if (value === null || value === undefined) return;
+                            const { channelKey, localeKey } = getValueKeys(attr);
+                            const attrValues = nextValues[attr.id] || {};
+                            const groupValues = attrValues[groupKey] || {};
+                            nextValues[attr.id] = {
+                                ...attrValues,
+                                [groupKey]: {
+                                    ...groupValues,
+                                    [channelKey]: {
+                                        ...(groupValues[channelKey] || {}),
+                                        [localeKey]: value,
+                                    },
+                                },
+                            };
+                        });
                     });
                     return { ...prev, values: nextValues };
                 });
@@ -2321,6 +2344,14 @@ export default function ProductEdit({
                                                 );
 
                                             const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
+                                            // group.id === 0 คือ group สังเคราะห์ "General" (ดู
+                                            // ProductController::buildProductFormProps() — เกิดตอน
+                                            // family ยัง resolve ได้แต่ยังไม่มี attribute ผูกไว้เลย
+                                            // สักตัว) ไม่ใช่ attribute_group_id จริง — ฝั่ง backend
+                                            // เก็บ attribute พวกนี้ไว้ที่ groupKey 'ungrouped' เสมอ
+                                            // (attribute_group_id เป็น NULL จริงๆ) ต้อง map ให้ตรงกัน
+                                            // ไม่งั้นค่าที่เคย save ไว้จะหาไม่เจอตอนโหลดกลับมา
+                                            const groupKey = group.id === 0 ? 'ungrouped' : String(group.id);
 
                                             return (
                                                 <Paper
@@ -2472,8 +2503,8 @@ export default function ProductEdit({
                                                                 // (ดู ProductRowImporter) ถ้าไม่มี fallback นี้ ฟิลด์ที่เพิ่ง
                                                                 // import มาจะดูเหมือนว่างเปล่า
                                                                 const val =
-                                                                    data.values[attr.id]?.[channelKey]?.[localeKey] ??
-                                                                    data.values[attr.id]?.[channelKey]?.['default'] ??
+                                                                    data.values[attr.id]?.[groupKey]?.[channelKey]?.[localeKey] ??
+                                                                    data.values[attr.id]?.[groupKey]?.[channelKey]?.['default'] ??
                                                                     '';
                                                                 const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
                                                                 // activeChannelId เป็น null แปลว่า scope "Default (All Channels)"
@@ -2491,6 +2522,7 @@ export default function ProductEdit({
                                                                         key={attr.id}
                                                                         attr={attr}
                                                                         value={val}
+                                                                        groupKey={groupKey}
                                                                         channelKey={channelKey}
                                                                         localeKey={localeKey}
                                                                         onValueChange={setAttributeValue}
@@ -2638,8 +2670,8 @@ export default function ProductEdit({
                                                     </Stack>
                                                     <TextField
                                                         select
-                                                        value={(data.values[productTypeAttribute.id]?.['global']?.['default'] as string) || ''}
-                                                        onChange={(e) => setAttributeValue(productTypeAttribute.id, 'global', 'default', e.target.value)}
+                                                        value={(data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.['default'] as string) || ''}
+                                                        onChange={(e) => setAttributeValue(productTypeAttribute.id, 'ungrouped', 'global', 'default', e.target.value)}
                                                         size="small"
                                                         fullWidth
                                                         disabled={productTypeAttribute.editable === false}
@@ -2653,7 +2685,7 @@ export default function ProductEdit({
                                                             .filter(
                                                                 (opt) =>
                                                                     opt.is_active !== false ||
-                                                                    opt.code === (data.values[productTypeAttribute.id]?.['global']?.['default'] as string),
+                                                                    opt.code === (data.values[productTypeAttribute.id]?.['ungrouped']?.['global']?.['default'] as string),
                                                             )
                                                             .map((opt) => (
                                                                 <MenuItem key={opt.id} value={opt.code || ''}>
@@ -3707,9 +3739,10 @@ function optionValue(opt: AttributeOption) {
 
 type FieldControlProps = {
     attributeId: number;
+    groupKey: string;
     channelKey: string;
     localeKey: string;
-    onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
+    onValueChange: (attributeId: number, groupKey: string, channelKey: string, localeKey: string, val: AttributeValue) => void;
 };
 
 // Autocomplete (popper ของ options, virtualization, filtering) เป็นหนึ่งใน
@@ -3720,6 +3753,7 @@ type FieldControlProps = {
 // เท่านั้น ทำให้มันข้าม re-render ได้ แทนที่จะต้องสร้างใหม่ทุกครั้งที่สลับ
 const SelectControl = memo(function SelectControl({
     attributeId,
+    groupKey,
     channelKey,
     localeKey,
     options,
@@ -3747,7 +3781,7 @@ const SelectControl = memo(function SelectControl({
             popupIcon={<KeyboardArrowDownIcon />}
             getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
             isOptionEqualToValue={(opt, val) => opt.id === val.id}
-            onChange={(_, newValue) => onValueChange(attributeId, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
+            onChange={(_, newValue) => onValueChange(attributeId, groupKey, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
             sx={fioriComboBoxSx('none')}
             slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
             renderInput={(params) => <TextField {...params} placeholder={t('selectOption')} />}
@@ -3760,6 +3794,7 @@ const SelectControl = memo(function SelectControl({
 // — เปลี่ยนแค่ label (ที่ render แยกต่างหาก) เท่านั้น
 const RichTextControl = memo(function RichTextControl({
     attributeId,
+    groupKey,
     channelKey,
     localeKey,
     value,
@@ -3776,7 +3811,7 @@ const RichTextControl = memo(function RichTextControl({
     return (
         <RichTextEditor
             value={value}
-            onChange={(val) => onValueChange(attributeId, channelKey, localeKey, val)}
+            onChange={(val) => onValueChange(attributeId, groupKey, channelKey, localeKey, val)}
             placeholder={placeholder}
             readOnly={readOnly}
             imageUploadUrl={readOnly ? undefined : `/catalog/products/${productId}/upload-description-image`}
@@ -3795,6 +3830,7 @@ const RichTextControl = memo(function RichTextControl({
 const RenderAttributeInput = memo(function RenderAttributeInput({
     attr,
     value,
+    groupKey,
     channelKey,
     localeKey,
     onValueChange,
@@ -3809,9 +3845,10 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
 }: {
     attr: AttributeItem;
     value: AttributeValue;
+    groupKey: string;
     channelKey: string;
     localeKey: string;
-    onValueChange: (attributeId: number, channelKey: string, localeKey: string, val: AttributeValue) => void;
+    onValueChange: (attributeId: number, groupKey: string, channelKey: string, localeKey: string, val: AttributeValue) => void;
     label: string;
     activeLocaleCode?: string;
     activeChannelName?: string;
@@ -3824,10 +3861,10 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     const { t } = useTranslation('catalog');
     // ใช้กับทุกประเภทฟิลด์ด้านล่าง ยกเว้น SelectControl / RichTextControl ที่
     // memoize ไว้ (สองตัวนี้เรียก onValueChange ตรงๆ พร้อม
-    // attributeId/channelKey/localeKey ที่ resolve แล้วแทน) — เพราะสองฟิลด์นี้
+    // attributeId/groupKey/channelKey/localeKey ที่ resolve แล้วแทน) — เพราะสองฟิลด์นี้
     // มีต้นทุนสูงพอที่ closure identity ใหม่ตรงนี้จะทำลายการ memoize ของมันทุกครั้ง
     // ที่ parent re-render (เช่น ตอนสลับ locale)
-    const onChange = (val: AttributeValue) => onValueChange(attr.id, channelKey, localeKey, val);
+    const onChange = (val: AttributeValue) => onValueChange(attr.id, groupKey, channelKey, localeKey, val);
     const stringValue = typeof value === 'string' ? value : '';
     const isReadOnly = attr.editable === false;
     const [addOptionOpen, setAddOptionOpen] = useState(false);
@@ -3836,6 +3873,21 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
     const [galleryError, setGalleryError] = useState<string | null>(null);
+    const [justUploadedPath, setJustUploadedPath] = useState<string | null>(null);
+
+    // อัปโหลดไฟล์จริงทันทีตอนเลือก (ผ่าน FioriUploadDropzone + progress bar) แทนที่จะ
+    // แนบ File object ไว้เฉยๆ รอ submit ทั้งฟอร์ม — แยก 3 ชุดเพราะ gallery/video/single
+    // file เป็นคนละ endpoint ของ rows ที่กำลังอัปโหลดอยู่ ไม่ปนกัน ประกาศไว้นอก
+    // if (attr.type === ...) เสมอเพราะกฎของ hooks ต้องเรียกจำนวนเท่ากันทุก render
+    const { rows: galleryUploadRows, upload: uploadGalleryFile, removeRow: removeGalleryUploadRow } = useFileUploadRows();
+    const { rows: videoUploadRows, upload: uploadVideoFile, removeRow: removeVideoUploadRow } = useFileUploadRows();
+    const { rows: singleFileUploadRows, upload: uploadSingleFile, removeRow: removeSingleFileUploadRow } = useFileUploadRows();
+    // อัปโหลดหลายไฟล์พร้อมกันของ gallery/video เสร็จไม่พร้อมกันแน่ๆ (คนละ progress
+    // bar คนละ XHR) — ต้องต่อท้าย path ที่เพิ่งได้กลับมาจาก ref นี้ (sync ทุก render
+    // จาก items ปัจจุบัน) แทนที่จะอ้าง items จาก closure ตอน render ที่เริ่มอัปโหลด
+    // ไม่งั้นไฟล์ที่อัปโหลดเสร็จใกล้ๆ กันจะเขียนทับ path ของกันและกัน
+    const galleryItemsRef = useRef<Array<string | File>>([]);
+    const videoItemsRef = useRef<Array<string | File>>([]);
 
     useEffect(() => {
         if ((attr.type === 'image' || attr.type === 'file') && value instanceof File) {
@@ -4011,6 +4063,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 <Stack direction="row" spacing={1} alignItems="center">
                     <SelectControl
                         attributeId={attr.id}
+                        groupKey={groupKey}
                         channelKey={channelKey}
                         localeKey={localeKey}
                         options={options}
@@ -4061,6 +4114,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 </Stack>
                 <RichTextControl
                     attributeId={attr.id}
+                    groupKey={groupKey}
                     channelKey={channelKey}
                     localeKey={localeKey}
                     value={stringValue}
@@ -4196,11 +4250,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         // ซึ่ง backend จะ merge กลับเข้าด้วยกันตอน save แทนที่จะแทนที่ทั้งชุด
         // (ดู ProductController::update())
         const items = parseGalleryItems(value);
+        galleryItemsRef.current = items;
         const atLimit = items.length >= MAX_GALLERY_IMAGES;
 
         const removeAt = (index: number) => {
             setGalleryError(null);
-            onChange(items.filter((_, i) => i !== index));
+            const next = items.filter((_, i) => i !== index);
+            galleryItemsRef.current = next;
+            onChange(next);
         };
 
         // ทำงานคล้าย handleVideoSelect() ของฟิลด์ video ด้านล่าง — เหตุผลเดียวกัน
@@ -4222,10 +4279,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 img.src = url;
             });
 
-        const addFiles = (fileList: FileList) => {
+        const uploadUrl = `/catalog/products/${productId}/attributes/${attr.id}/upload`;
+
+        const addFiles = (incoming: File[]) => {
             setGalleryError(null);
 
-            const incoming = Array.from(fileList);
             const remainingSlots = MAX_GALLERY_IMAGES - items.length;
 
             if (remainingSlots <= 0) {
@@ -4253,9 +4311,18 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     setGalleryError(messages.join(' — '));
                 }
 
-                if (valid.length > 0) {
-                    onChange([...items, ...valid]);
-                }
+                // อัปโหลดทีละไฟล์แยกจากกัน (ไม่รวมเป็นคำขอเดียว) เพื่อให้แต่ละไฟล์มี
+                // progress bar ของตัวเอง — ไฟล์ที่เสร็จก่อนต้องต่อท้าย
+                // galleryItemsRef.current (ไม่ใช่ items ตัวแปรใน closure นี้ที่ค้าง
+                // ค่าตอน render รอบนี้) ไม่งั้นสองไฟล์ที่เสร็จเกือบพร้อมกันจะเขียน
+                // ทับ path ของกันและกัน
+                valid.forEach((file) => {
+                    uploadGalleryFile(file, uploadUrl, ({ path }) => {
+                        const next = [...galleryItemsRef.current, path];
+                        galleryItemsRef.current = next;
+                        onChange(next);
+                    });
+                });
             });
         };
 
@@ -4270,28 +4337,34 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                     {t('galleryHelperText', { max: MAX_GALLERY_IMAGES, count: items.length, dim: MIN_GALLERY_DIMENSION })}
                 </Typography>
-                {items.length > 0 && (
-                    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
-                        {items.map((item, index) => (
-                            <GalleryThumb
-                                key={`${index}-${typeof item === 'string' ? item : item.name}`}
-                                item={item}
-                                disabled={isReadOnly}
-                                onRemove={() => removeAt(index)}
-                            />
-                        ))}
-                    </Stack>
-                )}
-                <Box sx={{ maxWidth: 420 }}>
-                    <FioriFileUploader
-                        placeholder={atLimit ? t('galleryMaxReached', { max: MAX_GALLERY_IMAGES }) : t('browseOrDropImages')}
-                        accept="image/*"
-                        multiple
-                        disabled={isReadOnly || atLimit}
-                        onSelect={(fl) => addFiles(fl)}
-                        error={galleryError ?? undefined}
-                    />
-                </Box>
+                <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="flex-start" sx={{ mb: 1 }}>
+                    {items.map((item, index) => (
+                        <GalleryThumb
+                            key={`${index}-${typeof item === 'string' ? item : item.name}`}
+                            item={item}
+                            disabled={isReadOnly}
+                            onRemove={() => removeAt(index)}
+                        />
+                    ))}
+                    {!atLimit && (
+                        <FioriUploadDropzoneTile
+                            width={200}
+                            height={200}
+                            accept="image/*"
+                            multiple
+                            disabled={isReadOnly}
+                            label={t('uploadButtonLabel')}
+                            hasError={!!galleryError}
+                            onFilesSelected={addFiles}
+                        />
+                    )}
+                </Stack>
+                <FileUploadRowsList
+                    error={atLimit ? t('galleryMaxReached', { max: MAX_GALLERY_IMAGES }) : (galleryError ?? undefined)}
+                    rows={galleryUploadRows}
+                    percentLabel={(percent) => t('uploadPercentComplete', { percent })}
+                    onRemoveRow={removeGalleryUploadRow}
+                />
             </Box>
         );
     }
@@ -4305,11 +4378,14 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         const MAX_VIDEO_COUNT = 3;
 
         const items = parseGalleryItems(value);
+        videoItemsRef.current = items;
         const atLimit = items.length >= MAX_VIDEO_COUNT;
 
         const removeAt = (index: number) => {
             setVideoError(null);
-            onChange(items.filter((_, i) => i !== index));
+            const next = items.filter((_, i) => i !== index);
+            videoItemsRef.current = next;
+            onChange(next);
         };
 
         // เช็ค type/ขนาดแบบ sync ก่อน แล้วค่อย probe duration/resolution แบบ
@@ -4351,10 +4427,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 probe.src = probeUrl;
             });
 
-        const addFiles = (fileList: FileList) => {
+        const uploadUrl = `/catalog/products/${productId}/attributes/${attr.id}/upload`;
+
+        const addFiles = (incoming: File[]) => {
             setVideoError(null);
 
-            const incoming = Array.from(fileList);
             const remainingSlots = MAX_VIDEO_COUNT - items.length;
 
             if (remainingSlots <= 0) {
@@ -4376,9 +4453,13 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     setVideoError(messages.join(' — '));
                 }
 
-                if (valid.length > 0) {
-                    onChange([...items, ...valid]);
-                }
+                valid.forEach((file) => {
+                    uploadVideoFile(file, uploadUrl, ({ path }) => {
+                        const next = [...videoItemsRef.current, path];
+                        videoItemsRef.current = next;
+                        onChange(next);
+                    });
+                });
             });
         };
 
@@ -4393,28 +4474,34 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                     {t('videoHelperText', { max: MAX_VIDEO_COUNT, count: items.length })}
                 </Typography>
-                {items.length > 0 && (
-                    <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ mb: 1 }}>
-                        {items.map((item, index) => (
-                            <VideoThumb
-                                key={`${index}-${typeof item === 'string' ? item : item.name}`}
-                                item={item}
-                                disabled={isReadOnly}
-                                onRemove={() => removeAt(index)}
-                            />
-                        ))}
-                    </Stack>
-                )}
-                <Box sx={{ maxWidth: 420 }}>
-                    <FioriFileUploader
-                        placeholder={atLimit ? t('videoMaxReached', { max: MAX_VIDEO_COUNT }) : t('browseOrDropVideos')}
-                        accept="video/mp4"
-                        multiple
-                        disabled={isReadOnly || atLimit}
-                        onSelect={(fl) => addFiles(fl)}
-                        error={videoError ?? undefined}
-                    />
-                </Box>
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-start" sx={{ mb: 1 }}>
+                    {items.map((item, index) => (
+                        <VideoThumb
+                            key={`${index}-${typeof item === 'string' ? item : item.name}`}
+                            item={item}
+                            disabled={isReadOnly}
+                            onRemove={() => removeAt(index)}
+                        />
+                    ))}
+                    {!atLimit && (
+                        <FioriUploadDropzoneTile
+                            width={160}
+                            height={100}
+                            accept="video/mp4"
+                            multiple
+                            disabled={isReadOnly}
+                            label={t('uploadButtonLabel')}
+                            hasError={!!videoError}
+                            onFilesSelected={addFiles}
+                        />
+                    )}
+                </Stack>
+                <FileUploadRowsList
+                    error={atLimit ? t('videoMaxReached', { max: MAX_VIDEO_COUNT }) : (videoError ?? undefined)}
+                    rows={videoUploadRows}
+                    percentLabel={(percent) => t('uploadPercentComplete', { percent })}
+                    onRemoveRow={removeVideoUploadRow}
+                />
             </Box>
         );
     }
@@ -4448,6 +4535,17 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         const existingIsPdf = !selectedName && existingLabel.toLowerCase().endsWith('.pdf');
         const pdfPreviewSrc = !isImage && (selectedIsPdf || existingIsPdf) ? filePreviewUrl || existingFileUrl : '';
 
+        const uploadUrl = `/catalog/products/${productId}/attributes/${attr.id}/upload`;
+        // value เป็น string ทันทีหลังอัปโหลดเสร็จเสมอแล้ว (ไม่ใช่ File object ที่รอ submit
+        // เหมือนก่อนหน้านี้อีกต่อไป) — selectedName เลยไม่มีทางไม่ว่างจริง แต่ยังปล่อยให้
+        // ผ่าน existingLabel ทางเดียวกันนี้ ทั้งไฟล์ที่เพิ่งอัปโหลดรอบนี้และไฟล์เดิมที่ save
+        // ไว้แล้ว ต่างกันแค่ปุ่มลบ (canClearCurrent): โชว์เฉพาะไฟล์ที่เพิ่งอัปโหลดในรอบแก้ไข
+        // นี้เอง (จำ path ที่ได้กลับมาไว้ใน justUploadedPath) ไม่ใช่ไฟล์เดิมจากเซิร์ฟเวอร์ —
+        // พฤติกรรมเดียวกับตอนที่ยังใช้ FioriFileUploader (onClear เดิมเช็คจาก selectedName
+        // ซึ่งมีได้ก็ต่อเมื่อเพิ่งเลือกไฟล์ใหม่ในฟอร์มเท่านั้น)
+        const currentLabel = existingLabel ? t('currentFileLabel', { name: existingLabel }) : '';
+        const canClearCurrent = justUploadedPath !== null && justUploadedPath === stringValue;
+
         return (
             <Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
@@ -4456,46 +4554,110 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Stack direction="column" spacing={1.5} alignItems="flex-start">
+                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="flex-start">
                     {isImage && previewSrc && (
-                        <Box
-                            component="img"
-                            src={previewSrc}
-                            alt={label}
-                            onClick={() => setLightboxOpen(true)}
-                            sx={{
-                                width: 200,
-                                height: 200,
-                                objectFit: 'cover',
-                                borderRadius: 1,
-                                border: '1px solid #e2e8f0',
-                                cursor: 'pointer',
-                                '&:hover': { opacity: 0.85 },
-                            }}
-                        />
+                        <Box sx={{ position: 'relative', width: 200, height: 200 }}>
+                            <Box
+                                component="img"
+                                src={previewSrc}
+                                alt={label}
+                                onClick={() => setLightboxOpen(true)}
+                                sx={{
+                                    width: 200,
+                                    height: 200,
+                                    objectFit: 'cover',
+                                    borderRadius: 1,
+                                    border: '1px solid #e2e8f0',
+                                    cursor: 'pointer',
+                                    '&:hover': { opacity: 0.85 },
+                                }}
+                            />
+                            {canClearCurrent && !isReadOnly && (
+                                <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                        setJustUploadedPath(null);
+                                        onChange('');
+                                    }}
+                                    aria-label="remove file"
+                                    sx={{
+                                        position: 'absolute',
+                                        top: -8,
+                                        right: -8,
+                                        bgcolor: '#fff',
+                                        border: '1px solid #e2e8f0',
+                                        width: 20,
+                                        height: 20,
+                                        '&:hover': { bgcolor: '#fee2e2' },
+                                    }}
+                                >
+                                    <CloseIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            )}
+                        </Box>
                     )}
-                    <Box sx={{ width: '100%', maxWidth: 420 }}>
-                        <FioriFileUploader
-                            placeholder={isImage ? t('browseOrDropImage') : t('browseOrDropFile')}
-                            accept={isImage ? 'image/*' : undefined}
-                            disabled={isReadOnly}
-                            onSelect={(fl) => onChange(fl[0])}
-                            valueLabel={selectedName || (existingLabel ? t('currentFileLabel', { name: existingLabel }) : null)}
-                            onClear={selectedName ? () => onChange('') : undefined}
-                        />
-                    </Box>
+                    {!isImage && pdfPreviewSrc && (
+                        <Box sx={{ width: 400, flexShrink: 0 }}>
+                            <FioriPdfViewer
+                                src={pdfPreviewSrc}
+                                title={selectedName || existingLabel}
+                                height={150}
+                                onClose={canClearCurrent && !isReadOnly ? () => { setJustUploadedPath(null); onChange(''); } : undefined}
+                            />
+                        </Box>
+                    )}
+                    {!isImage && !pdfPreviewSrc && currentLabel && (
+                        <Stack
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                            sx={{ border: `1px solid ${FIORI.border}`, borderRadius: '0.375rem', px: 1.25, py: 0.5, minWidth: 200, maxWidth: 260 }}
+                        >
+                            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0, color: FIORI.textPrimary }}>
+                                {currentLabel}
+                            </Typography>
+                            {canClearCurrent && !isReadOnly && (
+                                <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                        setJustUploadedPath(null);
+                                        onChange('');
+                                    }}
+                                    sx={{ p: 0.25, color: FIORI.error }}
+                                    aria-label="remove file"
+                                >
+                                    <CloseIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                            )}
+                        </Stack>
+                    )}
+                    <FioriUploadDropzoneTile
+                        width={200}
+                        height={200}
+                        accept={isImage ? 'image/*' : undefined}
+                        disabled={isReadOnly}
+                        label={t('uploadButtonLabel')}
+                        onFilesSelected={(files) => {
+                            const file = files[0];
+                            if (!file) return;
+                            uploadSingleFile(file, uploadUrl, ({ path }) => {
+                                setJustUploadedPath(path);
+                                onChange(path);
+                            });
+                        }}
+                    />
                 </Stack>
+                <FileUploadRowsList
+                    rows={singleFileUploadRows}
+                    percentLabel={(percent) => t('uploadPercentComplete', { percent })}
+                    onRemoveRow={removeSingleFileUploadRow}
+                />
                 {isImage && previewSrc && (
                     <Dialog open={lightboxOpen} onClose={() => setLightboxOpen(false)} maxWidth="md">
                         <DialogContent sx={{ p: 0, lineHeight: 0 }}>
                             <Box component="img" src={previewSrc} alt={label} sx={{ display: 'block', maxWidth: '90vw', maxHeight: '85vh' }} />
                         </DialogContent>
                     </Dialog>
-                )}
-                {pdfPreviewSrc && (
-                    <Box sx={{ mt: 1.5, maxWidth: 480 }}>
-                        <FioriPdfViewer src={pdfPreviewSrc} title={selectedName || existingLabel} height={320} />
-                    </Box>
                 )}
             </Box>
         );

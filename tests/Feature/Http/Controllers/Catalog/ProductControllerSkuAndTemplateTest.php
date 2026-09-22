@@ -205,10 +205,10 @@ test('update stores multiple videos for a "video" attribute as a JSON array, lik
             'sku' => $product->sku,
             'type' => 'simple',
             'enabled' => false,
-            'values' => [$videoAttr->id => ['global' => ['default' => []]]],
+            'values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => []]]]],
         ],
         [],
-        ['values' => [$videoAttr->id => ['global' => ['default' => [$file1, $file2]]]]]
+        ['values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => [$file1, $file2]]]]]]
     );
 
     pcController()->update($request, $product);
@@ -239,10 +239,10 @@ test('update rejects more videos than MAX_VIDEO_COUNT (3) for a "video" attribut
             'sku' => $product->sku,
             'type' => 'simple',
             'enabled' => false,
-            'values' => [$videoAttr->id => ['global' => ['default' => []]]],
+            'values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => []]]]],
         ],
         [],
-        ['values' => [$videoAttr->id => ['global' => ['default' => $files]]]]
+        ['values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => $files]]]]]
     );
 
     expect(fn () => pcController()->update($request, $product))->toThrow(ValidationException::class);
@@ -273,7 +273,7 @@ test('update removing one of two existing videos deletes only the removed file f
             'sku' => $product->sku,
             'type' => 'simple',
             'enabled' => false,
-            'values' => [$videoAttr->id => ['global' => ['default' => [$keptPath]]]],
+            'values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => [$keptPath]]]]],
         ]
     );
 
@@ -306,7 +306,7 @@ test('update rejects more than MAX_VIDEO_COUNT kept paths even when no new file 
             'sku' => $product->sku,
             'type' => 'simple',
             'enabled' => false,
-            'values' => [$videoAttr->id => ['global' => ['default' => $keptPaths]]],
+            'values' => [$videoAttr->id => ['ungrouped' => ['global' => ['default' => $keptPaths]]]],
         ]
     );
 
