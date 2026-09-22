@@ -90,6 +90,8 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
     const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
     const [deleteFamilyId, setDeleteFamilyId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [deleteUsage, setDeleteUsage] = useState<{ product_group_count: number; product_count: number } | null>(null);
+    const [deleteUsageLoading, setDeleteUsageLoading] = useState(false);
     const [duplicateFamilyId, setDuplicateFamilyId] = useState<number | null>(null);
     const [duplicating, setDuplicating] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
@@ -108,6 +110,32 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
 
         return () => clearTimeout(timeout);
     }, [search]);
+
+    // ดึงจำนวนกลุ่มสินค้า/สินค้าที่กำลังใช้ตระกูลนี้อยู่มาโชว์ในไดอะล็อกยืนยันลบ
+    // ก่อนกดยืนยันจริง — category_attribute_family.family_id เป็น cascadeOnDelete
+    // (ดู AttributeFamilyController::usage()) ลบไปแล้วความผูกกับกลุ่มสินค้าเหล่านี้
+    // หายทันทีแบบกู้คืนไม่ได้ ผู้ใช้ควรเห็นผลกระทบก่อนกดยืนยัน
+    useEffect(() => {
+        if (deleteFamilyId === null) {
+            setDeleteUsage(null);
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        setDeleteUsageLoading(true);
+        setDeleteUsage(null);
+
+        fetch(`/catalog/attributeFamilies/${deleteFamilyId}/usage`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json) => setDeleteUsage(json))
+            .catch(() => undefined)
+            .finally(() => setDeleteUsageLoading(false));
+
+        return () => controller.abort();
+    }, [deleteFamilyId]);
 
     const currentPage = gridData.current_page ?? 1;
     const lastPage = gridData.last_page ?? 1;
@@ -301,8 +329,29 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 confirmLoading={deleting}
+                confirmDisabled={deleteUsageLoading}
             >
-                {tCatalog('confirmDeleteAttributeFamilyMessage')}
+                <Stack spacing={1}>
+                    <Typography variant="body2">{tCatalog('confirmDeleteAttributeFamilyMessage')}</Typography>
+                    {deleteUsageLoading && (
+                        <Typography variant="body2" color="text.secondary">
+                            {tCatalog('checkingAttributeFamilyUsage')}
+                        </Typography>
+                    )}
+                    {!deleteUsageLoading && deleteUsage && (deleteUsage.product_group_count > 0 || deleteUsage.product_count > 0) && (
+                        <Typography variant="body2" color="error.main" fontWeight={600}>
+                            {tCatalog('attributeFamilyInUseWarning', {
+                                groups: deleteUsage.product_group_count,
+                                products: deleteUsage.product_count,
+                            })}
+                        </Typography>
+                    )}
+                    {!deleteUsageLoading && deleteUsage && deleteUsage.product_group_count === 0 && deleteUsage.product_count === 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                            {tCatalog('attributeFamilyNotInUse')}
+                        </Typography>
+                    )}
+                </Stack>
             </FioriMessageBox>
 
             {/* ไดอะล็อกยืนยันการทำสำเนา */}

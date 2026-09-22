@@ -298,6 +298,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributeFamilies/{attributeFamily}/set-default-for-all-groups', [AttributeFamilyController::class, 'setDefaultForAllGroups'])->name('attributeFamilies.setDefaultForAllGroups')->middleware('permission:attribute_families,assign_default_family');
     Route::post('attributeFamilies/{attributeFamily}/set-default-for-groups', [AttributeFamilyController::class, 'setDefaultForSelectedGroups'])->name('attributeFamilies.setDefaultForSelectedGroups')->middleware('permission:attribute_families,assign_default_family');
     Route::get('attributeFamilies/{attributeFamily}/product-groups-for-default-picker', [AttributeFamilyController::class, 'productGroupsForDefaultPicker'])->name('attributeFamilies.productGroupsForDefaultPicker')->middleware('permission:attribute_families,assign_default_family');
+    Route::get('attributeFamilies/{attributeFamily}/usage', [AttributeFamilyController::class, 'usage'])->name('attributeFamilies.usage')->middleware('permission:attribute_families,delete_attribute_families');
     Route::delete('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'destroy'])->name('attributeFamilies.destroy')->middleware('permission:attribute_families,delete_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/history', [AttributeFamilyController::class, 'history'])->name('attributeFamilies.history')->middleware('permission:attribute_families,view_history');
 

@@ -3615,16 +3615,16 @@ function GalleryThumb({ item, disabled, onRemove }: { item: string | File; disab
     const src = typeof item === 'string' ? (/^https?:\/\//.test(item) || item.startsWith('/') ? item : `/storage/${item}`) : previewUrl;
 
     return (
-        <Box sx={{ position: 'relative', width: 64, height: 64 }}>
+        <Box sx={{ position: 'relative', width: 200, height: 200 }}>
             {src ? (
                 <Box
                     component="img"
                     src={src}
                     alt=""
-                    sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, border: '1px solid #e2e8f0' }}
+                    sx={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 1, border: '1px solid #e2e8f0' }}
                 />
             ) : (
-                <Box sx={{ width: 64, height: 64, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
+                <Box sx={{ width: 200, height: 200, borderRadius: 1, border: '1px solid #e2e8f0', bgcolor: '#f1f5f9' }} />
             )}
             {!disabled && (
                 <IconButton
@@ -4456,7 +4456,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     </Typography>
                     {renderChips()}
                 </Stack>
-                <Stack direction="row" spacing={1.5} alignItems="flex-start" flexWrap="wrap">
+                <Stack direction="column" spacing={1.5} alignItems="flex-start">
                     {isImage && previewSrc && (
                         <Box
                             component="img"
@@ -4464,8 +4464,8 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             alt={label}
                             onClick={() => setLightboxOpen(true)}
                             sx={{
-                                width: 48,
-                                height: 48,
+                                width: 200,
+                                height: 200,
                                 objectFit: 'cover',
                                 borderRadius: 1,
                                 border: '1px solid #e2e8f0',
@@ -4474,7 +4474,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             }}
                         />
                     )}
-                    <Box sx={{ flex: 1, minWidth: 220, maxWidth: 420 }}>
+                    <Box sx={{ width: '100%', maxWidth: 420 }}>
                         <FioriFileUploader
                             placeholder={isImage ? t('browseOrDropImage') : t('browseOrDropFile')}
                             accept={isImage ? 'image/*' : undefined}

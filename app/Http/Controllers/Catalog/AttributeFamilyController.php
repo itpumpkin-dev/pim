@@ -489,6 +489,36 @@ class AttributeFamilyController extends Controller
         }
     }
 
+    /**
+     * นับกลุ่มสินค้า/สินค้าที่กำลังใช้ตระกูลนี้อยู่ ให้หน้า index เรียกก่อนเปิด
+     * ไดอะล็อกยืนยันลบ — category_attribute_family.family_id ผูก cascadeOnDelete
+     * ไว้ (ดู migration create_category_attribute_family_table) ลบตระกูลปุ๊บ
+     * ความผูกกับกลุ่มสินค้าเหล่านี้หายไปทันทีแบบเงียบๆ ไม่มี dialog เตือนอะไร
+     * เลยก่อนนี้ — effectiveFamilyIds() ของสินค้าในกลุ่มนั้นก็จะไม่เห็นตระกูลนี้
+     * อีกต่อไป (ค่า product_values ที่กรอกไว้ไม่ได้ถูกลบ แค่ไม่มี group ไหน
+     * อ้างอิงให้แสดงในหน้าแก้ไขสินค้าอีกแล้ว) จำนวนสินค้านับจากกลุ่มสินค้าที่ผูกไว้
+     * เท่านั้น (นิยามเดียวกับ effectiveFamilyIds()) ไม่ใช่จาก products.family_id
+     * เดิมที่เป็น legacy column แล้ว
+     */
+    public function usage(AttributeFamily $attributeFamily): JsonResponse
+    {
+        $categoryIds = DB::table('category_attribute_family')
+            ->where('family_id', $attributeFamily->id)
+            ->pluck('category_id');
+
+        $productCount = $categoryIds->isEmpty()
+            ? 0
+            : DB::table('product_category')
+                ->whereIn('category_id', $categoryIds)
+                ->distinct()
+                ->count('product_id');
+
+        return response()->json([
+            'product_group_count' => $categoryIds->count(),
+            'product_count' => $productCount,
+        ]);
+    }
+
     public function destroy(AttributeFamily $attributeFamily): RedirectResponse
     {
         FamilyAttribute::where('family_id', $attributeFamily->id)->delete();
