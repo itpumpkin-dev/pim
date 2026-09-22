@@ -123,3 +123,33 @@ test('processes every qualifying product group and totals updated/skipped across
     expect($result)->toBe(['updated' => 1, 'skipped' => 1]);
     expect($freshGroup->attributeFamilies()->pluck('attribute_families.id')->all())->toBe([$family->id]);
 });
+
+test('assignToProductGroups() only touches the groups explicitly listed, not every group in the system', function () {
+    $family = AttributeFamily::create(['code' => 'fam2']);
+    $selected = makeProductGroup();
+    $untouched = makeProductGroup();
+
+    $result = $this->assigner->assignToProductGroups($family, [$selected->id]);
+
+    expect($result)->toBe(['updated' => 1, 'skipped' => 0]);
+    expect($selected->attributeFamilies()->pluck('attribute_families.id')->all())->toBe([$family->id]);
+    expect($untouched->attributeFamilies()->count())->toBe(0);
+});
+
+test('assignToProductGroups() returns zero/zero for an empty category id list without querying anything', function () {
+    $family = AttributeFamily::create(['code' => 'fam3']);
+
+    $result = $this->assigner->assignToProductGroups($family, []);
+
+    expect($result)->toBe(['updated' => 0, 'skipped' => 0]);
+});
+
+test('assignToProductGroups() skips a selected group where the family is already default, same as the "all" variant', function () {
+    $family = AttributeFamily::create(['code' => 'fam4']);
+    $group = makeProductGroup();
+    $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $result = $this->assigner->assignToProductGroups($family, [$group->id]);
+
+    expect($result)->toBe(['updated' => 0, 'skipped' => 1]);
+});

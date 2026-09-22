@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -92,6 +93,21 @@ interface Props {
     canAssignDefaultFamily?: boolean;
 }
 
+interface ProductGroupPickerItem {
+    id: number;
+    name: string;
+    subcategory_name: string | null;
+    category_name: string | null;
+    is_default: boolean;
+}
+
+interface ProductGroupPickerResponse {
+    data: ProductGroupPickerItem[];
+    current_page: number;
+    last_page: number;
+    total: number;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'CATALOG', href: '#' },
     { title: 'ATTRIBUTE FAMILIES', href: '/catalog/attributeFamilies' },
@@ -109,7 +125,7 @@ export default function AttributeFamilyEdit({
 }: Props) {
     const { t } = useTranslation('catalog');
     const [tabIndex, setTabIndex] = useState(0);
-    const { data, setData, put, processing, errors, isDirty } = useForm({
+    const { data, setData, put, transform, processing, errors, isDirty } = useForm({
         code: family.code || '',
         translations: translations || {},
     });
@@ -358,6 +374,13 @@ export default function AttributeFamilyEdit({
 
     const submit = (e?: FormEvent) => {
         if (e) e.preventDefault();
+        // กันกด Save ซ้ำๆ ตอน request แรกยังไม่จบ (บั๊กจริงที่เจอ: หน้านี้เคยยิง
+        // ผ่าน router.put() ตรงๆ แทนที่จะเป็น put() ของ useForm() เอง ทำให้
+        // processing ด้านล่างไม่เคยเปลี่ยนเป็น true จริงๆ เลย — ปุ่ม Save เลย
+        // ไม่ disable ระหว่างรอ กดซ้ำได้เรื่อยๆ เช็ค processing ตรงนี้ไว้อีกชั้น
+        // ด้วย เผื่อกด Enter ในช่องกรอกซ้ำๆ ระหว่างรอ ซึ่ง disabled ของปุ่ม
+        // เพียงอย่างเดียวกันไม่ได้)
+        if (processing) return;
 
         const groupAttrsPayload: { attribute_id: number; attribute_group_id: number }[] = [];
         assignedGroups.forEach((g) => {
@@ -369,12 +392,9 @@ export default function AttributeFamilyEdit({
             });
         });
 
+        transform((formData) => ({ ...formData, group_attributes: groupAttrsPayload }));
         skipNavigationGuardRef.current = true;
-        router.put(`/catalog/attributeFamilies/${family.id}`, {
-            code: data.code,
-            translations: data.translations,
-            group_attributes: groupAttrsPayload,
-        }, {
+        put(`/catalog/attributeFamilies/${family.id}`, {
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },
@@ -398,6 +418,84 @@ export default function AttributeFamilyEdit({
                 preserveScroll: true,
                 preserveState: true,
                 onFinish: () => setSettingDefault(false),
+            },
+        );
+    };
+
+    // "กำหนดค่าเริ่มต้นบางกลุ่มสินค้า" — คู่หูของปุ่ม "ทุกกลุ่มสินค้า" ด้านบน แต่
+    // เลือกทีละกลุ่มผ่าน dialog ค้นหา/แบ่งหน้าได้ (มีกลุ่มสินค้าในระบบหลักร้อยตัว
+    // — โหลดมาทั้งหมดในหน้าเดียวไม่ไหว ต้องยิง fetch() ไปเซิร์ฟเวอร์ทีละหน้า
+    // เหมือนหน้า Product Groups เอง) selectedProductGroupIds เก็บไว้แยกจากหน้า
+    // ที่กำลังโชว์ตอนนี้ ให้ค้นหา/เปลี่ยนหน้าไปมาได้โดยไม่ลืมตัวที่ติ๊กไว้จากหน้าอื่น
+    // (ตั้งชื่อแยกจาก selectedGroupIds ด้านบน — ตัวนั้นคือ "Assign Attribute
+    // Group" dialog คนละเรื่องกันเลย ชื่อบังเอิญคล้ายกันเฉยๆ)
+    const [selectGroupsDialogOpen, setSelectGroupsDialogOpen] = useState(false);
+    const [groupPickerSearch, setGroupPickerSearch] = useState('');
+    const [groupPickerPage, setGroupPickerPage] = useState(1);
+    const [groupPickerData, setGroupPickerData] = useState<ProductGroupPickerResponse | null>(null);
+    const [groupPickerLoading, setGroupPickerLoading] = useState(false);
+    const [selectedProductGroupIds, setSelectedProductGroupIds] = useState<Set<number>>(new Set());
+    const [applyingSelectedGroups, setApplyingSelectedGroups] = useState(false);
+
+    useEffect(() => {
+        if (!selectGroupsDialogOpen) return undefined;
+
+        setGroupPickerLoading(true);
+        const params = new URLSearchParams({ page: String(groupPickerPage), per_page: '15' });
+        if (groupPickerSearch.trim()) params.set('search', groupPickerSearch.trim());
+
+        const controller = new AbortController();
+        fetch(`/catalog/attributeFamilies/${family.id}/product-groups-for-default-picker?${params}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        })
+            .then((res) => res.json())
+            .then((json: ProductGroupPickerResponse) => setGroupPickerData(json))
+            .catch((err) => {
+                if (err.name !== 'AbortError') setGroupPickerData(null);
+            })
+            .finally(() => setGroupPickerLoading(false));
+
+        return () => controller.abort();
+    }, [selectGroupsDialogOpen, groupPickerSearch, groupPickerPage, family.id]);
+
+    // ค้นหาใหม่ -> กลับไปหน้า 1 เสมอ (หน้าเดิมอาจไม่มีอยู่แล้วในผลลัพธ์ใหม่)
+    useEffect(() => {
+        setGroupPickerPage(1);
+    }, [groupPickerSearch]);
+
+    const toggleGroupSelected = (groupId: number) => {
+        setSelectedProductGroupIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(groupId)) {
+                next.delete(groupId);
+            } else {
+                next.add(groupId);
+            }
+            return next;
+        });
+    };
+
+    const closeSelectGroupsDialog = () => {
+        setSelectGroupsDialogOpen(false);
+        setGroupPickerSearch('');
+        setGroupPickerPage(1);
+        setGroupPickerData(null);
+        setSelectedProductGroupIds(new Set());
+    };
+
+    const applySelectedGroups = () => {
+        if (selectedProductGroupIds.size === 0 || applyingSelectedGroups) return;
+
+        setApplyingSelectedGroups(true);
+        router.post(
+            `/catalog/attributeFamilies/${family.id}/set-default-for-groups`,
+            { category_ids: Array.from(selectedProductGroupIds) },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => closeSelectGroupsDialog(),
+                onFinish: () => setApplyingSelectedGroups(false),
             },
         );
     };
@@ -809,21 +907,40 @@ export default function AttributeFamilyEdit({
                                     "ทุก" กลุ่มสินค้าในระบบพร้อมกัน — ต่างจากการแก้ไข family ทีละตัว —
                                     ไม่ซ่อนปุ่มไปเลย แค่ disable + บอกเหตุผลผ่าน tooltip ให้รู้ว่า
                                     ฟีเจอร์นี้มีอยู่แต่ต้องขอสิทธิ์เพิ่ม */}
-                                <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
-                                    <span>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            color="warning"
-                                            disabled={settingDefault || !canAssignDefaultFamily}
-                                            startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                            onClick={setAsDefaultForAllGroups}
-                                            sx={fioriGhostSx}
-                                        >
-                                            {t('setDefaultForAllGroups')}
-                                        </Button>
-                                    </span>
-                                </Tooltip>
+                                <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                                    <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
+                                        <span>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="warning"
+                                                disabled={settingDefault || !canAssignDefaultFamily}
+                                                startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                                onClick={setAsDefaultForAllGroups}
+                                                sx={fioriGhostSx}
+                                            >
+                                                {t('setDefaultForAllGroups')}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                    {/* "บางกลุ่มสินค้า" — คู่หูของปุ่มด้านบน แต่เลือกทีละกลุ่มผ่าน dialog
+                                        ค้นหา/แบ่งหน้าได้ แทนที่จะทับทุกกลุ่มในระบบทีเดียว ใช้สิทธิ์
+                                        assign_default_family ตัวเดียวกัน เพราะเป็นความสามารถเดียวกัน
+                                        แค่จำกัดขอบเขตแคบกว่า */}
+                                    <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
+                                        <span>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                disabled={!canAssignDefaultFamily}
+                                                onClick={() => setSelectGroupsDialogOpen(true)}
+                                                sx={fioriGhostSx}
+                                            >
+                                                {t('setDefaultForSomeGroups')}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </Stack>
                             </Paper>
                         </Stack>
                     </Grid>
@@ -958,6 +1075,124 @@ export default function AttributeFamilyEdit({
                         ));
                     })()}
             </Menu>
+
+            {/* "กำหนดค่าเริ่มต้นบางกลุ่มสินค้า" — picker ค้นหา/แบ่งหน้าได้ (กลุ่มสินค้า
+                ในระบบมีหลักร้อยตัว โหลดมาครั้งเดียวทั้งหมดไม่ไหว) แต่ละแถวโชว์ชัดว่า
+                ตระกูลนี้เป็นค่าเริ่มต้นของกลุ่มนั้นอยู่แล้วหรือยัง — checkbox เริ่มต้น
+                "ไม่ติ๊ก" เสมอไม่ว่าจะ default อยู่แล้วหรือไม่ (คือ "จะสั่งตั้งค่าไหม"
+                ไม่ใช่ "ตั้งอยู่แล้วหรือเปล่า" สองเรื่องนี้แยกกัน) เลือกจากหลายหน้า/
+                หลายคำค้นสะสมกันได้ก่อนค่อยกด Apply ทีเดียว */}
+            <Dialog open={selectGroupsDialogOpen} onClose={closeSelectGroupsDialog} fullWidth maxWidth="sm" PaperProps={{ sx: { height: '80vh', borderRadius: 2 } }}>
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                        {t('setDefaultForSomeGroups')}
+                    </Typography>
+                    <IconButton onClick={closeSelectGroupsDialog} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ p: 2, borderBottom: `1px solid ${FIORI.border}` }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            value={groupPickerSearch}
+                            onChange={(e) => setGroupPickerSearch(e.target.value)}
+                            placeholder={t('search')}
+                            InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary, mr: 1 }} /> }}
+                        />
+                        {selectedProductGroupIds.size > 0 && (
+                            <Typography variant="caption" sx={{ color: FIORI.brand, display: 'block', mt: 1 }}>
+                                {t('selectedGroupsCount', { count: selectedProductGroupIds.size })}
+                            </Typography>
+                        )}
+                    </Box>
+
+                    <Box sx={{ flex: 1, overflowY: 'auto' }}>
+                        {groupPickerLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        ) : !groupPickerData || groupPickerData.data.length === 0 ? (
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, textAlign: 'center', p: 4 }}>
+                                {t('noProductGroupsFound')}
+                            </Typography>
+                        ) : (
+                            <List dense disablePadding>
+                                {groupPickerData.data.map((group) => (
+                                    <ListItem
+                                        key={group.id}
+                                        onClick={() => toggleGroupSelected(group.id)}
+                                        sx={{ py: 1, px: 2, cursor: 'pointer', '&:hover': { bgcolor: FIORI.hover } }}
+                                    >
+                                        <ListItemIcon sx={{ minWidth: 36 }}>
+                                            <Checkbox
+                                                edge="start"
+                                                size="small"
+                                                checked={selectedProductGroupIds.has(group.id)}
+                                                tabIndex={-1}
+                                                disableRipple
+                                            />
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={group.name}
+                                            secondary={[group.category_name, group.subcategory_name].filter(Boolean).join(' / ')}
+                                            primaryTypographyProps={{ variant: 'body2', sx: { color: FIORI.textPrimary } }}
+                                            secondaryTypographyProps={{ variant: 'caption' }}
+                                        />
+                                        {group.is_default && (
+                                            <Box
+                                                sx={{
+                                                    ml: 1,
+                                                    px: 1,
+                                                    py: 0.25,
+                                                    borderRadius: 1,
+                                                    bgcolor: FIORI.selected,
+                                                    color: FIORI.brand,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {t('alreadyDefaultHere')}
+                                            </Box>
+                                        )}
+                                    </ListItem>
+                                ))}
+                            </List>
+                        )}
+                    </Box>
+
+                    {groupPickerData && groupPickerData.last_page > 1 && (
+                        <Stack direction="row" justifyContent="center" alignItems="center" spacing={1} sx={{ p: 1.5, borderTop: `1px solid ${FIORI.border}` }}>
+                            <IconButton size="small" disabled={groupPickerPage <= 1} onClick={() => setGroupPickerPage((p) => p - 1)}>
+                                <KeyboardArrowLeftIcon fontSize="small" />
+                            </IconButton>
+                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                                {groupPickerData.current_page} / {groupPickerData.last_page}
+                            </Typography>
+                            <IconButton size="small" disabled={groupPickerPage >= groupPickerData.last_page} onClick={() => setGroupPickerPage((p) => p + 1)}>
+                                <KeyboardArrowRightIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={closeSelectGroupsDialog} sx={fioriGhostSx}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="warning"
+                        disabled={selectedProductGroupIds.size === 0 || applyingSelectedGroups}
+                        startIcon={applyingSelectedGroups ? <CircularProgress size={14} color="inherit" /> : undefined}
+                        onClick={applySelectedGroups}
+                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                    >
+                        {t('setDefaultForSomeGroups')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
             {confirmElement}
         </AppLayout>
     );

@@ -5,13 +5,16 @@ namespace App\Services\Catalog;
 use App\Models\AttributeFamily;
 use App\Models\AuditLog;
 use App\Models\Category;
+use Illuminate\Support\Collection;
 
 /**
- * Shared logic behind "set this attribute family as the default for every
- * product group" — used by both `catalog:assign-default-family` (CLI) and
- * AttributeFamilyController::setDefaultForAllGroups() (the button on the
- * Attribute Family edit page), so the two stay in lockstep instead of
- * drifting into two slightly different implementations.
+ * Shared logic behind "set this attribute family as the default for every /
+ * some product group(s)" — used by `catalog:assign-default-family` (CLI),
+ * AttributeFamilyController::setDefaultForAllGroups() ("ตั้งเป็นค่าเริ่มต้นให้
+ * ทุกกลุ่มสินค้า" บนหน้าแก้ไข Attribute Family), and
+ * AttributeFamilyController::setDefaultForSelectedGroups() ("กำหนดค่าเริ่มต้น
+ * บางกลุ่มสินค้า" — เลือกจาก picker) เพื่อให้ทั้งสามที่นี้ใช้ตรรกะเดียวกันเป๊ะๆ
+ * ไม่มีวันเบี้ยวกันเอง
  *
  * There is no `is_default` column anywhere on `attribute_families` or on
  * the `category_attribute_family` pivot — "default" is purely positional:
@@ -20,10 +23,9 @@ use App\Models\Category;
  * ProductGroupController's edit page relies on for its "ค่าเริ่มต้น" badge
  * (only ever shown on index 0).
  *
- * Scoped to product groups using the exact same depth-3 join
- * ProductGroupController::index() uses (a `categories` row whose parent is
- * a subcategory whose parent is a real root, i.e. root.parent_id is null)
- * — not a stored "depth" column.
+ * "ทุกกลุ่มสินค้า" ใช้ depth-3 join เดียวกับ ProductGroupController::index()
+ * (categories row ที่ parent เป็น subcategory ซึ่ง parent เป็น root จริงๆ —
+ * root.parent_id เป็น null) ไม่มีคอลัมน์ "depth" เก็บไว้ตรงๆ
  */
 class DefaultAttributeFamilyAssigner
 {
@@ -41,6 +43,38 @@ class DefaultAttributeFamilyAssigner
             ->orderBy('categories.id')
             ->get();
 
+        return $this->assignToGroups($groups, $family, $onlyEmpty, $dryRun);
+    }
+
+    /**
+     * เหมือน assignToAllProductGroups() ทุกอย่าง แค่จำกัดเฉพาะกลุ่มสินค้าที่
+     * เลือกไว้ ($categoryIds) แทนที่จะเป็นทุกกลุ่มในระบบ — ไม่เช็คซ้ำว่าแต่ละ id
+     * เป็นกลุ่มสินค้า (leaf ระดับ 3) จริงหรือไม่ ผู้เรียกต้อง validate มาก่อนแล้ว
+     * (ดู AttributeFamilyController::setDefaultForSelectedGroups())
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return array{updated: int, skipped: int}
+     */
+    public function assignToProductGroups(AttributeFamily $family, array $categoryIds, bool $onlyEmpty = false, bool $dryRun = false): array
+    {
+        if (empty($categoryIds)) {
+            return ['updated' => 0, 'skipped' => 0];
+        }
+
+        $groups = Category::whereIn('id', $categoryIds)
+            ->with('attributeFamilies:id')
+            ->orderBy('id')
+            ->get();
+
+        return $this->assignToGroups($groups, $family, $onlyEmpty, $dryRun);
+    }
+
+    /**
+     * @param  Collection<int, Category>  $groups
+     * @return array{updated: int, skipped: int}
+     */
+    private function assignToGroups(Collection $groups, AttributeFamily $family, bool $onlyEmpty, bool $dryRun): array
+    {
         $updated = 0;
         $skipped = 0;
 

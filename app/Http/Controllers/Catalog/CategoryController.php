@@ -371,6 +371,14 @@ class CategoryController extends Controller
         // ever deals with roots and subcategories.
         $parent = $category->parent_id ? Category::find($category->parent_id) : null;
         if ($parent && $parent->parent_id !== null) {
+            // Route middleware ของหน้านี้เช็คแค่ categories,edit_categories —
+            // แต่ปลายทางจริงๆ (product-groups/{category}/edit) ต้องการ
+            // product_groups,edit_product_groups แยกต่างหาก (คนละ permission
+            // resource กันเลย) ถ้าไม่เช็คซ้ำตรงนี้ด้วย user ที่มีแค่สิทธิ์แก้ไข
+            // หมวดหมู่ (ไม่มีสิทธิ์แก้ไขกลุ่มสินค้า) จะเผลอ bounce ผ่านไปแก้ไข
+            // กลุ่มสินค้าได้อยู่ดี — ช่องโหว่สิทธิ์จริง ไม่ใช่แค่ทฤษฎี
+            abort_unless(auth()->user()?->hasPermission('product_groups', 'edit_product_groups') ?? false, 403);
+
             return to_route('catalog.productGroups.edit', $category->id);
         }
 

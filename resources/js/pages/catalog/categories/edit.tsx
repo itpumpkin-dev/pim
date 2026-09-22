@@ -1,7 +1,7 @@
 import { HistoryPanel } from '@/components/history-panel';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import UploadIcon from '@mui/icons-material/CloudUpload';
@@ -82,6 +82,18 @@ export default function CategoryEdit({
 
     const isRoot = category.parent_id === null;
 
+    // หน้านี้เป็น editor กลางที่ใช้ซ้ำทั้งกับ root category (ตาราง "ลูก" ด้านล่าง
+    // คือหมวดหมู่ย่อยจริงๆ) และ subcategory (ตาราง "ลูก" กลายเป็นกลุ่มสินค้าแทน
+    // — ดู CategoryController::edit()) เพราะงั้นตอนที่หน้านี้เปิดอยู่บน subcategory
+    // (!isRoot) ปุ่มแก้ไขแต่ละแถวต้องพาไปที่หน้าแก้ไข "กลุ่มสินค้า" โดยตรง
+    // (/catalog/product-groups/{id}/edit) ไม่ใช่วนกลับมาที่ /catalog/categories/
+    // {id}/edit อีกที (ซึ่งฝั่ง backend จะ redirect ต่อไปที่เดิมอยู่ดี แต่เช็คสิทธิ์
+    // ผิด resource — ดู CategoryController::edit()'s ที่เพิ่งแก้ไป) ต้องเช็คสิทธิ์
+    // product_groups.edit_product_groups เองแยกต่างหาก คนละ permission กับ
+    // categories.edit_categories ที่คุมหน้านี้อยู่
+    const { auth } = usePage<SharedData>().props;
+    const canEditProductGroups = (auth.permissions || []).includes('product_groups.edit_product_groups');
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
         { title: tNav('categories'), href: '/catalog/categories' },
@@ -141,11 +153,23 @@ export default function CategoryEdit({
             header: tGrid('actionsHeader'),
             priority: 'always',
             align: 'right',
-            render: (row) => (
-                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/categories/${row.id}/edit`)}>
-                    <EditIcon fontSize="small" />
-                </IconButton>
-            ),
+            render: (row) =>
+                // ไม่ใช่ root -> แถวที่โชว์อยู่คือกลุ่มสินค้า (leaf) จริงๆ ไม่ใช่
+                // หมวดหมู่ย่อย — พาไปหน้าแก้ไขกลุ่มสินค้าโดยตรง เช็คสิทธิ์
+                // product_groups.edit_product_groups เอง (ไม่ใช่ categories.edit_categories
+                // ที่คุมหน้านี้อยู่ — คนละ resource กัน ซ่อนปุ่มไปเลยถ้าไม่มีสิทธิ์
+                // แทนที่จะให้กดแล้วไปเจอ 403 เงียบๆ)
+                !isRoot ? (
+                    canEditProductGroups ? (
+                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/product-groups/${row.id}/edit`)}>
+                            <EditIcon fontSize="small" />
+                        </IconButton>
+                    ) : null
+                ) : (
+                    <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/categories/${row.id}/edit`)}>
+                        <EditIcon fontSize="small" />
+                    </IconButton>
+                ),
         },
     ];
 

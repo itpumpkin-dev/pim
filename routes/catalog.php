@@ -46,6 +46,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // on demand instead of shipping all ~1,100 options up front on every
     // Edit Product load. See ProductController::masterCategoryOptions().
     Route::get('products/master-category-options', [ProductController::class, 'masterCategoryOptions'])->name('products.masterCategoryOptions')->middleware('permission:products,edit_products');
+    Route::get('products/resolve-category-by-code', [ProductController::class, 'resolveCategoryByCode'])->name('products.resolveCategoryByCode')->middleware('permission:products,edit_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
     Route::post('products/push-bulk', [ProductController::class, 'pushBulk'])->name('products.pushBulk')->middleware('permission:products,edit_products');
     Route::post('products/deactivate-bulk', [ProductController::class, 'deactivateBulk'])->name('products.deactivateBulk')->middleware('permission:products,edit_products');
@@ -295,6 +296,8 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     // backfill_attribute_family_assign_default_permission ที่ copy สิทธิ์นี้ไป
     // ให้ทุก role ที่มี edit_attribute_families อยู่แล้วตอน deploy)
     Route::post('attributeFamilies/{attributeFamily}/set-default-for-all-groups', [AttributeFamilyController::class, 'setDefaultForAllGroups'])->name('attributeFamilies.setDefaultForAllGroups')->middleware('permission:attribute_families,assign_default_family');
+    Route::post('attributeFamilies/{attributeFamily}/set-default-for-groups', [AttributeFamilyController::class, 'setDefaultForSelectedGroups'])->name('attributeFamilies.setDefaultForSelectedGroups')->middleware('permission:attribute_families,assign_default_family');
+    Route::get('attributeFamilies/{attributeFamily}/product-groups-for-default-picker', [AttributeFamilyController::class, 'productGroupsForDefaultPicker'])->name('attributeFamilies.productGroupsForDefaultPicker')->middleware('permission:attribute_families,assign_default_family');
     Route::delete('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'destroy'])->name('attributeFamilies.destroy')->middleware('permission:attribute_families,delete_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/history', [AttributeFamilyController::class, 'history'])->name('attributeFamilies.history')->middleware('permission:attribute_families,view_history');
 

@@ -1756,6 +1756,30 @@ class ProductController extends Controller
     }
 
     /**
+     * แปลง category code (ค่าที่เลือกไว้ในฟิลด์ pcatname/psubcatname/
+     * productgroupname ของแผง Master Categories) กลับเป็น Category id จริง —
+     * ใช้เฉพาะตอนกดปุ่ม "แก้ไข" บนแผงนั้นเพื่อพาไปหน้าแก้ไขกลุ่มสินค้า/
+     * หมวดหมู่ย่อยนั้นโดยตรง (route /catalog/product-groups/{id}/edit ต้องการ
+     * id ตัวเลข ไม่ใช่ code) — ตัวเลือกในฟิลด์เหล่านี้ mirror มาจาก
+     * categories.code เป๊ะๆ (ดู ProductCategoryLinker) แต่ id ที่ frontend
+     * ถืออยู่ในมือ (จาก AttributeOption ของ masterCategoryOptions()) เป็นคนละ
+     * id กับ Category ตัวจริง เลยต้อง resolve กลับด้วย code แทน
+     */
+    public function resolveCategoryByCode(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:100'],
+        ]);
+
+        $category = Category::where('code', $validated['code'])->first(['id']);
+        if (! $category) {
+            return response()->json(['id' => null], 404);
+        }
+
+        return response()->json(['id' => $category->id]);
+    }
+
+    /**
      * อัปโหลดรูปเดี่ยวสำหรับฝังลงในเนื้อหา HTML ของ attribute แบบ rich-text
      * (textarea) โดยตรง — เช่นตอนกดปุ่มรูปภาพในตัวแก้ไขรายละเอียดสินค้า (ดู
      * resources/js/components/rich-text-editor.tsx) คนละกรณีกับไฟล์ของ
@@ -1791,9 +1815,10 @@ class ProductController extends Controller
      * ผูกกลุ่มสินค้ากับตระกูลไหนเลย = ไม่มีตระกูล ไม่ว่า family_id เดิมจะมีค่าค้างอยู่
      * หรือไม่ก็ตาม
      *
-     * @return array<int, int>  ลำดับความสำคัญจากมากไปน้อย — ถ้า attribute
-     *                            ตัวเดียวกันถูกผูกซ้ำในหลายตระกูล ตัวจากตระกูล
-     *                            ที่มาก่อนในลิสต์นี้จะชนะ
+     * @return array<int, int>  ลำดับที่ใช้ตอนแสดงผล (family ที่มาก่อนในลิสต์นี้
+     *                            แสดงก่อน) รองรับได้มากกว่า 1 ตระกูลพร้อมกันเสมอ —
+     *                            ดู resolveEffectiveFamilyAttributes() สำหรับวิธี
+     *                            รวม attribute ของหลายตระกูลเข้าด้วยกัน
      */
     private function effectiveFamilyIds(Product $product): array
     {
@@ -1812,16 +1837,24 @@ class ProductController extends Controller
 
     /**
      * รวม family_attributes ของทุก family ที่มีผลกับสินค้า ($effectiveFamilyIds
-     * จาก effectiveFamilyIds() — เรียงตามลำดับความสำคัญ) เข้าเป็นชุดเดียว — ถ้า
-     * attribute ตัวเดียวกันถูกผูกอยู่ในมากกว่าหนึ่ง family ให้ family ที่มาก่อน
-     * "ชนะ" ทั้งหมด (ทุกแถว/ทุก group ของ attribute นั้นใน family นั้น) ส่วน
-     * family ที่มาทีหลังจะถูกข้าม attribute ตัวนั้นไปเลย
+     * จาก effectiveFamilyIds() — เรียงตามลำดับความสำคัญ) เข้าเป็นชุดเดียว
      *
-     * ต่างจากการทำแค่ ->unique('attribute_id') เฉยๆ ตรงที่ยังคง "ทุกแถว" ของ
-     * attribute ที่ family ผู้ชนะผูกไว้เอง แทนที่จะเหลือแค่แถวแรกที่เจอ — จำเป็น
-     * ตั้งแต่ 1 attribute อยู่ได้หลาย group ภายใน family เดียวกันแล้ว (ดู migration
-     * 2026_09_22_000002_allow_same_family_multi_group_family_attributes) ไม่งั้น
-     * attribute ที่ตั้งใจใส่ไว้ 2 group ของ family เดียวกันจะโดนตัดเหลือ group เดียว
+     * ตั้งใจให้รองรับ "ตระกูลพื้นฐานได้มากกว่า 1" — ถ้า attribute ตัวเดียวกันถูก
+     * ผูกอยู่ในหลาย family พร้อมกัน (เช่น family "พื้นฐาน" ผูกไว้ใน group ทั่วไป
+     * และ family เฉพาะสินค้าอีกตัวผูกไว้ใน group ของตัวเอง) ทุก family จะได้แสดง
+     * group ของตัวเองครบ ไม่มี family ไหน "ชนะ" แล้วบัง group ของอีก family ทิ้ง
+     * ไปทั้งกลุ่ม (เดิมกันด้วย attribute_id เฉยๆ ทำให้ family ที่มาทีหลังในลำดับ
+     * ความสำคัญเสีย attribute ทั้งตัวไป ถ้า attribute นั้นเป็นตัวเดียวที่มันมี
+     * group ทั้งกลุ่มของ family นั้นก็หายไปด้วย) — ลำดับความสำคัญใน
+     * effectiveFamilyIds() ตอนนี้มีผลแค่ "ลำดับการแสดงผล" เท่านั้น ไม่ได้ใช้ตัดสิน
+     * ว่า family ไหนมีสิทธิ์แสดง attribute นั้นอีกต่อไป
+     *
+     * กันซ้ำแค่ระดับคู่ (attribute_id, attribute_group_id) เดียวกันเป๊ะๆ เท่านั้น
+     * (เผื่อกรณีคนไปตั้ง 2 family ให้ผูก attribute ตัวเดียวกันไว้ใน group เดียวกัน
+     * เป๊ะๆ โดยบังเอิญ — ไม่งั้นจะเห็นฟิลด์เดียวกันซ้ำสองแถวในแผงเดียวกัน) ส่วน
+     * attribute เดียวกันที่อยู่คนละ group (ไม่ว่าจะอยู่ family เดียวกันหรือคนละ
+     * family) ถือเป็นคนละตำแหน่งที่ต้องแสดงทั้งคู่ — ค่าที่กรอกยังคงเป็นค่าเดียวกัน
+     * เสมอเพราะอ้าง attribute_id เดียวกัน (ไม่ได้แยกค่าตาม group)
      *
      * @param  array<int, int>  $effectiveFamilyIds
      * @param  array<int, string>  $with  relation ให้ eager-load บน FamilyAttribute
@@ -1835,14 +1868,21 @@ class ProductController extends Controller
             ->groupBy('family_id');
 
         $resolved = collect();
-        $claimedAttributeIds = [];
+        $seenPairs = [];
 
         foreach ($effectiveFamilyIds as $familyId) {
             $rowsForFamily = $familyAttributesByFamily->get($familyId, collect())
-                ->reject(fn (FamilyAttribute $row) => in_array($row->attribute_id, $claimedAttributeIds, true));
+                ->reject(function (FamilyAttribute $row) use (&$seenPairs) {
+                    $pairKey = $row->attribute_id.'-'.$row->attribute_group_id;
+                    if (isset($seenPairs[$pairKey])) {
+                        return true;
+                    }
+                    $seenPairs[$pairKey] = true;
+
+                    return false;
+                });
 
             $resolved = $resolved->merge($rowsForFamily);
-            $claimedAttributeIds = array_merge($claimedAttributeIds, $rowsForFamily->pluck('attribute_id')->unique()->all());
         }
 
         return $resolved->values();

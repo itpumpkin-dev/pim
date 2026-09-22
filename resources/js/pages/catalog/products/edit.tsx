@@ -18,6 +18,7 @@ import {
     fioriDefaultSx,
     fioriEmphasizedSx,
     fioriGhostSx,
+    fioriIconButtonSx,
     fioriNegativeSx,
     fioriSwitchSx,
     fioriTabsSx,
@@ -38,6 +39,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DraftsIcon from '@mui/icons-material/Drafts';
+import EditIcon from '@mui/icons-material/Edit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -361,6 +363,13 @@ export default function ProductEdit({
     const canDuplicateProduct = auth.permissions.includes('products.create_products');
     const canDeleteProduct = auth.permissions.includes('products.delete_products');
     const canQueueTranslations = auth.permissions.includes('product_translations.edit_product_translations');
+    // สิทธิ์แก้ไข "กลุ่มสินค้า" เอง (resource product_groups) — คนละอย่างกับ
+    // canEditMasterCategories (resource master_categories, คุมแค่ว่าจะแก้ไข
+    // การผูกหมวดหมู่ของ "สินค้าตัวนี้" ได้ไหม) ใช้เฉพาะกับปุ่ม "แก้ไข" ข้างช่อง
+    // ชื่อกลุ่มสินค้าของแผง Master Categories ที่พาไปหน้าแก้ไขกลุ่มสินค้านั้นเอง
+    // โดยตรง (/catalog/product-groups/{id}/edit) — ต้องเช็คสิทธิ์ของปลายทางจริง
+    // แยกต่างหาก ไม่ใช่ยืมสิทธิ์ของแผงนี้
+    const canEditProductGroups = auth.permissions.includes('product_groups.edit_product_groups');
     const [tabIndex, setTabIndex] = useState(0);
     // แท็บย่อยภายในแท็บหลัก "General" ใช้จัดกลุ่มเนื้อหาฟอร์มฝั่งคอลัมน์ซ้าย —
     // ลำดับอ้างอิงตาม layout ต้นแบบ: General info -> Attributes -> Details ->
@@ -631,6 +640,80 @@ export default function ProductEdit({
         const { channelKey, localeKey } = getValueKeys(attr);
         const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? '';
         return typeof val === 'string' ? val : '';
+    };
+
+    // ปุ่ม "แก้ไข" ข้างช่อง "ชื่อกลุ่มสินค้า" ของแผง Master Categories — พาไปหน้า
+    // แก้ไขกลุ่มสินค้าที่เลือกอยู่ตอนนี้โดยตรง ค่าที่ฟิลด์นี้เก็บไว้เป็นแค่ code
+    // (mirror จาก categories.code — ดู ProductCategoryLinker) ไม่ใช่ Category id
+    // จริงๆ (id ที่ frontend ถืออยู่ในมือตอนนี้เป็นของ AttributeOption ที่ mirror
+    // มา คนละ id กับ Category ตัวจริง) เลยต้อง resolve code -> id ทาง backend
+    // ก่อนค่อย navigate — ดู ProductController::resolveCategoryByCode()
+    const [resolvingProductGroupEdit, setResolvingProductGroupEdit] = useState(false);
+    const goToProductGroupEdit = (code: string) => {
+        if (!code || resolvingProductGroupEdit) return;
+
+        setResolvingProductGroupEdit(true);
+        fetch(`/catalog/products/resolve-category-by-code?code=${encodeURIComponent(code)}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json: { id: number | null } | null) => {
+                if (json?.id) {
+                    router.visit(`/catalog/product-groups/${json.id}/edit`);
+                }
+            })
+            .finally(() => setResolvingProductGroupEdit(false));
+    };
+
+    // ใช้ร่วมกันทั้งแผง Master Categories หลัก (ในคอลัมน์ขวา) และ dialog
+    // "เลือกกลุ่มสินค้า" (เปิดจากลิงก์ใน Tips) เพราะ 2 ที่นี้ render ฟิลด์ชุด
+    // เดียวกันเป๊ะ — กันไม่ให้ปุ่มแก้ไขนี้ต้องเขียนซ้ำสองที่แล้วเผลอเบี้ยวกันทีหลัง
+    const renderMasterCategoryField = (attr: AttributeItem) => {
+        const { channelKey, localeKey } = getValueKeys(attr);
+        const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
+        const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
+        const isProductGroupField = attr.code === 'productgroupname';
+        const selectedCode = isProductGroupField ? selectedMasterCategoryCode(attr) : '';
+
+        const field = (
+            <RenderAttributeInput
+                key={attr.id}
+                attr={attr}
+                value={val}
+                channelKey={channelKey}
+                localeKey={localeKey}
+                onValueChange={handleMasterCategoryChange}
+                label={localizedLabel(attr, activeLocaleId)}
+                activeLocaleCode={activeLocaleCode}
+                canAddOptions={canAddAttributeOptions}
+                sku={data.sku}
+                productId={product.id}
+                masterSources={masterSources}
+                platformContext={platformContext}
+            />
+        );
+
+        if (!isProductGroupField || !canEditProductGroups) {
+            return field;
+        }
+
+        return (
+            <Stack key={attr.id} direction="row" spacing={1} alignItems="flex-end">
+                <Box sx={{ flex: 1, minWidth: 0 }}>{field}</Box>
+                <Tooltip title={t('editProductGroup')}>
+                    <span>
+                        <IconButton
+                            size="small"
+                            disabled={!selectedCode || resolvingProductGroupEdit}
+                            onClick={() => goToProductGroupEdit(selectedCode)}
+                            sx={{ ...fioriIconButtonSx, mb: '1px' }}
+                        >
+                            {resolvingProductGroupEdit ? <CircularProgress size={16} /> : <EditIcon fontSize="small" />}
+                        </IconButton>
+                    </span>
+                </Tooltip>
+            </Stack>
+        );
     };
 
     // ตัวเลือกของ 3 ฟิลด์นี้ (หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า) ให้โชว์เป็น
@@ -2652,36 +2735,7 @@ export default function ProductEdit({
                                                         })}
                                                 </Stack>
                                                 <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
-                                                    {cascadedMasterCategoryAttributes.map((attr) => {
-                                                        const { channelKey, localeKey } = getValueKeys(attr);
-                                                        const val =
-                                                            data.values[attr.id]?.[channelKey]?.[localeKey] ??
-                                                            data.values[attr.id]?.[channelKey]?.['default'] ??
-                                                            '';
-                                                        // ไม่ส่ง activeLocaleCode มาก่อนหน้านี้ — QuickAddOptionDialog
-                                                        // เลย fallback ไปที่ locales[0] เสมอ (ปกติคือ EN) แทนที่จะเป็น
-                                                        // locale ที่กำลังแก้ไขอยู่จริงตาม dropdown "กำลังแก้ไขในภาษา"
-                                                        // ด้านบน ทำให้ช่อง "ชื่อ (...)" ในไดอะล็อกเพิ่มตัวเลือกโชว์
-                                                        // ภาษาอังกฤษค้างไว้แม้ผู้ใช้จะสลับมาแก้ไทยอยู่ก็ตาม
-                                                        const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                                                        return (
-                                                            <RenderAttributeInput
-                                                                key={attr.id}
-                                                                attr={attr}
-                                                                value={val}
-                                                                channelKey={channelKey}
-                                                                localeKey={localeKey}
-                                                                onValueChange={handleMasterCategoryChange}
-                                                                label={localizedLabel(attr, activeLocaleId)}
-                                                                activeLocaleCode={activeLocaleCode}
-                                                                canAddOptions={canAddAttributeOptions}
-                                                                sku={data.sku}
-                                                                productId={product.id}
-                                                                masterSources={masterSources}
-                                                                platformContext={platformContext}
-                                                            />
-                                                        );
-                                                    })}
+                                                    {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
                                                 </Stack>
                                             </Paper>
                                         )}
@@ -3418,28 +3472,7 @@ export default function ProductEdit({
                 </DialogTitle>
                 <DialogContent dividers>
                     <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
-                        {cascadedMasterCategoryAttributes.map((attr) => {
-                            const { channelKey, localeKey } = getValueKeys(attr);
-                            const val = data.values[attr.id]?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.[channelKey]?.['default'] ?? '';
-                            const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
-                            return (
-                                <RenderAttributeInput
-                                    key={attr.id}
-                                    attr={attr}
-                                    value={val}
-                                    channelKey={channelKey}
-                                    localeKey={localeKey}
-                                    onValueChange={handleMasterCategoryChange}
-                                    label={localizedLabel(attr, activeLocaleId)}
-                                    activeLocaleCode={activeLocaleCode}
-                                    canAddOptions={canAddAttributeOptions}
-                                    sku={data.sku}
-                                    productId={product.id}
-                                    masterSources={masterSources}
-                                    platformContext={platformContext}
-                                />
-                            );
-                        })}
+                        {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>

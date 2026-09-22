@@ -2,7 +2,7 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
@@ -79,7 +79,7 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
         { title: t('createAttributeFamily'), href: '/catalog/attributeFamilies/create' },
     ];
 
-    const { data, setData, post, processing, errors, isDirty } = useForm({
+    const { data, setData, post, transform, processing, errors, isDirty } = useForm({
         translations: {} as Record<string, string>,
         group_attributes: [] as { attribute_id: number; attribute_group_id: number }[],
     });
@@ -258,6 +258,13 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        // กันกด Save ซ้ำๆ ตอน request แรกยังไม่จบ (บั๊กจริงที่เจอ: หน้านี้เคยยิง
+        // ผ่าน router.post() ตรงๆ แทนที่จะเป็น post() ของ useForm() เอง ทำให้
+        // processing ด้านล่างไม่เคยเปลี่ยนเป็น true จริงๆ เลย — ปุ่ม Save เลย
+        // ไม่ disable ระหว่างรอ กดซ้ำได้เรื่อยๆ จนสร้าง attribute family ซ้ำกัน
+        // หลายตัว เช็ค processing ตรงนี้ไว้อีกชั้นด้วย เผื่อกด Enter ในช่องกรอก
+        // ซ้ำๆ ระหว่างรอ ซึ่ง disabled ของปุ่มเพียงอย่างเดียวกันไม่ได้)
+        if (processing) return;
 
         const groupAttrsPayload: { attribute_id: number; attribute_group_id: number }[] = [];
         assignedGroups.forEach((g) => {
@@ -269,11 +276,9 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
             });
         });
 
+        transform((formData) => ({ ...formData, group_attributes: groupAttrsPayload }));
         skipNavigationGuardRef.current = true;
-        router.post('/catalog/attributeFamilies', {
-            translations: data.translations,
-            group_attributes: groupAttrsPayload,
-        }, {
+        post('/catalog/attributeFamilies', {
             onFinish: () => {
                 skipNavigationGuardRef.current = false;
             },

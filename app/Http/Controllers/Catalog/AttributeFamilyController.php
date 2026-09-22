@@ -9,6 +9,7 @@ use App\Models\AttributeFamily;
 use App\Models\AttributeFamilyTranslation;
 use App\Models\AttributeGroup;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
 use App\Services\Catalog\DefaultAttributeFamilyAssigner;
@@ -249,6 +250,86 @@ class AttributeFamilyController extends Controller
         }
 
         return back()->with('success', "Set '{$attributeFamily->name}' as the default attribute family for {$result['updated']} product group(s).");
+    }
+
+    /**
+     * รายชื่อ "กลุ่มสินค้า" (leaf ระดับ 3 ของต้นไม้ categories — join เดียวกับ
+     * ProductGroupController::index()) แบบค้นหา/แบ่งหน้าได้ พร้อม flag
+     * is_default ต่อแถวว่าตระกูลนี้เป็นค่าเริ่มต้นของกลุ่มนั้นอยู่แล้วหรือยัง —
+     * ให้ dialog "กำหนดค่าเริ่มต้นบางกลุ่มสินค้า" บนหน้าแก้ไขเรียกผ่าน fetch()
+     * ไม่ใช้ Inertia::render() เพราะเป็นแค่ข้อมูลป้อน dialog บนหน้าเดิม ไม่ใช่
+     * หน้าใหม่ทั้งหน้า
+     */
+    public function productGroupsForDefaultPicker(Request $request, AttributeFamily $attributeFamily): JsonResponse
+    {
+        $search = $request->input('search');
+        $perPage = (int) $request->input('per_page', 15);
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
+        $groups = Category::query()
+            ->select('categories.*')
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->with(['parent:id,name,parent_id', 'parent.parent:id,name', 'attributeFamilies:id'])
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
+                });
+            })
+            ->orderBy('root.name')
+            ->orderBy('sub.name')
+            ->orderBy('categories.name')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $groups->getCollection()->transform(fn (Category $group) => [
+            'id' => $group->id,
+            'name' => $group->name,
+            'subcategory_name' => $group->parent?->name,
+            'category_name' => $group->parent?->parent?->name,
+            // แถวแรกของ attributeFamilies (orderByPivot('sort_order') — ดู
+            // Category::attributeFamilies()) คือ "ค่าเริ่มต้น" ปัจจุบันของกลุ่มนี้
+            // เทียบตรรกะเดียวกับ DefaultAttributeFamilyAssigner
+            'is_default' => $group->attributeFamilies->first()?->id === $attributeFamily->id,
+        ]);
+
+        return response()->json($groups);
+    }
+
+    /**
+     * "กำหนดค่าเริ่มต้นบางกลุ่มสินค้า" — เหมือน setDefaultForAllGroups() ทุก
+     * อย่างแต่จำกัดเฉพาะกลุ่มสินค้าที่เลือกไว้จาก picker เท่านั้น (ดู
+     * DefaultAttributeFamilyAssigner::assignToProductGroups())
+     */
+    public function setDefaultForSelectedGroups(Request $request, AttributeFamily $attributeFamily, DefaultAttributeFamilyAssigner $assigner): RedirectResponse
+    {
+        $validated = $request->validate([
+            'category_ids' => ['required', 'array', 'min:1'],
+            'category_ids.*' => ['integer'],
+        ]);
+
+        // ต้องเป็นกลุ่มสินค้าจริงๆ (leaf ระดับ 3) เท่านั้น — กัน request ที่ยิง id
+        // ของ category ระดับอื่น (root/subcategory) มาตรงๆ ข้าม UI ที่กรองไว้แล้ว
+        $validCategoryIds = Category::query()
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereIn('categories.id', $validated['category_ids'])
+            ->pluck('categories.id')
+            ->all();
+
+        $result = $assigner->assignToProductGroups($attributeFamily, $validCategoryIds);
+
+        if ($result['updated'] === 0) {
+            return back()->with('success', "'{$attributeFamily->name}' was already the default for every selected product group.");
+        }
+
+        return back()->with('success', "Set '{$attributeFamily->name}' as the default attribute family for {$result['updated']} selected product group(s).");
     }
 
     /**
