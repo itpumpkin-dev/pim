@@ -839,5 +839,6 @@
     "mappedToPlatformPayloadTooltip": "Este campo alimenta el campo \"{{field}}\" del payload de {{platform}} al enviar este producto.",
     "productSavedSuccess": "Producto guardado correctamente.",
     "selectAllMatching": "Seleccionar todas las coincidencias ({{count}})",
-    "clearSelection": "Borrar selección"
+    "clearSelection": "Borrar selección",
+    "allAttributeGroupsAssigned": "Todos los grupos ya están asignados"
 }

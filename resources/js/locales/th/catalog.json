@@ -839,5 +839,6 @@
     "mappedToPlatformPayloadTooltip": "ฟิลด์นี้จะป้อนเข้าฟิลด์ \"{{field}}\" ของ {{platform}} ตอน push สินค้านี้",
     "productSavedSuccess": "บันทึกสินค้าสำเร็จแล้ว",
     "selectAllMatching": "เลือกทั้งหมดที่ตรงกับคำค้น ({{count}})",
-    "clearSelection": "ล้างการเลือก"
+    "clearSelection": "ล้างการเลือก",
+    "allAttributeGroupsAssigned": "กำหนดครบทุกกลุ่มแล้ว"
 }

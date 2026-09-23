@@ -816,5 +816,6 @@
     "mappedToPlatformPayloadTooltip": "推送此产品时，此字段将填入 {{platform}} 的「{{field}}」payload 字段。",
     "productSavedSuccess": "产品已保存成功。",
     "selectAllMatching": "选择所有匹配项（{{count}}）",
-    "clearSelection": "清除选择"
+    "clearSelection": "清除选择",
+    "allAttributeGroupsAssigned": "所有组均已指定"
 }

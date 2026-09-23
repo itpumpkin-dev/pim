@@ -839,5 +839,6 @@
     "mappedToPlatformPayloadTooltip": "This field feeds {{platform}}'s \"{{field}}\" payload field when this product is pushed.",
     "productSavedSuccess": "Product saved successfully.",
     "selectAllMatching": "Select all matching ({{count}})",
-    "clearSelection": "Clear selection"
+    "clearSelection": "Clear selection",
+    "allAttributeGroupsAssigned": "All groups already assigned"
 }

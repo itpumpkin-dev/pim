@@ -692,7 +692,7 @@ export default function AttributeFamilyEdit({
                                         onClick={() => setAssignDialogOpen(true)}
                                         sx={fioriDefaultSx}
                                     >
-                                        Assign Attribute Group
+                                        {t('assignAttributeGroup')}
                                     </Button>
                                 </Stack>
                             </Stack>
@@ -729,7 +729,7 @@ export default function AttributeFamilyEdit({
                                         {assignedGroups.length === 0 ? (
                                             <Box sx={{ border: `1px dashed ${FIORI.border}`, borderRadius: '8px', p: 4, textAlign: 'center' }}>
                                                 <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                    No groups assigned yet. Click "Assign Attribute Group" to add groups.
+                                                    {t('noGroupsAssignedYet')}
                                                 </Typography>
                                             </Box>
                                         ) : !groupSearchHasResults ? (
@@ -1087,7 +1087,7 @@ export default function AttributeFamilyEdit({
             >
                 <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        Assign Attribute Group
+                        {t('assignAttributeGroup')}
                     </Typography>
                     <IconButton onClick={closeAssignDialog} size="small">
                         <CloseIcon />
@@ -1095,7 +1095,7 @@ export default function AttributeFamilyEdit({
                 </DialogTitle>
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                        Groups *
+                        {t('groupsRequired')}
                     </Typography>
                     <FormControl fullWidth size="small">
                         <Select
@@ -1109,7 +1109,7 @@ export default function AttributeFamilyEdit({
                             }
                             renderValue={(selected) => {
                                 if (selected.length === 0) {
-                                    return <Typography color="text.secondary">Select option</Typography>;
+                                    return <Typography color="text.secondary">{t('selectOption')}</Typography>;
                                 }
                                 return selected
                                     .map((id) => {
@@ -1127,7 +1127,7 @@ export default function AttributeFamilyEdit({
                             ))}
                             {assignableGroups.length === 0 && (
                                 <MenuItem value="" disabled>
-                                    {groups.length === 0 ? 'No attribute groups available' : 'All groups already assigned'}
+                                    {groups.length === 0 ? t('noAttributeGroupsAvailable') : t('allAttributeGroupsAssigned')}
                                 </MenuItem>
                             )}
                         </Select>
@@ -1140,7 +1140,7 @@ export default function AttributeFamilyEdit({
                         disabled={selectedGroupIds.length === 0}
                         sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                     >
-                        Assign Attribute Group
+                        {t('assignAttributeGroup')}
                     </Button>
                 </DialogActions>
             </Dialog>
