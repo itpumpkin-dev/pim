@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ProcessImportJob;
 use App\Models\AttributeFamily;
 use App\Models\AuditLog;
+use App\Models\Category;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Models\Locale;
@@ -13,6 +14,7 @@ use App\Services\CodeGenerator;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\SampleTemplateBuilder;
 use App\Services\ImportExport\SpreadsheetWriter;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -59,19 +61,21 @@ class ImportConfigController extends Controller
                 ->values(),
             'requiredColumnsByType' => $this->requiredColumnsByType(),
             'columnLabelsByType' => $this->columnLabelsByType(),
-            'families' => AttributeFamily::cachedList()->map(fn ($f) => [
-                'code' => $f->code,
-                'name' => $f->name,
-            ])->values(),
         ]);
     }
 
     /**
      * Column schema for one import type, resolved for the current user and
-     * (products only) an optional Attribute Family — powers the wizard's
+     * (products only) the Attribute Family/Families resolved for the wizard's
+     * chosen Category/Subcategory/Product Group — powers the wizard's
      * "review" step: which columns exist, which are required, their labels,
      * and a one-row sample preview. Kept as a plain JSON endpoint so the
-     * wizard can refetch it when the family changes without a full reload.
+     * wizard can refetch it when the selection changes without a full reload.
+     *
+     * $family may hold several comma-separated Attribute Family codes (the
+     * union of every family bound to the selected Product Group — see
+     * categoryAttributeFamilies() below) — ProductRowImporter resolves the
+     * union of their attributes, same as it always did for a single code.
      */
     public function schema(Request $request, string $type): JsonResponse
     {
@@ -89,6 +93,34 @@ class ImportConfigController extends Controller
             'labels' => $importer->columnLabels(),
             'sample' => $sample,
         ]);
+    }
+
+    /**
+     * Nested Category/Subcategory/Product Group tree for the product-import
+     * wizard's "family" step — same cached payload CategoryController::tree()
+     * serves to CategoryCascadeSelect (see Category::treeArray()), just
+     * exposed under an import_configs-gated route so import-only roles
+     * (without the separate `categories` permission) can still use it.
+     */
+    public function categoryTree(): JsonResponse
+    {
+        return response()->json(Category::treeArray());
+    }
+
+    /**
+     * Attribute Family/Families bound to one Product Group (a leaf Category)
+     * via `category_attribute_family` — resolves what the wizard's "family"
+     * step shows once the user finishes drilling down the cascade, ordered
+     * the same way Category::attributeFamilies() always has (sort_order).
+     */
+    public function categoryAttributeFamilies(Category $category): JsonResponse
+    {
+        return response()->json(
+            $category->attributeFamilies()
+                ->get(['attribute_families.code', 'attribute_families.name'])
+                ->map(fn (AttributeFamily $family) => ['code' => $family->code, 'name' => $family->name])
+                ->values()
+        );
     }
 
     public function store(Request $request): RedirectResponse
@@ -234,7 +266,20 @@ class ImportConfigController extends Controller
             'validation_strategy' => ['required', 'in:skip_errors,stop_on_errors'],
             'ai_translate' => ['nullable', 'boolean'],
             'source_locale' => ['required', 'string', Rule::in(Locale::active()->pluck('code')->all())],
-            'family_code' => ['nullable', 'string', Rule::exists('attribute_families', 'code')],
+            // Comma-separated list of Attribute Family codes (the wizard's
+            // category picker may resolve more than one family for a single
+            // Product Group) — Rule::exists() only checks a single scalar,
+            // so each code is validated individually here instead.
+            'family_code' => ['nullable', 'string', function (string $attribute, mixed $value, \Closure $fail) {
+                $codes = array_values(array_filter(array_map('trim', explode(',', (string) $value))));
+                if ($codes === []) {
+                    return;
+                }
+                $missing = array_diff($codes, AttributeFamily::whereIn('code', $codes)->pluck('code')->all());
+                if ($missing !== []) {
+                    $fail("The {$attribute} contains unknown Attribute Family code(s): ".implode(', ', $missing));
+                }
+            }],
             'allowed_errors' => ['required', 'integer', 'min:0'],
             'image_directory_path' => ['nullable', 'string', 'max:255'],
             'file' => ['nullable', 'file', 'max:20480'],

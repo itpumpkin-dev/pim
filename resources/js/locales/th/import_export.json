@@ -46,7 +46,6 @@
     "previewError": "ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้",
     "previewEmpty": "ไม่พบข้อมูลในไฟล์นี้",
     "previewRowsNote": "แสดง {{count}} แถวแรก",
-
     "wizardStepType": "ประเภท",
     "wizardStepLanguage": "ภาษา",
     "wizardStepFamily": "ตระกูลแอตทริบิวต์",
@@ -62,10 +61,16 @@
     "wizardMasterTypeSubtitle": "เลือกชนิดข้อมูลมาสเตอร์ที่ต้องการนำเข้า ขั้นตอนถัดไปจะปรับตามตัวเลือกนี้",
     "wizardLanguageHeading": "ไฟล์นี้เขียนด้วยภาษาใด?",
     "wizardLanguageSubtitle": "ข้อความ (ชื่อ, รายละเอียด) จะถูกระบุเป็นภาษานี้ โดยไม่เขียนทับคำแปลของภาษาอื่นที่มีอยู่แล้ว",
-    "wizardFamilyHeading": "จำกัดคอลัมน์ให้เหลือแค่ตระกูลใดตระกูลหนึ่งไหม?",
-    "wizardFamilySubtitle": "เลือกไว้แค่ทำให้เห็น/บังคับกรอกเฉพาะคอลัมน์ของตระกูลนั้นด้านล่าง — ไม่ได้ตั้งตระกูลของสินค้าที่ import ให้ ตระกูลจริงของสินค้าคำนวณอัตโนมัติจากคอลัมน์หมวดหมู่ในแต่ละแถว (pcatname/psubcatname/productgroupname) เหมือนกับหน้า Create/Edit สินค้า",
-    "wizardFamilyAll": "ทุกแอตทริบิวต์ (ไม่ระบุตระกูล)",
-    "wizardFamilyHelp": "เลือกตระกูลเพื่อจำกัดคอลัมน์ให้เหลือเฉพาะแอตทริบิวต์ของตระกูลนั้น (และทำเครื่องหมายฟิลด์ที่บังคับกรอก) หรือปล่อยเป็น \"ทุกแอตทริบิวต์\" เพื่อคงทุกฟิลด์ที่ import ได้ไว้",
+    "wizardFamilyHeading": "ข้อมูลนี้เป็นของ หมวดหมู่ / หมวดหมู่ย่อย / กลุ่มสินค้า ไหน?",
+    "wizardFamilySubtitle": "เลือกกลุ่มสินค้าเพื่อให้ระบบหาว่าต้องใช้ตระกูลแอตทริบิวต์ใดบ้างมาแสดงตัวอย่างด้านล่าง — ไม่ได้ตั้งตระกูลของสินค้าที่ import ให้ ตระกูลจริงของสินค้าคำนวณอัตโนมัติจากคอลัมน์หมวดหมู่ในแต่ละแถว (pcatname/psubcatname/productgroupname) เหมือนกับหน้า Create/Edit สินค้า",
+    "wizardFamilyAll": "ทุกแอตทริบิวต์ (ยังไม่ได้เลือกหมวดหมู่)",
+    "wizardFamilyHelp": "เลือกกลุ่มสินค้าเพื่อจำกัดคอลัมน์ให้เหลือเฉพาะแอตทริบิวต์ของตระกูลที่ผูกไว้ (และทำเครื่องหมายฟิลด์ที่บังคับกรอก) หรือปล่อยว่างไว้เพื่อคงทุกฟิลด์ที่ import ได้ไว้",
+    "categoryStepCategoryLabel": "หมวดหมู่",
+    "categoryStepSubcategoryLabel": "หมวดหมู่ย่อย",
+    "categoryStepProductGroupLabel": "กลุ่มสินค้า",
+    "resolvedFamiliesLabel": "ตระกูลแอตทริบิวต์ที่ระบบหาให้",
+    "selectProductGroupFirst": "เลือกกลุ่มสินค้าเพื่อให้ระบบหาตระกูลแอตทริบิวต์ที่เกี่ยวข้อง — ต้องเลือกก่อนจึงจะไปขั้นตอนถัดไปได้",
+    "noFamilyBoundToProductGroup": "กลุ่มสินค้านี้ไม่ได้ผูกกับตระกูลแอตทริบิวต์ใดเลย — ฟิลด์ที่นำเข้าได้ทั้งหมดจะยังใช้ได้ตามปกติ",
     "wizardReviewHeading": "ฟิลด์ที่จำเป็นและรูปแบบไฟล์",
     "wizardReviewSubtitle": "ตรวจสอบว่าไฟล์ของคุณมีคอลัมน์เหล่านี้ครบ แล้วดาวน์โหลดไฟล์ตัวอย่างเพื่อจัดรูปแบบให้ตรงกัน",
     "wizardRequiredAttributes": "คอลัมน์ที่จำเป็น",
@@ -75,7 +80,6 @@
     "wizardUploadSubtitle": "ระบบจะสแกนไฟล์ในเบราว์เซอร์ของคุณและแจ้งเตือนสิ่งที่จะทำให้การนำเข้าล้มเหลว",
     "wizardNext": "ถัดไป",
     "wizardAdvancedOptions": "ตัวเลือกเพิ่มเติม",
-
     "preflightTitle": "ตรวจสอบข้อมูล",
     "preflightRequiredPresent": "มีคอลัมน์ที่จำเป็นครบทุกคอลัมน์",
     "preflightRequiredMissing": "ขาดคอลัมน์ที่จำเป็น: {{columns}}",
@@ -133,7 +137,6 @@
     "summary": "สรุปผล",
     "allStatuses": "ทุกสถานะ",
     "allJobTypes": "ทุกประเภทงาน",
-
     "wooConvertTitle": "WooCommerce",
     "wooHubSubtitle": "แปลงข้อมูลสินค้าระหว่างระบบนี้กับร้าน WooCommerce ได้ทั้งสองทิศทาง",
     "wooImportCardTitle": "นำเข้าจาก WooCommerce",
@@ -183,7 +186,6 @@
     "wooConvertGoToImport": "ไปที่หน้านำเข้าสินค้า",
     "wooConvertTypeWarningsTitle": "คำเตือนเรื่องประเภทสินค้า ({{count}})",
     "wooConvertTypeWarningsTruncated": "และอีก {{remaining}} รายการ",
-
     "wooExportTitle": "ส่งออกไปยัง WooCommerce",
     "wooExportIntro": "ส่งออกสินค้าจากระบบ PIM ให้อยู่ในรูปแบบคอลัมน์ที่หน้า Products > Import ของ WooCommerce เองต้องการ โดยเลือกได้ 1 ภาษาต่อการส่งออกหนึ่งครั้ง สินค้าที่มีตัวเลือกย่อย (variant) จะถูกแปลงเป็นแถวสินค้าแม่ชนิด variable พร้อมแถว variation ของแต่ละตัวเลือก ตามรูปแบบที่ WooCommerce ใช้กับสินค้าที่มีตัวเลือกย่อย",
     "wooExportLanguageSectionTitle": "ภาษา",
@@ -200,5 +202,6 @@
     "wooExportAllFamilies": "ทุกตระกูล",
     "wooExportEnabledOnly": "เฉพาะสินค้าที่เปิดใช้งาน",
     "wooExportFormatSectionTitle": "รูปแบบไฟล์",
-    "wooExportSubmit": "ดาวน์โหลดไฟล์ส่งออก"
+    "wooExportSubmit": "ดาวน์โหลดไฟล์ส่งออก",
+    "categoryTreeLoadError": "โหลดรายการหมวดหมู่ไม่สำเร็จ — ตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง"
 }

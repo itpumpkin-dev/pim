@@ -100,6 +100,7 @@ body {
     --fiori-brand-dark: #0040b0;
     --fiori-text-primary: #1d2d3e;
     --fiori-text-secondary: #6a6d70;
+    --fiori-placeholder: #b3b7bb;
     --fiori-border: #d9d9d9;
     --fiori-border-strong: #89919a;
     --fiori-page-bg: #f7f7f7;
@@ -125,6 +126,7 @@ body {
     --fiori-brand-dark: #1f7ae0;
     --fiori-text-primary: #e8eaed;
     --fiori-text-secondary: #9aa4ae;
+    --fiori-placeholder: #6b7278;
     --fiori-border: #383c40;
     --fiori-border-strong: #565c63;
     --fiori-page-bg: #17191b;

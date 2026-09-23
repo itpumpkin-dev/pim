@@ -438,32 +438,7 @@ class CategoryController extends Controller
     public function tree(Request $request): JsonResponse
     {
         $excludeId = $request->integer('exclude') ?: null;
-        $cacheKey = 'category-tree:'.Category::treeCacheVersion().':'.app()->getLocale();
-
-        $tree = Cache::remember($cacheKey, now()->addHours(6), function () {
-            $roots = Category::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
-
-            $map = function (Category $category) use (&$map) {
-                return [
-                    'id' => $category->id,
-                    'code' => $category->code,
-                    'name' => $category->name,
-                    // คำนวณแบบเดียวกับคอลัมน์ mapped_platforms ของ
-                    // CategoryController::index() — ทำให้ CategoryCascadeSelect
-                    // ของหน้าแก้ไขสินค้าโชว์ได้ว่าแต่ละระดับที่เลือกไว้แมปกับ
-                    // marketplace ไหนอยู่แล้วบ้าง (ดู docblock ของ component นั้นเอง)
-                    'mapped_platforms' => collect([
-                        'lazada' => $category->lazada_category_id,
-                        'shopee' => $category->shopee_category_id,
-                        'tiktok' => $category->tiktok_category_id,
-                        'woocommerce' => $category->woocommerce_category_id,
-                    ])->filter()->keys()->values()->all(),
-                    'children' => $category->recursiveChildren->map($map)->filter()->values(),
-                ];
-            };
-
-            return $roots->map($map)->filter()->values();
-        });
+        $tree = Category::treeArray();
 
         if ($excludeId) {
             $tree = $this->excludeFromTree($tree, $excludeId);

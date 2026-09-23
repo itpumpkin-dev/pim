@@ -113,6 +113,9 @@ class AttributeFamilyController extends Controller
         return Inertia::render('catalog/attribute-families/create', [
             'groups' => $groups,
             'attributes' => $attributes,
+            // ตัวเลือกให้ปุ่ม "ใช้เทมเพลตจาก..." — ยังไม่มีตัวเองให้ยกเว้น (สินค้า
+            // ยังไม่ถูกสร้าง) เลยเอาทุกตระกูลที่มีอยู่แล้วมาให้เลือกได้หมด
+            'otherFamilies' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -184,8 +187,36 @@ class AttributeFamilyController extends Controller
             'groups' => $groups,
             'attributes' => $attributes,
             'familyAttributes' => $familyAttributes,
+            // ตัวเลือกให้ปุ่ม "ใช้เทมเพลตจาก..." — ตระกูลอื่นทั้งหมดยกเว้นตัวเอง
+            // เบาพอจะส่งมาเต็มๆ ได้เลยไม่ต้องมี endpoint ค้นหา/แบ่งหน้าแยก (ระบบนี้
+            // มีตระกูลแอตทริบิวต์อยู่หลักสิบตัวเท่านั้น ต่างจากกลุ่มสินค้าที่มีเป็นร้อย)
+            'otherFamilies' => AttributeFamily::select('id', 'code', 'name')
+                ->where('id', '!=', $attributeFamily->id)
+                ->orderBy('name')
+                ->get(),
             'canViewHistory' => auth()->user()?->hasPermission('attribute_families', 'view_history') ?? false,
             'canAssignDefaultFamily' => auth()->user()?->hasPermission('attribute_families', 'assign_default_family') ?? false,
+        ]);
+    }
+
+    /**
+     * โครงสร้าง group/attribute ของตระกูลอื่น (ไม่ใช่ตัวที่กำลังแก้ไขอยู่) ให้
+     * ปุ่ม "ใช้เทมเพลตจาก..." โหลดมาพรีวิวก่อนกดยืนยัน — รูปแบบเดียวกับ
+     * `familyAttributes` prop ของ edit() เป๊ะๆ (ใช้ grouping logic ฝั่ง
+     * frontend ร่วมกันได้เลย) เพื่อให้ผู้ใช้เห็นว่ากำลังจะเพิ่ม group/attribute
+     * อะไรเข้าไปบ้างก่อนกดยืนยันจริง — ตัวปุ่มเองแค่ "เพิ่มต่อท้าย" (merge) เข้า
+     * โครงสร้างปัจจุบันที่ยังไม่ได้ save เท่านั้น ไม่ได้เขียนลง DB ตรงนี้เลย
+     */
+    public function templatePreview(AttributeFamily $attributeFamily): JsonResponse
+    {
+        $familyAttributes = FamilyAttribute::with(['attribute', 'attributeGroup'])
+            ->where('family_id', $attributeFamily->id)
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json([
+            'family' => $attributeFamily->only(['id', 'code', 'name']),
+            'familyAttributes' => $familyAttributes,
         ]);
     }
 

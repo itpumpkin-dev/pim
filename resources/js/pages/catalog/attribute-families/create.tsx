@@ -64,12 +64,33 @@ interface AssignedGroup {
     expanded: boolean;
 }
 
-interface Props {
-    groups: AttributeGroup[];
+interface AttributeFamilyOption {
+    id: number;
+    code: string;
+    name?: string;
+}
+
+interface FamilyAttributePivot {
+    attribute_id: number;
+    attribute_group_id: number;
+    attribute?: AttributeItem;
+    attribute_group?: AttributeGroup;
+}
+
+interface TemplatePreviewGroup {
+    id: number;
+    code: string;
+    name: string;
     attributes: AttributeItem[];
 }
 
-export default function AttributeFamilyCreate({ groups, attributes }: Props) {
+interface Props {
+    groups: AttributeGroup[];
+    attributes: AttributeItem[];
+    otherFamilies?: AttributeFamilyOption[];
+}
+
+export default function AttributeFamilyCreate({ groups, attributes, otherFamilies = [] }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -159,6 +180,107 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
 
     // เฉพาะกลุ่มที่ยังไม่ถูกกำหนด — กันไม่ให้เลือกซ้ำจากใน dropdown
     const assignableGroups = groups.filter((g) => !assignedGroups.some((a) => a.id === g.id));
+
+    // ปุ่ม "ใช้เทมเพลตจาก..." — เลือกตระกูลที่มีอยู่แล้วเป็นต้นแบบ, พรีวิวโครงสร้าง
+    // group/attribute ของมันก่อน แล้วค่อย "เพิ่มต่อท้าย" เข้าโครงสร้างที่กำลัง
+    // จัดอยู่ตอนนี้ (ยังไม่ได้ save เลยด้วยซ้ำ เพราะหน้านี้คือ Create) — เหมือนกับ
+    // ฟีเจอร์เดียวกันในหน้า Edit ทุกประการ
+    const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+    const [templateStep, setTemplateStep] = useState<'pick' | 'preview'>('pick');
+    const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+    const [templatePreviewGroups, setTemplatePreviewGroups] = useState<TemplatePreviewGroup[] | null>(null);
+    const [templatePreviewLoading, setTemplatePreviewLoading] = useState(false);
+
+    const openTemplateDialog = () => {
+        setSelectedTemplateId(null);
+        setTemplatePreviewGroups(null);
+        setTemplateStep('pick');
+        setTemplateDialogOpen(true);
+    };
+
+    const closeTemplateDialog = () => {
+        setTemplateDialogOpen(false);
+        setSelectedTemplateId(null);
+        setTemplatePreviewGroups(null);
+        setTemplateStep('pick');
+    };
+
+    const loadTemplatePreview = (templateId: number) => {
+        setSelectedTemplateId(templateId);
+        setTemplatePreviewLoading(true);
+        fetch(`/catalog/attributeFamilies/${templateId}/template-preview`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((json: { familyAttributes?: FamilyAttributePivot[] } | null) => {
+                const groupsMap = new Map<number, TemplatePreviewGroup>();
+                (json?.familyAttributes ?? []).forEach((item) => {
+                    const grpId = item.attribute_group_id;
+                    if (!groupsMap.has(grpId)) {
+                        const grpCode = item.attribute_group?.code || `Group ${grpId}`;
+                        groupsMap.set(grpId, {
+                            id: grpId,
+                            code: grpCode,
+                            name: item.attribute_group?.name || grpCode.charAt(0).toUpperCase() + grpCode.slice(1),
+                            attributes: [],
+                        });
+                    }
+                    if (item.attribute) {
+                        groupsMap.get(grpId)!.attributes.push(item.attribute);
+                    }
+                });
+                setTemplatePreviewGroups(Array.from(groupsMap.values()));
+                setTemplateStep('preview');
+            })
+            .finally(() => setTemplatePreviewLoading(false));
+    };
+
+    // "เพิ่มต่อท้าย" โครงสร้าง group/attribute ของเทมเพลตเข้า assignedGroups
+    // ปัจจุบัน — group ที่มีอยู่แล้วในหน้านี้ (id ตรงกัน เพราะ group เป็น master
+    // กลางใช้ร่วมกันทุกตระกูล) จะได้ attribute ใหม่ที่ยังไม่มีเพิ่มเข้าไป (ไม่ทับ/
+    // ไม่ลบของเดิม) ส่วน group ที่ยังไม่เคยมีจะถูกเพิ่มเข้าไปทั้งกลุ่มใหม่ต่อท้าย —
+    // attribute ที่ถูกวางไปจะถูกเอาออกจาก Unassigned ด้วย (ถ้ายังไม่เคยถูกจัดกลุ่ม
+    // ที่ไหนมาก่อน)
+    const applyTemplateStructure = (templateGroups: TemplatePreviewGroup[]) => {
+        if (templateGroups.length === 0) {
+            closeTemplateDialog();
+            return;
+        }
+
+        const placedAttributeIds = new Set<number>();
+        templateGroups.forEach((tg) => tg.attributes.forEach((a) => placedAttributeIds.add(a.id)));
+
+        setAssignedGroups((prev) => {
+            const byId = new Map(prev.map((g) => [g.id, g]));
+            const originalOrder = prev.map((g) => g.id);
+
+            templateGroups.forEach((tg) => {
+                const existing = byId.get(tg.id);
+                if (existing) {
+                    const existingAttrIds = new Set(existing.attributes.map((a) => a.id));
+                    const toAdd = tg.attributes.filter((a) => !existingAttrIds.has(a.id));
+                    if (toAdd.length > 0) {
+                        byId.set(tg.id, { ...existing, attributes: [...existing.attributes, ...toAdd] });
+                    }
+                } else {
+                    const groupMeta = groups.find((g) => g.id === tg.id);
+                    byId.set(tg.id, {
+                        id: tg.id,
+                        code: groupMeta?.code || tg.code,
+                        name: groupMeta?.name || tg.name,
+                        attributes: [...tg.attributes],
+                        expanded: true,
+                    });
+                }
+            });
+
+            const newGroupIds = Array.from(byId.keys()).filter((id) => !originalOrder.includes(id));
+            return [...originalOrder, ...newGroupIds].map((id) => byId.get(id)!);
+        });
+
+        setUnassignedAttrs((prev) => prev.filter((a) => !placedAttributeIds.has(a.id)));
+        closeTemplateDialog();
+    };
 
     // การวาง "ครั้งแรก" จากคอลัมน์ Unassigned เข้า group ใดก็ได้ — ตัดออกจาก pool
     // แล้วใส่เข้า group ปลายทางตัวเดียว (ยังไม่มีที่อื่นให้ "ย้ายจาก" เพราะเพิ่ง
@@ -335,6 +457,15 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                                     >
                                         {t('deleteGroup')}
                                     </Button>
+                                    {otherFamilies.length > 0 && (
+                                        <Button
+                                            variant="outlined"
+                                            onClick={openTemplateDialog}
+                                            sx={fioriDefaultSx}
+                                        >
+                                            {t('useTemplateFrom')}
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="outlined"
                                         onClick={() => setAssignDialogOpen(true)}
@@ -671,6 +802,116 @@ export default function AttributeFamilyCreate({ groups, attributes }: Props) {
                         sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                     >
                         {t('assignAttributeGroup')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ไดอะล็อก "ใช้เทมเพลตจาก..." — 2 ขั้นตอน: เลือกตระกูลต้นแบบ แล้วพรีวิว
+            โครงสร้างของมันก่อนกดยืนยัน (เหมือนกับหน้า Edit ทุกประการ) */}
+            <Dialog
+                open={templateDialogOpen}
+                onClose={closeTemplateDialog}
+                fullWidth
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                        {t('useTemplateFrom')}
+                    </Typography>
+                    <IconButton onClick={closeTemplateDialog} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3 }}>
+                    {templateStep === 'pick' && (
+                        <Stack spacing={1.5}>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('useTemplateFromHelp')}
+                            </Typography>
+                            <List sx={{ maxHeight: 360, overflowY: 'auto' }}>
+                                {otherFamilies.map((fam) => (
+                                    <ListItem
+                                        key={fam.id}
+                                        onClick={() => loadTemplatePreview(fam.id)}
+                                        sx={{
+                                            cursor: 'pointer',
+                                            borderRadius: '8px',
+                                            border: `1px solid ${FIORI.border}`,
+                                            mb: 1,
+                                            '&:hover': { bgcolor: FIORI.brandBg },
+                                        }}
+                                    >
+                                        <ListItemText
+                                            primary={fam.name || fam.code}
+                                            secondary={fam.code}
+                                        />
+                                        {templatePreviewLoading && selectedTemplateId === fam.id && (
+                                            <CircularProgress size={18} />
+                                        )}
+                                    </ListItem>
+                                ))}
+                            </List>
+                        </Stack>
+                    )}
+
+                    {templateStep === 'preview' && (
+                        <Stack spacing={2}>
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                {t('useTemplateFromPreviewHelp', {
+                                    name: otherFamilies.find((f) => f.id === selectedTemplateId)?.name
+                                        || otherFamilies.find((f) => f.id === selectedTemplateId)?.code
+                                        || '',
+                                })}
+                            </Typography>
+                            {(templatePreviewGroups?.length ?? 0) === 0 ? (
+                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontStyle: 'italic' }}>
+                                    {t('useTemplateFromEmpty')}
+                                </Typography>
+                            ) : (
+                                <Stack spacing={1.5} sx={{ maxHeight: 360, overflowY: 'auto' }}>
+                                    {templatePreviewGroups!.map((g) => (
+                                        <Paper key={g.id} variant="outlined" sx={{ p: 1.5, borderRadius: '8px' }}>
+                                            <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5 }}>
+                                                {g.name}
+                                            </Typography>
+                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                                                {g.attributes.map((attr) => (
+                                                    <Box
+                                                        key={attr.id}
+                                                        sx={{
+                                                            px: 1,
+                                                            py: 0.25,
+                                                            borderRadius: '6px',
+                                                            bgcolor: FIORI.brandBg,
+                                                            fontSize: '0.75rem',
+                                                            color: FIORI.textPrimary,
+                                                        }}
+                                                    >
+                                                        {attr.name || attr.code}
+                                                    </Box>
+                                                ))}
+                                            </Stack>
+                                        </Paper>
+                                    ))}
+                                </Stack>
+                            )}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    {templateStep === 'preview' && (
+                        <Button onClick={() => setTemplateStep('pick')} sx={fioriGhostSx}>
+                            {t('back')}
+                        </Button>
+                    )}
+                    <Button
+                        variant="contained"
+                        onClick={() => applyTemplateStructure(templatePreviewGroups ?? [])}
+                        disabled={templateStep !== 'preview' || (templatePreviewGroups?.length ?? 0) === 0}
+                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                    >
+                        {t('useTemplateFromApply')}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -38,6 +38,11 @@ class ProductRowImporter implements RowImporterInterface
      * — every AI-translate dispatch increments its total_translations_queued
      * counter, so the job status page can show live progress instead of
      * those translations running with no visibility at all.
+     *
+     * $familyCode is a single Attribute Family code, or a comma-separated
+     * list of several (see familyAttributeCodes()) — the wizard resolves
+     * these from the Category/Subcategory/Product Group the user picks,
+     * since one Product Group can bind more than one family.
      */
     public function __construct(
         private readonly ?User $user = null,
@@ -47,24 +52,30 @@ class ProductRowImporter implements RowImporterInterface
     }
 
     /**
-     * When the import is scoped to an Attribute Family, the subset of that
-     * family's attributes this importer can actually handle (non-locale/
-     * non-channel — see baseAttributeCodes()). Returns null when no family
-     * was chosen, meaning "don't narrow the column set at all".
+     * When the import is scoped to one or more Attribute Families (the
+     * wizard's category picker can resolve several families for one Product
+     * Group — see ImportConfigController::categoryAttributeFamilies()),
+     * the union of those families' attributes this importer can actually
+     * handle (non-locale/non-channel — see baseAttributeCodes()). Returns
+     * null when no family was chosen, meaning "don't narrow the column set
+     * at all". $familyCode holds a single code or a comma-separated list.
      *
      * @return array<int, string>|null
      */
     private function familyAttributeCodes(): ?array
     {
         if ($this->familyAttributeCodesCache === null) {
-            $code = trim((string) $this->familyCode);
-            if ($code === '') {
+            $codes = array_values(array_filter(array_map('trim', explode(',', (string) $this->familyCode))));
+            if ($codes === []) {
                 $this->familyAttributeCodesCache = false;
             } else {
-                $family = AttributeFamily::where('code', $code)->with('attributes:id,code')->first();
-                $this->familyAttributeCodesCache = $family
-                    ? array_values(array_intersect(self::baseAttributeCodes(), $family->attributes->pluck('code')->all()))
-                    : [];
+                $attributeCodes = AttributeFamily::whereIn('code', $codes)
+                    ->with('attributes:id,code')
+                    ->get()
+                    ->flatMap(fn (AttributeFamily $family) => $family->attributes->pluck('code'))
+                    ->unique()
+                    ->all();
+                $this->familyAttributeCodesCache = array_values(array_intersect(self::baseAttributeCodes(), $attributeCodes));
             }
         }
 

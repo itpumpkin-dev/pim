@@ -46,7 +46,6 @@
     "previewError": "No se puede previsualizar este archivo.",
     "previewEmpty": "No se encontraron datos en este archivo.",
     "previewRowsNote": "Mostrando las primeras {{count}} filas",
-
     "wizardStepType": "Tipo",
     "wizardStepLanguage": "Idioma",
     "wizardStepFamily": "Familia de Atributos",
@@ -62,10 +61,16 @@
     "wizardMasterTypeSubtitle": "Elige el tipo de dato maestro específico. Los pasos restantes se adaptan a esta elección.",
     "wizardLanguageHeading": "¿En qué idioma está escrito el archivo?",
     "wizardLanguageSubtitle": "Los valores de texto (nombres, descripciones) se etiquetan con este idioma y no sobrescribirán las traducciones de otros idiomas.",
-    "wizardFamilyHeading": "¿Limitar las columnas a una Familia de Atributos?",
-    "wizardFamilySubtitle": "Elegir una solo muestra/requiere las columnas de atributos propias de esa familia a continuación — no establece la familia de los productos importados. Eso se determina automáticamente a partir de las columnas de categoría de cada fila (pcatname/psubcatname/productgroupname), igual que en las páginas de Crear/Editar producto.",
-    "wizardFamilyAll": "Todos los atributos (sin familia específica)",
-    "wizardFamilyHelp": "Elige una familia para limitar las columnas solo a sus atributos y marcar los obligatorios. Deja \"Todos los atributos\" para mantener disponible cada campo importable.",
+    "wizardFamilyHeading": "¿Para qué Categoría / Subcategoría / Grupo de productos son estos datos?",
+    "wizardFamilySubtitle": "Elegir un Grupo de productos solo resuelve qué Familia(s) de Atributos previsualizar a continuación — no establece la familia de los productos importados. Eso se determina automáticamente a partir de las columnas de categoría de cada fila (pcatname/psubcatname/productgroupname), igual que en las páginas de Crear/Editar producto.",
+    "wizardFamilyAll": "Todos los atributos (sin categoría seleccionada)",
+    "wizardFamilyHelp": "Elige un Grupo de productos para limitar las columnas a su(s) Familia(s) de Atributos vinculada(s) y marcar sus campos obligatorios. Déjalo sin seleccionar para mantener disponible cada campo importable.",
+    "categoryStepCategoryLabel": "Categoría",
+    "categoryStepSubcategoryLabel": "Subcategoría",
+    "categoryStepProductGroupLabel": "Grupo de productos",
+    "resolvedFamiliesLabel": "Familia(s) de Atributos resuelta(s)",
+    "selectProductGroupFirst": "Selecciona un Grupo de productos para resolver su(s) Familia(s) de Atributos — obligatorio para continuar.",
+    "noFamilyBoundToProductGroup": "Ninguna Familia de Atributos está vinculada a este Grupo de productos — todos los campos importables siguen disponibles.",
     "wizardReviewHeading": "Campos obligatorios y formato del archivo",
     "wizardReviewSubtitle": "Asegúrate de que tu archivo tenga estas columnas, luego descarga una muestra para ajustar el formato.",
     "wizardRequiredAttributes": "Columnas obligatorias",
@@ -75,7 +80,6 @@
     "wizardUploadSubtitle": "Analizaremos el archivo en tu navegador y señalaremos cualquier cosa que fallaría al importar.",
     "wizardNext": "Siguiente",
     "wizardAdvancedOptions": "Opciones avanzadas",
-
     "preflightTitle": "Verificación de datos",
     "preflightRequiredPresent": "Todas las columnas obligatorias están presentes.",
     "preflightRequiredMissing": "Falta(n) columna(s) obligatoria(s): {{columns}}",
@@ -86,7 +90,6 @@
     "preflightEmptyCells": "\"{{column}}\" está vacío en {{count}} fila(s) — esas filas se omitirán.",
     "preflightDuplicateSku": "{{count}} valor(es) de SKU aparecen más de una vez — las filas posteriores sobrescriben a las anteriores.",
     "preflightAllGood": "No se encontraron problemas — este archivo parece listo para importar.",
-
     "exportsTitle": "Exportaciones",
     "createExport": "Crear Exportación",
     "editExport": "Editar Exportación",
@@ -96,7 +99,6 @@
     "fileFormat": "Formato de Archivo",
     "withMedia": "Con Medios",
     "exportNow": "Exportar Ahora",
-
     "jobTrackerTitle": "Rastreador de Tareas",
     "job": "Tarea",
     "jobType": "Tipo de Tarea",
@@ -135,7 +137,6 @@
     "summary": "Resumen",
     "allStatuses": "Todos los estados",
     "allJobTypes": "Todos los tipos de trabajo",
-
     "wooConvertTitle": "Convertidor de WooCommerce",
     "wooHubSubtitle": "Convierte datos de productos entre este catálogo y tu tienda WooCommerce, en cualquier dirección.",
     "wooImportCardTitle": "Importar desde WooCommerce",
@@ -185,7 +186,6 @@
     "wooConvertGoToImport": "Ir a Importación de Productos",
     "wooConvertTypeWarningsTitle": "Advertencias de Tipo ({{count}})",
     "wooConvertTypeWarningsTruncated": "...y {{remaining}} más.",
-
     "wooExportTitle": "Exportar a WooCommerce",
     "wooExportIntro": "Exporta productos de este PIM al formato de columnas que espera la propia pantalla Productos > Importar de WooCommerce, para un único idioma elegido. Los productos configurables se expanden en una fila padre variable más una fila de variación por cada variante, igual que el propio formato de WooCommerce para productos con opciones.",
     "wooExportLanguageSectionTitle": "Idioma",
@@ -202,5 +202,6 @@
     "wooExportAllFamilies": "Todas las familias",
     "wooExportEnabledOnly": "Solo productos habilitados",
     "wooExportFormatSectionTitle": "Formato de Archivo",
-    "wooExportSubmit": "Descargar Exportación"
+    "wooExportSubmit": "Descargar Exportación",
+    "categoryTreeLoadError": "No se pudo cargar la lista de categorías: comprueba tu conexión e inténtalo de nuevo."
 }

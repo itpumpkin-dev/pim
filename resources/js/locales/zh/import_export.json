@@ -108,10 +108,16 @@
     "wizardMasterTypeSubtitle": "选择具体的主数据类型，后续步骤会根据此选择进行调整。",
     "wizardLanguageHeading": "文件是用哪种语言编写的？",
     "wizardLanguageSubtitle": "文本值（名称、描述）会标记为该语言，不会覆盖其他语言的翻译。",
-    "wizardFamilyHeading": "要把列范围缩小到某一个属性家族吗？",
-    "wizardFamilySubtitle": "选择后只会显示/要求该家族自己的属性列——并不会设置导入产品的家族。产品的实际家族由每行的分类列（pcatname/psubcatname/productgroupname）自动计算得出，做法与产品的创建/编辑页面一致。",
-    "wizardFamilyAll": "全部属性（不指定家族）",
-    "wizardFamilyHelp": "选择一个家族可将列范围缩小为其属性，并标出其中的必填项。保留“全部属性”则保留所有可导入字段。",
+    "wizardFamilyHeading": "这批数据属于哪个 类别 / 子类别 / 产品组？",
+    "wizardFamilySubtitle": "选择产品组只会解析出下方要预览的属性家族——并不会设置导入产品的家族。产品的实际家族由每行的分类列（pcatname/psubcatname/productgroupname）自动计算得出，做法与产品的创建/编辑页面一致。",
+    "wizardFamilyAll": "全部属性（未选择类别）",
+    "wizardFamilyHelp": "选择一个产品组可将列范围缩小为其绑定的属性家族，并标出其中的必填项。不选择则保留所有可导入字段。",
+    "categoryStepCategoryLabel": "类别",
+    "categoryStepSubcategoryLabel": "子类别",
+    "categoryStepProductGroupLabel": "产品组",
+    "resolvedFamiliesLabel": "解析出的属性家族",
+    "selectProductGroupFirst": "选择一个产品组以解析其绑定的属性家族——必须选择后才能继续。",
+    "noFamilyBoundToProductGroup": "该产品组未绑定任何属性家族——所有可导入字段仍然可用。",
     "wizardReviewHeading": "必填字段与文件格式",
     "wizardReviewSubtitle": "确认文件包含这些列，然后下载示例以匹配布局。",
     "wizardRequiredAttributes": "必填列",
@@ -196,5 +202,6 @@
     "wooExportAllFamilies": "所有家族",
     "wooExportEnabledOnly": "仅启用的产品",
     "wooExportFormatSectionTitle": "文件格式",
-    "wooExportSubmit": "下载导出"
+    "wooExportSubmit": "下载导出",
+    "categoryTreeLoadError": "无法加载类别列表——请检查网络连接后重试。"
 }

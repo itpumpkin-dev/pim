@@ -4142,6 +4142,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     disabled={isReadOnly}
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
+                    autoComplete="off"
                     sx={fioriFieldStateSx('none')}
                     InputProps={{
                         startAdornment: <InputAdornment position="start">฿</InputAdornment>,
@@ -4168,6 +4169,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={t('enterFieldPlaceholder', { label: label.toLowerCase() })}
+                    autoComplete="off"
                     sx={fioriFieldStateSx('none')}
                 />
             </Box>
@@ -4234,6 +4236,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     value={stringValue}
                     onChange={(e) => onChange(e.target.value)}
                     InputLabelProps={{ shrink: true }}
+                    autoComplete="off"
                     sx={fioriFieldStateSx('none')}
                 />
             </Box>
@@ -4678,6 +4681,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                 value={stringValue}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={attr.code === 'pid' || attr.code === 'pname' ? sku : t('enterFieldPlaceholder', { label: label.toLowerCase() })}
+                autoComplete="off"
                 sx={fioriFieldStateSx('none')}
             />
         </Box>

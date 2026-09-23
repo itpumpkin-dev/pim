@@ -1,3 +1,4 @@
+import { type CategoryNode } from '@/components/category-cascade-select';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
 import ImportPreflight, { type PreflightSchema } from '@/components/import-export/import-preflight';
 import WizardSteps, { type WizardStep } from '@/components/import-export/wizard-steps';
@@ -35,19 +36,19 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
     types: string[];
     requiredColumnsByType: Record<string, string[]>;
     columnLabelsByType: Record<string, Record<string, string>>;
-    families: { code: string; name: string }[];
 }
 
 type SchemaResponse = PreflightSchema & { sample: { columns: string[]; rows: Record<string, string>[] } };
+type ResolvedFamily = { code: string; name: string };
 
-export default function ImportCreate({ types, requiredColumnsByType, columnLabelsByType, families }: Props) {
+export default function ImportCreate({ types, requiredColumnsByType, columnLabelsByType }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -102,6 +103,28 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     const [schema, setSchema] = useState<SchemaResponse | null>(null);
     const [schemaLoading, setSchemaLoading] = useState(false);
 
+    // Category/Subcategory/Product Group cascade — replaces a flat Attribute
+    // Family picker so the user says *what the data is* instead of having to
+    // already know which family that maps to; the family/families that
+    // narrow the review step's columns are then resolved from the chosen
+    // Product Group (a leaf category) via category_attribute_family.
+    const [categoryTree, setCategoryTree] = useState<CategoryNode[]>([]);
+    const [categoryTreeLoading, setCategoryTreeLoading] = useState(false);
+    const [categoryTreeError, setCategoryTreeError] = useState(false);
+    // A ref, not state, gates the one-time fetch below — putting
+    // categoryTreeLoading *state* in that effect's own dependency array (an
+    // earlier version of this code did) made it self-retrigger: setting
+    // loading=true reruns the effect, whose cleanup marks the in-flight
+    // fetch's closure stale before it resolves, so its `finally` then skips
+    // clearing loading — stuck at loading=true forever. A ref sidesteps that
+    // because writing to it doesn't cause a re-render.
+    const categoryTreeFetchStarted = useRef(false);
+    const [catId, setCatId] = useState<number | null>(null);
+    const [subcatId, setSubcatId] = useState<number | null>(null);
+    const [groupId, setGroupId] = useState<number | null>(null);
+    const [resolvedFamilies, setResolvedFamilies] = useState<ResolvedFamily[]>([]);
+    const [familiesLoading, setFamiliesLoading] = useState(false);
+
     const currentKey = stepKeys[Math.min(activeStep, stepKeys.length - 1)];
 
     // Column schema for the review/upload steps — refetched whenever the type
@@ -133,6 +156,78 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         };
     }, [data.type, data.family_code, isProducts]);
 
+    // Fetched once, lazily — only products need the category cascade.
+    useEffect(() => {
+        if (!isProducts || categoryTreeFetchStarted.current) return;
+        categoryTreeFetchStarted.current = true;
+        let active = true;
+        setCategoryTreeLoading(true);
+        fetch('/import-export/imports/category-tree', { headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`category-tree fetch failed: ${res.status}`))))
+            .then((tree: CategoryNode[]) => {
+                if (!active) return;
+                setCategoryTree(tree);
+                setCategoryTreeError(false);
+            })
+            .catch((err) => {
+                console.error(err);
+                if (active) setCategoryTreeError(true);
+            })
+            .finally(() => {
+                if (active) setCategoryTreeLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [isProducts]);
+
+    // Resolves the Attribute Family/Families bound to the chosen Product
+    // Group (a leaf category) — a Product Group can bind more than one, so
+    // family_code carries the comma-separated union of their codes.
+    useEffect(() => {
+        if (groupId === null) return;
+        let active = true;
+        setFamiliesLoading(true);
+        fetch(`/import-export/imports/category-families/${groupId}`, { headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : []))
+            .then((list: ResolvedFamily[]) => {
+                if (!active) return;
+                setResolvedFamilies(list);
+                setData('family_code', list.map((f) => f.code).join(','));
+            })
+            .finally(() => {
+                if (active) setFamiliesLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [groupId]);
+
+    const catNode = useMemo(() => categoryTree.find((n) => n.id === catId), [categoryTree, catId]);
+    const subcatNode = useMemo(() => catNode?.children.find((n) => n.id === subcatId), [catNode, subcatId]);
+
+    const selectCategory = (id: number | null) => {
+        setCatId(id);
+        setSubcatId(null);
+        setGroupId(null);
+        setResolvedFamilies([]);
+        setData('family_code', '');
+    };
+    const selectSubcategory = (id: number | null) => {
+        setSubcatId(id);
+        setGroupId(null);
+        setResolvedFamilies([]);
+        setData('family_code', '');
+    };
+    const selectGroup = (id: number | null) => {
+        setGroupId(id);
+        if (id === null) {
+            setResolvedFamilies([]);
+            setData('family_code', '');
+        }
+    };
+
     const goNext = () => {
         setActiveStep((step) => {
             const next = Math.min(step + 1, stepKeys.length - 1);
@@ -150,6 +245,11 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         // Downstream choices no longer apply to the new type.
         setFurthest(0);
         setSchema(null);
+        setCatId(null);
+        setSubcatId(null);
+        setGroupId(null);
+        setResolvedFamilies([]);
+        setData('family_code', '');
     };
 
     const changeKind = (kind: 'master' | 'product') => {
@@ -193,10 +293,13 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     };
 
     const isLastStep = activeStep === stepKeys.length - 1;
-    // Only block "Next" while the schema is still loading — if the fetch
-    // failed outright, let the user proceed and rely on server-side
-    // validation when the import runs.
-    const nextDisabled = currentKey === 'review' && schemaLoading;
+    // Block "Next" while the schema is still loading (if the fetch failed
+    // outright, let the user proceed and rely on server-side validation when
+    // the import runs) — and, on the family step, until a Product Group is
+    // actually picked, so the wizard can't be skipped straight through
+    // without resolving which Attribute Family/Families apply.
+    const nextDisabled =
+        (currentKey === 'review' && schemaLoading) || (currentKey === 'family' && isProducts && groupId === null);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -380,25 +483,101 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                     {t('wizardFamilySubtitle')}
                                 </Typography>
                             </Box>
-                            <FormControl fullWidth>
-                                <InputLabel id="import-family-label">{t('wizardStepFamily')}</InputLabel>
-                                <Select
-                                    labelId="import-family-label"
-                                    label={t('wizardStepFamily')}
-                                    value={data.family_code}
-                                    onChange={(e) => setData('family_code', e.target.value)}
-                                >
-                                    <MenuItem value="">
-                                        <em>{t('wizardFamilyAll')}</em>
-                                    </MenuItem>
-                                    {families.map((f) => (
-                                        <MenuItem key={f.code} value={f.code}>
-                                            {f.name} ({f.code})
+
+                            {categoryTreeError && <Alert severity="error">{t('categoryTreeLoadError')}</Alert>}
+
+                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                <FormControl fullWidth disabled={categoryTreeLoading}>
+                                    <InputLabel id="import-category-label">{t('categoryStepCategoryLabel')}</InputLabel>
+                                    <Select
+                                        labelId="import-category-label"
+                                        label={t('categoryStepCategoryLabel')}
+                                        value={catId ?? ''}
+                                        onChange={(e) => selectCategory(e.target.value === '' ? null : Number(e.target.value))}
+                                    >
+                                        <MenuItem value="">
+                                            <em>{t('wizardFamilyAll')}</em>
                                         </MenuItem>
-                                    ))}
-                                </Select>
+                                        {categoryTree.map((n) => (
+                                            <MenuItem key={n.id} value={n.id}>
+                                                {n.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                <FormControl fullWidth disabled={!catNode}>
+                                    <InputLabel id="import-subcategory-label">{t('categoryStepSubcategoryLabel')}</InputLabel>
+                                    <Select
+                                        labelId="import-subcategory-label"
+                                        label={t('categoryStepSubcategoryLabel')}
+                                        value={subcatId ?? ''}
+                                        onChange={(e) => selectSubcategory(e.target.value === '' ? null : Number(e.target.value))}
+                                    >
+                                        <MenuItem value="">
+                                            <em>—</em>
+                                        </MenuItem>
+                                        {(catNode?.children ?? []).map((n) => (
+                                            <MenuItem key={n.id} value={n.id}>
+                                                {n.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                <FormControl fullWidth disabled={!subcatNode}>
+                                    <InputLabel id="import-group-label">{t('categoryStepProductGroupLabel')}</InputLabel>
+                                    <Select
+                                        labelId="import-group-label"
+                                        label={t('categoryStepProductGroupLabel')}
+                                        value={groupId ?? ''}
+                                        onChange={(e) => selectGroup(e.target.value === '' ? null : Number(e.target.value))}
+                                    >
+                                        <MenuItem value="">
+                                            <em>—</em>
+                                        </MenuItem>
+                                        {(subcatNode?.children ?? []).map((n) => (
+                                            <MenuItem key={n.id} value={n.id}>
+                                                {n.name}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Stack>
+
+                            <Box>
+                                <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                    {t('resolvedFamiliesLabel')}
+                                </Typography>
+                                {familiesLoading ? (
+                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                        <CircularProgress size={14} />
+                                        <Typography variant="body2" color="text.secondary">
+                                            {t('previewLoading')}
+                                        </Typography>
+                                    </Stack>
+                                ) : groupId === null ? (
+                                    <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 0.5, color: FIORI.warning }}>
+                                        {t('selectProductGroupFirst')}
+                                    </Typography>
+                                ) : resolvedFamilies.length === 0 ? (
+                                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', mt: 0.5 }}>
+                                        {t('noFamilyBoundToProductGroup')}
+                                    </Typography>
+                                ) : (
+                                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                                        {resolvedFamilies.map((f) => (
+                                            <Chip
+                                                key={f.code}
+                                                label={`${f.name} (${f.code})`}
+                                                size="small"
+                                                sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600 }}
+                                            />
+                                        ))}
+                                    </Stack>
+                                )}
                                 <FormHelperText>{t('wizardFamilyHelp')}</FormHelperText>
-                            </FormControl>
+                            </Box>
                         </Stack>
                     )}
 

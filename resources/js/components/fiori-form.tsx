@@ -65,7 +65,7 @@ const fioriInputBaseSx = {
         paddingBottom: '6px',
         paddingLeft: '8px',
         lineHeight: '1.4375em',
-        '&::placeholder': { color: FIORI.textSecondary, opacity: 1 },
+        '&::placeholder': { color: FIORI.placeholder, opacity: 1 },
     },
     '& .MuiSelect-select.MuiOutlinedInput-input': { paddingTop: '6px', paddingBottom: '6px', paddingLeft: '8px' },
     // multiline: MUI keeps the padding on the root, the textarea is flush already
@@ -176,7 +176,7 @@ export function fioriComboBoxSx(state: FioriValueState): SxProps<Theme> {
             '& .MuiAutocomplete-input': {
                 padding: '6px 4px 6px 8px',
                 lineHeight: '1.4375em',
-                '&::placeholder': { color: FIORI.textSecondary, opacity: 1 },
+                '&::placeholder': { color: FIORI.placeholder, opacity: 1 },
             },
             '& fieldset': { borderColor: border, borderWidth, transition: 'border-color 0.1s ease' },
             '&:hover fieldset': { borderColor: state === 'none' ? FIORI.brand : border, borderWidth },

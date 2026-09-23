@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 class Category extends Model
@@ -215,6 +216,40 @@ class Category extends Model
     public static function treeCacheVersion(): int
     {
         return (int) Cache::get(self::TREE_CACHE_VERSION_KEY, 1);
+    }
+
+    /**
+     * The cached nested tree ({id, code, name, mapped_platforms, children})
+     * behind CategoryController::tree() — extracted here so a second consumer
+     * (ImportConfigController's product-import category picker) can share
+     * the exact same cache entry instead of rebuilding the ~1,100-node tree
+     * a second time. Unlike tree(), this never applies an `exclude` filter —
+     * that stays a per-request concern of the caller.
+     */
+    public static function treeArray(): Collection
+    {
+        $cacheKey = 'category-tree:'.self::treeCacheVersion().':'.app()->getLocale();
+
+        return Cache::remember($cacheKey, now()->addHours(6), function () {
+            $roots = self::whereNull('parent_id')->with('recursiveChildren')->orderBy('name')->get();
+
+            $map = function (Category $category) use (&$map) {
+                return [
+                    'id' => $category->id,
+                    'code' => $category->code,
+                    'name' => $category->name,
+                    'mapped_platforms' => collect([
+                        'lazada' => $category->lazada_category_id,
+                        'shopee' => $category->shopee_category_id,
+                        'tiktok' => $category->tiktok_category_id,
+                        'woocommerce' => $category->woocommerce_category_id,
+                    ])->filter()->keys()->values()->all(),
+                    'children' => $category->recursiveChildren->map($map)->filter()->values(),
+                ];
+            };
+
+            return $roots->map($map)->filter()->values();
+        });
     }
 
     /**

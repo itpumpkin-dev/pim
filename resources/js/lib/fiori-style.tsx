@@ -23,6 +23,8 @@ export const FIORI = {
     brandDark: 'var(--fiori-brand-dark)',
     textPrimary: 'var(--fiori-text-primary)',
     textSecondary: 'var(--fiori-text-secondary)',
+    /** Field placeholder text — deliberately lighter/more muted than textSecondary (used elsewhere for helper text, disabled states, etc.), so an empty field reads as "empty" at a glance instead of looking like it already has a value. */
+    placeholder: 'var(--fiori-placeholder)',
     border: 'var(--fiori-border)',
     borderStrong: 'var(--fiori-border-strong)',
     pageBg: 'var(--fiori-page-bg)',

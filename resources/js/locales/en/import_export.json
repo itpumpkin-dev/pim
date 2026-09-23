@@ -46,7 +46,6 @@
     "previewError": "Unable to preview this file.",
     "previewEmpty": "No data found in this file.",
     "previewRowsNote": "Showing first {{count}} rows",
-
     "wizardStepType": "Type",
     "wizardStepLanguage": "Language",
     "wizardStepFamily": "Attribute Family",
@@ -62,10 +61,16 @@
     "wizardMasterTypeSubtitle": "Pick the specific master data type. The remaining steps adapt to this choice.",
     "wizardLanguageHeading": "Which language is the file written in?",
     "wizardLanguageSubtitle": "Text values (names, descriptions) are tagged to this locale and won't overwrite other languages' translations.",
-    "wizardFamilyHeading": "Narrow the columns to one Attribute Family?",
-    "wizardFamilySubtitle": "Picking one only shows/requires that family's own attribute columns below — it doesn't set the imported products' family. That's worked out automatically from each row's category columns (pcatname/psubcatname/productgroupname), the same way the Create/Edit product pages do it.",
-    "wizardFamilyAll": "All attributes (no specific family)",
-    "wizardFamilyHelp": "Choose a family to narrow the columns to just its attributes and mark its required ones. Leave as \"All attributes\" to keep every importable field available.",
+    "wizardFamilyHeading": "Which Category / Subcategory / Product Group is this data for?",
+    "wizardFamilySubtitle": "Picking a Product Group only resolves which Attribute Family/Families to preview below — it doesn't set the imported products' family. That's worked out automatically from each row's own category columns (pcatname/psubcatname/productgroupname), the same way the Create/Edit product pages do it.",
+    "wizardFamilyAll": "All attributes (no category selected)",
+    "wizardFamilyHelp": "Pick a Product Group to narrow the columns to its bound Attribute Family/Families and mark their required fields. Leave unselected to keep every importable field available.",
+    "categoryStepCategoryLabel": "Category",
+    "categoryStepSubcategoryLabel": "Subcategory",
+    "categoryStepProductGroupLabel": "Product Group",
+    "resolvedFamiliesLabel": "Resolved Attribute Family/Families",
+    "selectProductGroupFirst": "Select a Product Group to resolve its Attribute Family/Families — required before you can continue.",
+    "noFamilyBoundToProductGroup": "No Attribute Family is bound to this Product Group — every importable field stays available.",
     "wizardReviewHeading": "Required fields and file format",
     "wizardReviewSubtitle": "Make sure your file has these columns, then download a sample to match the layout.",
     "wizardRequiredAttributes": "Required columns",
@@ -75,7 +80,6 @@
     "wizardUploadSubtitle": "We'll scan the file in your browser and flag anything that would fail on import.",
     "wizardNext": "Next",
     "wizardAdvancedOptions": "Advanced options",
-
     "preflightTitle": "Data check",
     "preflightRequiredPresent": "All required columns are present.",
     "preflightRequiredMissing": "Missing required column(s): {{columns}}",
@@ -86,7 +90,6 @@
     "preflightEmptyCells": "\"{{column}}\" is empty in {{count}} row(s) — those rows will be skipped.",
     "preflightDuplicateSku": "{{count}} SKU value(s) appear more than once — later rows overwrite earlier ones.",
     "preflightAllGood": "No problems found — this file looks ready to import.",
-
     "exportsTitle": "Exports",
     "createExport": "Create Export",
     "editExport": "Edit Export",
@@ -96,7 +99,6 @@
     "fileFormat": "File Format",
     "withMedia": "With Media",
     "exportNow": "Export Now",
-
     "jobTrackerTitle": "Job Tracker",
     "job": "Job",
     "jobType": "Job Type",
@@ -135,7 +137,6 @@
     "summary": "Summary",
     "allStatuses": "All Statuses",
     "allJobTypes": "All Job Types",
-
     "wooConvertTitle": "WooCommerce Converter",
     "wooHubSubtitle": "Convert product data between this catalog and your WooCommerce store, in either direction.",
     "wooImportCardTitle": "Import from WooCommerce",
@@ -185,7 +186,6 @@
     "wooConvertGoToImport": "Go to Product Import",
     "wooConvertTypeWarningsTitle": "Type Warnings ({{count}})",
     "wooConvertTypeWarningsTruncated": "...and {{remaining}} more.",
-
     "wooExportTitle": "Export to WooCommerce",
     "wooExportIntro": "Exports products from this PIM into the column shape WooCommerce's own Products > Import screen expects, for a single chosen language. Configurable products are expanded into a variable parent row plus one variation row per variant, matching WooCommerce's own format for products with options.",
     "wooExportLanguageSectionTitle": "Language",
@@ -202,5 +202,6 @@
     "wooExportAllFamilies": "All families",
     "wooExportEnabledOnly": "Enabled products only",
     "wooExportFormatSectionTitle": "File Format",
-    "wooExportSubmit": "Download Export"
+    "wooExportSubmit": "Download Export",
+    "categoryTreeLoadError": "Couldn't load the category list — check your connection and try again."
 }
