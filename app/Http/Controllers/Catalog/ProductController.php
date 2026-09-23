@@ -3786,17 +3786,26 @@ class ProductController extends Controller
                 return $this->canUserEditAttribute($user, $attribute);
             };
 
-            // groupKey ที่ส่งมาต้องตรงกับตำแหน่งจริงของ attribute นั้นในบริบทของ
-            // product นี้เท่านั้น ('ungrouped' ถูกเสมอสำหรับ attribute ที่ไม่มี
-            // group เลย — ดู $attributeGroupsById ด้านบน) กันคำขอที่ยิงตรงมาที่
-            // endpoint (ข้าม UI ที่คำนวณ groupKey ให้ถูกต้องอยู่แล้ว) ส่ง groupKey
-            // มั่วๆ เข้ามา ซึ่งจะสร้างแถว product_values ที่ไม่มี group placement
-            // ไหนรองรับจริงเลย (เช่น group ที่เพิ่งถูกถอด attribute นี้ออกไปแล้ว)
+            // groupKey แบบตัวเลขต้องตรงกับตำแหน่งจริงของ attribute นั้นในบริบทของ
+            // product นี้เท่านั้น กันคำขอที่ยิงตรงมาที่ endpoint (ข้าม UI ที่คำนวณ
+            // groupKey ให้ถูกต้องอยู่แล้ว) ส่ง group id มั่วๆ/ของ attribute อื่นเข้ามา
+            //
+            // 'ungrouped' ยอมรับเสมอ ไม่ว่า attribute นั้นจะมี group จริงตอนนี้
+            // หรือไม่ก็ตาม (ต่างจากเดิมที่ปฏิเสธถ้ามี group จริงอยู่) — เพราะมีแถว
+            // ที่ถูกสร้างเป็น "ungrouped" (attribute_group_id = NULL) ได้จากหลาย
+            // ทางที่ไม่ผ่าน UI นี้เลย (เช่น Product::applySmartDefaults() ตอนสร้าง/
+            // duplicate สินค้าใหม่, backfill ที่ยังไม่ได้รันย้อนหลัง) ถ้า attribute
+            // ตัวนั้นถูกผูกเข้า group จริงทีหลัง ฟิลด์ในหน้าแก้ไขจะโชว์ว่างเปล่า
+            // (ค่าเดิมยังอยู่ใต้ 'ungrouped' ไม่ใช่ group จริง) และถ้าผู้ใช้ไม่ได้
+            // แตะฟิลด์นั้นเลย ค่าเดิมก็จะถูกส่งกลับมาเป็น 'ungrouped' เหมือนเดิม —
+            // การบล็อกไม่ให้ save ทั้งหน้าเพราะเรื่องนี้สร้างความเสียหายมากกว่า
+            // ปล่อยให้เขียนทับที่ตำแหน่งเดิมไปก่อน (backfill รอบถัดไปจะซ่อมให้เอง)
             $isValidGroupKey = function (int $attributeId, string $groupKey) use ($attributeGroupsById) {
-                $realGroupIds = $attributeGroupsById->get($attributeId, collect())->pluck('id')->all();
                 if ($groupKey === 'ungrouped') {
-                    return empty($realGroupIds);
+                    return true;
                 }
+
+                $realGroupIds = $attributeGroupsById->get($attributeId, collect())->pluck('id')->all();
 
                 return is_numeric($groupKey) && in_array((int) $groupKey, $realGroupIds, true);
             };

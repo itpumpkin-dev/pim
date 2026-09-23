@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Services\Catalog\EffectiveFamilyAttributeResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -158,11 +159,26 @@ class Product extends Model
      */
     public function applySmartDefaults(): void
     {
+        // pid/pname มักถูกผูกไว้กับ group จริงใน family_attributes เสมอ (เช่น
+        // group "ข้อมูลทั่วไป") ตั้งแต่ product_values มี attribute_group_id
+        // แล้ว (migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
+        // ต้องเขียนแถวเริ่มต้นเหล่านี้ให้ตรง group จริงตั้งแต่แรก ไม่งั้นแถวจะ
+        // ถูกสร้างเป็น "ungrouped" (NULL) ทั้งที่ตอนโหลดหน้าแก้ไขสินค้า ฟิลด์นี้
+        // ถูกวางไว้ใน group จริงอยู่แล้ว — ทำให้ค่าที่เพิ่ง set ไปหาไม่เจอ (ช่องว่าง
+        // ในหน้าแก้ไข) แล้วพอ save โดยไม่ได้แตะฟิลด์นี้เลย จะส่ง groupKey
+        // 'ungrouped' เดิมกลับไป ซึ่งไม่ตรงกับ placement จริงที่ ProductController::
+        // update() ตรวจสอบอยู่ กลายเป็น validation error "invalid group placement"
+        // ทั้งที่ผู้ใช้ไม่ได้ทำอะไรผิดเลย
+        $familyAttributeResolver = app(EffectiveFamilyAttributeResolver::class);
+        $effectiveFamilyIds = $familyAttributeResolver->effectiveFamilyIds($this);
+
         // 1. Set `pid` = SKU if empty/not set
         $pidAttr = Attribute::where('code', 'pid')->first();
         if ($pidAttr) {
+            $pidGroupId = $familyAttributeResolver->primaryGroupIdFor($pidAttr->id, $effectiveFamilyIds);
             $exists = $this->values()
                 ->where('attribute_id', $pidAttr->id)
+                ->where('attribute_group_id', $pidGroupId)
                 ->whereNull('channel_id')
                 ->whereNull('locale_id')
                 ->first();
@@ -170,6 +186,7 @@ class Product extends Model
                 $this->values()->updateOrCreate(
                     [
                         'attribute_id' => $pidAttr->id,
+                        'attribute_group_id' => $pidGroupId,
                         'channel_id' => null,
                         'locale_id' => null,
                     ],
@@ -187,8 +204,10 @@ class Product extends Model
         // read paths prefer the locale-specific row over the global one.
         $pnameAttr = Attribute::where('code', 'pname')->first();
         if ($pnameAttr) {
+            $pnameGroupId = $familyAttributeResolver->primaryGroupIdFor($pnameAttr->id, $effectiveFamilyIds);
             $globalName = $this->values()
                 ->where('attribute_id', $pnameAttr->id)
+                ->where('attribute_group_id', $pnameGroupId)
                 ->whereNull('channel_id')
                 ->whereNull('locale_id')
                 ->value('value');
@@ -198,6 +217,7 @@ class Product extends Model
             foreach ($locales as $locale) {
                 $exists = $this->values()
                     ->where('attribute_id', $pnameAttr->id)
+                    ->where('attribute_group_id', $pnameGroupId)
                     ->whereNull('channel_id')
                     ->where('locale_id', $locale->id)
                     ->first();
@@ -205,6 +225,7 @@ class Product extends Model
                     $this->values()->updateOrCreate(
                         [
                             'attribute_id' => $pnameAttr->id,
+                            'attribute_group_id' => $pnameGroupId,
                             'channel_id' => null,
                             'locale_id' => $locale->id,
                         ],

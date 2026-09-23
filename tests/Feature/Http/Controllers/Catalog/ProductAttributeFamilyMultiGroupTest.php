@@ -175,3 +175,47 @@ test('an attribute placed in the exact same group by two different families is n
 
     expect($occurrences)->toBe(1);
 });
+
+test('re-saving a product whose value is still stored as "ungrouped" (stale, pre-backfill data) but is now bound to a real group does not error', function () {
+    // Reproduces a real production incident: Product::applySmartDefaults()
+    // used to always write attribute_group_id = NULL, so a brand-new
+    // product's pid/pname rows landed as "ungrouped" even when those
+    // attributes are actually bound to a real group. Re-saving the product
+    // without ever touching that field resubmits the stale groupKey
+    // ('ungrouped') the page loaded with — update() must not hard-reject
+    // that as "invalid group placement" (it did, until this fix), or a
+    // brand-new product could never be saved again through no fault of the
+    // user's own.
+    $attribute = Attribute::create(['code' => 'paf_stale_ungrouped_attr', 'type' => 'text']);
+    $group = AttributeGroup::create(['code' => 'paf_stale_group']);
+    $family = AttributeFamily::create(['code' => 'paf_stale_family', 'name' => 'Stale Family']);
+    FamilyAttribute::create(['family_id' => $family->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $group->id, 'sort_order' => 0]);
+
+    $category = Category::create(['code' => 'paf_stale_category', 'name' => 'Stale Category']);
+    DB::table('category_attribute_family')->insert(['category_id' => $category->id, 'family_id' => $family->id, 'sort_order' => 0]);
+
+    $pcatname = \App\Models\Attribute::firstOrCreate(['code' => 'pcatname'], ['type' => 'select']);
+    $product = Product::create(['sku' => 'PAF-STALE-'.uniqid(), 'type' => 'simple', 'enabled' => false]);
+    $product->categories()->attach($category->id);
+
+    // Simulates the pre-fix bug directly: a value that exists as
+    // "ungrouped" even though the attribute is bound to a real group.
+    \App\Models\ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => null, 'value' => 'stale value']);
+
+    $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => $product->sku,
+        'type' => 'simple',
+        'enabled' => false,
+        'values' => [
+            // Resubmits the exact same stale groupKey the page loaded with —
+            // the user never touched this field.
+            $attribute->id => ['ungrouped' => ['global' => ['default' => 'stale value']]],
+            $pcatname->id => ['ungrouped' => ['global' => ['default' => $category->code]]],
+        ],
+    ]);
+
+    pafController()->update($request, $product);
+
+    expect(\App\Models\ProductValue::where('product_id', $product->id)->where('attribute_id', $attribute->id)->first()->value)
+        ->toBe('stale value');
+});
