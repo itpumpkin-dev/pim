@@ -12,9 +12,11 @@ use App\Models\AuditLog;
 use App\Models\Category;
 use App\Models\FamilyAttribute;
 use App\Models\Locale;
+use App\Services\Catalog\AttributeFamilyBulkGenerator;
 use App\Services\Catalog\DefaultAttributeFamilyAssigner;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,6 +104,9 @@ class AttributeFamilyController extends Controller
                 'dir' => $request->input('dir', ''),
                 'filters' => $originalFilters,
             ],
+            // ตัวเลือก "เริ่มจากเทมเพลต" ของไดอะล็อก "สร้างตามกลุ่มสินค้า" —
+            // เหมือน otherFamilies ของ create()/edit() ทุกประการ
+            'otherFamilies' => AttributeFamily::select('id', 'code', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -379,6 +384,107 @@ class AttributeFamilyController extends Controller
         }
 
         return back()->with('success', "Set '{$attributeFamily->name}' as the default attribute family for {$result['updated']} selected product group(s).");
+    }
+
+    /**
+     * รายชื่อ "กลุ่มสินค้า" ทั้งหมด (ไม่กรองว่ามีตระกูลแอตทริบิวต์ผูกอยู่แล้วหรือไม่ —
+     * ส่วนใหญ่มีตระกูล "เริ่มต้น" ผูกอยู่แล้วทั้งนั้น dialog นี้ไว้ "เพิ่ม" ตระกูล
+     * ใหม่ต่อท้ายรายการเดิม ไม่ใช่ตั้งตระกูลแรกให้) — คู่หูของ
+     * productGroupsForDefaultPicker() ด้านบน (join/search/pagination
+     * เดียวกันเป๊ะ) ใช้โดย dialog "สร้างตามกลุ่มสินค้า" บนหน้า index
+     */
+    public function productGroupsForBulkGenerate(Request $request): JsonResponse
+    {
+        $perPage = (int) $request->input('per_page', 15);
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
+        $groups = $this->productGroupsForBulkGenerateQuery($request->input('search'))
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $groups->getCollection()->transform(fn (Category $group) => [
+            'id' => $group->id,
+            'name' => $group->name,
+            'subcategory_name' => $group->parent?->name,
+            'category_name' => $group->parent?->parent?->name,
+        ]);
+
+        return response()->json($groups);
+    }
+
+    /**
+     * ทุก id ของกลุ่มสินค้าที่ตรงกับคำค้นปัจจุบัน (ไม่แบ่งหน้า) — ให้ปุ่ม
+     * "เลือกทั้งหมด" ของ dialog "สร้างตามกลุ่มสินค้า" เลือกกลุ่มที่ค้นเจอได้
+     * ครบทุกหน้าในคลิกเดียว แทนที่จะต้องไล่ติ๊กทีละหน้า (มีกลุ่มสินค้าเป็นร้อยๆ
+     * ตามที่ผู้ใช้ต้องการ)
+     */
+    public function productGroupsForBulkGenerateIds(Request $request): JsonResponse
+    {
+        $ids = $this->productGroupsForBulkGenerateQuery($request->input('search'))
+            ->pluck('categories.id');
+
+        return response()->json(['ids' => $ids]);
+    }
+
+    private function productGroupsForBulkGenerateQuery(?string $search): Builder
+    {
+        return Category::query()
+            ->select('categories.*')
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->with(['parent:id,name,parent_id', 'parent.parent:id,name'])
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
+                });
+            })
+            ->orderBy('root.name')
+            ->orderBy('sub.name')
+            ->orderBy('categories.name');
+    }
+
+    /**
+     * สร้างตระกูลแอตทริบิวต์หนึ่งตระกูลต่อกลุ่มสินค้าที่เลือกไว้ ตั้งชื่อตาม
+     * $namePattern (ต้องมี token "{name}" ให้แทนที่ด้วยชื่อกลุ่มสินค้านั้นๆ)
+     * แล้วเพิ่มต่อท้ายรายการตระกูลเดิมของกลุ่มสินค้านั้น (ไม่ได้แทนที่/ลบตระกูล
+     * เดิมที่มีอยู่) — ดู AttributeFamilyBulkGenerator สำหรับตรรกะทั้งหมด
+     * (สร้าง, clone จาก template ถ้ามี, ผูกต่อท้าย)
+     */
+    public function bulkGenerate(Request $request, AttributeFamilyBulkGenerator $generator): RedirectResponse
+    {
+        $validated = $request->validate([
+            'category_ids' => ['required', 'array', 'min:1'],
+            'category_ids.*' => ['integer'],
+            'name_pattern' => ['required', 'string', 'max:255', function ($attribute, $value, $fail) {
+                if (! str_contains($value, '{name}')) {
+                    $fail('The name pattern must contain the {name} token.');
+                }
+            }],
+            'template_family_id' => ['nullable', 'integer', 'exists:attribute_families,id'],
+        ]);
+
+        // ต้องเป็นกลุ่มสินค้าจริงๆ (leaf ระดับ 3) เท่านั้น — เหตุผลเดียวกับ
+        // setDefaultForSelectedGroups() ด้านบน
+        $validCategoryIds = Category::query()
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereIn('categories.id', $validated['category_ids'])
+            ->pluck('categories.id')
+            ->all();
+
+        $template = isset($validated['template_family_id'])
+            ? AttributeFamily::find($validated['template_family_id'])
+            : null;
+
+        $result = $generator->generate($validCategoryIds, $validated['name_pattern'], $template, $request->user()?->id);
+
+        return back()->with('success', "Created {$result['created']} attribute family/families.");
     }
 
     /**

@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
+import { BulkGenerateDialog } from './bulk-generate-dialog';
 import {
     FIORI,
     fioriCardSx,
@@ -65,13 +66,19 @@ interface GridData {
     last_page?: number;
     per_page?: number;
 }
+interface OtherFamily {
+    id: number;
+    code: string;
+    name?: string;
+}
 interface Props {
     gridConfig: GridConfig;
     gridData: GridData;
     filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> };
+    otherFamilies: OtherFamily[];
 }
 
-export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: Props) {
+export default function AttributeFamilyIndex({ gridConfig, gridData, filters, otherFamilies }: Props) {
     const { t } = useTranslation('grid');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -96,6 +103,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
     const [duplicating, setDuplicating] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+    const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -208,13 +216,22 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                         </Typography>
                     </Box>
                     {canCreate && (
-                        <Button
-                            variant="contained"
-                            onClick={() => router.visit('/catalog/attributeFamilies/create')}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                        >
-                            {tCatalog('createAttributeFamily')}
-                        </Button>
+                        <Stack direction="row" spacing={1.5}>
+                            <Button
+                                variant="outlined"
+                                onClick={() => setBulkGenerateOpen(true)}
+                                sx={{ ...fioriDefaultSx, px: 2.5, py: 1 }}
+                            >
+                                {tCatalog('generateFromProductGroups')}
+                            </Button>
+                            <Button
+                                variant="contained"
+                                onClick={() => router.visit('/catalog/attributeFamilies/create')}
+                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
+                            >
+                                {tCatalog('createAttributeFamily')}
+                            </Button>
+                        </Stack>
                     )}
                 </Stack>
 
@@ -383,6 +400,8 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters }: 
                 onApply={applyFilters}
                 t={t}
             />
+
+            <BulkGenerateDialog open={bulkGenerateOpen} onClose={() => setBulkGenerateOpen(false)} otherFamilies={otherFamilies} />
         </AppLayout>
     );
 }

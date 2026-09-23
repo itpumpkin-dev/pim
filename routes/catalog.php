@@ -283,6 +283,9 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributeFamilies', [AttributeFamilyController::class, 'index'])->name('attributeFamilies.index')->middleware('permission:attribute_families,list_attribute_families');
     Route::get('attributeFamilies/create', [AttributeFamilyController::class, 'create'])->name('attributeFamilies.create')->middleware('permission:attribute_families,create_attribute_families');
     Route::post('attributeFamilies', [AttributeFamilyController::class, 'store'])->name('attributeFamilies.store')->middleware('permission:attribute_families,create_attribute_families');
+    Route::get('attributeFamilies/product-groups-for-bulk-generate', [AttributeFamilyController::class, 'productGroupsForBulkGenerate'])->name('attributeFamilies.productGroupsForBulkGenerate')->middleware('permission:attribute_families,create_attribute_families');
+    Route::get('attributeFamilies/product-groups-for-bulk-generate/ids', [AttributeFamilyController::class, 'productGroupsForBulkGenerateIds'])->name('attributeFamilies.productGroupsForBulkGenerateIds')->middleware('permission:attribute_families,create_attribute_families');
+    Route::post('attributeFamilies/bulk-generate', [AttributeFamilyController::class, 'bulkGenerate'])->name('attributeFamilies.bulkGenerate')->middleware('permission:attribute_families,create_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/edit', [AttributeFamilyController::class, 'edit'])->name('attributeFamilies.edit')->middleware('permission:attribute_families,edit_attribute_families');
     Route::put('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'update'])->name('attributeFamilies.update')->middleware('permission:attribute_families,edit_attribute_families');
     // ทำสำเนา — ถือเป็นการ "สร้าง" ตระกูลใหม่ (โค้ดใหม่, id ใหม่) เลยใช้สิทธิ์
