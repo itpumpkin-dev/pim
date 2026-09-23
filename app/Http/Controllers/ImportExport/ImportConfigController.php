@@ -41,11 +41,15 @@ class ImportConfigController extends Controller
     }
 
     /**
-     * Import types held back from the create wizard for now — categories,
-     * attributes, attribute families and attribute options. Remove entries
-     * here to re-enable them; the importers/registry still support them.
+     * Import types held back from the create wizard — none anymore. Master
+     * data types (categories/attributes/attribute_families/attribute_options)
+     * were gated off here while the wizard only supported products; the
+     * Master/Product split in imports/create.tsx now covers them properly
+     * (edit() already exposed the full, unrestricted type list, so an
+     * existing master-data import config could always be edited — only
+     * *creating* a new one was blocked).
      */
-    private const CREATE_DISABLED_TYPES = ['categories', 'attributes', 'attribute_families', 'attribute_options'];
+    private const CREATE_DISABLED_TYPES = [];
 
     public function create(): Response
     {

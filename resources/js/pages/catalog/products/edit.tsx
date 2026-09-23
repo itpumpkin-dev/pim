@@ -4485,8 +4485,8 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                     ))}
                     {!atLimit && (
                         <FioriUploadDropzoneTile
-                            width={160}
-                            height={100}
+                            width={200}
+                            height={200}
                             accept="video/mp4"
                             multiple
                             disabled={isReadOnly}

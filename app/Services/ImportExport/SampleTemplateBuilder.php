@@ -60,6 +60,15 @@ class SampleTemplateBuilder
             'attribute_options' => [
                 'attribute_code' => 'color', 'code' => 'red', 'admin_label' => 'Red', 'swatch_value' => '#ff0000', 'sort_order' => '0',
             ],
+            'brands' => ['code' => 'nike', 'name' => 'Nike', 'slug' => 'nike', 'is_active' => '1'],
+            'base_units' => ['code' => 'pcs', 'name' => 'Pieces', 'is_active' => '1'],
+            'points' => ['point_type' => 'A', 'point_ratio' => '1.00', 'is_active' => '1'],
+            'commission_groups' => ['code' => 'cg01', 'p_group_name' => 'Group 1', 'divisor_start' => '1.00', 'is_active' => '1'],
+            'business_types' => ['code' => 'retail', 'name' => 'Retail', 'is_active' => '1'],
+            'vendors' => ['code' => 'v0001', 'name' => 'Acme Supply Co.', 'currency_code' => 'thb', 'is_active' => '1'],
+            'currencies' => ['code' => 'thb', 'name' => 'Thai Baht', 'exchange_rate' => '1.0000'],
+            'product_grades' => ['code' => 'a', 'name' => 'Grade A', 'is_active' => '1'],
+            'product_types' => ['code' => 'chemical', 'name' => 'Chemical', 'is_active' => '1'],
             default => [],
         };
     }
