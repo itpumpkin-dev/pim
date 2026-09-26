@@ -18,12 +18,15 @@
         "lastName": "Last name",
         "displayName": "Display Name",
         "sku": "SKU",
-        "isGuest": "Guest Role"
+        "isGuest": "Guest Role",
+        "endpoint": "Endpoint",
+        "authType": "Auth Type"
     },
     "rowActions": {
         "edit": "Edit",
         "delete": "Delete",
-        "duplicate": "Duplicate"
+        "duplicate": "Duplicate",
+        "test": "Test"
     },
     "actionsHeader": "Actions",
     "active": "Active",

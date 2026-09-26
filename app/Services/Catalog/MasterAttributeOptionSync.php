@@ -4,7 +4,6 @@ namespace App\Services\Catalog;
 
 use App\Models\Attribute;
 use App\Models\AttributeOption;
-use App\Models\AttributeOptionTranslation;
 use App\Models\BaseUnit;
 use App\Models\Brand;
 use App\Models\BusinessType;
@@ -42,6 +41,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MasterAttributeOptionSync
 {
+    public function __construct(private AttributeOptionMirror $mirror)
+    {
+    }
+
     /** source key => [label: i18n key (catalog ns), model: watched Eloquent class] */
     public const SOURCES = [
         'categories' => ['label' => 'masterSourceCategories', 'model' => Category::class],
@@ -227,57 +230,23 @@ class MasterAttributeOptionSync
     }
 
     // ── option writer ──────────────────────────────────────────────────
+    //
+    // The actual upsert/is_customized-preserving logic lives in
+    // AttributeOptionMirror (shared with ApiAttributeOptionSync) — kept here
+    // as thin private wrappers so every call site above didn't need to
+    // change from `$this->normaliseCode(...)` / `$this->upsertOption(...)`.
 
     /**
      * @param  array{code: string, label: ?string, is_active?: bool, translations?: array<int, string>}  $row
      */
     private function normaliseCode(?string $code): ?string
     {
-        $code = strtolower(trim((string) $code));
-
-        return $code === '' ? null : $code;
+        return $this->mirror->normaliseCode($code);
     }
 
     private function upsertOption(int $attributeId, array $row): void
     {
-        $code = $this->normaliseCode($row['code']);
-        if ($code === null) {
-            return;
-        }
-
-        $option = AttributeOption::firstOrNew(['attribute_id' => $attributeId, 'code' => $code]);
-
-        if ($option->exists && $option->is_customized) {
-            // แอดมิน custom label/สถานะเปิดปิด/คำแปลของตัวเลือกนี้ไว้แล้วเอง
-            // ผ่านแผง Options บนหน้าแก้ไข attribute (ดู
-            // AttributeOptionController::update()/batchUpdate()) — master
-            // ยังคงเป็นแหล่งข้อมูลตั้งต้น (ตัวเลือกใหม่ๆ จาก master ที่ยังไม่
-            // เคยมีแถวมาก่อนจะยัง insert ตามปกติด้านล่าง) แต่ตัวเลือกที่ถูก
-            // custom แล้วจะไม่โดนทับค่ากลับไปเป็นของ master อีกจนกว่าจะกด
-            // "Reset to master" (ดู resetToMaster())
-            return;
-        }
-
-        $option->admin_label = trim((string) ($row['label'] ?? '')) ?: $code;
-        if (array_key_exists('is_active', $row)) {
-            $option->is_active = (bool) $row['is_active'];
-        }
-        $option->save();
-
-        $kept = [];
-        foreach (($row['translations'] ?? []) as $localeId => $label) {
-            if (trim((string) $label) === '') {
-                continue;
-            }
-            AttributeOptionTranslation::updateOrCreate(
-                ['attribute_option_id' => $option->id, 'locale_id' => $localeId],
-                ['label' => $label],
-            );
-            $kept[] = $localeId;
-        }
-        AttributeOptionTranslation::where('attribute_option_id', $option->id)
-            ->when($kept, fn ($q) => $q->whereNotIn('locale_id', $kept))
-            ->delete();
+        $this->mirror->upsertOption($attributeId, $row);
     }
 
     // ── row extraction ────────────────────────────────────────────────

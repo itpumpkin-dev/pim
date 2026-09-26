@@ -18,12 +18,15 @@
         "lastName": "Apellidos",
         "displayName": "Nombre para Mostrar",
         "sku": "SKU",
-        "isGuest": "Rol de Invitado"
+        "isGuest": "Rol de Invitado",
+        "endpoint": "Endpoint",
+        "authType": "Tipo de Autenticación"
     },
     "rowActions": {
         "edit": "Editar",
         "delete": "Eliminar",
-        "duplicate": "Duplicar"
+        "duplicate": "Duplicar",
+        "test": "Probar"
     },
     "actionsHeader": "Acciones",
     "active": "Activo",

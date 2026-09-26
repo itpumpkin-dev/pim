@@ -16,12 +16,15 @@
         "firstName": "名前（ firstName ）",
         "lastName": "名前（ lastName ）",
         "displayName": "表示名",
-        "sku": "SKU"
+        "sku": "SKU",
+        "endpoint": "エンドポイント",
+        "authType": "認証タイプ"
     },
     "rowActions": {
         "edit": "編集",
         "delete": "削除",
-        "duplicate": " duplic ate"
+        "duplicate": " duplic ate",
+        "test": "テスト"
     },
     "actionsHeader": "アクション",
     "active": "活性化",

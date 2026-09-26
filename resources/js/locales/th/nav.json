@@ -11,6 +11,7 @@
     "attributes": "แอตทริบิวต์",
     "attributeGroups": "กลุ่มแอตทริบิวต์",
     "attributeFamilies": "ตระกูลแอตทริบิวต์",
+    "attributeApiSources": "แหล่งข้อมูล API",
     "system": "ระบบ",
     "users": "ผู้ใช้งาน",
     "userGroups": "กลุ่มผู้ใช้งาน",

@@ -20,6 +20,8 @@ const swatchTypeKeys: Record<string, string> = {
     image: 'swatchTypeImage',
 };
 
+type SourceType = 'none' | 'master' | 'api';
+
 interface Attribute {
     id: number;
     code: string;
@@ -27,6 +29,7 @@ interface Attribute {
     type: string;
     swatch_type: string | null;
     master_source: string | null;
+    api_source_id: number | null;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -40,11 +43,17 @@ interface MasterSourceOption {
     labelKey: string;
 }
 
+interface ApiSourceOption {
+    id: number;
+    name: string;
+}
+
 interface AttributeForm {
     code: string;
     type: string;
     swatch_type: string;
     master_source: string;
+    api_source_id: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -60,10 +69,11 @@ interface Props {
     translations: Record<string, string>;
     options?: AttributeOptionItem[];
     masterSources?: MasterSourceOption[];
+    apiSources?: ApiSourceOption[];
     canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], canViewHistory = false }: Props) {
+export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], apiSources = [], canViewHistory = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -101,6 +111,7 @@ export default function AttributeEdit({ attribute, translations, options = [], m
         type: attribute.type || 'text',
         swatch_type: attribute.swatch_type || '',
         master_source: attribute.master_source || '',
+        api_source_id: attribute.api_source_id ? String(attribute.api_source_id) : '',
         is_required: Boolean(attribute.is_required),
         is_unique: Boolean(attribute.is_unique),
         is_locale_based: Boolean(attribute.is_locale_based),
@@ -110,6 +121,9 @@ export default function AttributeEdit({ attribute, translations, options = [], m
         translations: translations || {},
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
+    const [sourceType, setSourceType] = useState<SourceType>(
+        attribute.master_source ? 'master' : attribute.api_source_id ? 'api' : 'none',
+    );
 
     const showSwatchType = data.type === 'select' || data.type === 'multiselect';
 
@@ -118,10 +132,23 @@ export default function AttributeEdit({ attribute, translations, options = [], m
         if (value !== 'select' && value !== 'multiselect') {
             setData('swatch_type', '');
             setData('master_source', '');
+            setData('api_source_id', '');
+            setSourceType('none');
+        }
+    };
+
+    const handleSourceTypeChange = (value: SourceType) => {
+        setSourceType(value);
+        if (value !== 'master') {
+            setData('master_source', '');
+        }
+        if (value !== 'api') {
+            setData('api_source_id', '');
         }
     };
 
     const masterBound = data.master_source !== '';
+    const apiBound = data.api_source_id !== '';
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -200,6 +227,22 @@ export default function AttributeEdit({ attribute, translations, options = [], m
                         )}
 
                         {showSwatchType && (
+                            <FioriField label={t('sourceTypeLabel')} htmlFor="attribute-source-type">
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        id="attribute-source-type"
+                                        value={sourceType}
+                                        onChange={(event) => handleSourceTypeChange(event.target.value as SourceType)}
+                                    >
+                                        <MenuItem value="none">{t('sourceTypeNone')}</MenuItem>
+                                        <MenuItem value="master">{t('sourceTypeMaster')}</MenuItem>
+                                        <MenuItem value="api">{t('sourceTypeApi')}</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </FioriField>
+                        )}
+
+                        {showSwatchType && sourceType === 'master' && (
                             <FioriField
                                 label={t('masterSourceLabel')}
                                 htmlFor="attribute-master-source"
@@ -222,6 +265,36 @@ export default function AttributeEdit({ attribute, translations, options = [], m
                                         ))}
                                     </Select>
                                 </FormControl>
+                            </FioriField>
+                        )}
+
+                        {showSwatchType && sourceType === 'api' && (
+                            <FioriField
+                                label={t('apiSourceLabel')}
+                                htmlFor="attribute-api-source"
+                                valueState={valueStateOf(errors.api_source_id)}
+                                message={errors.api_source_id}
+                            >
+                                <Stack spacing={0.5}>
+                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.api_source_id))}>
+                                        <Select
+                                            id="attribute-api-source"
+                                            displayEmpty
+                                            value={data.api_source_id}
+                                            onChange={(event) => setData('api_source_id', event.target.value)}
+                                        >
+                                            <MenuItem value="">{t('apiSourceSelectPlaceholder')}</MenuItem>
+                                            {apiSources.map((source) => (
+                                                <MenuItem key={source.id} value={String(source.id)}>
+                                                    {source.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <Link href="/catalog/attributes/api-sources/create" style={{ fontSize: 13 }}>
+                                        {t('manageApiSources')}
+                                    </Link>
+                                </Stack>
                             </FioriField>
                         )}
                     </FioriFormGroup>
@@ -258,11 +331,19 @@ export default function AttributeEdit({ attribute, translations, options = [], m
                                     })}
                                 </FioriMessageStrip>
                             )}
+                            {apiBound && (
+                                <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
+                                    {t('apiSourceOptionsCustomizable', {
+                                        source: apiSources.find((s) => String(s.id) === data.api_source_id)?.name ?? t('apiSourceLabel'),
+                                    })}
+                                </FioriMessageStrip>
+                            )}
                             <AttributeOptionsPanel
                                 attributeId={attribute.id}
                                 swatchType={data.swatch_type}
                                 options={options}
                                 isMasterBound={masterBound}
+                                isApiBound={apiBound}
                             />
                         </FioriFormGroup>
                     )}

@@ -9,6 +9,7 @@
     "attributes": "属性",
     "attributeGroups": "属性グループ",
     "attributeFamilies": "属性家族",
+    "attributeApiSources": "APIソース",
     "system": "システム",
     "users": "ユーザー",
     "userGroups": "ユーザーグループ",

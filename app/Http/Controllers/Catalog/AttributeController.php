@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Catalog;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\Attribute;
+use App\Models\AttributeApiSource;
 use App\Models\AttributeFamily;
 use App\Models\AttributeGroup;
 use App\Models\AttributeTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
+use App\Services\Catalog\ApiAttributeOptionSync;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
@@ -212,17 +214,30 @@ class AttributeController extends Controller
     {
         return Inertia::render('catalog/attributes/create', [
             'masterSources' => MasterAttributeOptionSync::pickerOptions(),
+            'apiSources' => AttributeApiSource::where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
     public function edit(Attribute $attribute): Response
     {
+        // Active sources for the picker, plus the currently-bound one even
+        // if it's since been deactivated — otherwise an attribute bound to a
+        // now-inactive source would silently show no selection at all.
+        $apiSources = AttributeApiSource::where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        if ($attribute->api_source_id !== null && ! $apiSources->contains('id', $attribute->api_source_id)) {
+            $bound = AttributeApiSource::find($attribute->api_source_id, ['id', 'name']);
+            if ($bound !== null) {
+                $apiSources->push($bound);
+            }
+        }
+
         return Inertia::render('catalog/attributes/edit', [
             'attribute' => $attribute->only([
-                'id', 'code', 'name', 'type', 'swatch_type', 'master_source', 'is_required', 'is_unique',
+                'id', 'code', 'name', 'type', 'swatch_type', 'master_source', 'api_source_id', 'is_required', 'is_unique',
                 'is_locale_based', 'is_ai_translate', 'is_channel_based', 'is_filterable',
             ]),
             'masterSources' => MasterAttributeOptionSync::pickerOptions(),
+            'apiSources' => $apiSources,
             'translations' => $attribute->translations()->get()
                 ->mapWithKeys(fn (AttributeTranslation $t) => [(string) $t->locale_id => $t->label]),
             'options' => $attribute->options()->orderBy('sort_order')->orderBy('id')->get([
@@ -255,6 +270,7 @@ class AttributeController extends Controller
             'type' => ['required', 'in:text,textarea,price,number,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'master_source' => ['nullable', 'in:' . implode(',', MasterAttributeOptionSync::keys())],
+            'api_source_id' => ['nullable', 'exists:attribute_api_sources,id'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],
@@ -267,17 +283,14 @@ class AttributeController extends Controller
 
         $translations = $validated['translations'] ?? [];
         $name = $this->resolveName($translations, $validated['name'] ?? null);
-
-        // A master_source only makes sense for a dropdown attribute.
-        $masterSource = in_array($validated['type'], ['select', 'multiselect'], true)
-            ? ($validated['master_source'] ?? null)
-            : null;
+        [$masterSource, $apiSourceId] = $this->resolveSourceBinding($validated);
 
         $attribute = CodeGenerator::createWithRetry('attributes', 'attribute', fn ($code) => Attribute::create([
             ...$validated,
             'code' => $code,
             'name' => $name,
             'master_source' => $masterSource,
+            'api_source_id' => $apiSourceId,
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -296,14 +309,67 @@ class AttributeController extends Controller
             AuditLog::record('labels_set', $attribute, null, $newTranslations);
         }
 
+        $syncWarning = null;
         if ($attribute->master_source !== null) {
             app(MasterAttributeOptionSync::class)->rebuildAttribute($attribute);
+        } elseif ($attribute->api_source_id !== null) {
+            $syncWarning = $this->syncApiOptionsSafely($attribute);
         }
 
         Attribute::bumpCodeMapVersion();
         Attribute::bumpListVersion();
 
-        return to_route('catalog.attributes.index')->with('success', 'Attribute created successfully.');
+        $response = to_route('catalog.attributes.index');
+
+        // Only ever flash one of success/warning (see FlashToast's docblock
+        // on why a redirect must not carry both).
+        return $syncWarning !== null
+            ? $response->with('warning', $syncWarning)
+            : $response->with('success', 'Attribute created successfully.');
+    }
+
+    /**
+     * Unlike a master_source (an internal table — effectively always
+     * reachable), an AttributeApiSource is an external HTTP call that can
+     * fail (network blip, bad credentials, endpoint down). The attribute
+     * itself has already been saved and bound to the source by this point,
+     * so a sync failure here shouldn't 500 the whole request — the admin
+     * still gets their attribute, just with a warning that options didn't
+     * sync yet (they can retry from `catalog:sync-api-options` or by
+     * re-saving the attribute once the source is reachable).
+     */
+    private function syncApiOptionsSafely(Attribute $attribute): ?string
+    {
+        try {
+            app(ApiAttributeOptionSync::class)->rebuildAttribute($attribute);
+
+            return null;
+        } catch (\Throwable $e) {
+            return "Attribute saved, but syncing its options from the API source failed: {$e->getMessage()}";
+        }
+    }
+
+    /**
+     * A select/multiselect attribute binds to at most one option source —
+     * either a master_source or an AttributeApiSource, never both. The
+     * create/edit forms only ever submit one of the two (see the "Source
+     * Type" selector in attributes/create.tsx and edit.tsx), but this is
+     * enforced here too rather than trusted from the client.
+     *
+     * @param  array{type: string, master_source?: ?string, api_source_id?: ?int}  $validated
+     * @return array{0: ?string, 1: ?int}
+     */
+    private function resolveSourceBinding(array $validated): array
+    {
+        if (! in_array($validated['type'], ['select', 'multiselect'], true)) {
+            return [null, null];
+        }
+
+        if (! empty($validated['api_source_id'])) {
+            return [null, (int) $validated['api_source_id']];
+        }
+
+        return [$validated['master_source'] ?? null, null];
     }
 
     public function update(Request $request, Attribute $attribute): RedirectResponse
@@ -313,6 +379,7 @@ class AttributeController extends Controller
             'type' => ['required', 'in:text,textarea,price,number,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
             'swatch_type' => ['nullable', 'required_if:type,select,multiselect', 'in:text,color,image'],
             'master_source' => ['nullable', 'in:' . implode(',', MasterAttributeOptionSync::keys())],
+            'api_source_id' => ['nullable', 'exists:attribute_api_sources,id'],
             'is_required' => ['boolean'],
             'is_unique' => ['boolean'],
             'is_locale_based' => ['boolean'],
@@ -326,15 +393,15 @@ class AttributeController extends Controller
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($attribute);
         $oldMasterSource = $attribute->master_source;
+        $oldApiSourceId = $attribute->api_source_id;
 
-        $masterSource = in_array($validated['type'], ['select', 'multiselect'], true)
-            ? ($validated['master_source'] ?? null)
-            : null;
+        [$masterSource, $apiSourceId] = $this->resolveSourceBinding($validated);
 
         $attribute->update([
             ...$validated,
             'name' => $this->resolveName($translations, $validated['name'] ?? null),
             'master_source' => $masterSource,
+            'api_source_id' => $apiSourceId,
             'is_required' => $request->boolean('is_required'),
             'is_unique' => $request->boolean('is_unique'),
             'is_locale_based' => $request->boolean('is_locale_based'),
@@ -352,15 +419,22 @@ class AttributeController extends Controller
             AuditLog::record('labels_updated', $attribute, $oldTranslations, $newTranslations);
         }
 
-        // Rebound (or unbound) the master — regenerate the whole option list
-        // from the new source. A no-op source keeps whatever options exist.
+        // Rebound (or unbound) either source — regenerate the whole option
+        // list from the new one. A no-op source keeps whatever options exist.
+        $syncWarning = null;
         if ($attribute->master_source !== $oldMasterSource && $attribute->master_source !== null) {
             app(MasterAttributeOptionSync::class)->rebuildAttribute($attribute);
+        } elseif ($attribute->api_source_id !== $oldApiSourceId && $attribute->api_source_id !== null) {
+            $syncWarning = $this->syncApiOptionsSafely($attribute);
         }
 
         Attribute::bumpListVersion();
 
-        return to_route('catalog.attributes.index')->with('success', 'Attribute updated successfully.');
+        $response = to_route('catalog.attributes.index');
+
+        return $syncWarning !== null
+            ? $response->with('warning', $syncWarning)
+            : $response->with('success', 'Attribute updated successfully.');
     }
 
     /**

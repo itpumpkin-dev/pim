@@ -1,0 +1,42 @@
+datagrid:
+  attribute_api_source_grid:
+    source:
+      type: eloquent
+      class: App\Models\AttributeApiSource
+    columns:
+      id:
+        label: fields.id
+        type: number
+        sortable: true
+      name:
+        label: fields.name
+        type: string
+        sortable: true
+      endpoint:
+        label: fields.endpoint
+        type: string
+        sortable: true
+      auth_type:
+        label: fields.authType
+        type: string
+        sortable: true
+      is_active:
+        label: fields.status
+        type: boolean
+        sortable: true
+    filters:
+      global:
+        type: string
+        fields:
+          - name
+          - endpoint
+    actions:
+      test:
+        icon: sync
+        label: rowActions.test
+      update:
+        icon: edit
+        label: rowActions.edit
+      delete:
+        icon: delete
+        label: rowActions.delete

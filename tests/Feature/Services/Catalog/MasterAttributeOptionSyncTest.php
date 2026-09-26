@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Models\Vendor;
+use App\Services\Catalog\AttributeOptionMirror;
 use App\Services\Catalog\MasterAttributeOptionSync;
 
 function masterAttr(string $masterSource): Attribute
@@ -18,7 +19,7 @@ function masterAttr(string $masterSource): Attribute
 }
 
 beforeEach(function () {
-    $this->sync = new MasterAttributeOptionSync();
+    $this->sync = new MasterAttributeOptionSync(new AttributeOptionMirror());
 });
 
 test('rebuildAttribute with no (or an unrecognized) master_source deletes every existing option', function () {

@@ -7,9 +7,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
 import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+
+type SourceType = 'none' | 'master' | 'api';
 
 const attributeTypeKeys: Record<string, string> = {
     text: 'attrTypeText',
@@ -39,14 +42,21 @@ interface MasterSourceOption {
     labelKey: string;
 }
 
+interface ApiSourceOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     masterSources?: MasterSourceOption[];
+    apiSources?: ApiSourceOption[];
 }
 
 interface AttributeForm {
     type: string;
     swatch_type: string;
     master_source: string;
+    api_source_id: string;
     is_required: boolean;
     is_unique: boolean;
     is_locale_based: boolean;
@@ -57,7 +67,7 @@ interface AttributeForm {
     [key: string]: string | boolean | Record<string, string>;
 }
 
-export default function AttributeCreate({ masterSources = [] }: Props) {
+export default function AttributeCreate({ masterSources = [], apiSources = [] }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
 
@@ -81,6 +91,7 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
         type: 'text',
         swatch_type: '',
         master_source: '',
+        api_source_id: '',
         is_required: false,
         is_unique: false,
         // ตั้งค่าเริ่มต้นให้ติ๊ก "ค่าต่อภาษา" ไว้ — แอตทริบิวต์ส่วนใหญ่ที่สร้างใหม่
@@ -92,6 +103,11 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
         translations: {},
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
+    // เก็บแยกจาก data.master_source/data.api_source_id เพราะ selector นี้แค่
+    // ควบคุมว่าจะโชว์ dropdown ตัวไหน — ไม่ใช่ฟิลด์ที่ส่งไป backend เอง (ดู
+    // AttributeController::resolveSourceBinding() ฝั่ง server ที่ตัดสินใจจาก
+    // master_source/api_source_id ตรงๆ อยู่แล้ว)
+    const [sourceType, setSourceType] = useState<SourceType>('none');
 
     const showSwatchType = data.type === 'select' || data.type === 'multiselect';
 
@@ -100,6 +116,18 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
         if (value !== 'select' && value !== 'multiselect') {
             setData('swatch_type', '');
             setData('master_source', '');
+            setData('api_source_id', '');
+            setSourceType('none');
+        }
+    };
+
+    const handleSourceTypeChange = (value: SourceType) => {
+        setSourceType(value);
+        if (value !== 'master') {
+            setData('master_source', '');
+        }
+        if (value !== 'api') {
+            setData('api_source_id', '');
         }
     };
 
@@ -161,6 +189,22 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
                         )}
 
                         {showSwatchType && (
+                            <FioriField label={t('sourceTypeLabel')} htmlFor="attribute-source-type">
+                                <FormControl fullWidth size="small">
+                                    <Select
+                                        id="attribute-source-type"
+                                        value={sourceType}
+                                        onChange={(event) => handleSourceTypeChange(event.target.value as SourceType)}
+                                    >
+                                        <MenuItem value="none">{t('sourceTypeNone')}</MenuItem>
+                                        <MenuItem value="master">{t('sourceTypeMaster')}</MenuItem>
+                                        <MenuItem value="api">{t('sourceTypeApi')}</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </FioriField>
+                        )}
+
+                        {showSwatchType && sourceType === 'master' && (
                             <FioriField
                                 label={t('masterSourceLabel')}
                                 htmlFor="attribute-master-source"
@@ -183,6 +227,36 @@ export default function AttributeCreate({ masterSources = [] }: Props) {
                                         ))}
                                     </Select>
                                 </FormControl>
+                            </FioriField>
+                        )}
+
+                        {showSwatchType && sourceType === 'api' && (
+                            <FioriField
+                                label={t('apiSourceLabel')}
+                                htmlFor="attribute-api-source"
+                                valueState={valueStateOf(errors.api_source_id)}
+                                message={errors.api_source_id}
+                            >
+                                <Stack spacing={0.5}>
+                                    <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.api_source_id))}>
+                                        <Select
+                                            id="attribute-api-source"
+                                            displayEmpty
+                                            value={data.api_source_id}
+                                            onChange={(event) => setData('api_source_id', event.target.value)}
+                                        >
+                                            <MenuItem value="">{t('apiSourceSelectPlaceholder')}</MenuItem>
+                                            {apiSources.map((source) => (
+                                                <MenuItem key={source.id} value={String(source.id)}>
+                                                    {source.name}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <Link href="/catalog/attributes/api-sources/create" style={{ fontSize: 13 }}>
+                                        {t('manageApiSources')}
+                                    </Link>
+                                </Stack>
                             </FioriField>
                         )}
                     </FioriFormGroup>

@@ -18,12 +18,15 @@
         "lastName": "นามสกุล",
         "displayName": "ชื่อที่แสดง",
         "sku": "SKU",
-        "isGuest": "Role สำหรับผู้ไม่ Login"
+        "isGuest": "Role สำหรับผู้ไม่ Login",
+        "endpoint": "Endpoint",
+        "authType": "รูปแบบการยืนยันตัวตน"
     },
     "rowActions": {
         "edit": "แก้ไข",
         "delete": "ลบ",
-        "duplicate": "ทำสำเนา"
+        "duplicate": "ทำสำเนา",
+        "test": "ทดสอบ"
     },
     "actionsHeader": "การดำเนินการ",
     "active": "ใช้งาน",

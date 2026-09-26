@@ -196,6 +196,11 @@ export function useMainNavItems(): NavItem[] {
                                 url: '/catalog/attributeFamilies',
                                 permission: 'attribute_families.list_attribute_families',
                             },
+                            {
+                                title: t('attributeApiSources'),
+                                url: '/catalog/attributes/api-sources',
+                                permission: 'attribute_api_sources.list_attribute_api_sources',
+                            },
                         ],
                     },
                     {

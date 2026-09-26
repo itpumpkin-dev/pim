@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Catalog\AttributeApiSourceController;
 use App\Http\Controllers\Catalog\AttributeController;
 use App\Http\Controllers\Catalog\AttributeFamilyController;
 use App\Http\Controllers\Catalog\AttributeGroupController;
@@ -128,6 +129,24 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('attributes', [AttributeController::class, 'index'])->name('attributes.index')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/export', [AttributeController::class, 'export'])->name('attributes.export')->middleware('permission:attributes,list_attributes');
     Route::get('attributes/create', [AttributeController::class, 'create'])->name('attributes.create')->middleware('permission:attributes,create_attributes');
+
+    // Admin-configured external API "options sources" a select/multiselect
+    // attribute can bind to instead of a master_source — see
+    // App\Services\Catalog\ApiAttributeOptionSync. Registered as their own
+    // literal-prefixed group ("attributes/api-sources/...") ahead of the
+    // attributes/{attribute}/... wildcard routes below, same convention as
+    // attributes/create and attributes/export above.
+    Route::get('attributes/api-sources', [AttributeApiSourceController::class, 'index'])->name('attributeApiSources.index')->middleware('permission:attribute_api_sources,list_attribute_api_sources');
+    Route::get('attributes/api-sources/create', [AttributeApiSourceController::class, 'create'])->name('attributeApiSources.create')->middleware('permission:attribute_api_sources,create_attribute_api_sources');
+    Route::post('attributes/api-sources', [AttributeApiSourceController::class, 'store'])->name('attributeApiSources.store')->middleware('permission:attribute_api_sources,create_attribute_api_sources');
+    Route::get('attributes/api-sources/{attributeApiSource}/edit', [AttributeApiSourceController::class, 'edit'])->name('attributeApiSources.edit')->middleware('permission:attribute_api_sources,edit_attribute_api_sources');
+    Route::put('attributes/api-sources/{attributeApiSource}', [AttributeApiSourceController::class, 'update'])->name('attributeApiSources.update')->middleware('permission:attribute_api_sources,edit_attribute_api_sources');
+    Route::delete('attributes/api-sources/{attributeApiSource}', [AttributeApiSourceController::class, 'destroy'])->name('attributeApiSources.destroy')->middleware('permission:attribute_api_sources,delete_attribute_api_sources');
+    // GET (not POST) — read-only preview with no side effects, called via a
+    // plain fetch() from the admin UI (see attributeApiSources/edit.tsx and
+    // index.tsx's "Test" action) without needing to plumb a CSRF token.
+    Route::get('attributes/api-sources/{attributeApiSource}/test', [AttributeApiSourceController::class, 'test'])->name('attributeApiSources.test')->middleware('permission:attribute_api_sources,edit_attribute_api_sources');
+
     // แยกเป็นคนละ action/URL/หน้ากันจริงๆ ต่อแพลตฟอร์มแล้ว (เคยรวมเป็นหน้าเดียว
     // มี Tabs สลับ ก่อนแยกจริงตามที่ user ขอ) — ดู docblock ของ
     // MarketplaceAttributeMappingController อยู่ใต้ path prefix "marketplace/"

@@ -40,6 +40,7 @@ class Attribute extends Model
         'type',
         'swatch_type',
         'master_source',
+        'api_source_id',
         'auto_created_platform',
         'is_required',
         'is_unique',
@@ -71,6 +72,11 @@ class Attribute extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function apiSource(): BelongsTo
+    {
+        return $this->belongsTo(AttributeApiSource::class, 'api_source_id');
     }
 
     public function options(): HasMany

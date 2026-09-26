@@ -99,12 +99,15 @@ export function AttributeOptionsPanel({
     swatchType,
     options,
     isMasterBound = false,
+    isApiBound = false,
 }: {
     attributeId: number;
     swatchType: string;
     options: AttributeOptionItem[];
     /** attribute นี้ผูก master_source ไว้ — โชว์คอลัมน์ "Customized" + ปุ่ม "Reset to master" เพิ่ม และซ่อนปุ่มลบ (ลบแล้วจะโดน master sync คืนกลับมาใหม่อยู่ดี) */
     isMasterBound?: boolean;
+    /** attribute นี้ผูก AttributeApiSource ไว้แทน — ซ่อนปุ่มลบเหมือนกัน (ลบแล้วจะโดน API sync คืนกลับมาใหม่อยู่ดี) แต่ยังไม่มีปุ่ม "Reset" แบบ master (ดู ApiAttributeOptionSync — ยังไม่รองรับ reset รายตัวใน v1 นี้) */
+    isApiBound?: boolean;
 }) {
     const { locale, locales } = useLocale();
     const { errors } = usePage<any>().props;
@@ -286,7 +289,14 @@ export function AttributeOptionsPanel({
     // ต่างหาก แทนที่จะยัดรวมเข้าไปใน `pagedRows` — เพื่อให้ field (และ
     // handler) ของมันแยกออกจาก logic การ render column ของ option ที่มีอยู่แล้ว
     type OptionRow = { kind: 'new' } | { kind: 'existing'; option: EditableOption };
-    const tableRows: OptionRow[] = [{ kind: 'new' }, ...pagedRows.map((option): OptionRow => ({ kind: 'existing', option }))];
+    // แถว "new" (ฟอร์มเพิ่มตัวเลือก) ไม่มีความหมายสำหรับ attribute ที่ผูก API
+    // source — ตัวเลือกทั้งหมดมาจาก response ของ API เท่านั้น เพิ่มเองตรงนี้
+    // ยังไงก็โดน AttributeOptionController::store() ปฏิเสธกลับมาเสมอ (ดู
+    // docblock ของมัน) เลยซ่อนแถวนี้ไปเลยแทนที่จะปล่อยให้กดแล้วเจอ error
+    const tableRows: OptionRow[] = [
+        ...(isApiBound ? [] : [{ kind: 'new' } as OptionRow]),
+        ...pagedRows.map((option): OptionRow => ({ kind: 'existing', option })),
+    ];
 
     // ลำดับความสำคัญของคอลัมน์ตอนจอเล็ก (SAP Fiori responsive table): Code
     // ใช้ระบุตัวตนของแถว ส่วน Actions มี control ที่กดได้ตัวเดียวของแถว
@@ -465,12 +475,13 @@ export function AttributeOptionsPanel({
                 >
                     {adding ? 'Adding…' : 'Add Row'}
                 </Button>
-            ) : isMasterBound ? (
-                // ลบไม่ได้สำหรับ attribute ที่ผูก master — master record ต้นทาง
-                // ยังอยู่ ตัวเลือกจะถูก sync กลับมาใหม่ทันทีอยู่ดี (ดู
-                // MasterAttributeOptionSync::rebuildAttribute()) ปิดที่ Active
+            ) : isMasterBound || isApiBound ? (
+                // ลบไม่ได้สำหรับ attribute ที่ผูก master/API source — record
+                // ต้นทางยังอยู่ ตัวเลือกจะถูก sync กลับมาใหม่ทันทีอยู่ดี (ดู
+                // MasterAttributeOptionSync::rebuildAttribute() /
+                // ApiAttributeOptionSync::rebuildAttribute()) ปิดที่ Active
                 // แทนถ้าไม่อยากให้โผล่ในหน้าสินค้า
-                <Tooltip title="Can't delete an option mirrored from a Master — turn off Active instead, or delete it from the Master itself.">
+                <Tooltip title="Can't delete an option mirrored from a Master/API source — turn off Active instead.">
                     <span>
                         <IconButton size="small" disabled>
                             <DeleteIcon fontSize="small" />

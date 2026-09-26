@@ -81,6 +81,19 @@ class AttributeOptionController extends Controller
             return $this->storeMasterBackedOption($request, $attribute);
         }
 
+        // An API-bound attribute's options are a read-only mirror of its
+        // source's response — unlike a master, there's no writable table
+        // behind it to add a real record into, so a manually-created
+        // AttributeOption row here would just be silently deleted the next
+        // time ApiAttributeOptionSync::rebuildAttribute() runs (its rows
+        // aren't in the source's current response). Reject up front instead,
+        // same as an unsupported master_source below.
+        if ($attribute->api_source_id !== null) {
+            throw ValidationException::withMessages([
+                'translations' => "This attribute's options come from an external API and can't be added manually — they only change when the API's response changes.",
+            ]);
+        }
+
         $validated = $request->validate([
             'admin_label' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -231,14 +244,16 @@ class AttributeOptionController extends Controller
             'swatch_value' => $swatchValue,
             'sort_order' => $validated['sort_order'] ?? $option->sort_order,
             'is_active' => $newIsActive,
-            // แก้ผ่านแผงนี้ตรงๆ = "custom" ถ้า attribute ผูก master ไว้ *และ*
-            // ค่าจริงๆ เปลี่ยนไปจากเดิม (ดู optionWasActuallyEdited()) — เช็ค
-            // ให้ชัวร์ว่ามีอะไรเปลี่ยนจริง ไม่ใช่ตั้ง flag เพราะแค่มี request
-            // เข้ามา ไม่งั้น resave ค่าเดิมเป๊ะๆ ก็จะโดนล็อกไม่ให้ sync จาก
-            // master อีกทั้งที่ไม่มีใครตั้งใจ custom อะไรเลย —
-            // MasterAttributeOptionSync::upsertOption() จะไม่ทับค่านี้อีกจน
-            // กว่าจะกด "Reset to master" (ดู resetToMaster() ด้านล่าง)
-            'is_customized' => $attribute->master_source !== null && ($edited || $option->is_customized),
+            // แก้ผ่านแผงนี้ตรงๆ = "custom" ถ้า attribute ผูก master หรือ API
+            // source ไว้ *และ* ค่าจริงๆ เปลี่ยนไปจากเดิม (ดู
+            // optionWasActuallyEdited()) — เช็คให้ชัวร์ว่ามีอะไรเปลี่ยนจริง
+            // ไม่ใช่ตั้ง flag เพราะแค่มี request เข้ามา ไม่งั้น resave ค่าเดิม
+            // เป๊ะๆ ก็จะโดนล็อกไม่ให้ sync อีกทั้งที่ไม่มีใครตั้งใจ custom อะไร
+            // เลย — AttributeOptionMirror::upsertOption() (ใช้ร่วมกันโดย
+            // MasterAttributeOptionSync และ ApiAttributeOptionSync) จะไม่ทับ
+            // ค่านี้อีกจนกว่าจะกด "Reset to master" (master เท่านั้น — ดู
+            // resetToMaster() ด้านล่าง)
+            'is_customized' => ($attribute->master_source !== null || $attribute->api_source_id !== null) && ($edited || $option->is_customized),
         ]);
 
         $this->syncTranslations($option, $translations);
@@ -333,9 +348,9 @@ class AttributeOptionController extends Controller
                     // is_customized = true ให้ทุกแถวแบบไม่มีเงื่อนไข การกด
                     // "Save all" เพียงครั้งเดียว (ต่อให้แก้แค่ตัวเดียว) จะ
                     // ล็อกตัวเลือกทั้งหมดของ attribute นี้ไม่ให้รับการอัปเดต
-                    // จาก master อีกเลยตลอดไป ต้องเช็คว่าแถวนี้ถูกแก้จริงๆ
-                    // ก่อน (ดู optionWasActuallyEdited())
-                    'is_customized' => $attribute->master_source !== null && ($edited || $option->is_customized),
+                    // จาก master/API source อีกเลยตลอดไป ต้องเช็คว่าแถวนี้ถูก
+                    // แก้จริงๆ ก่อน (ดู optionWasActuallyEdited())
+                    'is_customized' => ($attribute->master_source !== null || $attribute->api_source_id !== null) && ($edited || $option->is_customized),
                 ]);
 
                 $this->syncTranslations($option, $translations);
