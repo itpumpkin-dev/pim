@@ -648,7 +648,20 @@ export default function ProductEdit({
     const selectedMasterCategoryCode = (attr?: AttributeItem): string => {
         if (!attr) return '';
         const { channelKey, localeKey } = getValueKeys(attr);
-        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? '';
+        // fallback ไปที่ 'default' เหมือน renderMasterCategoryField() ด้านล่าง —
+        // pcatname/psubcatname/productgroupname เก็บค่าจริงไว้ที่ channel/locale
+        // 'global'/'default' เสมอ (ดู ProductCategoryLinker) แต่ถ้า attribute
+        // ตัวไหนดันมี is_locale_based/is_channel_based ติ๊กไว้ (เผลอเปิดทีหลัง
+        // ผ่านหน้าแก้ไข attribute) getValueKeys() จะคำนวณ localeKey เป็น locale
+        // ปัจจุบันแทน 'default' — ไม่มี fallback ตรงนี้จะทำให้ฟังก์ชันนี้อ่านว่าง
+        // เปล่าทั้งที่ renderMasterCategoryField() (ที่มี fallback นี้อยู่แล้ว)
+        // โชว์ค่าถูกต้อง ผลคือ cascadedMasterCategoryAttributes ด้านล่าง (ที่เรียก
+        // ฟังก์ชันนี้ตัดสินว่าจะโชว์ฟิลด์ "หมวดหมู่ย่อย"/"กลุ่มสินค้า" หรือไม่)
+        // มองว่าหมวดหมู่ยังไม่ถูกเลือก เลยซ่อนฟิลด์ถัดไปทั้งชุดไปเลย ทั้งที่ค่าจริง
+        // มีอยู่และแสดงผลถูกต้องในฟิลด์แรกอยู่แล้ว
+        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey]
+            ?? data.values[attr.id]?.['ungrouped']?.[channelKey]?.['default']
+            ?? '';
         return typeof val === 'string' ? val : '';
     };
 
@@ -3873,7 +3886,6 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
     const [galleryError, setGalleryError] = useState<string | null>(null);
-    const [justUploadedPath, setJustUploadedPath] = useState<string | null>(null);
 
     // อัปโหลดไฟล์จริงทันทีตอนเลือก (ผ่าน FioriUploadDropzone + progress bar) แทนที่จะ
     // แนบ File object ไว้เฉยๆ รอ submit ทั้งฟอร์ม — แยก 3 ชุดเพราะ gallery/video/single
@@ -4542,12 +4554,11 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
         // value เป็น string ทันทีหลังอัปโหลดเสร็จเสมอแล้ว (ไม่ใช่ File object ที่รอ submit
         // เหมือนก่อนหน้านี้อีกต่อไป) — selectedName เลยไม่มีทางไม่ว่างจริง แต่ยังปล่อยให้
         // ผ่าน existingLabel ทางเดียวกันนี้ ทั้งไฟล์ที่เพิ่งอัปโหลดรอบนี้และไฟล์เดิมที่ save
-        // ไว้แล้ว ต่างกันแค่ปุ่มลบ (canClearCurrent): โชว์เฉพาะไฟล์ที่เพิ่งอัปโหลดในรอบแก้ไข
-        // นี้เอง (จำ path ที่ได้กลับมาไว้ใน justUploadedPath) ไม่ใช่ไฟล์เดิมจากเซิร์ฟเวอร์ —
-        // พฤติกรรมเดียวกับตอนที่ยังใช้ FioriFileUploader (onClear เดิมเช็คจาก selectedName
-        // ซึ่งมีได้ก็ต่อเมื่อเพิ่งเลือกไฟล์ใหม่ในฟอร์มเท่านั้น)
+        // ไว้แล้ว — ปุ่มลบต้องโชว์ทั้งสองกรณีเหมือนกัน (เดิมเคยจำกัดไว้แค่ไฟล์ที่เพิ่ง
+        // อัปโหลดรอบนี้เท่านั้นผ่าน justUploadedPath ทำให้ไฟล์เดิมที่ save ไว้แล้วลบไม่ได้
+        // เลยเอาเงื่อนไขนั้นออก — เงื่อนไข isImage && previewSrc / currentLabel ที่ครอบ
+        // ปุ่มนี้อยู่แล้วก็การันตีว่ามีไฟล์ให้ลบจริงอยู่แล้วในตัว)
         const currentLabel = existingLabel ? t('currentFileLabel', { name: existingLabel }) : '';
-        const canClearCurrent = justUploadedPath !== null && justUploadedPath === stringValue;
 
         return (
             <Box>
@@ -4575,13 +4586,10 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                                     '&:hover': { opacity: 0.85 },
                                 }}
                             />
-                            {canClearCurrent && !isReadOnly && (
+                            {!isReadOnly && (
                                 <IconButton
                                     size="small"
-                                    onClick={() => {
-                                        setJustUploadedPath(null);
-                                        onChange('');
-                                    }}
+                                    onClick={() => onChange('')}
                                     aria-label="remove file"
                                     sx={{
                                         position: 'absolute',
@@ -4605,7 +4613,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                                 src={pdfPreviewSrc}
                                 title={selectedName || existingLabel}
                                 height={150}
-                                onClose={canClearCurrent && !isReadOnly ? () => { setJustUploadedPath(null); onChange(''); } : undefined}
+                                onClose={!isReadOnly ? () => onChange('') : undefined}
                             />
                         </Box>
                     )}
@@ -4619,13 +4627,10 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0, color: FIORI.textPrimary }}>
                                 {currentLabel}
                             </Typography>
-                            {canClearCurrent && !isReadOnly && (
+                            {!isReadOnly && (
                                 <IconButton
                                     size="small"
-                                    onClick={() => {
-                                        setJustUploadedPath(null);
-                                        onChange('');
-                                    }}
+                                    onClick={() => onChange('')}
                                     sx={{ p: 0.25, color: FIORI.error }}
                                     aria-label="remove file"
                                 >
@@ -4644,7 +4649,6 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                             const file = files[0];
                             if (!file) return;
                             uploadSingleFile(file, uploadUrl, ({ path }) => {
-                                setJustUploadedPath(path);
                                 onChange(path);
                             });
                         }}
