@@ -322,6 +322,13 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::post('attributeFamilies/{attributeFamily}/set-default-for-all-groups', [AttributeFamilyController::class, 'setDefaultForAllGroups'])->name('attributeFamilies.setDefaultForAllGroups')->middleware('permission:attribute_families,assign_default_family');
     Route::post('attributeFamilies/{attributeFamily}/set-default-for-groups', [AttributeFamilyController::class, 'setDefaultForSelectedGroups'])->name('attributeFamilies.setDefaultForSelectedGroups')->middleware('permission:attribute_families,assign_default_family');
     Route::get('attributeFamilies/{attributeFamily}/product-groups-for-default-picker', [AttributeFamilyController::class, 'productGroupsForDefaultPicker'])->name('attributeFamilies.productGroupsForDefaultPicker')->middleware('permission:attribute_families,assign_default_family');
+    // ปุ่ม "ยกเลิกตั้งตระกูลให้ทุกกลุ่มสินค้า" / "ยกเลิกให้บางกลุ่มสินค้า" — ทิศทาง
+    // ตรงข้ามของสองเส้นด้านบน ใช้สิทธิ์ assign_default_family ตัวเดียวกัน เพราะ
+    // เป็นความสามารถ mass-overwrite เดียวกัน (ดูคอมเมนต์ AttributeFamilyController::
+    // unsetDefaultForAllGroups())
+    Route::post('attributeFamilies/{attributeFamily}/unset-default-for-all-groups', [AttributeFamilyController::class, 'unsetDefaultForAllGroups'])->name('attributeFamilies.unsetDefaultForAllGroups')->middleware('permission:attribute_families,assign_default_family');
+    Route::post('attributeFamilies/{attributeFamily}/unset-default-for-groups', [AttributeFamilyController::class, 'unsetDefaultForSelectedGroups'])->name('attributeFamilies.unsetDefaultForSelectedGroups')->middleware('permission:attribute_families,assign_default_family');
+    Route::get('attributeFamilies/{attributeFamily}/product-groups-for-unassign-picker', [AttributeFamilyController::class, 'productGroupsForUnassignPicker'])->name('attributeFamilies.productGroupsForUnassignPicker')->middleware('permission:attribute_families,assign_default_family');
     Route::get('attributeFamilies/{attributeFamily}/usage', [AttributeFamilyController::class, 'usage'])->name('attributeFamilies.usage')->middleware('permission:attribute_families,delete_attribute_families');
     Route::get('attributeFamilies/{attributeFamily}/template-preview', [AttributeFamilyController::class, 'templatePreview'])->name('attributeFamilies.templatePreview')->middleware('permission:attribute_families,edit_attribute_families');
     Route::delete('attributeFamilies/{attributeFamily}', [AttributeFamilyController::class, 'destroy'])->name('attributeFamilies.destroy')->middleware('permission:attribute_families,delete_attribute_families');

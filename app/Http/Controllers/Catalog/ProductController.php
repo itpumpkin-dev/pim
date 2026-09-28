@@ -2645,8 +2645,31 @@ class ProductController extends Controller
         if ($user) {
             $masterCategoryAttributes = $masterCategoryAttributes->filter(fn ($attr) => $this->canUserViewAttribute($user, $attr))->values();
         }
-        $masterCategoryAttributes->each(function (Attribute $attr) use ($user, $values) {
+        // ถ้าต้นไม้ categories ($categoryIds ด้านบน) ถูก assign ไว้จริง แต่
+        // ProductValue ของ pcatname/psubcatname/productgroupname ยังไม่เคยถูกเขียน
+        // หรือค้างอยู่ (pivot ถูก sync มาจากที่อื่นที่ไม่เคยเรียก
+        // ProductCategoryLinker::deriveLegacyCodesFromCategories() ให้จริง) ใช้
+        // ค่านี้เป็น fallback ด้านล่างแทน ดูคอมเมนต์ที่ legacyCodesFromCategories()
+        $legacyCategoryCodesByAttribute = ProductCategoryLinker::legacyCodesFromCategories($categoryIds);
+
+        $masterCategoryAttributes->each(function (Attribute $attr) use ($user, &$values, $legacyCategoryCodesByAttribute) {
             $attr->editable = $this->canUserEditAttribute($user, $attr);
+
+            // master-category attribute ไม่เคยอยู่ใน family_attributes เลย —
+            // groupKey เป็น 'ungrouped' เสมอ (ดู loop สร้าง $values ด้านบน)
+            $currentCode = collect($values[$attr->id]['ungrouped'] ?? [])
+                ->flatMap(fn ($byLocale) => $byLocale)
+                ->first(fn ($v) => is_string($v) && $v !== '');
+
+            if (!$currentCode) {
+                $currentCode = $legacyCategoryCodesByAttribute[$attr->code] ?? null;
+                if ($currentCode) {
+                    // เติมกลับเข้า $values ด้วย (โครงสร้างเดียวกับ loop สร้าง
+                    // $values ด้านบน) ไม่งั้น productValues ที่ส่งให้ frontend
+                    // จะยังว่างอยู่ดี ทั้งที่ dropdown ควรเลือกค่านี้ไว้แล้ว
+                    $values[$attr->id]['ungrouped']['global']['default'] = $currentCode;
+                }
+            }
 
             if ($attr->code === self::MASTER_CATEGORY_ATTRIBUTE_CODES[0]) {
                 $attr->load('options');
@@ -2654,11 +2677,6 @@ class ProductController extends Controller
                 return;
             }
 
-            // master-category attribute ไม่เคยอยู่ใน family_attributes เลย —
-            // groupKey เป็น 'ungrouped' เสมอ (ดู loop สร้าง $values ด้านบน)
-            $currentCode = collect($values[$attr->id]['ungrouped'] ?? [])
-                ->flatMap(fn ($byLocale) => $byLocale)
-                ->first(fn ($v) => is_string($v) && $v !== '');
             $attr->setRelation(
                 'options',
                 $currentCode ? AttributeOption::where('attribute_id', $attr->id)->where('code', $currentCode)->get() : collect(),

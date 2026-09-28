@@ -613,6 +613,101 @@ export default function AttributeFamilyEdit({
         );
     };
 
+    // "ยกเลิกตั้งตระกูลให้ทุกกลุ่มสินค้า" / "ยกเลิกให้บางกลุ่มสินค้า" — ทิศทางตรงข้าม
+    // ของสองบล็อกด้านบน ถอด family นี้ออกจากกลุ่มสินค้าที่ผูกอยู่แทนที่จะตั้งเป็น
+    // default ให้ ใช้ endpoint/สิทธิ์คนละชุดกับด้านบน เลยแยก state ของตัวเอง
+    // ไม่ปนกับ selectGroupsDialogOpen ด้านบน
+    const [unassigningAll, setUnassigningAll] = useState(false);
+    const unassignFromAllGroups = async () => {
+        const confirmed = await confirm({
+            title: t('unsetDefaultForAllGroups'),
+            message: t('unsetDefaultForAllGroupsConfirm', { name: family.name || family.code }),
+            severity: 'warning',
+        });
+        if (!confirmed) return;
+
+        setUnassigningAll(true);
+        router.post(
+            `/catalog/attributeFamilies/${family.id}/unset-default-for-all-groups`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setUnassigningAll(false),
+            },
+        );
+    };
+
+    const [unassignDialogOpen, setUnassignDialogOpen] = useState(false);
+    const [unassignPickerSearch, setUnassignPickerSearch] = useState('');
+    const [unassignPickerPage, setUnassignPickerPage] = useState(1);
+    const [unassignPickerData, setUnassignPickerData] = useState<ProductGroupPickerResponse | null>(null);
+    const [unassignPickerLoading, setUnassignPickerLoading] = useState(false);
+    const [selectedUnassignGroupIds, setSelectedUnassignGroupIds] = useState<Set<number>>(new Set());
+    const [applyingUnassignGroups, setApplyingUnassignGroups] = useState(false);
+
+    useEffect(() => {
+        if (!unassignDialogOpen) return undefined;
+
+        setUnassignPickerLoading(true);
+        const params = new URLSearchParams({ page: String(unassignPickerPage), per_page: '15' });
+        if (unassignPickerSearch.trim()) params.set('search', unassignPickerSearch.trim());
+
+        const controller = new AbortController();
+        fetch(`/catalog/attributeFamilies/${family.id}/product-groups-for-unassign-picker?${params}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        })
+            .then((res) => res.json())
+            .then((json: ProductGroupPickerResponse) => setUnassignPickerData(json))
+            .catch((err) => {
+                if (err.name !== 'AbortError') setUnassignPickerData(null);
+            })
+            .finally(() => setUnassignPickerLoading(false));
+
+        return () => controller.abort();
+    }, [unassignDialogOpen, unassignPickerSearch, unassignPickerPage, family.id]);
+
+    useEffect(() => {
+        setUnassignPickerPage(1);
+    }, [unassignPickerSearch]);
+
+    const toggleUnassignGroupSelected = (groupId: number) => {
+        setSelectedUnassignGroupIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(groupId)) {
+                next.delete(groupId);
+            } else {
+                next.add(groupId);
+            }
+            return next;
+        });
+    };
+
+    const closeUnassignDialog = () => {
+        setUnassignDialogOpen(false);
+        setUnassignPickerSearch('');
+        setUnassignPickerPage(1);
+        setUnassignPickerData(null);
+        setSelectedUnassignGroupIds(new Set());
+    };
+
+    const applyUnassignGroups = () => {
+        if (selectedUnassignGroupIds.size === 0 || applyingUnassignGroups) return;
+
+        setApplyingUnassignGroups(true);
+        router.post(
+            `/catalog/attributeFamilies/${family.id}/unset-default-for-groups`,
+            { category_ids: Array.from(selectedUnassignGroupIds) },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => closeUnassignDialog(),
+                onFinish: () => setApplyingUnassignGroups(false),
+            },
+        );
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Attribute Family: ${family.code}`} />
@@ -1064,6 +1159,49 @@ export default function AttributeFamilyEdit({
                                     </Tooltip>
                                 </Stack>
                             </Paper>
+
+                            {/* ยกเลิกการตั้งตระกูลนี้ให้กลุ่มสินค้า — ทิศทางตรงข้ามของการ์ดด้านบน
+                                ถอด family นี้ออกจากกลุ่มสินค้าที่ผูกอยู่ (ไม่ว่าจะเป็น default
+                                หรือแค่ต่อท้ายก็ตาม) ใช้สิทธิ์ assign_default_family ตัวเดียวกัน */}
+                            <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
+                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                    {t('unsetDefaultForAllGroups')}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
+                                    {t('unsetDefaultForAllGroupsDescription')}
+                                </Typography>
+                                <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                                    <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
+                                        <span>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="error"
+                                                disabled={unassigningAll || !canAssignDefaultFamily}
+                                                startIcon={unassigningAll ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                                onClick={unassignFromAllGroups}
+                                                sx={fioriGhostSx}
+                                            >
+                                                {t('unsetDefaultForAllGroups')}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                    <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
+                                        <span>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="error"
+                                                disabled={!canAssignDefaultFamily}
+                                                onClick={() => setUnassignDialogOpen(true)}
+                                                sx={fioriGhostSx}
+                                            >
+                                                {t('unsetDefaultForSomeGroups')}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </Stack>
+                            </Paper>
                         </Stack>
                     </Grid>
                 </Grid>
@@ -1423,6 +1561,120 @@ export default function AttributeFamilyEdit({
                         sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                     >
                         {t('setDefaultForSomeGroups')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ไดอะล็อก "ยกเลิกให้บางกลุ่มสินค้า" — คู่หูของ dialog ด้านบน แต่แสดง
+                เฉพาะกลุ่มสินค้าที่ผูกกับตระกูลนี้อยู่แล้วเท่านั้น (productGroupsForUnassignPicker) */}
+            <Dialog open={unassignDialogOpen} onClose={closeUnassignDialog} fullWidth maxWidth="sm" PaperProps={{ sx: { height: '80vh', borderRadius: 2 } }}>
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                        {t('unsetDefaultForSomeGroups')}
+                    </Typography>
+                    <IconButton onClick={closeUnassignDialog} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ p: 2, borderBottom: `1px solid ${FIORI.border}` }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            value={unassignPickerSearch}
+                            onChange={(e) => setUnassignPickerSearch(e.target.value)}
+                            placeholder={t('search')}
+                            InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary, mr: 1 }} /> }}
+                        />
+                        {selectedUnassignGroupIds.size > 0 && (
+                            <Typography variant="caption" sx={{ color: FIORI.brand, display: 'block', mt: 1 }}>
+                                {t('selectedGroupsCount', { count: selectedUnassignGroupIds.size })}
+                            </Typography>
+                        )}
+                    </Box>
+
+                    <Box sx={{ flex: 1, overflowY: 'auto' }}>
+                        {unassignPickerLoading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        ) : !unassignPickerData || unassignPickerData.data.length === 0 ? (
+                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, textAlign: 'center', p: 4 }}>
+                                {t('noProductGroupsAssigned')}
+                            </Typography>
+                        ) : (
+                            <List dense disablePadding>
+                                {unassignPickerData.data.map((group) => (
+                                    <ListItem
+                                        key={group.id}
+                                        onClick={() => toggleUnassignGroupSelected(group.id)}
+                                        sx={{ py: 1, px: 2, cursor: 'pointer', '&:hover': { bgcolor: FIORI.hover } }}
+                                    >
+                                        <ListItemIcon sx={{ minWidth: 36 }}>
+                                            <Checkbox
+                                                edge="start"
+                                                size="small"
+                                                checked={selectedUnassignGroupIds.has(group.id)}
+                                                tabIndex={-1}
+                                                disableRipple
+                                            />
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={group.name}
+                                            secondary={[group.category_name, group.subcategory_name].filter(Boolean).join(' / ')}
+                                            primaryTypographyProps={{ variant: 'body2', sx: { color: FIORI.textPrimary } }}
+                                            secondaryTypographyProps={{ variant: 'caption' }}
+                                        />
+                                        {group.is_default && (
+                                            <Box
+                                                sx={{
+                                                    ml: 1,
+                                                    px: 1,
+                                                    py: 0.25,
+                                                    borderRadius: 1,
+                                                    bgcolor: FIORI.selected,
+                                                    color: FIORI.brand,
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {t('alreadyDefaultHere')}
+                                            </Box>
+                                        )}
+                                    </ListItem>
+                                ))}
+                            </List>
+                        )}
+                    </Box>
+
+                    {unassignPickerData && unassignPickerData.last_page > 1 && (
+                        <Stack direction="row" justifyContent="center" alignItems="center" spacing={1} sx={{ p: 1.5, borderTop: `1px solid ${FIORI.border}` }}>
+                            <IconButton size="small" disabled={unassignPickerPage <= 1} onClick={() => setUnassignPickerPage((p) => p - 1)}>
+                                <KeyboardArrowLeftIcon fontSize="small" />
+                            </IconButton>
+                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                                {unassignPickerData.current_page} / {unassignPickerData.last_page}
+                            </Typography>
+                            <IconButton size="small" disabled={unassignPickerPage >= unassignPickerData.last_page} onClick={() => setUnassignPickerPage((p) => p + 1)}>
+                                <KeyboardArrowRightIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={closeUnassignDialog} sx={fioriGhostSx}>
+                        {t('cancel')}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        disabled={selectedUnassignGroupIds.size === 0 || applyingUnassignGroups}
+                        startIcon={applyingUnassignGroups ? <CircularProgress size={14} color="inherit" /> : undefined}
+                        onClick={applyUnassignGroups}
+                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                    >
+                        {t('unsetDefaultForSomeGroups')}
                     </Button>
                 </DialogActions>
             </Dialog>

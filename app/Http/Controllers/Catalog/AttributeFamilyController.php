@@ -387,6 +387,97 @@ class AttributeFamilyController extends Controller
     }
 
     /**
+     * "ยกเลิกตั้งตระกูลให้ทุกกลุ่มสินค้า" — คู่หูของ setDefaultForAllGroups() ถอด
+     * family นี้ออกจากทุกกลุ่มสินค้าที่กำลังผูกอยู่ (ดู
+     * DefaultAttributeFamilyAssigner::unassignFromAllProductGroups()) ใช้สิทธิ์
+     * assign_default_family ตัวเดียวกัน เพราะเป็นความสามารถ mass-overwrite
+     * เดียวกัน แค่ทิศทางตรงข้าม
+     */
+    public function unsetDefaultForAllGroups(AttributeFamily $attributeFamily, DefaultAttributeFamilyAssigner $assigner): RedirectResponse
+    {
+        $result = $assigner->unassignFromAllProductGroups($attributeFamily);
+
+        if ($result['updated'] === 0) {
+            return back()->with('success', "'{$attributeFamily->name}' was not assigned to any product group.");
+        }
+
+        return back()->with('success', "Removed '{$attributeFamily->name}' from {$result['updated']} product group(s).");
+    }
+
+    /**
+     * รายชื่อ "กลุ่มสินค้า" ที่กำลังผูกกับตระกูลนี้อยู่เท่านั้น (ต่างจาก
+     * productGroupsForDefaultPicker() ที่โชว์ทุกกลุ่ม) — dialog "ยกเลิกให้บาง
+     * กลุ่มสินค้า" มีไว้ถอดออก เลยมีความหมายเฉพาะกลุ่มที่ผูกอยู่แล้วเท่านั้น
+     */
+    public function productGroupsForUnassignPicker(Request $request, AttributeFamily $attributeFamily): JsonResponse
+    {
+        $search = $request->input('search');
+        $perPage = (int) $request->input('per_page', 15);
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
+        $groups = Category::query()
+            ->select('categories.*')
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereHas('attributeFamilies', fn ($q) => $q->where('attribute_families.id', $attributeFamily->id))
+            ->with(['parent:id,name,parent_id', 'parent.parent:id,name', 'attributeFamilies:id'])
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
+                });
+            })
+            ->orderBy('root.name')
+            ->orderBy('sub.name')
+            ->orderBy('categories.name')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        $groups->getCollection()->transform(fn (Category $group) => [
+            'id' => $group->id,
+            'name' => $group->name,
+            'subcategory_name' => $group->parent?->name,
+            'category_name' => $group->parent?->parent?->name,
+            'is_default' => $group->attributeFamilies->first()?->id === $attributeFamily->id,
+        ]);
+
+        return response()->json($groups);
+    }
+
+    /**
+     * "ยกเลิกให้บางกลุ่มสินค้า" — เหมือน unsetDefaultForAllGroups() ทุกอย่างแต่
+     * จำกัดเฉพาะกลุ่มสินค้าที่เลือกไว้จาก picker เท่านั้น (ดู
+     * DefaultAttributeFamilyAssigner::unassignFromProductGroups())
+     */
+    public function unsetDefaultForSelectedGroups(Request $request, AttributeFamily $attributeFamily, DefaultAttributeFamilyAssigner $assigner): RedirectResponse
+    {
+        $validated = $request->validate([
+            'category_ids' => ['required', 'array', 'min:1'],
+            'category_ids.*' => ['integer'],
+        ]);
+
+        $validCategoryIds = Category::query()
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereIn('categories.id', $validated['category_ids'])
+            ->pluck('categories.id')
+            ->all();
+
+        $result = $assigner->unassignFromProductGroups($attributeFamily, $validCategoryIds);
+
+        if ($result['updated'] === 0) {
+            return back()->with('success', "'{$attributeFamily->name}' was not assigned to any of the selected product group(s).");
+        }
+
+        return back()->with('success', "Removed '{$attributeFamily->name}' from {$result['updated']} selected product group(s).");
+    }
+
+    /**
      * รายชื่อ "กลุ่มสินค้า" ทั้งหมด (ไม่กรองว่ามีตระกูลแอตทริบิวต์ผูกอยู่แล้วหรือไม่ —
      * ส่วนใหญ่มีตระกูล "เริ่มต้น" ผูกอยู่แล้วทั้งนั้น dialog นี้ไว้ "เพิ่ม" ตระกูล
      * ใหม่ต่อท้ายรายการเดิม ไม่ใช่ตั้งตระกูลแรกให้) — คู่หูของ

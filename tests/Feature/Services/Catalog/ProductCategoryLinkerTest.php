@@ -153,3 +153,32 @@ test('re-deriving updates an existing value in place rather than creating a dupl
     expect($rows)->toHaveCount(1);
     expect($rows->first()->value)->toBe('b');
 });
+
+// --- legacyCodesFromCategories (read-only counterpart, no DB writes) ---
+
+test('legacyCodesFromCategories() computes the same codes as deriveLegacyCodesFromCategories() would write, without touching the DB', function () {
+    $root = Category::create(['code' => 'a', 'name' => 'Root']);
+    $sub = Category::create(['code' => 'a025', 'name' => 'Sub', 'parent_id' => $root->id]);
+    $group = Category::create(['code' => 'a025001', 'name' => 'Group', 'parent_id' => $sub->id]);
+
+    $codes = ProductCategoryLinker::legacyCodesFromCategories([$group->id]);
+
+    expect($codes)->toBe([
+        'pcatid' => 'a',
+        'pcatname' => 'a',
+        'psubcatname' => 'a025',
+        'productgroupname' => 'a025001',
+    ]);
+    expect(ProductValue::count())->toBe(0);
+});
+
+test('legacyCodesFromCategories() returns null for every level when given no category ids', function () {
+    $codes = ProductCategoryLinker::legacyCodesFromCategories([]);
+
+    expect($codes)->toBe([
+        'pcatid' => null,
+        'pcatname' => null,
+        'psubcatname' => null,
+        'productgroupname' => null,
+    ]);
+});

@@ -67,7 +67,7 @@ class ProductCategoryLinker
             return;
         }
 
-        $chain = self::deepestAncestorChain($categoryIds);
+        $codesByAttribute = self::legacyCodesFromCategories($categoryIds);
 
         foreach (self::LEGACY_CODE_LEVELS as $attributeCode => $level) {
             $attributeId = $attributeIds->get($attributeCode);
@@ -75,8 +75,7 @@ class ProductCategoryLinker
                 continue;
             }
 
-            $category = $chain[$level] ?? null;
-            $code = $category ? strtolower(trim($category->code)) : null;
+            $code = $codesByAttribute[$attributeCode] ?? null;
 
             // เขียนเฉพาะ code ที่เป็นตัวเลือกที่ใช้ได้จริงของ attribute ตัวนี้เท่านั้น
             // (เช่น หมวดหมู่ที่สร้างขึ้นเองทีหลังจาก CSV seed แล้วไม่มีตัวเลือก
@@ -93,6 +92,34 @@ class ProductCategoryLinker
                 ProductValue::where('product_id', $product->id)->where('attribute_id', $attributeId)->delete();
             }
         }
+    }
+
+    /**
+     * เหมือน deriveLegacyCodesFromCategories() เป๊ะๆ แต่แค่คำนวณ ไม่เขียนอะไรลง
+     * DB เลย — ให้ ProductController::buildProductFormProps() ใช้เป็น fallback
+     * ตอนโหลดหน้า Edit Product (GET request ล้วนๆ ไม่ควรมี side effect เขียน DB)
+     * สำหรับสินค้าที่ต้นไม้ categories (product_category pivot) ถูก assign ไว้
+     * แล้วจริง แต่ ProductValue ของ pcatname/psubcatname/productgroupname ยังไม่
+     * เคยถูกเขียนหรือค้างอยู่ (เช่น pivot ถูก sync มาจากที่อื่นที่ไม่ผ่าน
+     * updateMasterCategories()/update() ที่เรียก deriveLegacyCodesFromCategories()
+     * จริงๆ ให้) ไม่งั้น dropdown ของ 3 ฟิลด์นี้จะโชว์ว่างทั้งที่มีหมวดหมู่ที่
+     * assign ไว้จริงอยู่ ค่าที่ fallback ตรงนี้จะถูกเขียนถาวรตอนแอดมินกด Save
+     * (ปุ่มไหนก็ได้ที่ท้ายสุดเรียก deriveLegacyCodesFromCategories() จริง)
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return array<string, string|null> attribute code => code ที่ควรจะเป็น
+     */
+    public static function legacyCodesFromCategories(array $categoryIds): array
+    {
+        $chain = self::deepestAncestorChain($categoryIds);
+
+        $result = [];
+        foreach (self::LEGACY_CODE_LEVELS as $attributeCode => $level) {
+            $category = $chain[$level] ?? null;
+            $result[$attributeCode] = $category ? strtolower(trim($category->code)) : null;
+        }
+
+        return $result;
     }
 
     /**

@@ -153,3 +153,88 @@ test('assignToProductGroups() skips a selected group where the family is already
 
     expect($result)->toBe(['updated' => 0, 'skipped' => 1]);
 });
+
+test('unassignFromAllProductGroups() detaches the family from a group where it is the sole default', function () {
+    $group = makeProductGroup();
+    $family = AttributeFamily::create(['code' => 'unfam1']);
+    $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $result = $this->assigner->unassignFromAllProductGroups($family);
+
+    expect($result)->toBe(['updated' => 1, 'skipped' => 0]);
+    expect($group->attributeFamilies()->count())->toBe(0);
+});
+
+test('unassignFromAllProductGroups() removes only the given family and renumbers the rest without gaps', function () {
+    $group = makeProductGroup();
+    $family = AttributeFamily::create(['code' => 'unfam2']);
+    $keep = AttributeFamily::create(['code' => 'unfam2_keep']);
+    $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+    $group->attributeFamilies()->attach($keep->id, ['sort_order' => 1]);
+
+    $result = $this->assigner->unassignFromAllProductGroups($family);
+
+    expect($result)->toBe(['updated' => 1, 'skipped' => 0]);
+    expect($group->attributeFamilies()->orderByPivot('sort_order')->pluck('attribute_families.id')->all())->toBe([$keep->id]);
+    expect($group->attributeFamilies()->wherePivot('family_id', $keep->id)->first()->pivot->sort_order)->toBe(0);
+});
+
+test('unassignFromAllProductGroups() skips, without logging, a group the family was never assigned to', function () {
+    $group = makeProductGroup();
+    $family = AttributeFamily::create(['code' => 'unfam3']);
+
+    $result = $this->assigner->unassignFromAllProductGroups($family);
+
+    expect($result)->toBe(['updated' => 0, 'skipped' => 0]);
+    expect(AuditLog::where('event', 'attribute_families_updated')->where('auditable_id', $group->id)->exists())->toBeFalse();
+});
+
+test('unassignFromAllProductGroups() logs the before/after family id list', function () {
+    $group = makeProductGroup();
+    $family = AttributeFamily::create(['code' => 'unfam4']);
+    $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $this->assigner->unassignFromAllProductGroups($family);
+
+    $log = AuditLog::where('event', 'attribute_families_updated')
+        ->where('auditable_type', $group->getMorphClass())
+        ->where('auditable_id', $group->id)
+        ->first();
+
+    expect($log)->not->toBeNull();
+    expect($log->old_values['family_ids'])->toBe([$family->id]);
+    expect($log->new_values['family_ids'])->toBe([]);
+});
+
+test('unassignFromAllProductGroups() dryRun=true counts what would change but persists nothing', function () {
+    $group = makeProductGroup();
+    $family = AttributeFamily::create(['code' => 'unfam5']);
+    $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $result = $this->assigner->unassignFromAllProductGroups($family, dryRun: true);
+
+    expect($result)->toBe(['updated' => 1, 'skipped' => 0]);
+    expect($group->attributeFamilies()->count())->toBe(1);
+});
+
+test('unassignFromProductGroups() only touches the groups explicitly listed', function () {
+    $family = AttributeFamily::create(['code' => 'unfam6']);
+    $selected = makeProductGroup();
+    $selected->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+    $untouched = makeProductGroup();
+    $untouched->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $result = $this->assigner->unassignFromProductGroups($family, [$selected->id]);
+
+    expect($result)->toBe(['updated' => 1, 'skipped' => 0]);
+    expect($selected->attributeFamilies()->count())->toBe(0);
+    expect($untouched->attributeFamilies()->count())->toBe(1);
+});
+
+test('unassignFromProductGroups() returns zero/zero for an empty category id list', function () {
+    $family = AttributeFamily::create(['code' => 'unfam7']);
+
+    $result = $this->assigner->unassignFromProductGroups($family, []);
+
+    expect($result)->toBe(['updated' => 0, 'skipped' => 0]);
+});

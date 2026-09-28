@@ -121,4 +121,88 @@ class DefaultAttributeFamilyAssigner
 
         return ['updated' => $updated, 'skipped' => $skipped];
     }
+
+    /**
+     * ตรงข้ามกับ assignToAllProductGroups() — ถอด family นี้ออกจากทุกกลุ่มสินค้า
+     * ที่กำลังผูกอยู่ (ไม่ว่าจะเป็น default อยู่ที่ sort_order 0 หรือแค่ต่อท้ายจาก
+     * bulk-generate ก็ตาม) แล้วเรียง sort_order ของตระกูลที่เหลือใหม่ให้ต่อเนื่อง
+     * (0..n-1) ไม่ให้มีช่องว่าง — ใช้โดย
+     * AttributeFamilyController::unsetDefaultForAllGroups()
+     *
+     * @return array{updated: int, skipped: int}
+     */
+    public function unassignFromAllProductGroups(AttributeFamily $family, bool $dryRun = false): array
+    {
+        $groups = Category::query()
+            ->select('categories.*')
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereHas('attributeFamilies', fn ($q) => $q->where('attribute_families.id', $family->id))
+            ->with('attributeFamilies:id')
+            ->orderBy('categories.id')
+            ->get();
+
+        return $this->unassignFromGroups($groups, $family, $dryRun);
+    }
+
+    /**
+     * เหมือน unassignFromAllProductGroups() แค่จำกัดเฉพาะกลุ่มสินค้าที่เลือกไว้ —
+     * ใช้โดย AttributeFamilyController::unsetDefaultForSelectedGroups()
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return array{updated: int, skipped: int}
+     */
+    public function unassignFromProductGroups(AttributeFamily $family, array $categoryIds, bool $dryRun = false): array
+    {
+        if (empty($categoryIds)) {
+            return ['updated' => 0, 'skipped' => 0];
+        }
+
+        $groups = Category::whereIn('id', $categoryIds)
+            ->with('attributeFamilies:id')
+            ->orderBy('id')
+            ->get();
+
+        return $this->unassignFromGroups($groups, $family, $dryRun);
+    }
+
+    /**
+     * @param  Collection<int, Category>  $groups
+     * @return array{updated: int, skipped: int}
+     */
+    private function unassignFromGroups(Collection $groups, AttributeFamily $family, bool $dryRun): array
+    {
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($groups as $group) {
+            $existingIds = $group->attributeFamilies->pluck('id')->all();
+
+            if (! in_array($family->id, $existingIds, true)) {
+                // ไม่ได้ผูกกับกลุ่มนี้อยู่แล้ว — ไม่มีอะไรให้ถอด
+                $skipped++;
+
+                continue;
+            }
+
+            $updated++;
+
+            if ($dryRun) {
+                continue;
+            }
+
+            $remainingIds = array_values(array_filter($existingIds, fn ($id) => $id !== $family->id));
+
+            $pivotData = [];
+            foreach ($remainingIds as $index => $familyId) {
+                $pivotData[$familyId] = ['sort_order' => $index];
+            }
+            $group->attributeFamilies()->sync($pivotData);
+
+            AuditLog::record('attribute_families_updated', $group, ['family_ids' => $existingIds], ['family_ids' => $remainingIds]);
+        }
+
+        return ['updated' => $updated, 'skipped' => $skipped];
+    }
 }
