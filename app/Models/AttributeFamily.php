@@ -126,12 +126,28 @@ class AttributeFamily extends Model
      * dropdown, previously re-queried on every grid page/sort/filter.
      * Invalidated on family CRUD — see
      * AttributeFamilyController::store()/update()/destroy().
+     *
+     * Scoped per locale (key suffix `:l{localeId}`) the same way and for
+     * the same reason as Attribute::cachedList() — this model also
+     * defaults to eager-loading `translations` (every locale) via
+     * `$with`, and a catalog can have one family per product group (see
+     * AttributeFamilyBulkGenerator), so an un-scoped `rememberForever` here
+     * multiplies families × locales into one blob that can be large enough
+     * to exhaust memory_limit on unserialize.
      */
     public static function cachedList(): \Illuminate\Support\Collection
     {
+        $localeId = \App\Models\Locale::idForCode(app()->getLocale());
+
         return Cache::rememberForever(
-            'attribute_families.list:v'.static::listVersion(),
-            fn () => static::select('id', 'code', 'name')->orderBy('name')->get()
+            'attribute_families.list:v'.static::listVersion().':l'.($localeId ?? 0),
+            fn () => static::query()
+                ->with(['translations' => fn ($q) => $localeId
+                    ? $q->where('locale_id', $localeId)
+                    : $q->whereRaw('1 = 0')])
+                ->select('id', 'code', 'name')
+                ->orderBy('name')
+                ->get()
         );
     }
 

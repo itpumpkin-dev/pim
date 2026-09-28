@@ -155,12 +155,32 @@ class Attribute extends Model
      * name/type/is_filterable can change on update (not just create/
      * delete), so update() also bumps this — see
      * AttributeController::store()/update()/destroy().
+     *
+     * Scoped to a single cache entry PER LOCALE (key suffix `:l{localeId}`),
+     * each holding only that locale's `translations` row per attribute —
+     * NOT the model's default `$with = ['translations']` (every locale, on
+     * every attribute). That used to bake every locale's translation into
+     * one `rememberForever` blob, so this cache's serialized size scaled
+     * with attributes × locales, unbounded — on a catalog with many
+     * attributes and several admin UI locales, unserializing that single
+     * blob (Illuminate\Cache\RedisStore::unserialize()) could exhaust PHP's
+     * memory_limit well before the request finished, taking down every page
+     * that calls this (ProductController::index() first, on every load).
+     * One locale's translation per attribute here keeps the per-locale
+     * entry's size proportional to attribute count only.
      */
     public static function cachedList(): \Illuminate\Support\Collection
     {
+        $localeId = \App\Models\Locale::idForCode(app()->getLocale());
+
         return Cache::rememberForever(
-            'attributes.list:v'.static::listVersion(),
-            fn () => static::orderBy('code')->get(['id', 'code', 'name', 'type', 'is_filterable'])
+            'attributes.list:v'.static::listVersion().':l'.($localeId ?? 0),
+            fn () => static::query()
+                ->with(['translations' => fn ($q) => $localeId
+                    ? $q->where('locale_id', $localeId)
+                    : $q->whereRaw('1 = 0')])
+                ->orderBy('code')
+                ->get(['id', 'code', 'name', 'type', 'is_filterable'])
         );
     }
 
