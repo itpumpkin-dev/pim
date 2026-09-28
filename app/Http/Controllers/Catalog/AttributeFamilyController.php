@@ -411,29 +411,13 @@ class AttributeFamilyController extends Controller
      */
     public function productGroupsForUnassignPicker(Request $request, AttributeFamily $attributeFamily): JsonResponse
     {
-        $search = $request->input('search');
         $perPage = (int) $request->input('per_page', 15);
         if (! in_array($perPage, [10, 15, 25, 50], true)) {
             $perPage = 15;
         }
 
-        $groups = Category::query()
-            ->select('categories.*')
-            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
-            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
-            ->whereNull('root.parent_id')
-            ->whereHas('attributeFamilies', fn ($q) => $q->where('attribute_families.id', $attributeFamily->id))
+        $groups = $this->productGroupsForUnassignQuery($attributeFamily, $request->input('search'))
             ->with(['parent:id,name,parent_id', 'parent.parent:id,name', 'attributeFamilies:id'])
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($qq) use ($search) {
-                    $qq->where('categories.code', 'ilike', "%{$search}%")
-                        ->orWhere('categories.name', 'ilike', "%{$search}%")
-                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
-                });
-            })
-            ->orderBy('root.name')
-            ->orderBy('sub.name')
-            ->orderBy('categories.name')
             ->paginate($perPage)
             ->withQueryString();
 
@@ -446,6 +430,40 @@ class AttributeFamilyController extends Controller
         ]);
 
         return response()->json($groups);
+    }
+
+    /**
+     * ทุก id ของกลุ่มสินค้าที่ผูกกับตระกูลนี้อยู่และตรงกับคำค้นปัจจุบัน (ไม่แบ่งหน้า)
+     * — ให้ปุ่ม "เลือกทั้งหมด" ของ dialog "ยกเลิกให้บางกลุ่มสินค้า" เลือกกลุ่มที่
+     * ค้นเจอได้ครบทุกหน้าในคลิกเดียว เหมือนปุ่มเดียวกันของ dialog "สร้างตามกลุ่ม
+     * สินค้า" (ดู productGroupsForBulkGenerateIds())
+     */
+    public function productGroupsForUnassignPickerIds(Request $request, AttributeFamily $attributeFamily): JsonResponse
+    {
+        $ids = $this->productGroupsForUnassignQuery($attributeFamily, $request->input('search'))
+            ->pluck('categories.id');
+
+        return response()->json(['ids' => $ids]);
+    }
+
+    private function productGroupsForUnassignQuery(AttributeFamily $attributeFamily, ?string $search): Builder
+    {
+        return Category::query()
+            ->select('categories.*')
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->whereHas('attributeFamilies', fn ($q) => $q->where('attribute_families.id', $attributeFamily->id))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
+                });
+            })
+            ->orderBy('root.name')
+            ->orderBy('sub.name')
+            ->orderBy('categories.name');
     }
 
     /**

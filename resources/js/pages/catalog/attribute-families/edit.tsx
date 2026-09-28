@@ -645,6 +645,7 @@ export default function AttributeFamilyEdit({
     const [unassignPickerLoading, setUnassignPickerLoading] = useState(false);
     const [selectedUnassignGroupIds, setSelectedUnassignGroupIds] = useState<Set<number>>(new Set());
     const [applyingUnassignGroups, setApplyingUnassignGroups] = useState(false);
+    const [selectAllUnassignLoading, setSelectAllUnassignLoading] = useState(false);
 
     useEffect(() => {
         if (!unassignDialogOpen) return undefined;
@@ -683,6 +684,28 @@ export default function AttributeFamilyEdit({
             return next;
         });
     };
+
+    // ดึง id ของกลุ่มสินค้าที่ผูกกับตระกูลนี้อยู่ตรงกับคำค้นปัจจุบัน "ทุกหน้า" มา
+    // เลือกทีเดียว (เหมือน selectAllMatching ของ BulkGenerateDialog) — union
+    // เข้ากับตัวที่เลือกไว้ก่อนหน้า ไม่ทับของเดิม
+    const selectAllUnassignMatching = () => {
+        if (selectAllUnassignLoading) return;
+
+        setSelectAllUnassignLoading(true);
+        const params = new URLSearchParams();
+        if (unassignPickerSearch.trim()) params.set('search', unassignPickerSearch.trim());
+
+        fetch(`/catalog/attributeFamilies/${family.id}/product-groups-for-unassign-picker/ids?${params}`, {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => res.json())
+            .then((json: { ids: number[] }) => {
+                setSelectedUnassignGroupIds((prev) => new Set([...prev, ...json.ids]));
+            })
+            .finally(() => setSelectAllUnassignLoading(false));
+    };
+
+    const clearUnassignSelection = () => setSelectedUnassignGroupIds(new Set());
 
     const closeUnassignDialog = () => {
         setUnassignDialogOpen(false);
@@ -1586,6 +1609,28 @@ export default function AttributeFamilyEdit({
                             placeholder={t('search')}
                             InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary, mr: 1 }} /> }}
                         />
+
+                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1 }}>
+                            <Button
+                                size="small"
+                                onClick={selectAllUnassignMatching}
+                                disabled={selectAllUnassignLoading || !unassignPickerData || unassignPickerData.total === 0}
+                                startIcon={selectAllUnassignLoading ? <CircularProgress size={12} /> : undefined}
+                                sx={{ textTransform: 'none', minWidth: 0, p: 0, color: FIORI.brand }}
+                            >
+                                {t('selectAllMatching', { count: unassignPickerData?.total ?? 0 })}
+                            </Button>
+                            {selectedUnassignGroupIds.size > 0 && (
+                                <Button
+                                    size="small"
+                                    onClick={clearUnassignSelection}
+                                    sx={{ textTransform: 'none', minWidth: 0, p: 0, color: FIORI.textSecondary }}
+                                >
+                                    {t('clearSelection')}
+                                </Button>
+                            )}
+                        </Stack>
+
                         {selectedUnassignGroupIds.size > 0 && (
                             <Typography variant="caption" sx={{ color: FIORI.brand, display: 'block', mt: 1 }}>
                                 {t('selectedGroupsCount', { count: selectedUnassignGroupIds.size })}

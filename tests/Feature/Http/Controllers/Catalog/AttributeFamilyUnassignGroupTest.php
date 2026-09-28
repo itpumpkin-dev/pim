@@ -52,6 +52,37 @@ test('productGroupsForUnassignPicker() search filters by product group name', fu
     expect($ids)->toBe([$match->id]);
 });
 
+test('productGroupsForUnassignPickerIds() returns every matching id unpaginated, for the "select all" button', function () {
+    $family = AttributeFamily::create(['code' => 'unpicker_ids_fam1']);
+    $assigned = [];
+    for ($i = 0; $i < 20; $i++) {
+        $group = aufProductGroup("Bulk {$i}");
+        $group->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+        $assigned[] = $group->id;
+    }
+    $notAssigned = aufProductGroup('Not Assigned');
+
+    $response = aufController()->productGroupsForUnassignPickerIds(Request::create('/'), $family);
+    $payload = json_decode($response->getContent(), true);
+
+    expect($payload['ids'])->toHaveCount(20);
+    expect($payload['ids'])->toEqualCanonicalizing($assigned);
+    expect($payload['ids'])->not->toContain($notAssigned->id);
+});
+
+test('productGroupsForUnassignPickerIds() honors the search filter', function () {
+    $family = AttributeFamily::create(['code' => 'unpicker_ids_fam2']);
+    $match = aufProductGroup('Findable Widget');
+    $match->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+    $unmatched = aufProductGroup('Something Else Entirely');
+    $unmatched->attributeFamilies()->attach($family->id, ['sort_order' => 0]);
+
+    $response = aufController()->productGroupsForUnassignPickerIds(Request::create('/', 'GET', ['search' => 'Findable']), $family);
+    $payload = json_decode($response->getContent(), true);
+
+    expect($payload['ids'])->toBe([$match->id]);
+});
+
 test('unsetDefaultForAllGroups() detaches the family from every product group it is assigned to', function () {
     $family = AttributeFamily::create(['code' => 'unall_fam1']);
     $groupA = aufProductGroup('A');
