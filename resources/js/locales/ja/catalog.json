@@ -180,7 +180,6 @@
     "selectCurrencies": "通貨を選択",
     "selectLocales": "ロケールを選択",
     "saveChannel": "チャネルの保存",
-
     "channelsTab": "チャネル",
     "salesPlatformsTab": "販売プラットフォーム",
     "salesPlatformsTitle": "販売プラットフォーム",
@@ -278,5 +277,7 @@
     "uploadPercentComplete": "{{percent}}% 完了",
     "mappedToPlatformPayloadChip": "{{platform}} にマップ済み",
     "mappedToPlatformPayloadTooltip": "この商品をプッシュする際、このフィールドは {{platform}} の「{{field}}」ペイロードフィールドに送られます。",
-    "productSavedSuccess": "商品を保存しました。"
+    "productSavedSuccess": "商品を保存しました。",
+    "saveAndTranslate": "保存して他の言語に翻訳",
+    "productSavedTranslationQueued": "製品を保存しました — 未入力の他言語への翻訳をキューに追加しました。"
 }

@@ -482,6 +482,7 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
     category_fields: 'Category Fields',
     brands: 'Brands',
     product_groups: 'Product Groups',
+    products: 'Products',
 };
 
 function jobDateTime(value: string | null): string {

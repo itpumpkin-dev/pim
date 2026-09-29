@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Attribute;
+use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
@@ -96,26 +98,49 @@ class AttributeAutoTranslator
      * marketplace/CSV export/storefront consumers that share this
      * limitation for now.
      */
-    public function fillMissingProductValue(int $productId, int $attributeId, int $sourceLocaleId, string $sourceValue): void
+    /**
+     * @param  int|null  $actorUserId  ผู้ที่สั่งแปล (user ของ JobTracker) — ใช้เป็นผู้กระทำใน
+     *                                 audit log เพราะตอนรันใน queue ไม่มี auth() ให้อ่าน
+     * @return array<int, string> error ของแต่ละภาษาที่แปลไม่สำเร็จ (ว่าง = สำเร็จทุกภาษา)
+     */
+    public function fillMissingProductValue(int $productId, int $attributeId, int $sourceLocaleId, string $sourceValue, ?int $actorUserId = null): array
     {
         $product = Product::find($productId);
         $effectiveFamilyIds = $product ? $this->familyAttributeResolver->effectiveFamilyIds($product) : [];
         $groupId = $this->familyAttributeResolver->primaryGroupIdFor($attributeId, $effectiveFamilyIds);
 
-        $this->translateMissing($sourceLocaleId, $sourceValue, function () use ($productId, $attributeId, $groupId) {
-            return ProductValue::where('product_id', $productId)
+        $existing = [];
+        $oldValues = [];
+        $newValues = [];
+        $code = Attribute::whereKey($attributeId)->value('code') ?? "attribute_{$attributeId}";
+        // key รูปแบบเดียวกับ ProductController::productValueSnapshot() — diff ในแท็บ
+        // ประวัติจะได้อ่านเหมือนการแก้ไขปกติ
+        $auditKey = fn (int $localeId) => $code.'['.implode(',', array_filter([$groupId ? "group:{$groupId}" : null, "locale:{$localeId}"])).']';
+
+        $errors = $this->translateMissing($sourceLocaleId, $sourceValue, function () use ($productId, $attributeId, $groupId, &$existing) {
+            return $existing = ProductValue::where('product_id', $productId)
                 ->where('attribute_id', $attributeId)
                 ->where('attribute_group_id', $groupId)
                 ->whereNull('channel_id')
                 ->whereNotNull('locale_id')
                 ->pluck('value', 'locale_id')
                 ->all();
-        }, function (string $value, Locale $locale) use ($productId, $attributeId, $groupId) {
+        }, function (string $value, Locale $locale) use ($productId, $attributeId, $groupId, &$existing, &$oldValues, &$newValues, $auditKey) {
             ProductValue::updateOrCreate(
                 ['product_id' => $productId, 'attribute_id' => $attributeId, 'attribute_group_id' => $groupId, 'channel_id' => null, 'locale_id' => $locale->id],
                 ['value' => $value]
             );
+            $oldValues[$auditKey($locale->id)] = $existing[$locale->id] ?? null;
+            $newValues[$auditKey($locale->id)] = $value;
         }, ['model' => ProductValue::class, 'product_id' => $productId, 'attribute_id' => $attributeId], retranslateIdenticalCopies: true);
+
+        // ProductValue ไม่มี Auditable — ไม่บันทึกเองตรงนี้ ค่าที่ AI แปลจะไม่โผล่ในแท็บ
+        // ประวัติของสินค้าเลย (แยกไม่ออกว่าค่าไหนเครื่องแปล ค่าไหนคนพิมพ์)
+        if ($product && $newValues) {
+            AuditLog::record('attribute_values_auto_translated', $product, $oldValues, $newValues, $actorUserId);
+        }
+
+        return $errors;
     }
 
     /**
@@ -136,22 +161,28 @@ class AttributeAutoTranslator
      * @param callable(): array<int, string> $existingValuesByLocale locale_id => current value
      * @param callable(string, Locale): void $save
      */
-    private function translateMissing(int $sourceLocaleId, string $sourceLabel, callable $existingValuesByLocale, callable $save, array $logContext, bool $retranslateIdenticalCopies = false): void
+    /**
+     * @return array<int, string> error ต่อภาษาที่แปลไม่สำเร็จ ("{locale}: {message}") —
+     *         ผู้เรียกที่มี tracker เอาไปแสดงในแท็บงานแปลได้ (เดิมถูกกลืนลง log อย่างเดียว)
+     */
+    private function translateMissing(int $sourceLocaleId, string $sourceLabel, callable $existingValuesByLocale, callable $save, array $logContext, bool $retranslateIdenticalCopies = false): array
     {
         $sourceLabel = trim($sourceLabel);
         if ($sourceLabel === '') {
-            return;
+            return [];
         }
 
         $provider = TranslationProvider::where('enabled', true)->where('is_default', true)->first();
         if (!$provider) {
-            return;
+            return ['No enabled default translation provider is configured.'];
         }
 
         $sourceLocale = Locale::find($sourceLocaleId);
         if (!$sourceLocale) {
-            return;
+            return [];
         }
+
+        $errors = [];
 
         $existingValues = $existingValuesByLocale();
 
@@ -159,7 +190,9 @@ class AttributeAutoTranslator
             if ($locale->id === $sourceLocale->id) {
                 return false;
             }
-            if (!array_key_exists($locale->id, $existingValues)) {
+            // แถวที่มีอยู่แต่ค่าว่าง (บันทึกฟอร์มตอนช่องยังว่าง) ถือว่ายังไม่ได้แปล —
+            // ไม่งั้นงานที่ controller มองว่า "ขาด" แล้วสั่งมา จะถูกข้ามทิ้งเงียบๆ ที่นี่
+            if (!array_key_exists($locale->id, $existingValues) || trim((string) $existingValues[$locale->id]) === '') {
                 return true;
             }
 
@@ -183,7 +216,10 @@ class AttributeAutoTranslator
                     'locale' => $locale->code,
                     'error' => $e->getMessage(),
                 ]);
+                $errors[] = "{$locale->code}: {$e->getMessage()}";
             }
         }
+
+        return $errors;
     }
 }

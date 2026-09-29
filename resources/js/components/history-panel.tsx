@@ -8,6 +8,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import CloseIcon from '@mui/icons-material/Close';
 import {
     Box,
+    Chip,
     Divider,
     IconButton,
     MenuItem,
@@ -133,7 +134,16 @@ export function HistoryPanel({ historyUrl }: { historyUrl: string }) {
             key: 'user',
             header: 'User',
             priority: 'high',
-            render: (entry) => <Typography sx={{ color: 'primary.main' }}>{entry.user}</Typography>,
+            render: (entry) => (
+                <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography sx={{ color: 'primary.main' }}>{entry.user}</Typography>
+                    {/* ค่าที่งานแปลอัตโนมัติเขียน (AutoTranslateProductValueJob) — แยกให้เห็นจาก
+                        การแก้ไขที่คนพิมพ์เอง ผู้ใช้ที่แสดงคือคนที่สั่งแปล */}
+                    {entry.event === 'attribute_values_auto_translated' && (
+                        <Chip label="AI translated" size="small" sx={{ height: 20, fontSize: 11, bgcolor: '#ede9fe', color: '#6d28d9' }} />
+                    )}
+                </Stack>
+            ),
         },
         {
             key: 'actions',

@@ -72,6 +72,8 @@
     "saveProduct": "Guardar producto",
     "saveDraft": "Guardar borrador",
     "saveAndPublish": "Guardar y publicar",
+    "saveAndTranslate": "Guardar y traducir a otros idiomas",
+    "productSavedTranslationQueued": "Producto guardado: la traducción a los demás idiomas vacíos se ha puesto en cola.",
     "saveAsTemplate": "Guardar como plantilla",
     "confirmSaveDraft": "Confirmar guardar borrador",
     "confirmSaveDraftMessage": "Esto guardará los cambios actuales y siempre pondrá el producto como \"deshabilitado\" (no publicado). ¿Continuar?",

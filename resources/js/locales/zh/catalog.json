@@ -51,6 +51,8 @@
     "saveProduct": "保存产品",
     "saveDraft": "保存草稿",
     "saveAndPublish": "保存并发布",
+    "saveAndTranslate": "保存并翻译其他语言",
+    "productSavedTranslationQueued": "产品已保存——已将其他空白语言的翻译加入队列。",
     "saveAsTemplate": "另存为模板",
     "confirmSaveDraft": "确认保存草稿",
     "confirmSaveDraftMessage": "此操作将保存当前更改，并始终将产品设置为“已禁用”(未发布)。是否继续？",

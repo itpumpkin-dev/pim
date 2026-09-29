@@ -15,6 +15,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
 import SyncOutlinedIcon from '@mui/icons-material/SyncOutlined';
+import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 import { Box, Chip, Collapse, IconButton, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 interface TimelineDiffRow {
@@ -67,6 +68,8 @@ const EVENT_META: Record<string, { label: string; icon: typeof HistoryOutlinedIc
     // changes already fall under "updated" above via the Auditable trait).
     attribute_values_updated: { label: 'Product details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
     variant_values_updated: { label: 'Variant details updated', icon: EditNoteOutlinedIcon, color: '#2563eb' },
+    // AutoTranslateProductValueJob → AttributeAutoTranslator::fillMissingProductValue()
+    attribute_values_auto_translated: { label: 'AI translated', icon: TranslateOutlinedIcon, color: '#7c3aed' },
     // Lazada category/attribute mapping journey — see
     // LazadaMappingTimelineBuilder and the AuditLog::record() call sites it
     // pulls from (CategoryController::bulkMapMarketplaceCategory(),

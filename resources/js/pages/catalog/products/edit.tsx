@@ -1640,7 +1640,7 @@ export default function ProductEdit({
      *                        reads it) so the request is correct regardless
      *                        of React's state-update timing.
      */
-    const performSave = (options?: { forceDisabled?: boolean; onSuccess?: () => void }) => {
+    const performSave = (options?: { forceDisabled?: boolean; translateOtherLocales?: boolean; onSuccess?: () => void }) => {
         setConflictMessage(null);
         if (options?.forceDisabled) setData('enabled', false);
         // PHP ไม่รองรับการ parse body แบบ multipart/form-data สำหรับ request แบบ PUT
@@ -1648,6 +1648,9 @@ export default function ProductEdit({
         transform((formData) => ({
             ...formData,
             ...(options?.forceDisabled ? { enabled: false } : {}),
+            // "บันทึกและแปลภาษาอื่น" — backend ใช้ภาษาที่กำลังแก้อยู่ (activeLocaleId)
+            // เป็นต้นทาง แล้วเติมเฉพาะภาษาที่ยังว่าง ดู ProductController::update()
+            ...(options?.translateOtherLocales ? { translate_other_locales: 1, translation_source_locale_id: activeLocaleId } : {}),
             _method: 'put',
             expected_updated_at: product.updated_at,
         }));
@@ -2094,6 +2097,23 @@ export default function ProductEdit({
                                     <DraftsIcon fontSize="small" sx={{ mr: 1.5 }} />
                                     {t('saveDraft')}
                                 </MenuItem>
+                                {/* บันทึกแล้วสั่งแปลจากภาษาที่กำลังแก้ ไปยังภาษาอื่นที่เปิดใช้งานและยังว่าง —
+                                    gate ด้วยสิทธิ์เดียวกับ "สั่งแปลส่วนที่ขาด" ในเมนู More */}
+                                {canQueueTranslations && (
+                                    <MenuItem
+                                        disabled={processing}
+                                        onClick={() => {
+                                            setSaveMenuAnchor(null);
+                                            performSave({
+                                                translateOtherLocales: true,
+                                                onSuccess: () => setPushResult({ severity: 'success', message: t('productSavedTranslationQueued') }),
+                                            });
+                                        }}
+                                    >
+                                        <TranslateIcon fontSize="small" sx={{ mr: 1.5 }} />
+                                        {t('saveAndTranslate')}
+                                    </MenuItem>
+                                )}
                                 {/* ย้ายมาจากปุ่ม "เผยแพร่" แยกต่างหากในทูลบาร์เดิม — gate ด้วย
                                     canEditSalesChannels ตัวเดียวกับปุ่มเดิมนั้น (คุม published_shop_ids
                                     ที่ publish() ใช้) เปิด dialog ยืนยันเดิมไว้ก่อน กด confirm ค่อยเรียก

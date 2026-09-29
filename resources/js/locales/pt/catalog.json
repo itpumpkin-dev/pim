@@ -180,7 +180,6 @@
     "selectCurrencies": "Select currencies",
     "selectLocales": "Select locales",
     "saveChannel": "Save Channel",
-
     "channelsTab": "Channels",
     "salesPlatformsTab": "Sales Platforms",
     "salesPlatformsTitle": "Sales Platforms",
@@ -278,5 +277,7 @@
     "uploadPercentComplete": "{{percent}}% complete",
     "mappedToPlatformPayloadChip": "Mapped to {{platform}}",
     "mappedToPlatformPayloadTooltip": "This field feeds {{platform}}'s \"{{field}}\" payload field when this product is pushed.",
-    "productSavedSuccess": "Product saved successfully."
+    "productSavedSuccess": "Product saved successfully.",
+    "saveAndTranslate": "Salvar e traduzir para outros idiomas",
+    "productSavedTranslationQueued": "Produto salvo — a tradução para os outros idiomas vazios foi colocada na fila."
 }

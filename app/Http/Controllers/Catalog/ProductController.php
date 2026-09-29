@@ -18,6 +18,7 @@ use App\Models\Channel;
 use App\Models\FamilyAttribute;
 use App\Models\LazadaAttributeMapping;
 use App\Models\LazadaCategoryAttribute;
+use App\Models\JobTracker;
 use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductAssociation;
@@ -839,14 +840,19 @@ class ProductController extends Controller
      * @param  array<int, array{id: int}>  $localeList
      * @return array{sourceLocaleId: int|null, sourceValue: string, missingLocaleIds: int[]}
      */
-    private function resolveAttributeCoverage(array $valuesByLocale, array $localeList, string $sku, bool $isNameAttribute, ?int $thaiLocaleId): array
+    private function resolveAttributeCoverage(array $valuesByLocale, array $localeList, string $sku, bool $isNameAttribute, ?int $thaiLocaleId, ?int $preferredSourceLocaleId = null): array
     {
         $isRealValue = fn (?string $value) => ! $this->isProductValueMissing($value, $sku, $isNameAttribute);
 
         $sourceLocaleId = null;
         $sourceValue = '';
 
-        if ($thaiLocaleId !== null && $isRealValue($valuesByLocale[$thaiLocaleId] ?? null)) {
+        // "Save and translate" ส่งภาษาที่ผู้ใช้กำลังแก้อยู่มา — ใช้เป็นต้นทางก่อนภาษาไทย
+        // ถ้าฟิลด์นั้นมีค่าจริงในภาษานั้น (ไม่งั้นตกไปใช้ลำดับเดิมด้านล่าง)
+        if ($preferredSourceLocaleId !== null && $isRealValue($valuesByLocale[$preferredSourceLocaleId] ?? null)) {
+            $sourceLocaleId = $preferredSourceLocaleId;
+            $sourceValue = trim($valuesByLocale[$preferredSourceLocaleId]);
+        } elseif ($thaiLocaleId !== null && $isRealValue($valuesByLocale[$thaiLocaleId] ?? null)) {
             $sourceLocaleId = $thaiLocaleId;
             $sourceValue = trim($valuesByLocale[$thaiLocaleId]);
         } else {
@@ -1019,8 +1025,13 @@ class ProductController extends Controller
      *         placeholder) — ผู้เรียกใช้ค่านี้แยกกรณี "แปลครบแล้ว" ออกจาก
      *         "ติดอยู่ ต้องพิมพ์ค่าใส่เองก่อน" ตอนที่ queued เป็น 0
      */
-    private function queueProductTranslationJobs(Collection $products): array
+    private function queueProductTranslationJobs(Collection $products, ?int $preferredSourceLocaleId = null): array
     {
+        // แถวติดตามในแท็บ "งานแปล" หน้า Locales — เปิดตอน dispatch งานแรกจริงเท่านั้น
+        // (สั่งแล้วไม่มีอะไรต้องแปลจะได้ไม่มีแถวค้างสถานะ processing ตลอดไป)
+        $tracker = null;
+        $reference = $products->count() === 1 ? (string) $products->first()->sku : "{$products->count()} products";
+
         $localeBasedAttributeIds = Attribute::where('is_locale_based', true)->pluck('id');
         $nameAttributeId = Attribute::idForCode('pname');
         $thaiLocaleId = Locale::idForCode('th');
@@ -1052,7 +1063,7 @@ class ProductController extends Controller
                 $valuesByLocale = $this->foldGlobalValueIntoThai($rawValuesByLocale, $thaiLocaleId);
                 $isNameAttribute = $attributeId === $nameAttributeId;
 
-                $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $product->sku, $isNameAttribute, $thaiLocaleId);
+                $coverage = $this->resolveAttributeCoverage($valuesByLocale, $localeList, $product->sku, $isNameAttribute, $thaiLocaleId, $preferredSourceLocaleId);
                 if (empty($coverage['missingLocaleIds'])) {
                     continue;
                 }
@@ -1063,7 +1074,9 @@ class ProductController extends Controller
                     continue;
                 }
 
-                AutoTranslateProductValueJob::dispatch($product->id, $attributeId, $coverage['sourceLocaleId'], $coverage['sourceValue']);
+                $tracker ??= JobTracker::openTranslation('products', $reference, auth()->id());
+                $tracker->noteTranslationQueued();
+                AutoTranslateProductValueJob::dispatch($product->id, $attributeId, $coverage['sourceLocaleId'], $coverage['sourceValue'], $tracker->id);
                 $queued++;
             }
         }
@@ -4190,6 +4203,19 @@ class ProductController extends Controller
                 : null,
         ]));
 
+        // "Save and translate other languages" (เมนูปุ่ม Save ของ edit.tsx) — หลัง
+        // บันทึกสำเร็จแล้วเท่านั้น สั่งคิวแปลแบบเดียวกับ queueMissingTranslations()
+        // แต่ใช้ภาษาที่ผู้ใช้กำลังแก้อยู่เป็นต้นทาง และเติมเฉพาะภาษาที่ยังว่าง
+        // (หรือเป็นสำเนาต้นฉบับ) ไม่เขียนทับคำแปลที่มีอยู่แล้ว
+        $translationNote = '';
+        if ($request->boolean('translate_other_locales') && $request->user()?->hasPermission('product_translations', 'edit_product_translations')) {
+            $sourceLocaleId = Locale::active()->firstWhere('id', $request->integer('translation_source_locale_id'))?->id;
+            $result = $this->queueProductTranslationJobs(collect([$product->fresh()]), $sourceLocaleId);
+            $translationNote = $result['queued'] > 0
+                ? " Queued {$result['queued']} field(s) for translation."
+                : ' Nothing to translate — every other language already has a value.';
+        }
+
         // $lostPlatformMappings (from reconcilePlatformCategoryOverrides(),
         // via the transaction closure above) — surfaced here as a 'warning'
         // flash instead of the usual plain 'success' so it can't be missed
@@ -4210,10 +4236,10 @@ class ProductController extends Controller
                 route('catalog.products.edit', $product)
             );
 
-            return $redirect->with('warning', $message);
+            return $redirect->with('warning', $message.$translationNote);
         }
 
-        return $redirect->with('success', 'Product updated successfully.');
+        return $redirect->with('success', 'Product updated successfully.'.$translationNote);
     }
 
     /**

@@ -72,6 +72,8 @@
     "saveProduct": "Save Product",
     "saveDraft": "Save Draft",
     "saveAndPublish": "Save and Publish",
+    "saveAndTranslate": "Save and translate other languages",
+    "productSavedTranslationQueued": "Product saved — translation into the other empty languages has been queued.",
     "saveAsTemplate": "Save as Template",
     "confirmSaveDraft": "Confirm Save Draft",
     "confirmSaveDraftMessage": "This will save your current changes and always set the product to \"disabled\" (unpublished). Continue?",

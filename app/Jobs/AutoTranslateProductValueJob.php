@@ -48,18 +48,43 @@ class AutoTranslateProductValueJob implements ShouldQueue
         $cancelled = $this->jobTrackerId
             && JobTracker::where('id', $this->jobTrackerId)->whereNotNull('cancel_requested_at')->exists();
 
+        $errors = [];
         if (!$cancelled) {
-            $translator->fillMissingProductValue(
+            $errors = $translator->fillMissingProductValue(
                 $this->productId,
                 $this->attributeId,
                 $this->sourceLocaleId,
                 $this->sourceValue,
+                // ผู้สั่งแปล — ใช้เป็นผู้กระทำใน audit log (queue ไม่มี auth())
+                $this->jobTrackerId ? JobTracker::whereKey($this->jobTrackerId)->value('user_id') : null,
             );
         }
 
-        if ($this->jobTrackerId) {
-            JobTracker::where('id', $this->jobTrackerId)->increment('total_translations_completed');
+        // error รายภาษา (เช่น DeepL ปฏิเสธ key) — เดิมหายเงียบลง log ตอนนี้ขึ้นในแท็บงานแปลด้วย
+        $this->reportDone($errors ? implode('; ', $errors) : null);
+    }
+
+    /**
+     * Two kinds of tracker can own this job: an import's (raw counter bump —
+     * the import closes itself) or a standalone "translate this product" run
+     * from JobTracker::openTranslation() (Locales page → Translation Jobs tab),
+     * which must go through noteTranslationDone() so it closes + notifies once
+     * every queued field has reported back.
+     */
+    private function reportDone(?string $error = null): void
+    {
+        if (! $this->jobTrackerId) {
+            return;
         }
+
+        $tracker = JobTracker::find($this->jobTrackerId);
+        if ($tracker?->job_type === 'translation') {
+            $tracker->noteTranslationDone($error);
+
+            return;
+        }
+
+        JobTracker::where('id', $this->jobTrackerId)->increment('total_translations_completed');
     }
 
     /**
@@ -70,10 +95,8 @@ class AutoTranslateProductValueJob implements ShouldQueue
      * completed catch up to queued, and poll every 2s forever showing
      * "Translating" for work that's actually dead.
      */
-    public function failed(): void
+    public function failed(\Throwable $e): void
     {
-        if ($this->jobTrackerId) {
-            JobTracker::where('id', $this->jobTrackerId)->increment('total_translations_completed');
-        }
+        $this->reportDone($e->getMessage());
     }
 }

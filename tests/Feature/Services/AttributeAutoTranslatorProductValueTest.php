@@ -111,3 +111,65 @@ test('fillMissingProductValue() writes to attribute_group_id = null for an attri
     expect($row->attribute_group_id)->toBeNull();
     expect($row->value)->toBe('translated text');
 });
+
+test('fillMissingProductValue() records an "AI translated" audit entry on the product, attributed to the requesting user', function () {
+    aatSetUpFakeProvider();
+
+    $thaiLocaleId = aatEnsureLocale('th');
+    $enLocaleId = aatEnsureLocale('en');
+    $user = App\Models\User::factory()->create();
+
+    $attribute = Attribute::create(['code' => 'aat_audit_attr', 'type' => 'text', 'is_locale_based' => true]);
+    $product = Product::create(['sku' => 'AAT-AUDIT-'.uniqid(), 'type' => 'simple', 'enabled' => false]);
+
+    $errors = app(AttributeAutoTranslator::class)->fillMissingProductValue($product->id, $attribute->id, $thaiLocaleId, 'source', $user->id);
+
+    expect($errors)->toBe([]);
+    $log = App\Models\AuditLog::where('event', 'attribute_values_auto_translated')
+        ->where('auditable_type', $product->getMorphClass())->where('auditable_id', $product->id)->first();
+    expect($log)->not->toBeNull();
+    expect($log->user_id)->toBe($user->id);
+    expect($log->new_values)->toHaveKey("aat_audit_attr[locale:{$enLocaleId}]", 'translated text');
+    expect($log->old_values["aat_audit_attr[locale:{$enLocaleId}]"])->toBeNull();
+});
+
+test('fillMissingProductValue() fills a locale whose existing row is blank instead of skipping it', function () {
+    aatSetUpFakeProvider();
+
+    $thaiLocaleId = aatEnsureLocale('th');
+    $enLocaleId = aatEnsureLocale('en');
+
+    $attribute = Attribute::create(['code' => 'aat_blank_attr', 'type' => 'text', 'is_locale_based' => true]);
+    $product = Product::create(['sku' => 'AAT-BLANK-'.uniqid(), 'type' => 'simple', 'enabled' => false]);
+    ProductValue::create(['product_id' => $product->id, 'attribute_id' => $attribute->id, 'locale_id' => $enLocaleId, 'value' => '']);
+
+    app(AttributeAutoTranslator::class)->fillMissingProductValue($product->id, $attribute->id, $thaiLocaleId, 'source');
+
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $attribute->id)->where('locale_id', $enLocaleId)->value('value'))
+        ->toBe('translated text');
+});
+
+test('fillMissingProductValue() returns per-locale provider errors and records no audit entry when nothing was written', function () {
+    // not aatSetUpFakeProvider(): its 200 stub would be matched first and win
+    TranslationProvider::query()->update(['enabled' => false, 'is_default' => false]);
+    TranslationProvider::create([
+        'type' => 'libretranslate',
+        'name' => 'Fake',
+        'credentials' => ['url' => 'https://fake-translate.test/translate'],
+        'enabled' => true,
+        'is_default' => true,
+    ]);
+    Http::fake(['fake-translate.test/*' => Http::response(['error' => 'bad key'], 403)]);
+
+    $thaiLocaleId = aatEnsureLocale('th');
+    aatEnsureLocale('en');
+
+    $attribute = Attribute::create(['code' => 'aat_error_attr', 'type' => 'text', 'is_locale_based' => true]);
+    $product = Product::create(['sku' => 'AAT-ERR-'.uniqid(), 'type' => 'simple', 'enabled' => false]);
+
+    $errors = app(AttributeAutoTranslator::class)->fillMissingProductValue($product->id, $attribute->id, $thaiLocaleId, 'source');
+
+    expect($errors)->not->toBeEmpty();
+    expect($errors[0])->toStartWith('en: ');
+    expect(App\Models\AuditLog::where('event', 'attribute_values_auto_translated')->where('auditable_id', $product->id)->exists())->toBeFalse();
+});
