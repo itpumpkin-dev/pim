@@ -2,6 +2,7 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import { Autocomplete, Box, Button, Drawer, IconButton, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface ProductFamilyOption {
     id: number;
@@ -56,6 +57,7 @@ export function ProductFilterDrawer({
     attributeFilters: AttributeFilterRow[];
     onApply: (filters: ProductFilters, attributeFilters: AttributeFilterRow[]) => void;
 }) {
+    const { t } = useTranslation('grid');
     const [draftFilters, setDraftFilters] = useState<ProductFilters>(filters);
     const [draftAttrFilters, setDraftAttrFilters] = useState<AttributeFilterRow[]>(attributeFilters);
 
@@ -95,7 +97,7 @@ export function ProductFilterDrawer({
             <Box sx={{ width: 340, p: 3 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                     <Typography variant="h6" fontWeight={700}>
-                        Apply Filters
+                        {t('filterDrawerTitle')}
                     </Typography>
                     <IconButton onClick={onClose} size="small">
                         <CloseIcon />
@@ -118,12 +120,12 @@ export function ProductFilterDrawer({
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            Name
+                            {t('filterDrawerName')}
                         </Typography>
                         <TextField
                             fullWidth
                             size="small"
-                            placeholder="Name"
+                            placeholder={t('filterDrawerName')}
                             value={draftFilters.name ?? ''}
                             onChange={(e) => setDraftFilters((prev) => ({ ...prev, name: e.target.value }))}
                         />
@@ -131,7 +133,7 @@ export function ProductFilterDrawer({
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            Attribute Family
+                            {t('filterDrawerAttributeFamily')}
                         </Typography>
                         <Select
                             fullWidth
@@ -141,7 +143,7 @@ export function ProductFilterDrawer({
                             onChange={(e) => setDraftFilters((prev) => ({ ...prev, family_id: e.target.value === '' ? '' : Number(e.target.value) }))}
                         >
                             <MenuItem value="">
-                                <em>Select option</em>
+                                <em>{t('filterDrawerSelectOption')}</em>
                             </MenuItem>
                             {families.map((family) => (
                                 <MenuItem key={family.id} value={family.id}>
@@ -153,7 +155,7 @@ export function ProductFilterDrawer({
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            Status
+                            {t('filterDrawerStatus')}
                         </Typography>
                         <Select
                             fullWidth
@@ -163,16 +165,16 @@ export function ProductFilterDrawer({
                             onChange={(e) => setDraftFilters((prev) => ({ ...prev, enabled: e.target.value as ProductFilters['enabled'] }))}
                         >
                             <MenuItem value="">
-                                <em>Select</em>
+                                <em>{t('filterDrawerSelect')}</em>
                             </MenuItem>
-                            <MenuItem value="1">Enabled</MenuItem>
-                            <MenuItem value="0">Disabled</MenuItem>
+                            <MenuItem value="1">{t('enabled')}</MenuItem>
+                            <MenuItem value="0">{t('disabled')}</MenuItem>
                         </Select>
                     </Box>
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            Type
+                            {t('filterDrawerType')}
                         </Typography>
                         <Select
                             fullWidth
@@ -182,10 +184,10 @@ export function ProductFilterDrawer({
                             onChange={(e) => setDraftFilters((prev) => ({ ...prev, type: e.target.value as ProductFilters['type'] }))}
                         >
                             <MenuItem value="">
-                                <em>Select</em>
+                                <em>{t('filterDrawerSelect')}</em>
                             </MenuItem>
-                            <MenuItem value="simple">Simple</MenuItem>
-                            <MenuItem value="configurable">Configurable</MenuItem>
+                            <MenuItem value="simple">{t('filterDrawerSimple')}</MenuItem>
+                            <MenuItem value="configurable">{t('filterDrawerConfigurable')}</MenuItem>
                         </Select>
                     </Box>
 
@@ -198,11 +200,11 @@ export function ProductFilterDrawer({
                                 getOptionLabel={(opt) => opt.label || opt.code}
                                 value={filterableAttributes.find((attr) => attr.id === row.attribute_id) ?? null}
                                 onChange={(_, val) => updateFilterRow(index, { attribute_id: val?.id ?? '' })}
-                                renderInput={(params) => <TextField {...params} placeholder="Search..." />}
+                                renderInput={(params) => <TextField {...params} placeholder={t('filterDrawerSearchAttribute')} />}
                             />
                             <TextField
                                 size="small"
-                                placeholder="Value"
+                                placeholder={t('filterDrawerValue')}
                                 sx={{ flex: 1 }}
                                 value={row.value}
                                 onChange={(e) => updateFilterRow(index, { value: e.target.value })}
@@ -219,12 +221,12 @@ export function ProductFilterDrawer({
                         onClick={addFilterRow}
                         sx={{ borderStyle: 'dashed' }}
                     >
-                        Add Filter
+                        {t('filterDrawerAddFilter')}
                     </Button>
                 </Stack>
 
                 <Button fullWidth variant="contained" sx={{ mt: 3, color: 'white' }} onClick={save}>
-                    Save
+                    {t('filterDrawerSave')}
                 </Button>
             </Box>
         </Drawer>

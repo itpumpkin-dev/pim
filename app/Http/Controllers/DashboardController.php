@@ -79,7 +79,7 @@ class DashboardController extends Controller
             $topViewed = $this->cacheRemember('topViewed:' . ($categoryId ?? 'all') . ':' . app()->getLocale(), fn () => $this->topViewedProducts($productIdsInCategory));
             $categoryOptions = $this->cacheRemember('categoryOptions', fn () => Category::whereHas('products')->orderBy('name')->get(['id', 'name']));
             $lowStockCount = $this->cacheRemember('lowStock', fn () => $this->lowStockCount());
-            $categoryPieChart = $this->cacheRemember('chart:categoryPie', fn () => $this->categoryPieChart());
+            $categoryPieChart = $this->categoryPieChart($this->cacheRemember('chart:categoryPie:counts', fn () => $this->categoryPieCounts()));
         }
 
         $categoryStat = $canCategories ? $this->cachedStat('category', Category::query()) : self::EMPTY_STAT;
@@ -215,17 +215,38 @@ class DashboardController extends Controller
         return $series;
     }
 
-    /** Product count per category (top 8), for the category distribution pie chart. */
-    private function categoryPieChart(): array
+    /**
+     * Product count per category id (top 8) — locale-neutral, so one cache
+     * entry serves every UI language; names are resolved per request below.
+     *
+     * @return array<int, int> category id => product count
+     */
+    private function categoryPieCounts(): array
     {
         return DB::table('product_category')
-            ->join('categories', 'categories.id', '=', 'product_category.category_id')
-            ->select('categories.name', DB::raw('COUNT(*) as count'))
-            ->groupBy('categories.id', 'categories.name')
+            ->select('category_id', DB::raw('COUNT(*) as count'))
+            ->groupBy('category_id')
             ->orderByDesc('count')
             ->limit(8)
-            ->get()
-            ->map(fn ($row) => ['label' => $row->name, 'value' => (int) $row->count])
+            ->pluck('count', 'category_id')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+    }
+
+    /**
+     * Category distribution pie chart, labelled in the current UI locale via
+     * Category's translated `name` accessor.
+     *
+     * @param array<int, int> $counts category id => product count
+     */
+    private function categoryPieChart(array $counts): array
+    {
+        $categories = Category::whereIn('id', array_keys($counts))->get(['id', 'name'])->keyBy('id');
+
+        return collect($counts)
+            ->filter(fn ($count, $id) => $categories->has($id))
+            ->map(fn ($count, $id) => ['label' => $categories[$id]->name, 'value' => $count])
+            ->values()
             ->all();
     }
 

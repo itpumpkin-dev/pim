@@ -132,9 +132,17 @@ class ProductPresenter
         }
 
         $labelsByAttributeId = AttributeOption::whereIn('attribute_id', $attributeIdsByCode->values())
-            ->get(['attribute_id', 'code', 'admin_label'])
+            // ต้องมี `id` ด้วย ไม่งั้น eager-load `translations` ($with) จับคู่แถวไม่ได้
+            // แล้ว admin_label accessor จะคืนค่า label ดิบ (ไทย) แทนภาษาที่เลือก
+            ->get(['id', 'attribute_id', 'code', 'admin_label'])
             ->groupBy('attribute_id')
-            ->map(fn (Collection $options) => $options->pluck('admin_label', 'code'));
+            // ชื่อแบรนด์เป็นชื่อเฉพาะ ห้ามแปล (translation ของ option "PUMPKIN" ถูกแปลตรงตัว
+            // เป็น 南瓜/ฟักทอง) — ใช้ label ดิบเสมอ ส่วน pcatname/pbaseunit ใช้ label ตามภาษา
+            ->map(fn (Collection $options, int $attributeId) => $options->mapWithKeys(fn (AttributeOption $option) => [
+                $option->code => $attributeId === $attributeIdsByCode->get('pbrand')
+                    ? $option->getRawOriginal('admin_label')
+                    : $option->admin_label,
+            ]));
 
         return $valuesByProduct->map(function (Collection $values) use ($attributeIdsByCode, $labelsByAttributeId) {
             foreach ($attributeIdsByCode as $code => $attributeId) {

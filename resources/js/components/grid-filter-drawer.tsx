@@ -1,6 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, Chip, Drawer, IconButton, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface GridColumn {
     label: string;
@@ -24,17 +25,18 @@ const toDateInputValue = (date: Date): string => {
     return `${year}-${month}-${day}`;
 };
 
+// keys are grid.json translation keys
 const quickRanges: Record<string, () => [Date, Date]> = {
-    Today: () => {
+    rangeToday: () => {
         const today = new Date();
         return [today, today];
     },
-    Yesterday: () => {
+    rangeYesterday: () => {
         const d = new Date();
         d.setDate(d.getDate() - 1);
         return [d, d];
     },
-    'This Week': () => {
+    rangeThisWeek: () => {
         const today = new Date();
         const day = today.getDay();
         const diffToMonday = day === 0 ? 6 : day - 1;
@@ -42,23 +44,23 @@ const quickRanges: Record<string, () => [Date, Date]> = {
         start.setDate(today.getDate() - diffToMonday);
         return [start, today];
     },
-    'This Month': () => {
+    rangeThisMonth: () => {
         const today = new Date();
         return [new Date(today.getFullYear(), today.getMonth(), 1), today];
     },
-    'Last Month': () => {
+    rangeLastMonth: () => {
         const today = new Date();
         return [new Date(today.getFullYear(), today.getMonth() - 1, 1), new Date(today.getFullYear(), today.getMonth(), 0)];
     },
-    'Last 3 Months': () => {
+    rangeLast3Months: () => {
         const today = new Date();
         return [new Date(today.getFullYear(), today.getMonth() - 3, today.getDate()), today];
     },
-    'Last 6 Months': () => {
+    rangeLast6Months: () => {
         const today = new Date();
         return [new Date(today.getFullYear(), today.getMonth() - 6, today.getDate()), today];
     },
-    'This Year': () => {
+    rangeThisYear: () => {
         const today = new Date();
         return [new Date(today.getFullYear(), 0, 1), today];
     },
@@ -86,6 +88,8 @@ export function GridFilterDrawer({
     onApply: (filters: Record<string, FilterValue>) => void;
     t: (key: string) => string;
 }) {
+    // `t` (prop) translates the page's column labels; tGrid covers this drawer's own chrome
+    const { t: tGrid } = useTranslation('grid');
     const [draft, setDraft] = useState<Record<string, FilterValue>>(value);
 
     useEffect(() => {
@@ -115,7 +119,7 @@ export function GridFilterDrawer({
             <Box sx={{ width: 340, p: 3 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                     <Typography variant="h6" fontWeight={700}>
-                        Apply Filters
+                        {tGrid('filterDrawerTitle')}
                     </Typography>
                     <IconButton onClick={onClose} size="small">
                         <CloseIcon />
@@ -133,10 +137,10 @@ export function GridFilterDrawer({
                                     </Typography>
                                     <Select fullWidth size="small" displayEmpty value={current} onChange={(e) => setField(key, e.target.value)}>
                                         <MenuItem value="">
-                                            <em>Select</em>
+                                            <em>{tGrid('filterDrawerSelect')}</em>
                                         </MenuItem>
-                                        <MenuItem value="1">Yes</MenuItem>
-                                        <MenuItem value="0">No</MenuItem>
+                                        <MenuItem value="1">{tGrid('yes')}</MenuItem>
+                                        <MenuItem value="0">{tGrid('no')}</MenuItem>
                                     </Select>
                                 </Box>
                             );
@@ -150,10 +154,10 @@ export function GridFilterDrawer({
                                         {t(column.label)}
                                     </Typography>
                                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                                        {Object.entries(quickRanges).map(([label, getRange]) => (
+                                        {Object.entries(quickRanges).map(([rangeKey, getRange]) => (
                                             <Chip
-                                                key={label}
-                                                label={label}
+                                                key={rangeKey}
+                                                label={tGrid(rangeKey)}
                                                 size="small"
                                                 onClick={() => {
                                                     const [from, to] = getRange();
@@ -197,7 +201,7 @@ export function GridFilterDrawer({
                 </Stack>
 
                 <Button fullWidth variant="contained" sx={{ mt: 3, color: 'white' }} onClick={save}>
-                    Save
+                    {tGrid('filterDrawerSave')}
                 </Button>
             </Box>
         </Drawer>
