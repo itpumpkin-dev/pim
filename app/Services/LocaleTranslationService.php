@@ -203,9 +203,7 @@ class LocaleTranslationService
     public function getNamespaceEntries(string $localeCode, string $namespace): array
     {
         $source = $this->readSourceFiles()[$namespace . '.json'] ?? [];
-        $target = LocaleTranslationFile::where('locale_code', $localeCode)
-            ->where('namespace', $namespace)
-            ->value('content') ?? [];
+        $target = $this->readTargetNamespace($localeCode, $namespace) ?? [];
 
         $entries = [];
 
@@ -238,9 +236,7 @@ class LocaleTranslationService
     public function updateNamespaceEntries(string $localeCode, string $namespace, array $values): array
     {
         $filename = $namespace . '.json';
-        $content = LocaleTranslationFile::where('locale_code', $localeCode)
-            ->where('namespace', $namespace)
-            ->value('content') ?? $this->readSourceFiles()[$filename] ?? [];
+        $content = $this->readTargetNamespace($localeCode, $namespace) ?? $this->readSourceFiles()[$filename] ?? [];
 
         $oldValues = [];
         foreach ($values as $path => $value) {
@@ -251,6 +247,38 @@ class LocaleTranslationService
         $this->writeTargetStrings($localeCode, [$filename => $content]);
 
         return $oldValues;
+    }
+
+    /**
+     * Machine-translates a single key's English source text into $localeCode
+     * with the default provider — the per-row "translate" button on the
+     * manual translations editor. Nothing is persisted: the result goes back
+     * into the editor field and is saved with the rest via updateNamespaceEntries().
+     *
+     * @throws \RuntimeException when the key is unknown, no provider is set, or the provider fails
+     */
+    public function translateEntry(string $localeCode, string $namespace, string $path): string
+    {
+        $source = $this->getNested($this->readSourceFiles()[$namespace . '.json'] ?? [], explode('.', $path));
+        if ($source === null) {
+            throw new \RuntimeException("Unknown translation key: {$namespace}.{$path}");
+        }
+
+        $provider = TranslationProvider::where('enabled', true)->where('is_default', true)->first();
+        if (! $provider) {
+            throw new \RuntimeException('No enabled default translation provider is configured.');
+        }
+
+        [$protected, $placeholders] = $this->protectPlaceholders($source);
+
+        $translated = TranslationProviderRegistry::resolve($provider->type)
+            ->translateBatch([$protected], self::SOURCE_LOCALE, $localeCode, $provider->readableCredentials());
+
+        if (! isset($translated[0]) || ! is_string($translated[0])) {
+            throw new \RuntimeException('Translation provider returned an unexpected response shape.');
+        }
+
+        return $this->restorePlaceholders($translated[0], $placeholders);
     }
 
     /**
@@ -280,10 +308,53 @@ class LocaleTranslationService
         $strings = [];
 
         foreach (LocaleTranslationFile::where('locale_code', $code)->get() as $row) {
-            $strings[$row->namespace . '.json'] = $row->content;
+            $strings[$row->namespace . '.json'] = $this->mergeDiskOver($code, $row->namespace, $row->content);
         }
 
         return $strings;
+    }
+
+    /**
+     * One namespace's current content for a locale, or null if the DB has no
+     * row for it and there's no file on disk either.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function readTargetNamespace(string $code, string $namespace): ?array
+    {
+        $dbContent = LocaleTranslationFile::where('locale_code', $code)
+            ->where('namespace', $namespace)
+            ->value('content');
+
+        $merged = $this->mergeDiskOver($code, $namespace, $dbContent ?? []);
+
+        return $dbContent === null && $merged === [] ? null : $merged;
+    }
+
+    /**
+     * The DB row is layered UNDER the physical resources/js/locales/{code}/{ns}.json
+     * (disk wins per key). Every write here already goes to both, but the JSON
+     * files also get edited by hand / arrive via git pull without touching the
+     * DB — and the Vite bundle (what users actually see) reads the files, not
+     * the DB. Reading the DB alone made the editor show stale/English values
+     * for keys that were really translated, and worse, a Save (which rewrites
+     * the whole namespace file) or a translate run silently reverted those
+     * hand edits and dropped every disk-only key. Keys only the DB has (e.g.
+     * a fresh clone before `translations:export`) still come through.
+     *
+     * @param  array<string, mixed>  $dbContent
+     * @return array<string, mixed>
+     */
+    private function mergeDiskOver(string $code, string $namespace, array $dbContent): array
+    {
+        $path = resource_path('js/locales/' . $code . '/' . $namespace . '.json');
+        if (! File::isFile($path)) {
+            return $dbContent;
+        }
+
+        $disk = json_decode(File::get($path), true);
+
+        return is_array($disk) ? array_replace_recursive($dbContent, $disk) : $dbContent;
     }
 
     /**

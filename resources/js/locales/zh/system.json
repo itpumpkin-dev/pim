@@ -123,6 +123,8 @@
     "translationKey": "键",
     "translationSource": "英文（参考）",
     "translationValue": "翻译",
+    "translateEntry": "翻译此键",
+    "translateEntryFailed": "无法翻译 {{key}}：{{error}}",
     "searchTranslations": "搜索键或文本",
     "noTranslationEntriesFound": "没有匹配的文本。",
     "saveTranslations": "保存更改",

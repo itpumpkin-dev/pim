@@ -97,6 +97,8 @@
     "translationKey": "Key",
     "translationSource": "English (reference)",
     "translationValue": "Translation",
+    "translateEntry": "Translate this key",
+    "translateEntryFailed": "Couldn't translate {{key}}: {{error}}",
     "searchTranslations": "Search key or text",
     "noTranslationEntriesFound": "No matching strings.",
     "saveTranslations": "Save Changes",

@@ -97,6 +97,8 @@
     "translationKey": "Clave",
     "translationSource": "Inglés (referencia)",
     "translationValue": "Traducción",
+    "translateEntry": "Traducir esta clave",
+    "translateEntryFailed": "No se pudo traducir {{key}}: {{error}}",
     "searchTranslations": "Buscar clave o texto",
     "noTranslationEntriesFound": "No hay cadenas coincidentes.",
     "saveTranslations": "Guardar cambios",

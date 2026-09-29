@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\ContentTranslationCoverageService;
 use App\Services\LocaleTranslationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -81,6 +82,31 @@ class LocaleTranslationController extends Controller
             $queued ? 'success' : 'error',
             $queued ? 'Queued for translation.' : 'Nothing to translate from — this record has no label in any locale yet.'
         );
+    }
+
+    /**
+     * Per-row "translate" button on the editor: machine-translates one key's
+     * English source and returns it as JSON — not saved here; the page drops
+     * it into the field as an unsaved edit that goes through update() below.
+     */
+    public function translateEntry(Request $request, Locale $locale): JsonResponse
+    {
+        abort_if($this->localeTranslationService->isSourceLocale($locale->code), 404);
+
+        $validated = $request->validate([
+            'namespace' => ['required', 'string', 'in:' . implode(',', $this->localeTranslationService->getNamespaces())],
+            'path' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            $value = $this->localeTranslationService->translateEntry($locale->code, $validated['namespace'], $validated['path']);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['value' => $value]);
     }
 
     public function update(Request $request, Locale $locale): RedirectResponse

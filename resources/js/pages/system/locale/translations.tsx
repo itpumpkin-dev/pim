@@ -2,10 +2,12 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import SearchIcon from '@mui/icons-material/Search';
+import TranslateIcon from '@mui/icons-material/Translate';
 import {
     Box,
     Button,
     CircularProgress,
+    IconButton,
     InputAdornment,
     Paper,
     Snackbar,
@@ -13,6 +15,7 @@ import {
     Tab,
     Tabs,
     TextField,
+    Tooltip,
     Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
@@ -20,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { ContentTranslationCoverage, type ContentGroup } from '@/components/system/content-translation-coverage';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { useFioriConfirm } from '@/components/fiori-message-box';
+import { xsrfToken } from '@/lib/csrf';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriSearchFieldSx, fioriTabsSx } from '@/lib/fiori-style';
 
 const CONTENT_NAMESPACE = 'content';
@@ -83,6 +87,10 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
     const [search, setSearch] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
+    // ปุ่มแปลรายคีย์ (ไอคอนในช่องคำแปล) — แปลแค่คีย์นั้นผ่าน provider ตั้งต้น แล้ว
+    // ใส่ผลลงช่องทันทีเป็น "ยังไม่บันทึก" เหมือนแก้เอง (ยังต้องกดบันทึกการเปลี่ยนแปลง)
+    const [translatingPaths, setTranslatingPaths] = useState<Set<string>>(new Set());
+    const [translateError, setTranslateError] = useState<string | null>(null);
     // Switching tabs here is a real server round-trip (router.get — the
     // "Content" tab in particular runs a heavy DB scan across attributes/
     // options/categories, worst at categories' 1000+ scale), not a client-
@@ -161,6 +169,34 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
         );
     };
 
+    const translateEntry = async (path: string) => {
+        if (!activeNamespace || translatingPaths.has(path)) {
+            return;
+        }
+
+        setTranslatingPaths((prev) => new Set(prev).add(path));
+        try {
+            const res = await fetch(`/system/locales/${localeModel.id}/translations/translate-entry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-XSRF-TOKEN': xsrfToken() },
+                body: JSON.stringify({ namespace: activeNamespace, path }),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok || typeof body.value !== 'string') {
+                throw new Error(body.message || `HTTP ${res.status}`);
+            }
+            setValues((prev) => ({ ...prev, [path]: body.value }));
+        } catch (e) {
+            setTranslateError(tSystem('translateEntryFailed', { key: path, error: e instanceof Error ? e.message : String(e) }));
+        } finally {
+            setTranslatingPaths((prev) => {
+                const next = new Set(prev);
+                next.delete(path);
+                return next;
+            });
+        }
+    };
+
     const isContentTab = activeNamespace === CONTENT_NAMESPACE;
 
     const namespaceLabel = (namespace: string): string => {
@@ -206,6 +242,26 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                     size="small"
                     value={values[entry.path] ?? ''}
                     onChange={(e) => setValues((prev) => ({ ...prev, [entry.path]: e.target.value }))}
+                    disabled={translatingPaths.has(entry.path)}
+                    InputProps={{
+                        endAdornment: (
+                            <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1.25 }}>
+                                <Tooltip title={tSystem('translateEntry')}>
+                                    <span>
+                                        <IconButton
+                                            size="small"
+                                            aria-label={tSystem('translateEntry')}
+                                            disabled={translatingPaths.has(entry.path)}
+                                            onClick={() => translateEntry(entry.path)}
+                                            sx={{ color: FIORI.brand }}
+                                        >
+                                            {translatingPaths.has(entry.path) ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
+                                        </IconButton>
+                                    </span>
+                                </Tooltip>
+                            </InputAdornment>
+                        ),
+                    }}
                     sx={{
                         bgcolor: FIORI.surface,
                         ...(dirty[entry.path] !== undefined && {
@@ -332,6 +388,13 @@ export default function LocaleTranslations({ localeModel, namespaces, activeName
                 autoHideDuration={5000}
                 onClose={() => setSaved(false)}
                 message={tSystem('saveTranslations')}
+                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+            />
+            <Snackbar
+                open={translateError !== null}
+                autoHideDuration={8000}
+                onClose={() => setTranslateError(null)}
+                message={translateError}
                 anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             />
             {confirmElement}

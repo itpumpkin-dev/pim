@@ -72,6 +72,7 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::post('locales/{locale}/translate', [LocaleController::class, 'translate'])->name('locales.translate')->middleware('permission:locales,edit_locales');
     Route::get('locales/{locale}/translations', [LocaleTranslationController::class, 'edit'])->name('locales.translations.edit')->middleware('permission:locales,edit_locales');
     Route::put('locales/{locale}/translations', [LocaleTranslationController::class, 'update'])->name('locales.translations.update')->middleware('permission:locales,edit_locales');
+    Route::post('locales/{locale}/translations/translate-entry', [LocaleTranslationController::class, 'translateEntry'])->name('locales.translations.translateEntry')->middleware('permission:locales,edit_locales');
     Route::post('locales/{locale}/translations/queue-missing', [LocaleTranslationController::class, 'queueMissingContent'])->name('locales.translations.queueMissing')->middleware('permission:locales,edit_locales');
     Route::post('locales/{locale}/translations/queue-one', [LocaleTranslationController::class, 'queueOneContent'])->name('locales.translations.queueOne')->middleware('permission:locales,edit_locales');
 

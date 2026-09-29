@@ -77,6 +77,8 @@
     "translationKey": "คีย์",
     "translationSource": "อังกฤษ (ต้นฉบับอ้างอิง)",
     "translationValue": "คำแปล",
+    "translateEntry": "แปลคีย์นี้",
+    "translateEntryFailed": "แปล {{key}} ไม่สำเร็จ: {{error}}",
     "searchTranslations": "ค้นหาคีย์หรือข้อความ",
     "noTranslationEntriesFound": "ไม่พบข้อความที่ตรงกัน",
     "saveTranslations": "บันทึกการเปลี่ยนแปลง",
