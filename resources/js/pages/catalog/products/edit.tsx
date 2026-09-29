@@ -1736,6 +1736,9 @@ export default function ProductEdit({
     // ด้านล่างมาไว้ใน dialog ให้เลือกโดยไม่ต้อง scroll ไปหา ผูกกับ data.values ตัว
     // เดียวกันเลย เปลี่ยนที่ไหนก็สะท้อนอีกที่ทันที
     const [masterCategoryPickerOpen, setMasterCategoryPickerOpen] = useState(false);
+    // error อื่นที่ไม่ใช่ conflict ของ panel save (เช่น validation) — เดิมถูกกลืนเงียบๆ
+    // dialog เลยค้างเปิดอยู่เฉยๆ ผู้ใช้เข้าใจว่ากดบันทึกไปแล้วทั้งที่ไม่ได้บันทึก
+    const [sectionSaveError, setSectionSaveError] = useState<{ section: 'channels' | 'master-categories'; message: string } | null>(null);
 
     const saveSection = (
         section: 'channels' | 'master-categories',
@@ -1744,6 +1747,7 @@ export default function ProductEdit({
     ) => {
         setSavingSection(section);
         setConflictMessage(null);
+        setSectionSaveError(null);
         skipNavigationGuardRef.current = true;
         // panel save พวกนี้ไม่ได้ผ่าน useForm() (ใช้ router.put ตรงๆ) เลยไม่มี
         // errors ของตัวเองให้ผูกกับ input ไหนโดยเฉพาะ — ต้องดัก conflict error
@@ -1757,7 +1761,12 @@ export default function ProductEdit({
                 preserveState: true,
                 onSuccess: () => options?.onSuccess?.(),
                 onError: (errs) => {
-                    if (errs.conflict) setConflictMessage(errs.conflict);
+                    if (errs.conflict) {
+                        setConflictMessage(errs.conflict);
+                        return;
+                    }
+                    const message = Object.values(errs)[0];
+                    if (message) setSectionSaveError({ section, message });
                 },
                 onFinish: () => {
                     setSavingSection(null);
@@ -2801,6 +2810,11 @@ export default function ProductEdit({
                                                             saveSection('master-categories', payload);
                                                         })}
                                                 </Stack>
+                                                {sectionSaveError?.section === 'master-categories' && !masterCategoryPickerOpen && (
+                                                    <Box sx={{ mb: 2 }}>
+                                                        <FioriMessageStrip severity="error">{sectionSaveError.message}</FioriMessageStrip>
+                                                    </Box>
+                                                )}
                                                 <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                                                     {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
                                                 </Stack>
@@ -3538,6 +3552,11 @@ export default function ProductEdit({
                     </IconButton>
                 </DialogTitle>
                 <DialogContent dividers>
+                    {(sectionSaveError?.section === 'master-categories' || conflictMessage) && (
+                        <Box sx={{ mb: 2 }}>
+                            <FioriMessageStrip severity="error">{conflictMessage ?? sectionSaveError?.message}</FioriMessageStrip>
+                        </Box>
+                    )}
                     <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                         {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
                     </Stack>
