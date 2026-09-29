@@ -122,6 +122,52 @@ test('importRow() raises no category/family warning when the product group resol
     expect(collect($warnings)->contains(fn ($w) => str_starts_with($w, 'No Attribute Family resolved')))->toBeFalse();
 });
 
+test('importRow() skips a unique value already used by another product, but imports the rest of the row', function () {
+    $barcode = Attribute::create(['code' => 'pri_uq_barcode', 'type' => 'text', 'is_unique' => true]);
+    $other = Attribute::create(['code' => 'pri_uq_other', 'type' => 'text']);
+
+    $owner = Product::create(['sku' => 'PRI-UQ-OWNER-'.uniqid(), 'type' => 'simple', 'enabled' => true]);
+    ProductValue::create(['product_id' => $owner->id, 'attribute_id' => $barcode->id, 'value' => '8850000000001']);
+
+    $sku = 'PRI-UQ-NEW-'.uniqid();
+    $warnings = (new ProductRowImporter())->importRow(
+        ['sku' => $sku, 'type' => 'simple', 'enabled' => '1', 'pri_uq_barcode' => '8850000000001', 'pri_uq_other' => 'kept'],
+        priImportConfig()
+    );
+
+    $product = Product::where('sku', $sku)->firstOrFail();
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $barcode->id)->exists())->toBeFalse();
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $other->id)->value('value'))->toBe('kept');
+    expect($warnings)->toContain("Value(s) must be unique but are already used by another product, not imported: pri_uq_barcode \"8850000000001\" (SKU {$owner->sku})");
+
+    // re-importing the owner's own value is not a conflict
+    $ownerWarnings = (new ProductRowImporter())->importRow(
+        ['sku' => $owner->sku, 'type' => 'simple', 'enabled' => '1', 'pri_uq_barcode' => '8850000000001'],
+        priImportConfig()
+    );
+    expect(collect($ownerWarnings)->contains(fn ($w) => str_starts_with($w, 'Value(s) must be unique')))->toBeFalse();
+});
+
+test('importRow() warns when a SKU repeats within the same file, naming the earlier row', function () {
+    $attribute = Attribute::create(['code' => 'pri_dupsku_attr', 'type' => 'text']);
+    $sku = 'PRI-DUPSKU-'.uniqid();
+    $importer = new ProductRowImporter();
+    $config = priImportConfig();
+
+    $first = $importer->importRow(['sku' => $sku, 'pri_dupsku_attr' => 'first'], $config);                    // row 2
+    $unrelated = $importer->importRow(['sku' => 'PRI-DUPSKU-OTHER-'.uniqid(), 'pri_dupsku_attr' => 'x'], $config); // row 3
+    $repeat = $importer->importRow(['sku' => $sku, 'pri_dupsku_attr' => 'second'], $config);                   // row 4
+
+    $isDupWarning = fn ($w) => str_contains($w, 'already appeared earlier in this file');
+    expect(collect($first)->contains($isDupWarning))->toBeFalse();
+    expect(collect($unrelated)->contains($isDupWarning))->toBeFalse();
+    expect($repeat)->toContain("SKU {$sku} already appeared earlier in this file (row 2) — this row's values overwrite that row's.");
+
+    // behavior unchanged: the later row still wins
+    $product = Product::where('sku', $sku)->firstOrFail();
+    expect(ProductValue::where('product_id', $product->id)->where('attribute_id', $attribute->id)->value('value'))->toBe('second');
+});
+
 test('importRow() still writes an ungrouped attribute with attribute_group_id = null (unchanged behavior)', function () {
     $attribute = Attribute::create(['code' => 'pri_ungrouped_attr', 'type' => 'text']);
     $sku = 'PRI-UNGROUPED-'.uniqid();

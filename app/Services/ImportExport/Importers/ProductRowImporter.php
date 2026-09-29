@@ -34,6 +34,12 @@ class ProductRowImporter implements RowImporterInterface
 
     private ?array $editableAttributeCodesCache = null;
 
+    /** importRow() calls so far on this instance — one per file row, in file order. */
+    private int $rowsSeen = 0;
+
+    /** @var array<string, int> sku => file row number where it first appeared */
+    private array $firstRowBySku = [];
+
     /** null = not resolved yet; false = no family scoping; array = the family's importable codes, in family order. */
     private array|false|null $familyAttributeCodesCache = null;
 
@@ -252,6 +258,12 @@ class ProductRowImporter implements RowImporterInterface
 
     public function importRow(array $row, ImportConfig $config): array
     {
+        // ProcessImportJob เรียก importRow() ครั้งละแถวตามลำดับไฟล์บน instance
+        // เดียวกันตลอดงาน — นับเองตรงนี้ได้ว่านี่คือแถวที่เท่าไหร่ของไฟล์
+        // (แถว 1 = header เหมือนเลขแถวใน error/warning log ของงาน)
+        $this->rowsSeen++;
+        $rowNumber = $this->rowsSeen + 1;
+
         $sku = trim((string) ($row['sku'] ?? ''));
         if ($sku === '') {
             throw new RowImportException('sku is required');
@@ -274,6 +286,11 @@ class ProductRowImporter implements RowImporterInterface
 
         $enabledRaw = strtolower(trim((string) ($row['enabled'] ?? '1')));
         $enabled = in_array($enabledRaw, ['1', 'true', 'yes'], true);
+
+        // SKU เดียวกันซ้ำในไฟล์เดียวกัน — ยัง import ตามปกติ (แถวหลังทับแถว
+        // ก่อนเหมือนเดิม) แต่แจ้ง warning ให้รู้ตัว ไม่งั้นค่าของแถวแรกหายเงียบๆ
+        $earlierRow = $this->firstRowBySku[$sku] ?? null;
+        $this->firstRowBySku[$sku] ??= $rowNumber;
 
         // ไม่ตั้ง family_id จาก import อีกต่อไป (ตัดตามที่ user ขอ) — ให้ตรงกับหน้า
         // Create/Edit ที่ไม่มี family picker ให้เลือกตรงๆ มาตั้งแต่ตัด family_id/
@@ -313,6 +330,7 @@ class ProductRowImporter implements RowImporterInterface
 
         $unknownColumns = [];
         $restrictedColumns = [];
+        $duplicateUniqueValues = [];
         // ตั้งแต่ 1 attribute อยู่ได้หลาย attribute_group_id พร้อมกัน (ดู
         // migration 2026_09_23_000001_add_attribute_group_id_to_product_values_table)
         // updateOrCreate() ด้านล่างต้องระบุ attribute_group_id ที่แน่นอนด้วย ไม่งั้น
@@ -349,6 +367,26 @@ class ProductRowImporter implements RowImporterInterface
             if ($this->user && isset($importableAttributeCodes[$key]) && !isset($editableAttributeCodes[$key])) {
                 $restrictedColumns[] = $key;
                 continue;
+            }
+
+            // is_unique (pid, barcode_*) ต้องไม่ซ้ำกับสินค้าอื่น — เช็ค scope
+            // เดียวกับที่ ProductController::update() เช็คตอนกด Save (channel/
+            // locale เดียวกัน ไม่กรองด้วย group) ไม่งั้น import ใส่ barcode ซ้ำได้
+            // เงียบๆ แล้วสินค้าทั้งคู่จะกด Save ในหน้าแก้ไขไม่ผ่านทีหลัง ข้ามแค่
+            // ช่องนี้ ช่องอื่นของแถวยัง import ตามปกติ
+            if ($attribute->is_unique) {
+                $takenBySku = ProductValue::where('product_values.attribute_id', $attribute->id)
+                    ->whereNull('product_values.channel_id')
+                    ->whereNull('product_values.locale_id')
+                    ->where('product_values.value', (string) $value)
+                    ->where('product_values.product_id', '!=', $product->id)
+                    ->join('products', 'products.id', '=', 'product_values.product_id')
+                    ->value('products.sku');
+
+                if ($takenBySku !== null) {
+                    $duplicateUniqueValues[] = "{$key} \"{$value}\" (SKU {$takenBySku})";
+                    continue;
+                }
             }
 
             $groupId = $familyAttributeResolver->primaryGroupIdFor($attribute->id, $effectiveFamilyIds);
@@ -393,6 +431,14 @@ class ProductRowImporter implements RowImporterInterface
 
         if (!empty($restrictedColumns)) {
             $warnings[] = "Column(s) skipped, your role doesn't have edit access to: ".implode(', ', $restrictedColumns);
+        }
+
+        if (!empty($duplicateUniqueValues)) {
+            $warnings[] = 'Value(s) must be unique but are already used by another product, not imported: '.implode(', ', $duplicateUniqueValues);
+        }
+
+        if ($earlierRow !== null) {
+            $warnings[] = "SKU {$sku} already appeared earlier in this file (row {$earlierRow}) — this row's values overwrite that row's.";
         }
 
         return $warnings;

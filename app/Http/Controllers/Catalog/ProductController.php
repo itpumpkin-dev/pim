@@ -3632,8 +3632,27 @@ class ProductController extends Controller
             // pcatname/psubcatname/productgroupname ไม่เคยอยู่ใน family_attributes
             // เลย (ไม่ได้ผูกกับ group ไหนทั้งนั้น) — groupKey ของฟิลด์พวกนี้เป็น
             // 'ungrouped' เสมอฝั่ง frontend (ดู renderMasterCategoryField())
+            //
+            // อ่าน 'default' ก่อน แล้ว fallback ไป locale ไหนก็ได้ที่มีค่า — ถ้า
+            // attribute พวกนี้ถูกติ๊ก is_locale_based ไว้ (เป็นอยู่จริงใน DB) frontend
+            // จะส่งค่ามาใต้ locale id (เช่น '1') ไม่ใช่ 'default' เดิมอ่านแค่ 'default'
+            // เลยได้ค่าว่างทั้ง 3 ตัว → relinkMasterCategoryCodes() เข้าใจว่าผู้ใช้ล้าง
+            // ทิ้งหมด → detach category ทั้งหมดของสินค้า (บั๊กจริง: กด Save ของแผง
+            // Master Categories แล้ว พอกด Save Product ตระกูลแอตทริบิวต์หายต้องกด
+            // บันทึกแผงนี้ใหม่อีกรอบ)
             $masterCategoryCodes = $masterCategoryAttributeIds
-                ->map(fn ($attributeId) => $values["{$attributeId}|ungrouped"]['global']['default'] ?? null)
+                ->map(function ($attributeId) use ($values) {
+                    $localeValues = $values["{$attributeId}|ungrouped"]['global'] ?? [];
+                    if (! is_array($localeValues)) {
+                        return null;
+                    }
+                    $default = $localeValues['default'] ?? null;
+                    if (is_string($default) && $default !== '') {
+                        return $default;
+                    }
+
+                    return collect($localeValues)->first(fn ($code) => is_string($code) && $code !== '');
+                })
                 ->filter(fn ($code) => is_string($code) && $code !== '')
                 ->all();
             // ไม่ส่ง $newCategoryIds เป็น $protectedCategoryIds อีกต่อไป (ต่างจาก

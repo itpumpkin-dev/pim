@@ -576,6 +576,19 @@ export default function ProductEdit({
     const setDataRef = useRef(setData);
     setDataRef.current = setData;
 
+    // useForm() อ่าน prop แค่ตอน mount — หลังกด Save ของแผง Master Categories
+    // (router.put + preserveState) backend ผูก category ใหม่ให้แล้ว prop categoryIds
+    // เปลี่ยน แต่ data.category_ids ยังเป็นชุดเก่าตอนเปิดหน้า พอกด Save Product
+    // update() จะ sync() category กลับเป็นชุดเก่า + derive pcatname/psubcatname/
+    // productgroupname ย้อนกลับเป็นค่าเดิม (ผู้ใช้ต้องมาเลือกกลุ่มสินค้าใหม่อีกรอบ)
+    // เลย sync prop เข้าฟอร์ม (ทั้งค่าและ baseline ของ isDirty) ทุกครั้งที่มันเปลี่ยน
+    const categoryIdsKey = categoryIds.join(',');
+    useEffect(() => {
+        setDataRef.current('category_ids', categoryIds);
+        setDefaults('category_ids', categoryIds);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [categoryIdsKey]);
+
     // identity คงที่ตลอด (deps ว่างเปล่า) ไม่ว่า identity ของ setData จะเปลี่ยน
     // หรือไม่ก็ตาม ความคงที่นี่แหละคือจุดสำคัญ: การส่งฟังก์ชันนี้ลงไปเป็น onChange
     // ของฟิลด์ที่ memo ไว้ ไม่ควรทำให้ฟิลด์นั้น re-render เองโดยไม่จำเป็น — เช่นตอน
