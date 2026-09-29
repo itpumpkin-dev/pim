@@ -90,6 +90,38 @@ test('importRow() places a brand-new SKU\'s values in the right group on the fir
     expect($rows->first()->value)->toBe('first pass');
 });
 
+test('importRow() warns about category codes that match no category, and about a product left with no family', function () {
+    $category = Category::create(['code' => 'pri_warn_cat', 'name' => 'PRI Warn Category']);
+    $sku = 'PRI-WARN-'.uniqid();
+
+    $warnings = (new ProductRowImporter())->importRow(
+        ['sku' => $sku, 'type' => 'simple', 'enabled' => '1', 'psubcatname' => 'pri_warn_cat', 'productgroupname' => 'PRI_WARN_TYPO'],
+        priImportConfig()
+    );
+
+    // the valid code is still linked — only the typo is reported
+    $product = Product::where('sku', $sku)->firstOrFail();
+    expect($product->categories()->pluck('categories.id')->all())->toBe([$category->id]);
+
+    expect($warnings)->toContain('Category code(s) not found, product not linked to them: PRI_WARN_TYPO');
+    // pri_warn_cat is bound to no family, so the product resolves none
+    expect(collect($warnings)->contains(fn ($w) => str_starts_with($w, 'No Attribute Family resolved for this product')))->toBeTrue();
+});
+
+test('importRow() raises no category/family warning when the product group resolves a family', function () {
+    $family = AttributeFamily::create(['code' => 'pri_ok_family', 'name' => 'PRI OK Family']);
+    $category = Category::create(['code' => 'pri_ok_cat', 'name' => 'PRI OK Category']);
+    DB::table('category_attribute_family')->insert(['category_id' => $category->id, 'family_id' => $family->id, 'sort_order' => 0]);
+
+    $warnings = (new ProductRowImporter())->importRow(
+        ['sku' => 'PRI-OK-'.uniqid(), 'type' => 'simple', 'enabled' => '1', 'productgroupname' => 'pri_ok_cat'],
+        priImportConfig()
+    );
+
+    expect(collect($warnings)->contains(fn ($w) => str_starts_with($w, 'Category code(s) not found')))->toBeFalse();
+    expect(collect($warnings)->contains(fn ($w) => str_starts_with($w, 'No Attribute Family resolved')))->toBeFalse();
+});
+
 test('importRow() still writes an ungrouped attribute with attribute_group_id = null (unchanged behavior)', function () {
     $attribute = Attribute::create(['code' => 'pri_ungrouped_attr', 'type' => 'text']);
     $sku = 'PRI-UNGROUPED-'.uniqid();

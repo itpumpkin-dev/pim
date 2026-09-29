@@ -158,7 +158,7 @@ class ApiAttributeOptionSync
 
     private function applyAuth(PendingRequest $request, AttributeApiSource $source): PendingRequest
     {
-        $credentials = $source->credentials ?? [];
+        $credentials = $source->readableCredentials();
 
         return match ($source->auth_type) {
             'api_key_header' => $request->withHeaders([

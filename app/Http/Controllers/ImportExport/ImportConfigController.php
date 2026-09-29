@@ -17,6 +17,7 @@ use App\Services\ImportExport\SpreadsheetWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -119,6 +120,32 @@ class ImportConfigController extends Controller
             $category->attributeFamilies()
                 ->get(['attribute_families.code', 'attribute_families.name'])
                 ->map(fn (AttributeFamily $family) => ['code' => $family->code, 'name' => $family->name])
+                ->values()
+        );
+    }
+
+    /**
+     * ทุก Attribute Family สำหรับโหมด "ตามตระกูลแอตทริบิวต์" ของขั้นตอน
+     * family ใน wizard — ไฟล์ที่มีหลายกลุ่มสินค้าแต่ใช้ตระกูลเดียวกัน (เช่น
+     * ตระกูลพื้นฐานที่ผูกอยู่กับหลายร้อยกลุ่ม) เลือกตระกูลได้ตรงๆ แทนการต้อง
+     * เลือกกลุ่มสินค้าสักกลุ่มมาแทน groups_count = จำนวนกลุ่มสินค้าที่ผูก
+     * ตระกูลนั้นอยู่ เรียงมากไปน้อยให้ตระกูลที่ใช้ร่วมกันหลายกลุ่มขึ้นก่อน
+     */
+    public function attributeFamilies(): JsonResponse
+    {
+        $groupsCount = DB::table('category_attribute_family')
+            ->select('family_id', DB::raw('count(*) as groups_count'))
+            ->groupBy('family_id')
+            ->pluck('groups_count', 'family_id');
+
+        return response()->json(
+            AttributeFamily::cachedList()
+                ->map(fn (AttributeFamily $family) => [
+                    'code' => $family->code,
+                    'name' => $family->name,
+                    'groups_count' => (int) ($groupsCount[$family->id] ?? 0),
+                ])
+                ->sortBy([['groups_count', 'desc'], ['name', 'asc']])
                 ->values()
         );
     }

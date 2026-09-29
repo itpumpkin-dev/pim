@@ -28,7 +28,12 @@ trait Auditable
                 return;
             }
 
-            $original = static::auditableAttributes($model, Arr::only($model->getOriginal(), array_keys($changes)));
+            // Read originals key-by-key: a bare getOriginal() casts every
+            // column, which decrypts excluded encrypted ones (e.g. credentials)
+            // and throws if they were encrypted under a previous APP_KEY.
+            $original = collect(array_keys($changes))
+                ->mapWithKeys(fn (string $key) => [$key => $model->getOriginal($key)])
+                ->all();
 
             AuditLog::record('updated', $model, $original, $changes);
         });

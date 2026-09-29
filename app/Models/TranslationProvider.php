@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Models\Concerns\HasEncryptedCredentials;
 use Illuminate\Database\Eloquent\Model;
 
 class TranslationProvider extends Model
 {
-    use Auditable;
+    use Auditable, HasEncryptedCredentials;
 
     protected static array $auditExcluded = ['credentials'];
 

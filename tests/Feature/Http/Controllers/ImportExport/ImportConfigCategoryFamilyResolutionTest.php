@@ -68,3 +68,32 @@ test('categoryAttributeFamilies() returns an empty list for a product group with
 
     expect(json_decode($response->getContent(), true))->toBe([]);
 });
+
+test('attributeFamilies() lists every family with how many product groups bind it, most-shared first', function () {
+    $shared = AttributeFamily::create(['code' => 'icfr_af_shared', 'name' => 'ICFR Shared']);
+    $single = AttributeFamily::create(['code' => 'icfr_af_single', 'name' => 'ICFR Single']);
+    $unbound = AttributeFamily::create(['code' => 'icfr_af_unbound', 'name' => 'ICFR Unbound']);
+    $groupA = Category::create(['code' => 'icfr_af_group_a', 'name' => 'Group A']);
+    $groupB = Category::create(['code' => 'icfr_af_group_b', 'name' => 'Group B']);
+
+    DB::table('category_attribute_family')->insert([
+        ['category_id' => $groupA->id, 'family_id' => $shared->id, 'sort_order' => 0],
+        ['category_id' => $groupB->id, 'family_id' => $shared->id, 'sort_order' => 0],
+        ['category_id' => $groupA->id, 'family_id' => $single->id, 'sort_order' => 1],
+    ]);
+
+    // cachedList() is version-keyed — bump so these families aren't hidden
+    // behind a list some earlier test already cached.
+    AttributeFamily::bumpListVersion();
+
+    $families = collect(json_decode(icfrController()->attributeFamilies()->getContent(), true))
+        ->filter(fn (array $f) => str_starts_with($f['code'], 'icfr_af_'))
+        ->values()
+        ->all();
+
+    expect($families)->toBe([
+        ['code' => 'icfr_af_shared', 'name' => 'ICFR Shared', 'groups_count' => 2],
+        ['code' => 'icfr_af_single', 'name' => 'ICFR Single', 'groups_count' => 1],
+        ['code' => 'icfr_af_unbound', 'name' => 'ICFR Unbound', 'groups_count' => 0],
+    ]);
+});

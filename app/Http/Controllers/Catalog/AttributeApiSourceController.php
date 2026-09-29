@@ -60,7 +60,7 @@ class AttributeApiSourceController extends Controller
     public function edit(AttributeApiSource $attributeApiSource): Response
     {
         $fields = self::CREDENTIAL_FIELDS[$attributeApiSource->auth_type] ?? [];
-        $existing = $attributeApiSource->credentials ?? [];
+        $existing = $attributeApiSource->readableCredentials();
 
         return Inertia::render('catalog/attributeApiSources/edit', [
             'attributeApiSource' => [
@@ -86,7 +86,7 @@ class AttributeApiSourceController extends Controller
     public function update(Request $request, AttributeApiSource $attributeApiSource): RedirectResponse
     {
         $validated = $this->validateSource($request);
-        $existing = $attributeApiSource->auth_type === $validated['auth_type'] ? ($attributeApiSource->credentials ?? []) : [];
+        $existing = $attributeApiSource->auth_type === $validated['auth_type'] ? $attributeApiSource->readableCredentials() : [];
         $credentials = $this->requireCredentials($validated['auth_type'], $validated['credentials'] ?? [], $existing);
 
         $attributeApiSource->update([

@@ -39,7 +39,8 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { relabelAttributes, relabelGroups } from './relabel-assignments';
 import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
 
@@ -120,6 +121,14 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
     // ต่างจากการลาก (ที่ "ย้าย") ตรงที่ปุ่มนี้ "เพิ่มสำเนาตำแหน่ง" โดยไม่เอาออกจาก
     // group เดิมเลย — เป็นทางเดียวที่จะทำให้ 1 attribute อยู่ 2+ group พร้อมกันได้
     const [addToGroupMenu, setAddToGroupMenu] = useState<{ element: HTMLElement; attr: AttributeItem; currentGroupId: number } | null>(null);
+
+    // สลับภาษาแล้ว props มาเป็นชื่อภาษาใหม่ — อัปเดตชื่อใน state ตาม (ดู relabel-assignments.ts)
+    useEffect(() => {
+        const attributesById = new Map(attributes.map((a) => [a.id, a]));
+        const groupsById = new Map(groups.map((g) => [g.id, g]));
+        setUnassignedAttrs((prev) => relabelAttributes(prev, attributesById));
+        setAssignedGroups((prev) => relabelGroups(prev, groupsById, attributesById));
+    }, [attributes, groups]);
 
     // ข้อมูลการจับคู่กลุ่ม/แอตทริบิวต์ เก็บไว้ใน local state (assignedGroups) ด้านบน
     // ไม่ได้อยู่ใน data ของ useForm ดังนั้นถ้าเช็คแค่ isDirty อย่างเดียวจะจับการเปลี่ยนแปลง

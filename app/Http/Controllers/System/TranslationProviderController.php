@@ -94,7 +94,7 @@ class TranslationProviderController extends Controller
     public function edit(TranslationProvider $translationProvider): Response
     {
         $fields = TranslationProviderRegistry::schema()[$translationProvider->type]['fields'] ?? [];
-        $existing = $translationProvider->credentials ?? [];
+        $existing = $translationProvider->readableCredentials();
 
         return Inertia::render('system/translationProvider/edit', [
             'providerTypes' => TranslationProviderRegistry::schema(),
@@ -124,7 +124,7 @@ class TranslationProviderController extends Controller
             'credentials' => ['array'],
         ]);
 
-        $existing = $translationProvider->type === $validated['type'] ? ($translationProvider->credentials ?? []) : [];
+        $existing = $translationProvider->type === $validated['type'] ? $translationProvider->readableCredentials() : [];
         $credentials = $this->requireCredentials($validated['type'], $validated['credentials'] ?? [], $existing);
 
         DB::transaction(function () use ($validated, $credentials, $translationProvider) {
@@ -158,9 +158,13 @@ class TranslationProviderController extends Controller
 
     public function test(TranslationProvider $translationProvider): RedirectResponse
     {
+        if ($translationProvider->credentialsUnreadable()) {
+            return back()->with('error', 'Test translation failed: the saved API key can no longer be decrypted (it was encrypted with a different APP_KEY). Edit this provider and re-enter the API key.');
+        }
+
         try {
             $translated = TranslationProviderRegistry::resolve($translationProvider->type)
-                ->translateBatch(['Hello'], 'en', 'th', $translationProvider->credentials ?? []);
+                ->translateBatch(['Hello'], 'en', 'th', $translationProvider->readableCredentials());
 
             return back()->with('success', 'Test translation succeeded: "Hello" → "' . ($translated[0] ?? '') . '"');
         } catch (\Throwable $e) {

@@ -553,9 +553,16 @@ class ProductController extends Controller
         $attributesById = $localeBasedAttributes->keyBy('id');
         $localeBasedAttributeIds = $localeBasedAttributes->pluck('id')->all();
 
-        $products = Product::with('family:id,code,name')
+        // ใช้แถวดิบ (toBase) แทน hydrate เป็น Product model ทีละหมื่นตัว +
+        // eager-load family — ตรงนี้ต้องการแค่ 4 คอลัมน์ ส่วนชื่อ family
+        // resolve จาก map เล็กๆ ด้านล่างแทน (จำนวน family น้อยกว่า product มาก)
+        $products = Product::query()
             ->orderBy('sku')
+            ->toBase()
             ->get(['id', 'sku', 'family_id', 'enabled']);
+        $familyNamesById = AttributeFamily::query()->get(['id', 'code', 'name'])
+            ->mapWithKeys(fn ($family) => [$family->id => $family->name ?: $family->code])
+            ->all();
 
         // จำกัดเฉพาะ locale-based attribute ที่ถูก assign ให้กับ family ของ
         // product นั้นจริงๆ — ใช้แหล่งข้อมูลเดียวกับที่ edit() ใช้จัดกลุ่ม
@@ -603,10 +610,21 @@ class ProductController extends Controller
                 // ภาษานี้แล้ว" ถ้า placement ไหนก็ได้มีค่าจริง ไม่ใช่ทับกันแบบสุ่ม
                 // ตามลำดับที่ query คืนมา (ซึ่งจะซ่อนเนื้อหาจริงของอีก placement
                 // แบบไม่แน่นอนว่าเมื่อไหร่)
+                //
+                // เก็บแค่ "ลายนิ้วมือ" ของค่าไว้ ไม่ใช่ข้อความเต็ม — ค่าพวก
+                // spec_* / warranty_* เป็น HTML ยาวๆ เป็นหมื่นแถว ถ้าเก็บทั้งก้อน
+                // ใน array นี้จะกิน memory เกิน memory_limit (128MB) จน 500
+                // การเช็คด้านล่างต้องการแค่ (1) ว่างหรือไม่ (2) ค่าเท่ากับ
+                // locale อื่นเป๊ะๆ หรือไม่ และ (3) เฉพาะ pname: เท่ากับ SKU
+                // หรือไม่ — เลยเก็บ pname เป็นข้อความ trim แล้ว (สั้น) ส่วนตัว
+                // อื่นเก็บเป็น md5 ของข้อความ trim แล้ว ('' ถ้าว่าง)
+                $trimmed = trim((string) $value->value);
+                $fingerprint = ($trimmed === '' || (int) $value->attribute_id === $nameAttributeId) ? $trimmed : md5($trimmed);
+
                 $key = $value->locale_id ?? 'global';
                 $existing = $rowsByProductAttribute[$value->product_id][$value->attribute_id][$key] ?? null;
-                if ($existing === null || trim((string) $existing) === '') {
-                    $rowsByProductAttribute[$value->product_id][$value->attribute_id][$key] = $value->value;
+                if ($existing === null || $existing === '') {
+                    $rowsByProductAttribute[$value->product_id][$value->attribute_id][$key] = $fingerprint;
                 }
             }
         }
@@ -682,17 +700,20 @@ class ProductController extends Controller
                 continue;
             }
 
+            // ส่งแค่ id ของ locale/attribute ต่อแถว — ตัว descriptor เต็มๆ
+            // (code, name, display_name) ส่งครั้งเดียวผ่าน props `locales` /
+            // `attributes` ไม่งั้น payload JSON จะซ้ำ object เดิมเป็นหมื่นครั้ง
             $missingLocales = [];
             foreach ($localeList as $locale) {
                 if (! empty($missingAttributesByLocaleId[$locale['id']])) {
-                    $missingLocales[] = ['locale' => $locale, 'missing_attributes' => $missingAttributesByLocaleId[$locale['id']]];
+                    $missingLocales[] = ['locale_id' => $locale['id'], 'attribute_ids' => $missingAttributesByLocaleId[$locale['id']]];
                 }
             }
 
             $rows[] = [
                 'id' => $product->id,
                 'sku' => $product->sku,
-                'family' => $product->family ? ($product->family->name ?: $product->family->code) : null,
+                'family' => $familyNamesById[$familyId] ?? null,
                 'enabled' => (bool) $product->enabled,
                 'missing_locales' => $missingLocales,
             ];
@@ -701,6 +722,8 @@ class ProductController extends Controller
         return Inertia::render('catalog/products/missing-translations', [
             'rows' => $rows,
             'totalProducts' => $products->count(),
+            'locales' => $localeList,
+            'attributes' => $localeBasedAttributes->map(fn ($attribute) => ['id' => $attribute->id, 'code' => $attribute->code, 'name' => $attribute->name])->values()->all(),
         ]);
     }
 
@@ -751,7 +774,7 @@ class ProductController extends Controller
      *
      * @param  array<int, string|null>  $valuesByLocale locale_id => ค่าดิบ
      * @param  array<int, array{id: int, code: string, display_name: string|null}>  $localeList
-     * @param  array<int, array<int, array{id: int, code: string, name: string|null}>>  $missingAttributesByLocaleId  locale_id => รายการ attribute, ส่งโดยอ้างอิง (by reference)
+     * @param  array<int, int[]>  $missingAttributesByLocaleId  locale_id => รายการ attribute id, ส่งโดยอ้างอิง (by reference)
      */
     private function collectMissingLocalesForAttribute(
         Attribute $attribute,
@@ -769,9 +792,8 @@ class ProductController extends Controller
             return;
         }
 
-        $descriptor = ['id' => $attribute->id, 'code' => $attribute->code, 'name' => $attribute->name];
         foreach ($coverage['missingLocaleIds'] as $localeId) {
-            $missingAttributesByLocaleId[$localeId][] = $descriptor;
+            $missingAttributesByLocaleId[$localeId][] = $attribute->id;
         }
     }
 

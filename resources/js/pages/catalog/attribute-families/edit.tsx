@@ -45,7 +45,8 @@ import {
     Tooltip,
     Typography,
 } from '@mui/material';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { relabelAttributes, relabelGroups } from './relabel-assignments';
 import { useTranslation } from 'react-i18next';
 import { FIORI, fioriAttentionSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriNegativeSx, fioriPositiveSx, fioriTabsSx } from '@/lib/fiori-style';
 
@@ -183,7 +184,21 @@ export default function AttributeFamilyEdit({
         return false;
     };
 
+    // อ่านผ่าน ref เพื่อไม่ให้ effect ด้านล่าง re-run แค่เพราะ groupsDirty เปลี่ยน
+    const groupsDirtyRef = useRef(groupsDirty);
+    groupsDirtyRef.current = groupsDirty;
+
     useEffect(() => {
+        // props เปลี่ยนระหว่างที่ผู้ใช้จัดกลุ่มค้างไว้ (เช่น สลับภาษา → router.reload())
+        // ห้ามสร้างใหม่จาก DB ไม่งั้นการลากที่ยังไม่บันทึกหายหมด — แค่อัปเดตชื่อตาม id
+        if (groupsDirtyRef.current) {
+            const attributesById = new Map(attributes.map((a) => [a.id, a]));
+            const groupsById = new Map(groups.map((g) => [g.id, g]));
+            setUnassignedAttrs((prev) => relabelAttributes(prev, attributesById));
+            setAssignedGroups((prev) => relabelGroups(prev, groupsById, attributesById));
+            return;
+        }
+
         // สร้าง assignedGroups และ unassignedAttrs จากข้อมูลจริงใน DB (familyAttributes กับ attributes props)
         // familyAttributes มาจาก backend เรียงตาม sort_order แล้ว — ต้องใช้ Map เพื่อ
         // รักษาลำดับ "กลุ่มที่เจอก่อน" ไว้ตามนั้น ถ้าใช้ object ธรรมดา Object.values()
@@ -215,7 +230,7 @@ export default function AttributeFamilyEdit({
 
         setAssignedGroups(Array.from(groupsMap.values()));
         setUnassignedAttrs(attributes.filter((a) => !assignedAttrIds.has(a.id)));
-    }, [familyAttributes, attributes]);
+    }, [familyAttributes, attributes, groups]);
 
     const filteredUnassigned = unassignedAttrs.filter((attr) => {
         const title = attr.name || attr.code;

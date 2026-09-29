@@ -169,7 +169,7 @@ class AttributeAutoTranslator
         foreach ($targetLocales as $locale) {
             try {
                 $translated = TranslationProviderRegistry::resolve($provider->type)
-                    ->translateBatch([$sourceLabel], $sourceLocale->code, $locale->code, $provider->credentials ?? []);
+                    ->translateBatch([$sourceLabel], $sourceLocale->code, $locale->code, $provider->readableCredentials());
 
                 $label = trim($translated[0] ?? '');
                 if ($label === '') {

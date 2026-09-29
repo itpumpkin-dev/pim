@@ -18,6 +18,7 @@ import {
     AccordionDetails,
     AccordionSummary,
     Alert,
+    Autocomplete,
     Box,
     Button,
     Checkbox,
@@ -47,6 +48,13 @@ interface Props {
 
 type SchemaResponse = PreflightSchema & { sample: { columns: string[]; rows: Record<string, string>[] } };
 type ResolvedFamily = { code: string; name: string };
+type FamilyOption = ResolvedFamily & { groups_count: number };
+// How the family step narrows the columns — by one Product Group (its bound
+// families), by Attribute Families picked directly (a file spanning many
+// groups that share one family), or not at all (a file mixing groups and
+// families). None of these sets the imported products' family: that always
+// comes from each row's own category columns.
+type ScopeMode = 'group' | 'family' | 'all';
 
 export default function ImportCreate({ types, requiredColumnsByType, columnLabelsByType }: Props) {
     const { t } = useTranslation('import_export');
@@ -125,6 +133,14 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     const [resolvedFamilies, setResolvedFamilies] = useState<ResolvedFamily[]>([]);
     const [familiesLoading, setFamiliesLoading] = useState(false);
 
+    const [scopeMode, setScopeMode] = useState<ScopeMode>('group');
+    const [familyOptions, setFamilyOptions] = useState<FamilyOption[]>([]);
+    const [familyOptionsLoading, setFamilyOptionsLoading] = useState(false);
+    const [familyOptionsError, setFamilyOptionsError] = useState(false);
+    // Same one-time-fetch-via-ref pattern as categoryTreeFetchStarted below.
+    const familyOptionsFetchStarted = useRef(false);
+    const [selectedFamilies, setSelectedFamilies] = useState<FamilyOption[]>([]);
+
     const currentKey = stepKeys[Math.min(activeStep, stepKeys.length - 1)];
 
     // Column schema for the review/upload steps — refetched whenever the type
@@ -181,6 +197,31 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         };
     }, [isProducts]);
 
+    // Fetched once, lazily — only the "by Attribute Family" mode needs it.
+    useEffect(() => {
+        if (!isProducts || scopeMode !== 'family' || familyOptionsFetchStarted.current) return;
+        familyOptionsFetchStarted.current = true;
+        let active = true;
+        setFamilyOptionsLoading(true);
+        fetch('/import-export/imports/attribute-families', { headers: { Accept: 'application/json' } })
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`attribute-families fetch failed: ${res.status}`))))
+            .then((list: FamilyOption[]) => {
+                if (!active) return;
+                setFamilyOptions(list);
+                setFamilyOptionsError(false);
+            })
+            .catch((err) => {
+                console.error(err);
+                if (active) setFamilyOptionsError(true);
+            })
+            .finally(() => {
+                if (active) setFamilyOptionsLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [isProducts, scopeMode]);
+
     // Resolves the Attribute Family/Families bound to the chosen Product
     // Group (a leaf category) — a Product Group can bind more than one, so
     // family_code carries the comma-separated union of their codes.
@@ -227,6 +268,25 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
             setData('family_code', '');
         }
     };
+    const selectFamilies = (families: FamilyOption[]) => {
+        setSelectedFamilies(families);
+        setData('family_code', families.map((f) => f.code).join(','));
+    };
+    // Each mode starts from a clean slate — a Product Group picked under
+    // "group" mode must not keep narrowing the columns after switching away.
+    const resetScope = () => {
+        setCatId(null);
+        setSubcatId(null);
+        setGroupId(null);
+        setResolvedFamilies([]);
+        setSelectedFamilies([]);
+        setData('family_code', '');
+    };
+    const changeScopeMode = (mode: ScopeMode) => {
+        if (mode === scopeMode) return;
+        setScopeMode(mode);
+        resetScope();
+    };
 
     const goNext = () => {
         setActiveStep((step) => {
@@ -245,11 +305,8 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         // Downstream choices no longer apply to the new type.
         setFurthest(0);
         setSchema(null);
-        setCatId(null);
-        setSubcatId(null);
-        setGroupId(null);
-        setResolvedFamilies([]);
-        setData('family_code', '');
+        setScopeMode('group');
+        resetScope();
     };
 
     const changeKind = (kind: 'master' | 'product') => {
@@ -295,11 +352,17 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     const isLastStep = activeStep === stepKeys.length - 1;
     // Block "Next" while the schema is still loading (if the fetch failed
     // outright, let the user proceed and rely on server-side validation when
-    // the import runs) — and, on the family step, until a Product Group is
-    // actually picked, so the wizard can't be skipped straight through
-    // without resolving which Attribute Family/Families apply.
-    const nextDisabled =
-        (currentKey === 'review' && schemaLoading) || (currentKey === 'family' && isProducts && groupId === null);
+    // the import runs) — and, on the family step, until the chosen mode has
+    // what it needs: a Product Group ("group") or at least one Attribute
+    // Family ("family"). "all" deliberately narrows nothing, so it never blocks.
+    const scopeIncomplete = (scopeMode === 'group' && groupId === null) || (scopeMode === 'family' && selectedFamilies.length === 0);
+    const nextDisabled = (currentKey === 'review' && schemaLoading) || (currentKey === 'family' && isProducts && scopeIncomplete);
+
+    const scopeModes: { value: ScopeMode; title: string; description: string }[] = [
+        { value: 'group', title: t('scopeModeGroup'), description: t('scopeModeGroupDescription') },
+        { value: 'family', title: t('scopeModeFamily'), description: t('scopeModeFamilyDescription') },
+        { value: 'all', title: t('wizardFamilyAll'), description: t('scopeModeAllDescription') },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -484,100 +547,189 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
                                 </Typography>
                             </Box>
 
-                            {categoryTreeError && <Alert severity="error">{t('categoryTreeLoadError')}</Alert>}
-
-                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                <FormControl fullWidth disabled={categoryTreeLoading}>
-                                    <InputLabel id="import-category-label">{t('categoryStepCategoryLabel')}</InputLabel>
-                                    <Select
-                                        labelId="import-category-label"
-                                        label={t('categoryStepCategoryLabel')}
-                                        value={catId ?? ''}
-                                        onChange={(e) => selectCategory(e.target.value === '' ? null : Number(e.target.value))}
-                                    >
-                                        <MenuItem value="">
-                                            <em>{t('wizardFamilyAll')}</em>
-                                        </MenuItem>
-                                        {categoryTree.map((n) => (
-                                            <MenuItem key={n.id} value={n.id}>
-                                                {n.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-
-                                <FormControl fullWidth disabled={!catNode}>
-                                    <InputLabel id="import-subcategory-label">{t('categoryStepSubcategoryLabel')}</InputLabel>
-                                    <Select
-                                        labelId="import-subcategory-label"
-                                        label={t('categoryStepSubcategoryLabel')}
-                                        value={subcatId ?? ''}
-                                        onChange={(e) => selectSubcategory(e.target.value === '' ? null : Number(e.target.value))}
-                                    >
-                                        <MenuItem value="">
-                                            <em>—</em>
-                                        </MenuItem>
-                                        {(catNode?.children ?? []).map((n) => (
-                                            <MenuItem key={n.id} value={n.id}>
-                                                {n.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-
-                                <FormControl fullWidth disabled={!subcatNode}>
-                                    <InputLabel id="import-group-label">{t('categoryStepProductGroupLabel')}</InputLabel>
-                                    <Select
-                                        labelId="import-group-label"
-                                        label={t('categoryStepProductGroupLabel')}
-                                        value={groupId ?? ''}
-                                        onChange={(e) => selectGroup(e.target.value === '' ? null : Number(e.target.value))}
-                                    >
-                                        <MenuItem value="">
-                                            <em>—</em>
-                                        </MenuItem>
-                                        {(subcatNode?.children ?? []).map((n) => (
-                                            <MenuItem key={n.id} value={n.id}>
-                                                {n.name}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Stack>
-
-                            <Box>
-                                <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('resolvedFamiliesLabel')}
-                                </Typography>
-                                {familiesLoading ? (
-                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                                        <CircularProgress size={14} />
-                                        <Typography variant="body2" color="text.secondary">
-                                            {t('previewLoading')}
-                                        </Typography>
-                                    </Stack>
-                                ) : groupId === null ? (
-                                    <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 0.5, color: FIORI.warning }}>
-                                        {t('selectProductGroupFirst')}
-                                    </Typography>
-                                ) : resolvedFamilies.length === 0 ? (
-                                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', mt: 0.5 }}>
-                                        {t('noFamilyBoundToProductGroup')}
-                                    </Typography>
-                                ) : (
-                                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                                        {resolvedFamilies.map((f) => (
-                                            <Chip
-                                                key={f.code}
-                                                label={`${f.name} (${f.code})`}
-                                                size="small"
-                                                sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600 }}
+                            <RadioGroup value={scopeMode} onChange={(e) => changeScopeMode(e.target.value as ScopeMode)}>
+                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+                                    {scopeModes.map((mode) => (
+                                        <Paper
+                                            key={mode.value}
+                                            variant="outlined"
+                                            onClick={() => changeScopeMode(mode.value)}
+                                            sx={{
+                                                p: 1.5,
+                                                flex: 1,
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                borderColor: scopeMode === mode.value ? FIORI.brand : FIORI.border,
+                                                bgcolor: scopeMode === mode.value ? FIORI.brandBg : FIORI.surface,
+                                            }}
+                                        >
+                                            <FormControlLabel
+                                                value={mode.value}
+                                                control={<Radio />}
+                                                label={
+                                                    <Box>
+                                                        <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>{mode.title}</Typography>
+                                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                                            {mode.description}
+                                                        </Typography>
+                                                    </Box>
+                                                }
+                                                sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
                                             />
-                                        ))}
+                                        </Paper>
+                                    ))}
+                                </Stack>
+                            </RadioGroup>
+
+                            {scopeMode === 'family' && (
+                                <Box>
+                                    {familyOptionsError && (
+                                        <Alert severity="error" sx={{ mb: 2 }}>
+                                            {t('familyListLoadError')}
+                                        </Alert>
+                                    )}
+                                    <Autocomplete
+                                        multiple
+                                        options={familyOptions}
+                                        value={selectedFamilies}
+                                        loading={familyOptionsLoading}
+                                        onChange={(_e, value) => selectFamilies(value)}
+                                        isOptionEqualToValue={(option, value) => option.code === value.code}
+                                        getOptionLabel={(option) => `${option.name} (${option.code})`}
+                                        filterSelectedOptions
+                                        renderOption={(props, option) => {
+                                            const { key, ...rest } = props as typeof props & { key: string };
+                                            return (
+                                                <Box component="li" key={key} {...rest}>
+                                                    <Box>
+                                                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                                                            {option.name} ({option.code})
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                                                            {t('familyGroupsCount', { count: option.groups_count })}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        }}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label={t('familyPickerLabel')}
+                                                placeholder={selectedFamilies.length === 0 ? t('familyPickerPlaceholder') : undefined}
+                                            />
+                                        )}
+                                    />
+                                    {selectedFamilies.length === 0 ? (
+                                        <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1, color: FIORI.warning }}>
+                                            {t('selectFamilyFirst')}
+                                        </Typography>
+                                    ) : (
+                                        <FormHelperText>{t('scopeModeFamilyHelp')}</FormHelperText>
+                                    )}
+                                </Box>
+                            )}
+
+                            {scopeMode === 'all' && <Alert severity="info">{t('scopeModeAllInfo')}</Alert>}
+
+                            {scopeMode === 'group' && categoryTreeError && <Alert severity="error">{t('categoryTreeLoadError')}</Alert>}
+
+                            {scopeMode === 'group' && (
+                                <>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                        <FormControl fullWidth disabled={categoryTreeLoading}>
+                                            <InputLabel id="import-category-label">{t('categoryStepCategoryLabel')}</InputLabel>
+                                            <Select
+                                                labelId="import-category-label"
+                                                label={t('categoryStepCategoryLabel')}
+                                                value={catId ?? ''}
+                                                onChange={(e) => selectCategory(e.target.value === '' ? null : Number(e.target.value))}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>—</em>
+                                                </MenuItem>
+                                                {categoryTree.map((n) => (
+                                                    <MenuItem key={n.id} value={n.id}>
+                                                        {n.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <FormControl fullWidth disabled={!catNode}>
+                                            <InputLabel id="import-subcategory-label">{t('categoryStepSubcategoryLabel')}</InputLabel>
+                                            <Select
+                                                labelId="import-subcategory-label"
+                                                label={t('categoryStepSubcategoryLabel')}
+                                                value={subcatId ?? ''}
+                                                onChange={(e) => selectSubcategory(e.target.value === '' ? null : Number(e.target.value))}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>—</em>
+                                                </MenuItem>
+                                                {(catNode?.children ?? []).map((n) => (
+                                                    <MenuItem key={n.id} value={n.id}>
+                                                        {n.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        <FormControl fullWidth disabled={!subcatNode}>
+                                            <InputLabel id="import-group-label">{t('categoryStepProductGroupLabel')}</InputLabel>
+                                            <Select
+                                                labelId="import-group-label"
+                                                label={t('categoryStepProductGroupLabel')}
+                                                value={groupId ?? ''}
+                                                onChange={(e) => selectGroup(e.target.value === '' ? null : Number(e.target.value))}
+                                            >
+                                                <MenuItem value="">
+                                                    <em>—</em>
+                                                </MenuItem>
+                                                {(subcatNode?.children ?? []).map((n) => (
+                                                    <MenuItem key={n.id} value={n.id}>
+                                                        {n.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
                                     </Stack>
-                                )}
-                                <FormHelperText>{t('wizardFamilyHelp')}</FormHelperText>
-                            </Box>
+
+                                    <Box>
+                                        <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                            {t('resolvedFamiliesLabel')}
+                                        </Typography>
+                                        {familiesLoading ? (
+                                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                                <CircularProgress size={14} />
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {t('previewLoading')}
+                                                </Typography>
+                                            </Stack>
+                                        ) : groupId === null ? (
+                                            <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 0.5, color: FIORI.warning }}>
+                                                {t('selectProductGroupFirst')}
+                                            </Typography>
+                                        ) : resolvedFamilies.length === 0 ? (
+                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', mt: 0.5 }}>
+                                                {t('noFamilyBoundToProductGroup')}
+                                            </Typography>
+                                        ) : (
+                                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                                                {resolvedFamilies.map((f) => (
+                                                    <Chip
+                                                        key={f.code}
+                                                        label={`${f.name} (${f.code})`}
+                                                        size="small"
+                                                        sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600 }}
+                                                    />
+                                                ))}
+                                            </Stack>
+                                        )}
+                                        <FormHelperText>{t('wizardFamilyHelp')}</FormHelperText>
+                                    </Box>
+                                </>
+                            )}
                         </Stack>
                     )}
 

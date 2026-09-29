@@ -13,6 +13,7 @@ Route::middleware(['auth'])->prefix('import-export')->name('importExport.')->gro
     Route::get('imports/sample/{type}', [ImportConfigController::class, 'sample'])->name('imports.sample')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/schema/{type}', [ImportConfigController::class, 'schema'])->name('imports.schema')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/category-tree', [ImportConfigController::class, 'categoryTree'])->name('imports.categoryTree')->middleware('permission:import_configs,list_import_configs');
+    Route::get('imports/attribute-families', [ImportConfigController::class, 'attributeFamilies'])->name('imports.attributeFamilies')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/category-families/{category}', [ImportConfigController::class, 'categoryAttributeFamilies'])->name('imports.categoryFamilies')->middleware('permission:import_configs,list_import_configs');
     Route::get('imports/{importConfig}/edit', [ImportConfigController::class, 'edit'])->name('imports.edit')->middleware('permission:import_configs,edit_import_configs');
     Route::put('imports/{importConfig}', [ImportConfigController::class, 'update'])->name('imports.update')->middleware('permission:import_configs,edit_import_configs');

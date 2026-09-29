@@ -58,3 +58,39 @@ test('columns() applies no family scoping when family_code is blank', function (
 
     expect($importer->columns())->toContain('mf_unscoped_a');
 });
+
+test('columns() lists locale-based family attributes, in family sort order', function () {
+    $second = Attribute::create(['code' => 'mf_loc_second', 'type' => 'text', 'is_locale_based' => true]);
+    $first = Attribute::create(['code' => 'mf_loc_first', 'type' => 'text', 'is_locale_based' => true]);
+    $channel = Attribute::create(['code' => 'mf_loc_channel', 'type' => 'text', 'is_channel_based' => true]);
+
+    $group = AttributeGroup::create(['code' => 'mf_loc_group']);
+    $family = AttributeFamily::create(['code' => 'mf_loc_family', 'name' => 'Locale Family']);
+    $family->attributes()->attach([
+        $second->id => ['attribute_group_id' => $group->id, 'sort_order' => 2],
+        $first->id => ['attribute_group_id' => $group->id, 'sort_order' => 1],
+        $channel->id => ['attribute_group_id' => $group->id, 'sort_order' => 3],
+    ]);
+
+    $columns = (new ProductRowImporter(null, null, 'mf_loc_family'))->columns();
+
+    $familyColumns = array_values(array_filter($columns, fn ($c) => str_starts_with($c, 'mf_loc_')));
+    // locale-based now importable (lands in the global scope); channel-based still not
+    expect($familyColumns)->toBe(['mf_loc_first', 'mf_loc_second']);
+});
+
+test('columns() always offers the category columns first, even when scoped to a family that lacks them', function () {
+    foreach (ProductRowImporter::CATEGORY_COLUMNS as $code) {
+        Attribute::firstOrCreate(['code' => $code], ['type' => 'select', 'is_locale_based' => true]);
+    }
+    $attr = Attribute::create(['code' => 'mf_cat_attr', 'type' => 'text']);
+    $group = AttributeGroup::create(['code' => 'mf_cat_group']);
+    $family = AttributeFamily::create(['code' => 'mf_cat_family', 'name' => 'Cat Family']);
+    $family->attributes()->attach([$attr->id => ['attribute_group_id' => $group->id]]);
+
+    $columns = (new ProductRowImporter(null, null, 'mf_cat_family'))->columns();
+
+    expect(array_slice($columns, 0, 7))->toBe([
+        'sku', 'type', 'enabled', 'pcatname', 'psubcatname', 'productgroupname', 'mf_cat_attr',
+    ]);
+});

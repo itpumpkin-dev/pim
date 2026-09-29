@@ -39,8 +39,8 @@ interface MissingAttribute {
 }
 
 interface MissingLocaleEntry {
-    locale: LocaleOption;
-    missing_attributes: MissingAttribute[];
+    locale_id: number;
+    attribute_ids: number[];
 }
 
 interface MissingRow {
@@ -54,9 +54,11 @@ interface MissingRow {
 interface Props {
     rows: MissingRow[];
     totalProducts: number;
+    locales: LocaleOption[];
+    attributes: MissingAttribute[];
 }
 
-export default function MissingTranslations({ rows, totalProducts }: Props) {
+export default function MissingTranslations({ rows, totalProducts, locales, attributes }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { auth } = usePage<SharedData>().props;
@@ -74,6 +76,10 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
         { title: tNav('management'), href: '/catalog/management' },
         { title: tNav('missingTranslations'), href: '#' },
     ];
+
+    // แต่ละแถวส่งมาแค่ id (ลด payload) — resolve เป็น locale/attribute เต็มๆ ตรงนี้
+    const localesById = useMemo(() => new Map(locales.map((locale) => [locale.id, locale])), [locales]);
+    const attributesById = useMemo(() => new Map(attributes.map((attribute) => [attribute.id, attribute])), [attributes]);
 
     const filteredRows = useMemo(() => {
         const needle = search.trim().toLowerCase();
@@ -195,16 +201,24 @@ export default function MissingTranslations({ rows, totalProducts }: Props) {
             priority: 'high',
             render: (row) => (
                 <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                    {row.missing_locales.map(({ locale, missing_attributes }) => (
-                        <Tooltip key={locale.id} title={missing_attributes.map((a) => a.name || a.code).join(', ')}>
-                            <Chip
-                                label={`${locale.display_name || locale.code} (${missing_attributes.length})`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ height: 20, fontSize: '0.7rem' }}
-                            />
-                        </Tooltip>
-                    ))}
+                    {row.missing_locales.map(({ locale_id, attribute_ids }) => {
+                        const locale = localesById.get(locale_id);
+                        const attributeLabels = attribute_ids.map((id) => {
+                            const attribute = attributesById.get(id);
+                            return attribute ? attribute.name || attribute.code : String(id);
+                        });
+
+                        return (
+                            <Tooltip key={locale_id} title={attributeLabels.join(', ')}>
+                                <Chip
+                                    label={`${locale ? locale.display_name || locale.code : locale_id} (${attribute_ids.length})`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ height: 20, fontSize: '0.7rem' }}
+                                />
+                            </Tooltip>
+                        );
+                    })}
                 </Stack>
             ),
         },

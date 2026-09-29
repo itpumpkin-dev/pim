@@ -400,7 +400,7 @@ class LocaleTranslationService
 
         try {
             $translated = TranslationProviderRegistry::resolve($provider->type)
-                ->translateBatch($values, self::SOURCE_LOCALE, $target, $provider->credentials ?? []);
+                ->translateBatch($values, self::SOURCE_LOCALE, $target, $provider->readableCredentials());
 
             if (count($translated) !== count($values)) {
                 throw new \RuntimeException('Translation provider returned an unexpected response shape.');
