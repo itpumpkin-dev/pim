@@ -66,6 +66,30 @@ test('importRow() writes to the primary (lowest id) group placement and never to
     expect($groupBRows->first()->value)->toBe('group B text');
 });
 
+test('importRow() places a brand-new SKU\'s values in the right group on the first pass (category linked before resolving groups)', function () {
+    $attribute = Attribute::create(['code' => 'pri_new_sku_attr', 'type' => 'text']);
+    $group = AttributeGroup::create(['code' => 'pri_new_sku_group']);
+    $family = AttributeFamily::create(['code' => 'pri_new_sku_family', 'name' => 'PRI New SKU Family']);
+    FamilyAttribute::create(['family_id' => $family->id, 'attribute_id' => $attribute->id, 'attribute_group_id' => $group->id, 'sort_order' => 0]);
+
+    $category = Category::create(['code' => 'pri_new_sku_cat', 'name' => 'PRI New SKU Category']);
+    DB::table('category_attribute_family')->insert(['category_id' => $category->id, 'family_id' => $family->id, 'sort_order' => 0]);
+
+    $sku = 'PRI-NEW-'.uniqid();
+    expect(Product::where('sku', $sku)->exists())->toBeFalse();
+
+    $importer = new ProductRowImporter();
+    $importer->importRow(['sku' => $sku, 'type' => 'simple', 'enabled' => '1', 'productgroupname' => 'pri_new_sku_cat', 'pri_new_sku_attr' => 'first pass'], priImportConfig());
+
+    $product = Product::where('sku', $sku)->firstOrFail();
+    $rows = ProductValue::where('product_id', $product->id)->where('attribute_id', $attribute->id)->get();
+
+    expect($product->categories()->pluck('categories.id')->all())->toBe([$category->id]);
+    expect($rows)->toHaveCount(1);
+    expect($rows->first()->attribute_group_id)->toBe($group->id);
+    expect($rows->first()->value)->toBe('first pass');
+});
+
 test('importRow() still writes an ungrouped attribute with attribute_group_id = null (unchanged behavior)', function () {
     $attribute = Attribute::create(['code' => 'pri_ungrouped_attr', 'type' => 'text']);
     $sku = 'PRI-UNGROUPED-'.uniqid();

@@ -496,6 +496,82 @@ class AttributeFamilyController extends Controller
     }
 
     /**
+     * แท็บ "จัดการ" บนหน้า index — หนึ่งแถวต่อหนึ่งกลุ่มสินค้า (leaf ระดับ 3 join
+     * เดียวกับ productGroupsForDefaultPicker()) พร้อมตระกูลแอตทริบิวต์ที่เป็น
+     * "ค่าเริ่มต้น" ของกลุ่มนั้นอยู่ตอนนี้ ซึ่งคือแถว sort_order ต่ำสุดใน pivot
+     * category_attribute_family (ไม่มีคอลัมน์ is_default — ดู
+     * DefaultAttributeFamilyAssigner) กลุ่มที่ยังไม่มีตระกูลผูกอยู่เลยจะไม่โผล่
+     * ค้นได้ทั้งจาก code/ชื่อ ของตระกูลและของกลุ่มสินค้า
+     */
+    public function defaultAssignments(Request $request): JsonResponse
+    {
+        $search = $request->input('search');
+        $familyId = $request->integer('family_id') ?: null;
+        $perPage = (int) $request->input('per_page', 15);
+        if (! in_array($perPage, [10, 15, 25, 50], true)) {
+            $perPage = 15;
+        }
+
+        $rows = Category::query()
+            ->without('translations')
+            ->select([
+                'categories.id as group_id',
+                'af.id as family_id',
+            ])
+            ->join('categories as sub', 'categories.parent_id', '=', 'sub.id')
+            ->join('categories as root', 'sub.parent_id', '=', 'root.id')
+            ->whereNull('root.parent_id')
+            ->join('category_attribute_family as caf', 'caf.category_id', '=', 'categories.id')
+            ->join('attribute_families as af', 'af.id', '=', 'caf.family_id')
+            ->whereRaw('caf.family_id = (select c2.family_id from category_attribute_family c2 where c2.category_id = categories.id order by c2.sort_order, c2.family_id limit 1)')
+            ->when($familyId, fn ($q) => $q->where('af.id', $familyId))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('af.code', 'ilike', "%{$search}%")
+                        ->orWhere('af.name', 'ilike', "%{$search}%")
+                        ->orWhereExists(fn ($eq) => $eq->from('attribute_family_translations as aft')
+                            ->whereColumn('aft.attribute_family_id', 'af.id')
+                            ->where('aft.label', 'ilike', "%{$search}%"))
+                        ->orWhere('categories.code', 'ilike', "%{$search}%")
+                        ->orWhere('categories.name', 'ilike', "%{$search}%")
+                        ->orWhereHas('translations', fn ($tq) => $tq->where('label', 'ilike', "%{$search}%"));
+                });
+            })
+            ->orderBy('af.name')
+            ->orderBy('root.name')
+            ->orderBy('sub.name')
+            ->orderBy('categories.name')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        // โหลด model จริงทีหลังเพื่อให้ accessor name() คืน label ตามภาษาปัจจุบัน
+        $groups = Category::with(['translations', 'parent:id,name,parent_id', 'parent.parent:id,name'])
+            ->whereIn('id', $rows->getCollection()->pluck('group_id'))
+            ->get()
+            ->keyBy('id');
+        $families = AttributeFamily::whereIn('id', $rows->getCollection()->pluck('family_id')->unique())
+            ->get()
+            ->keyBy('id');
+
+        $rows->getCollection()->transform(function ($row) use ($groups, $families) {
+            $group = $groups->get($row->group_id);
+            $family = $families->get($row->family_id);
+
+            return [
+                'family_id' => $family?->id,
+                'family_code' => $family?->code,
+                'family_name' => $family?->name,
+                'group_id' => $group?->id,
+                'group_name' => $group?->name,
+                'subcategory_name' => $group?->parent?->name,
+                'category_name' => $group?->parent?->parent?->name,
+            ];
+        });
+
+        return response()->json($rows);
+    }
+
+    /**
      * รายชื่อ "กลุ่มสินค้า" ทั้งหมด (ไม่กรองว่ามีตระกูลแอตทริบิวต์ผูกอยู่แล้วหรือไม่ —
      * ส่วนใหญ่มีตระกูล "เริ่มต้น" ผูกอยู่แล้วทั้งนั้น dialog นี้ไว้ "เพิ่ม" ตระกูล
      * ใหม่ต่อท้ายรายการเดิม ไม่ใช่ตั้งตระกูลแรกให้) — คู่หูของ

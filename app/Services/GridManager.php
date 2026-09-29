@@ -111,9 +111,13 @@ class GridManager
             }
         }
 
-        $perPage = (int) $request->input('per_page', 10);
-        if (!in_array($perPage, [10, 25, 50], true)) {
-            $perPage = 10;
+        // `per_page` ใน YAML ของแต่ละ grid เป็น opt-in เหมือน `default_sort` —
+        // grid ที่ไม่ได้ตั้งไว้ยังได้ 10 / [10, 25, 50] เหมือนเดิม
+        $perPageDefault = (int) ($this->config['per_page']['default'] ?? 10);
+        $perPageOptions = array_map('intval', $this->config['per_page']['options'] ?? [10, 25, 50]);
+        $perPage = (int) $request->input('per_page', $perPageDefault);
+        if (!in_array($perPage, $perPageOptions, true)) {
+            $perPage = $perPageDefault;
         }
 
         return $query->paginate($perPage)->withQueryString();

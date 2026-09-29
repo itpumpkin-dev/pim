@@ -47,7 +47,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriTabsSx } from '@/lib/fiori-style';
+import { FIORI, fioriAttentionSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriNegativeSx, fioriPositiveSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface AttributeGroup {
     id: number;
@@ -1157,7 +1157,7 @@ export default function AttributeFamilyEdit({
                                                 disabled={settingDefault || !canAssignDefaultFamily}
                                                 startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
                                                 onClick={setAsDefaultForAllGroups}
-                                                sx={fioriGhostSx}
+                                                sx={fioriAttentionSx}
                                             >
                                                 {t('setDefaultForAllGroups')}
                                             </Button>
@@ -1174,7 +1174,7 @@ export default function AttributeFamilyEdit({
                                                 variant="outlined"
                                                 disabled={!canAssignDefaultFamily}
                                                 onClick={() => setSelectGroupsDialogOpen(true)}
-                                                sx={fioriGhostSx}
+                                                sx={fioriPositiveSx}
                                             >
                                                 {t('setDefaultForSomeGroups')}
                                             </Button>
@@ -1203,7 +1203,7 @@ export default function AttributeFamilyEdit({
                                                 disabled={unassigningAll || !canAssignDefaultFamily}
                                                 startIcon={unassigningAll ? <CircularProgress size={14} color="inherit" /> : undefined}
                                                 onClick={unassignFromAllGroups}
-                                                sx={fioriGhostSx}
+                                                sx={fioriNegativeSx}
                                             >
                                                 {t('unsetDefaultForAllGroups')}
                                             </Button>
@@ -1217,7 +1217,7 @@ export default function AttributeFamilyEdit({
                                                 color="error"
                                                 disabled={!canAssignDefaultFamily}
                                                 onClick={() => setUnassignDialogOpen(true)}
-                                                sx={fioriGhostSx}
+                                                sx={fioriDefaultSx}
                                             >
                                                 {t('unsetDefaultForSomeGroups')}
                                             </Button>

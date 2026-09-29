@@ -151,6 +151,8 @@ interface AttributeItem {
     is_channel_based?: boolean;
     swatch_type?: string | null;
     options?: AttributeOption[];
+    /** true ระหว่างกำลังดึงตัวเลือกแบบ on-demand อยู่ (ตอนนี้ใช้แค่หมวดหมู่ย่อย/กลุ่มสินค้าของแผง Master Categories — ดู masterCategoryLoadingKeys) ให้ dropdown โชว์ indicator */
+    options_loading?: boolean;
     /** เป็น false เมื่อ role ของผู้ใช้ปัจจุบันมีสิทธิ์แค่ดู (ไม่ใช่แก้ไข) ในแอตทริบิวต์นี้ — ดูที่ "Attribute Access" ในฟอร์ม Role ถ้าไม่มีค่าหรือเป็น true คือแก้ไขได้ (เผื่อความเข้ากันได้กับของเก่า) */
     editable?: boolean;
     /** family id ที่แอตทริบิวต์นี้ถูกผูกไว้ด้วย — ใช้จำกัดขอบเขตของ variant-attribute picker ให้ตรงกับ family ของสินค้านั้นๆ */
@@ -762,6 +764,12 @@ export default function ProductEdit({
     // อยู่) ค่อยดึงตอนนี้แบบ on-demand แคชไว้ด้วย key `${code}:${parentCode}` กัน
     // fetch ซ้ำเวลาผู้ใช้สลับกลับไปมาระหว่าง parent เดิม
     const [masterCategoryChildOptions, setMasterCategoryChildOptions] = useState<Record<string, AttributeOption[]>>({});
+    // จำนวน request ที่กำลัง fetch อยู่ต่อ key — แยกจากแคชด้านบนเพราะ fetch ล้มเหลว
+    // จะไม่ถูกแคช (ให้ลองใหม่ได้) แต่ indicator ต้องหายไปด้วย นับเป็นตัวเลขแทน flag
+    // เพราะ effect ด้านล่าง re-run ได้ระหว่างที่ request เดิมยังไม่จบ (data.values
+    // เปลี่ยน) แล้วยิง key เดิมซ้ำ — ใช้ flag ธรรมดา request แรกที่จบจะลบ indicator
+    // ทิ้งทั้งที่ request ใหม่ยังโหลดอยู่
+    const [masterCategoryLoadingKeys, setMasterCategoryLoadingKeys] = useState<Record<string, number>>({});
 
     useEffect(() => {
         const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
@@ -778,6 +786,16 @@ export default function ProductEdit({
         if (toFetch.length === 0) return;
 
         let cancelled = false;
+        const keys = toFetch.map(({ code, parent }) => `${code}:${parent}`);
+        const bumpLoading = (delta: number) =>
+            setMasterCategoryLoadingKeys((prev) => {
+                const next = { ...prev };
+                keys.forEach((k) => {
+                    next[k] = Math.max(0, (next[k] ?? 0) + delta);
+                });
+                return next;
+            });
+        bumpLoading(1);
         Promise.all(
             toFetch.map(({ code, parent }) =>
                 fetch(`/catalog/products/master-category-options?code=${code}&parent_code=${encodeURIComponent(parent)}`, {
@@ -795,7 +813,9 @@ export default function ProductEdit({
                 });
                 return next;
             });
-        });
+        })
+            .catch(() => undefined)
+            .finally(() => bumpLoading(-1));
 
         return () => {
             cancelled = true;
@@ -815,6 +835,7 @@ export default function ProductEdit({
                 withCodePrefixedLabels({
                     ...subcatAttr,
                     options: masterCategoryChildOptions[`psubcatname:${categoryCode}`] ?? subcatAttr.options ?? [],
+                    options_loading: (masterCategoryLoadingKeys[`psubcatname:${categoryCode}`] ?? 0) > 0,
                 }),
             );
         }
@@ -823,12 +844,13 @@ export default function ProductEdit({
                 withCodePrefixedLabels({
                     ...groupAttr,
                     options: masterCategoryChildOptions[`productgroupname:${subcatCode}`] ?? groupAttr.options ?? [],
+                    options_loading: (masterCategoryLoadingKeys[`productgroupname:${subcatCode}`] ?? 0) > 0,
                 }),
             );
         }
         return visible;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [masterCategoryAttributes, masterCategoryChildOptions, data.values, activeChannelId, activeLocaleId]);
+    }, [masterCategoryAttributes, masterCategoryChildOptions, masterCategoryLoadingKeys, data.values, activeChannelId, activeLocaleId]);
 
     // เปลี่ยนหมวดหมู่/หมวดหมู่ย่อยแล้ว ต้องล้างค่าของฟิลด์ถัดไปทิ้งด้วย เพราะอาจไม่
     // ตรงกับสายใหม่แล้ว (เช่น เปลี่ยนหมวดหมู่ แต่หมวดหมู่ย่อยเดิมที่เลือกไว้เป็นของ
@@ -3772,11 +3794,13 @@ const SelectControl = memo(function SelectControl({
     options,
     value,
     disabled,
+    loading = false,
     onValueChange,
 }: FieldControlProps & {
     options: AttributeOption[];
     value: string;
     disabled: boolean;
+    loading?: boolean;
 }) {
     const { t } = useTranslation('catalog');
     const selectedOption = options.find((opt) => optionValue(opt) === value) ?? null;
@@ -3790,6 +3814,8 @@ const SelectControl = memo(function SelectControl({
             disabled={disabled}
             options={visibleOptions}
             value={selectedOption}
+            loading={loading}
+            loadingText={t('loadingOptions')}
             autoHighlight
             popupIcon={<KeyboardArrowDownIcon />}
             getOptionLabel={(opt) => opt.admin_label || opt.code || ''}
@@ -3797,7 +3823,21 @@ const SelectControl = memo(function SelectControl({
             onChange={(_, newValue) => onValueChange(attributeId, groupKey, channelKey, localeKey, newValue ? optionValue(newValue) : '')}
             sx={fioriComboBoxSx('none')}
             slotProps={{ paper: { sx: fioriComboBoxPaperSx } }}
-            renderInput={(params) => <TextField {...params} placeholder={t('selectOption')} />}
+            renderInput={(params) => (
+                <TextField
+                    {...params}
+                    placeholder={t('selectOption')}
+                    InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                            <>
+                                {loading && <CircularProgress size={16} thickness={4} sx={{ color: FIORI.brand, mr: 0.5 }} />}
+                                {params.InputProps.endAdornment}
+                            </>
+                        ),
+                    }}
+                />
+            )}
         />
     );
 });
@@ -4081,6 +4121,7 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                         options={options}
                         value={stringValue}
                         disabled={isReadOnly}
+                        loading={attr.options_loading}
                         onValueChange={onValueChange}
                     />
                     {canAddOptions && !isReadOnly && (

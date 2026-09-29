@@ -3,6 +3,9 @@ datagrid:
     source:
       type: eloquent
       class: App\Models\AttributeFamily
+    per_page:
+      default: 15
+      options: [10, 15, 25, 50]
     columns:
       id:
         label: fields.id

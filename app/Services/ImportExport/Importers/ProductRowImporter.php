@@ -235,6 +235,18 @@ class ProductRowImporter implements RowImporterInterface
             ]
         );
 
+        // ต้องผูกหมวดหมู่ "ก่อน" คำนวณ effectiveFamilyIds() ด้านล่าง — ตระกูลที่
+        // มีผลจริงมาจาก product_category → category_attribute_family ล้วนๆ ถ้า
+        // ผูกทีหลัง (แบบเดิม) SKU ใหม่ที่ import รอบแรกจะยังไม่มีหมวดหมู่ตอนหา
+        // group เลยได้ attribute_group_id = NULL ทุกแถว ไม่โผล่ใน panel ของ group
+        // ไหนในหน้า Edit เลย ต้อง import ซ้ำอีกรอบถึงจะเข้า group ถูก (และทิ้งแถว
+        // NULL ค้างไว้เป็นแถวซ้ำ)
+        ProductCategoryLinker::linkFromCodes($product, [
+            $row['pcatname'] ?? null,
+            $row['psubcatname'] ?? null,
+            $row['productgroupname'] ?? null,
+        ]);
+
         $unknownColumns = [];
         $restrictedColumns = [];
         $allowedAttributeCodes = $this->allowedAttributeCodes();
@@ -301,12 +313,6 @@ class ProductRowImporter implements RowImporterInterface
                 }
             }
         }
-
-        ProductCategoryLinker::linkFromCodes($product, [
-            $row['pcatname'] ?? null,
-            $row['psubcatname'] ?? null,
-            $row['productgroupname'] ?? null,
-        ]);
 
         $product->applySmartDefaults();
 

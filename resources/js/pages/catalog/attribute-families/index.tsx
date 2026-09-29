@@ -20,6 +20,8 @@ import {
     Paper,
     Select,
     Stack,
+    Tab,
+    Tabs,
     TextField,
     Tooltip,
     Typography,
@@ -30,6 +32,7 @@ import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import { BulkGenerateDialog } from './bulk-generate-dialog';
+import { ManageDefaultsTab } from './manage-defaults-tab';
 import {
     FIORI,
     fioriCardSx,
@@ -37,6 +40,7 @@ import {
     fioriEmphasizedSx,
     fioriIconButtonSx,
     fioriSearchFieldSx,
+    fioriTabsSx,
 } from '@/lib/fiori-style';
 
 interface GridColumn {
@@ -52,6 +56,7 @@ interface GridAction {
 interface GridConfig {
     columns: Record<string, GridColumn>;
     actions?: Record<string, GridAction>;
+    per_page?: { default?: number; options?: number[] };
 }
 interface AttributeFamilyRow {
     id: number;
@@ -92,9 +97,12 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
     const canCreate = permissions.includes('attribute_families.create_attribute_families');
     const canEdit = permissions.includes('attribute_families.edit_attribute_families');
     const canDelete = permissions.includes('attribute_families.delete_attribute_families');
+    const canAssignDefault = permissions.includes('attribute_families.assign_default_family');
+    const canEditProductGroup = permissions.includes('product_groups.edit_product_groups');
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [perPage, setPerPage] = useState<number>(gridData.per_page ?? 10);
+    const [perPage, setPerPage] = useState<number>(gridData.per_page ?? gridConfig.per_page?.default ?? 15);
+    const perPageOptions = gridConfig.per_page?.options ?? [10, 15, 25, 50];
     const [deleteFamilyId, setDeleteFamilyId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteUsage, setDeleteUsage] = useState<{ product_group_count: number; product_count: number } | null>(null);
@@ -104,6 +112,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
     const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false);
+    const [tab, setTab] = useState<'list' | 'manage'>('list');
     const firstRender = useRef(true);
 
     useEffect(() => {
@@ -235,7 +244,22 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
                     )}
                 </Stack>
 
+                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ ...fioriTabsSx, mb: 3 }}>
+                    <Tab value="list" label={tCatalog('attributeFamiliesListTab')} />
+                    <Tab value="manage" label={tCatalog('attributeFamiliesManageTab')} />
+                </Tabs>
+
+                {tab === 'manage' && (
+                    <ManageDefaultsTab
+                        families={otherFamilies}
+                        canEdit={canEdit}
+                        canAssignDefault={canAssignDefault}
+                        canEditProductGroup={canEditProductGroup}
+                    />
+                )}
+
                 {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
+                {tab === 'list' && (
                 <Paper elevation={0} sx={fioriCardSx}>
                     {/* แถบเครื่องมือ */}
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
@@ -277,9 +301,9 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
                                     '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
                                 }}
                             >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
+                                {perPageOptions.map((n) => (
+                                    <MenuItem key={n} value={n}>{n}</MenuItem>
+                                ))}
                             </Select>
 
                             <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
@@ -325,6 +349,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
                         emptyMessage={tCatalog('noAttributeFamiliesFound')}
                     />
                 </Paper>
+                )}
             </Box>
 
             {/* ไดอะล็อกยืนยันการลบ */}
