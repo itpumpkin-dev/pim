@@ -21,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // Listeners are registered explicitly in AppServiceProvider::boot()
+    // (Event::subscribe / Event::listen, each with its rationale). Laravel's
+    // auto-discovery of app/Listeners registered every one of them a SECOND
+    // time — each login/logout wrote two audit rows, and every
+    // ProductDataChanged queued two marketplace syncs.
+    ->withEvents(discover: false)
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->trustProxies(
             at: '*',
