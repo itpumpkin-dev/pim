@@ -18,9 +18,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Services\GridManager;
+use App\Services\Lark\LarkEmployeeDirectory;
 use App\Services\SessionInvalidator;
 
 class UserController extends Controller
@@ -33,8 +35,6 @@ class UserController extends Controller
             'gridConfig' => $grid->getConfig(),
             'gridData' => $grid->getData($request),
             'filters' => $request->only(['search', 'sort', 'dir']),
-            'departments' => Department::where('enabled', true)->orderBy('name')->get(['id', 'name']),
-            'jobPositions' => JobPosition::where('enabled', true)->orderBy('name')->get(['id', 'name']),
             'managerOptions' => User::orderBy('first_name')->orderBy('last_name')
                 ->get(['id', 'first_name', 'last_name', 'username'])
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => trim("{$u->first_name} {$u->last_name}") ?: $u->username]),
@@ -144,21 +144,111 @@ class UserController extends Controller
         ];
     }
 
-    public function store(StoreUserRequest $request): RedirectResponse
+    public function store(StoreUserRequest $request, LarkEmployeeDirectory $directory): RedirectResponse
     {
-        User::create([
+        $user = User::create([
             'username' => $request->username,
             'employee_id' => $request->employee_id,
             'password_hash' => $request->password,
             'first_name' => $request->first_name,
             'last_name' => $request->last_name,
             'email' => $request->email,
-            'department_id' => $request->department_id,
-            'job_position_id' => $request->job_position_id,
+            // หน้าสร้างผู้ใช้ส่งชื่อแผนก/ตำแหน่งเป็นข้อความ (ดึงมาจาก Lark หรือพิมพ์เอง)
+            // ไม่ใช่ id จาก select แล้ว — ผูกเข้า master เดิมตามชื่อ ถ้ายังไม่มีก็สร้าง
+            // ให้ หน้าแก้ไขผู้ใช้/รายงานที่ยังใช้ department_id/job_position_id อยู่
+            // เลยทำงานได้เหมือนเดิม
+            'department_id' => $this->resolveByName(Department::class, $request->department_name),
+            'job_position_id' => $this->resolveByName(JobPosition::class, $request->job_position_name),
             'manager_id' => $request->manager_id,
         ]);
 
+        // รูปที่อัปโหลดเองในหน้าสร้างผู้ใช้ชนะรูปจาก HR เสมอ
+        if ($request->hasFile('avatar')) {
+            $user->update(['avatar_path' => $request->file('avatar')->store('avatars', 'public')]);
+
+            return to_route('system.user.index')->with('success', 'User created successfully.');
+        }
+
+        // ติ๊ก "ใช้รูปจากระบบ HR" ไว้หลังกดดึงข้อมูล — โหลด EMP_PHOTO มาเป็นรูปโปรไฟล์
+        // ถ้าโหลดไม่ได้ (Lark ล่ม/ไม่มีรูปแล้ว) ก็ยังสร้างผู้ใช้ตามปกติ แค่ไม่มีรูป
+        // ไม่ควรให้เรื่องรูปมาทำให้การสร้างผู้ใช้ทั้งคนล้ม
+        if ($request->boolean('use_lark_photo') && $request->employee_id) {
+            try {
+                $photo = $directory->downloadPhoto(trim($request->employee_id));
+                if ($photo) {
+                    $path = 'avatars/'.Str::random(40).'.'.$photo['extension'];
+                    Storage::disk('public')->put($path, $photo['contents']);
+                    $user->update(['avatar_path' => $path]);
+                }
+            } catch (\RuntimeException $e) {
+                report($e);
+
+                return to_route('system.user.index')->with('warning', 'User created, but the HR photo could not be downloaded — upload one from the edit page.');
+            }
+        }
+
         return to_route('system.user.index')->with('success', 'User created successfully.');
+    }
+
+    /**
+     * รูปพนักงานจาก Lark สำหรับพรีวิวในหน้าสร้างผู้ใช้หลังกด "ดึงข้อมูล" — ต้อง
+     * ผ่าน backend เพราะ URL ของ Lark ใช้ tenant token ที่ห้ามส่งให้ browser
+     */
+    public function larkEmployeePhoto(Request $request, LarkEmployeeDirectory $directory): \Symfony\Component\HttpFoundation\Response
+    {
+        $validated = $request->validate(['employee_id' => ['required', 'string', 'max:50']]);
+
+        try {
+            $photo = $directory->downloadPhoto(trim($validated['employee_id']));
+        } catch (\RuntimeException $e) {
+            report($e);
+            abort(502);
+        }
+
+        abort_unless($photo, 404);
+
+        return response($photo['contents'], 200, [
+            'Content-Type' => $photo['mime'],
+            'Cache-Control' => 'private, max-age=600',
+        ]);
+    }
+
+    /**
+     * ปุ่ม "ดึงข้อมูล" ข้างช่อง Employee ID บนหน้าสร้างผู้ใช้ — ค้นพนักงานจาก
+     * ตาราง HR ใน Lark Base ด้วย PRS_NO แล้วคืนค่าไว้เติมฟอร์ม (ไม่บันทึกอะไร)
+     */
+    public function larkEmployee(Request $request, LarkEmployeeDirectory $directory): JsonResponse
+    {
+        $validated = $request->validate(['employee_id' => ['required', 'string', 'max:50']]);
+
+        try {
+            $employee = $directory->findByEmployeeId(trim($validated['employee_id']));
+        } catch (\RuntimeException $e) {
+            report($e);
+
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
+
+        if (! $employee) {
+            return response()->json(['message' => "ไม่พบพนักงานรหัส {$validated['employee_id']} ในระบบ HR"], 404);
+        }
+
+        return response()->json(['employee' => $employee]);
+    }
+
+    /**
+     * @param  class-string<Department|JobPosition>  $model
+     */
+    private function resolveByName(string $model, ?string $name): ?int
+    {
+        $name = trim(preg_replace('/\s+/u', ' ', (string) $name));
+        if ($name === '') {
+            return null;
+        }
+
+        $existing = $model::whereRaw('LOWER(name) = ?', [mb_strtolower($name)])->first();
+
+        return ($existing ?? $model::create(['name' => $name, 'enabled' => true]))->id;
     }
 
     public function edit(Request $request, User $user): Response

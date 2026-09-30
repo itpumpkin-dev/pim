@@ -103,4 +103,15 @@ return [
         'db_password' => env('WORDPRESS_DB_PASSWORD'),
     ],
 
+    // Lark Base (Bitable) employee directory — the "ดึงข้อมูล" button on
+    // the create-user dialog looks an employee up by PRS_NO here (see
+    // App\Services\Lark\LarkEmployeeDirectory).
+    'lark' => [
+        'base_url' => env('LARK_BASE_URL', 'https://open.larksuite.com/open-apis'),
+        'app_id' => env('LARK_APP_ID_BASE_API'),
+        'app_secret' => env('LARK_APP_SECRET_BASE_API'),
+        'employee_app_token' => env('LARK_BASE_APP_TOKEN'),
+        'employee_table_id' => env('LARK_BASE_TABLE_ID'),
+    ],
+
 ];

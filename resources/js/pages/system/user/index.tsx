@@ -39,15 +39,7 @@ interface GridConfig {
     }>;
 }
 
-interface DepartmentOption {
-    id: number;
-    name: string;
-}
 
-interface JobPositionOption {
-    id: number;
-    name: string;
-}
 
 interface UserIndexProps {
     gridConfig: GridConfig;
@@ -57,12 +49,10 @@ interface UserIndexProps {
         sort?: string;
         dir?: string;
     };
-    departments: DepartmentOption[];
-    jobPositions: JobPositionOption[];
     managerOptions: { id: number; name: string }[];
 }
 
-export default function UserIndex({ gridConfig, gridData, filters, departments, jobPositions, managerOptions }: UserIndexProps) {
+export default function UserIndex({ gridConfig, gridData, filters, managerOptions }: UserIndexProps) {
     const { t } = useTranslation('grid');
     const { t: tSystem } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
@@ -197,8 +187,6 @@ export default function UserIndex({ gridConfig, gridData, filters, departments, 
                 <CreateUserDialog
                     open={createOpen}
                     onClose={() => setCreateOpen(false)}
-                    departments={departments}
-                    jobPositions={jobPositions}
                     managerOptions={managerOptions}
                 />
 

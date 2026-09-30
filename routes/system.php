@@ -18,6 +18,8 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('user/summary', [UserController::class, 'summary'])->name('user.summary')->middleware('permission:users,list_users');
     Route::get('user/{user}/summary', [UserController::class, 'summaryShow'])->name('user.summary.show')->middleware('permission:users,list_users');
     Route::post('user', [UserController::class, 'store'])->name('user.store')->middleware('permission:users,create_users');
+    Route::get('user/lark-employee', [UserController::class, 'larkEmployee'])->name('user.larkEmployee')->middleware('permission:users,create_users');
+    Route::get('user/lark-employee/photo', [UserController::class, 'larkEmployeePhoto'])->name('user.larkEmployeePhoto')->middleware('permission:users,create_users');
     // No permission middleware here: a user is always allowed to view/edit their own
     // account (this is also the "Settings" page). UserController enforces that anyone
     // other than the account owner needs the `users.edit_users` permission, and that
