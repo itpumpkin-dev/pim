@@ -15,6 +15,7 @@ import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import DeleteIcon from '@mui/icons-material/Delete';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import {
     Alert,
     Box,
@@ -26,6 +27,7 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    Divider,
     FormControl,
     Grid,
     IconButton,
@@ -47,6 +49,7 @@ import {
 } from '@mui/material';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { relabelAttributes, relabelGroups } from './relabel-assignments';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { useTranslation } from 'react-i18next';
 import { FIORI, fioriAttentionSx, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx, fioriNegativeSx, fioriPositiveSx, fioriTabsSx } from '@/lib/fiori-style';
 
@@ -93,6 +96,8 @@ interface Props {
     otherFamilies?: AttributeFamily[];
     canViewHistory?: boolean;
     canAssignDefaultFamily?: boolean;
+    canEditCode?: boolean;
+    codeLocked?: boolean;
 }
 
 interface TemplatePreviewGroup {
@@ -132,6 +137,8 @@ export default function AttributeFamilyEdit({
     otherFamilies = [],
     canViewHistory = false,
     canAssignDefaultFamily = false,
+    canEditCode = false,
+    codeLocked = false,
 }: Props) {
     const { t } = useTranslation('catalog');
     const [tabIndex, setTabIndex] = useState(0);
@@ -529,6 +536,14 @@ export default function AttributeFamilyEdit({
         });
     };
 
+    // modal "Options" (ปุ่ม ⋯ ที่หัวหน้า) — ปิด modal ก่อนแล้วค่อยรัน action
+    // เพราะ action ถัดไปจะเปิด confirm / dialog เลือกกลุ่มซ้อนขึ้นมาอีกชั้น
+    const [optionsDialogOpen, setOptionsDialogOpen] = useState(false);
+    const runOption = (action: () => void) => {
+        setOptionsDialogOpen(false);
+        action();
+    };
+
     const [settingDefault, setSettingDefault] = useState(false);
     const setAsDefaultForAllGroups = async () => {
         const confirmed = await confirm({
@@ -771,6 +786,14 @@ export default function AttributeFamilyEdit({
                         Edit Attribute Family
                     </Typography>
                     <Stack direction="row" spacing={1.5}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<MoreHorizIcon />}
+                            onClick={() => setOptionsDialogOpen(true)}
+                            sx={fioriDefaultSx}
+                        >
+                            {t('familyOptions')}
+                        </Button>
                         <Button
                             component={Link}
                             href="/catalog/attributeFamilies"
@@ -1133,13 +1156,19 @@ export default function AttributeFamilyEdit({
                                 <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
                                     General
                                 </Typography>
+                                {/* แก้ code ได้เฉพาะคนที่มีสิทธิ์ attribute_families.edit_code
+                                    (เช็คซ้ำฝั่ง server ด้วย CodeRenameGuard) — family ของ
+                                    WooCommerce ล็อกไว้เสมอเพราะ generator หาด้วย code นี้ */}
                                 <TextField
                                     label="Code"
                                     fullWidth
                                     size="small"
                                     value={data.code}
-                                    disabled
-                                    helperText="This code is generated automatically and can't be changed."
+                                    disabled={!canEditCode}
+                                    onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                    error={!!errors.code}
+                                    helperText={errors.code || t(codeHintKey({ canEditCode, codeLocked }))}
+                                    inputProps={{ maxLength: 100 }}
                                 />
                             </Paper>
 
@@ -1147,99 +1176,6 @@ export default function AttributeFamilyEdit({
                                 values={data.translations}
                                 onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
                             />
-
-                            {/* ตั้งเป็นตระกูลเริ่มต้นให้ทุกกลุ่มสินค้า — ดัน family นี้ไปไว้ที่
-                                sort_order=0 ของทุกกลุ่มสินค้าในระบบ (ทับของเดิมถ้ามี) */}
-                            <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                    {t('defaultFamilyBadge')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
-                                    {t('setDefaultForAllGroupsDescription')}
-                                </Typography>
-                                {/* สิทธิ์ "assign_default_family" แยกออกมาจาก edit_attribute_families
-                                    ทั่วไป (ดู routes/catalog.php) เพราะปุ่มนี้ทับ default family ของ
-                                    "ทุก" กลุ่มสินค้าในระบบพร้อมกัน — ต่างจากการแก้ไข family ทีละตัว —
-                                    ไม่ซ่อนปุ่มไปเลย แค่ disable + บอกเหตุผลผ่าน tooltip ให้รู้ว่า
-                                    ฟีเจอร์นี้มีอยู่แต่ต้องขอสิทธิ์เพิ่ม */}
-                                <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                                    <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
-                                        <span>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="warning"
-                                                disabled={settingDefault || !canAssignDefaultFamily}
-                                                startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                                onClick={setAsDefaultForAllGroups}
-                                                sx={fioriAttentionSx}
-                                            >
-                                                {t('setDefaultForAllGroups')}
-                                            </Button>
-                                        </span>
-                                    </Tooltip>
-                                    {/* "บางกลุ่มสินค้า" — คู่หูของปุ่มด้านบน แต่เลือกทีละกลุ่มผ่าน dialog
-                                        ค้นหา/แบ่งหน้าได้ แทนที่จะทับทุกกลุ่มในระบบทีเดียว ใช้สิทธิ์
-                                        assign_default_family ตัวเดียวกัน เพราะเป็นความสามารถเดียวกัน
-                                        แค่จำกัดขอบเขตแคบกว่า */}
-                                    <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
-                                        <span>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                disabled={!canAssignDefaultFamily}
-                                                onClick={() => setSelectGroupsDialogOpen(true)}
-                                                sx={fioriPositiveSx}
-                                            >
-                                                {t('setDefaultForSomeGroups')}
-                                            </Button>
-                                        </span>
-                                    </Tooltip>
-                                </Stack>
-                            </Paper>
-
-                            {/* ยกเลิกการตั้งตระกูลนี้ให้กลุ่มสินค้า — ทิศทางตรงข้ามของการ์ดด้านบน
-                                ถอด family นี้ออกจากกลุ่มสินค้าที่ผูกอยู่ (ไม่ว่าจะเป็น default
-                                หรือแค่ต่อท้ายก็ตาม) ใช้สิทธิ์ assign_default_family ตัวเดียวกัน */}
-                            <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                    {t('unsetDefaultForAllGroups')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
-                                    {t('unsetDefaultForAllGroupsDescription')}
-                                </Typography>
-                                <Stack direction="row" spacing={1.5} flexWrap="wrap">
-                                    <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
-                                        <span>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="error"
-                                                disabled={unassigningAll || !canAssignDefaultFamily}
-                                                startIcon={unassigningAll ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                                onClick={unassignFromAllGroups}
-                                                sx={fioriNegativeSx}
-                                            >
-                                                {t('unsetDefaultForAllGroups')}
-                                            </Button>
-                                        </span>
-                                    </Tooltip>
-                                    <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
-                                        <span>
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                color="error"
-                                                disabled={!canAssignDefaultFamily}
-                                                onClick={() => setUnassignDialogOpen(true)}
-                                                sx={fioriDefaultSx}
-                                            >
-                                                {t('unsetDefaultForSomeGroups')}
-                                            </Button>
-                                        </span>
-                                    </Tooltip>
-                                </Stack>
-                            </Paper>
                         </Stack>
                     </Grid>
                 </Grid>
@@ -1252,6 +1188,117 @@ export default function AttributeFamilyEdit({
                 </>
                 )}
             </Box>
+
+            {/* Options — รวมการ์ด "เริ่มต้น" กับ "ยกเลิกตั้งตระกูลให้ทุกกลุ่มสินค้า"
+                ที่เคยอยู่คอลัมน์ขวาไว้ใน modal เดียว เปิดจากปุ่ม ⋯ Options ที่หัวหน้า */}
+            <Dialog open={optionsDialogOpen} onClose={() => setOptionsDialogOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                        {t('familyOptions')}
+                    </Typography>
+                    <IconButton onClick={() => setOptionsDialogOpen(false)} size="small">
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3 }}>
+                    <Stack spacing={3}>
+                    {/* ตั้งเป็นตระกูลเริ่มต้นให้ทุกกลุ่มสินค้า — ดัน family นี้ไปไว้ที่
+                        sort_order=0 ของทุกกลุ่มสินค้าในระบบ (ทับของเดิมถ้ามี) */}
+                    <Box>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                            {t('defaultFamilyBadge')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
+                            {t('setDefaultForAllGroupsDescription')}
+                        </Typography>
+                        {/* สิทธิ์ "assign_default_family" แยกออกมาจาก edit_attribute_families
+                            ทั่วไป (ดู routes/catalog.php) เพราะปุ่มนี้ทับ default family ของ
+                            "ทุก" กลุ่มสินค้าในระบบพร้อมกัน — ต่างจากการแก้ไข family ทีละตัว —
+                            ไม่ซ่อนปุ่มไปเลย แค่ disable + บอกเหตุผลผ่าน tooltip ให้รู้ว่า
+                            ฟีเจอร์นี้มีอยู่แต่ต้องขอสิทธิ์เพิ่ม */}
+                        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                            <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="warning"
+                                        disabled={settingDefault || !canAssignDefaultFamily}
+                                        startIcon={settingDefault ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                        onClick={() => runOption(setAsDefaultForAllGroups)}
+                                        sx={fioriAttentionSx}
+                                    >
+                                        {t('setDefaultForAllGroups')}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                            {/* "บางกลุ่มสินค้า" — คู่หูของปุ่มด้านบน แต่เลือกทีละกลุ่มผ่าน dialog
+                                ค้นหา/แบ่งหน้าได้ แทนที่จะทับทุกกลุ่มในระบบทีเดียว ใช้สิทธิ์
+                                assign_default_family ตัวเดียวกัน เพราะเป็นความสามารถเดียวกัน
+                                แค่จำกัดขอบเขตแคบกว่า */}
+                            <Tooltip title={canAssignDefaultFamily ? '' : t('setDefaultForAllGroupsNoPermission')}>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={!canAssignDefaultFamily}
+                                        onClick={() => runOption(() => setSelectGroupsDialogOpen(true))}
+                                        sx={fioriPositiveSx}
+                                    >
+                                        {t('setDefaultForSomeGroups')}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        </Stack>
+                    </Box>
+
+                    <Divider />
+
+                    {/* ยกเลิกการตั้งตระกูลนี้ให้กลุ่มสินค้า — ทิศทางตรงข้ามของการ์ดด้านบน
+                        ถอด family นี้ออกจากกลุ่มสินค้าที่ผูกอยู่ (ไม่ว่าจะเป็น default
+                        หรือแค่ต่อท้ายก็ตาม) ใช้สิทธิ์ assign_default_family ตัวเดียวกัน */}
+                    <Box>
+                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                            {t('unsetDefaultForAllGroups')}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
+                            {t('unsetDefaultForAllGroupsDescription')}
+                        </Typography>
+                        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+                            <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        disabled={unassigningAll || !canAssignDefaultFamily}
+                                        startIcon={unassigningAll ? <CircularProgress size={14} color="inherit" /> : undefined}
+                                        onClick={() => runOption(unassignFromAllGroups)}
+                                        sx={fioriNegativeSx}
+                                    >
+                                        {t('unsetDefaultForAllGroups')}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                            <Tooltip title={canAssignDefaultFamily ? '' : t('unsetDefaultForAllGroupsNoPermission')}>
+                                <span>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        color="error"
+                                        disabled={!canAssignDefaultFamily}
+                                        onClick={() => runOption(() => setUnassignDialogOpen(true))}
+                                        sx={fioriDefaultSx}
+                                    >
+                                        {t('unsetDefaultForSomeGroups')}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        </Stack>
+                    </Box>
+                    </Stack>
+                </DialogContent>
+            </Dialog>
 
             {/* ไดอะล็อกสำหรับกำหนดกลุ่มแอตทริบิวต์ */}
             <Dialog

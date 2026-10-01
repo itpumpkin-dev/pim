@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\CategoryField;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -105,6 +108,8 @@ class CategoryFieldController extends Controller
         return Inertia::render('catalog/categoryFields/edit', [
             'field' => $categoryField,
             'canViewHistory' => auth()->user()?->hasPermission('category_fields', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('category_fields'),
+            'codeLocked' => false,
         ]);
     }
 
@@ -118,6 +123,11 @@ class CategoryFieldController extends Controller
      */
     public function update(Request $request, CategoryField $categoryField): RedirectResponse
     {
+        // categories.additional_data is keyed by field code, next to the
+        // built-in 'name_eng' key (CategoryController / CategoryMatcher) —
+        // renaming a field onto it would overwrite that value
+        $newCode = CodeRenameGuard::resolve($request, $categoryField, 'category_fields', reservedCodes: ['name_eng']);
+
         $validated = $request->validate([
             'type' => ['required', 'in:Text,Textarea,Boolean,Select,Multiselect,Datetime,Date,Image,File,Checkbox'],
             'labels' => ['required', 'array'],
@@ -131,10 +141,27 @@ class CategoryFieldController extends Controller
             'display_section' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $categoryField->update([
-            ...$validated,
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($categoryField, $validated, $newCode, $request) {
+            if ($newCode !== null) {
+                // move each category's stored value onto the new key
+                // (jsonb_exists() rather than the `?` operator, which PDO
+                // would read as a placeholder)
+                DB::update(
+                    'UPDATE categories SET additional_data = (additional_data - ?) || jsonb_build_object(?::text, additional_data -> ?) WHERE jsonb_exists(additional_data, ?)',
+                    [$categoryField->code, $newCode, $categoryField->code, $categoryField->code],
+                );
+            }
+
+            $categoryField->update([
+                ...$validated,
+                'code' => $newCode ?? $categoryField->code,
+                'updated_by' => $request->user()?->id,
+            ]);
+        });
+
+        if ($newCode !== null) {
+            Category::bumpTreeCacheVersion();
+        }
 
         $this->autoTranslate($categoryField, $validated['labels']);
 

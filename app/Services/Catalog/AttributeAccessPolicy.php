@@ -7,7 +7,9 @@ use App\Models\AttributeGroup;
 use App\Models\FamilyAttribute;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\SessionInvalidator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ตัวเช็คสิทธิ์ "Attribute Access" ที่ใช้ร่วมกันหลายที่ — เช็คว่า role ของ user
@@ -232,5 +234,49 @@ class AttributeAccessPolicy
         $allowedCodes = $this->filterAttributes($user, $attributes, $mode)->pluck('code')->all();
 
         return array_values(array_filter($codes, fn ($code) => in_array($code, $allowedCodes, true)));
+    }
+
+    /**
+     * Attribute Access permissions name the attribute / group by its code
+     * ('view_attributes.view_{code}', 'edit_attribute_groups.edit_{code}') —
+     * carry them over when that code is renamed, or every restricted role
+     * silently loses (or keeps the wrong) access. Run inside the rename's
+     * transaction; affected users' cached permissions are busted after commit.
+     *
+     * @param  'attributes'|'attribute_groups'  $kind
+     */
+    public static function renameCodePermissions(string $kind, string $oldCode, string $newCode): void
+    {
+        $roleIds = [];
+        foreach (['view', 'edit'] as $mode) {
+            // rows left behind by a deleted attribute/group that had $newCode —
+            // they'd collide with the unique (role_id, resource, action) index
+            // or silently hand their old grants/denies to the renamed record
+            DB::table('role_permissions')
+                ->where('resource', "{$mode}_{$kind}")
+                ->where('action', "{$mode}_{$newCode}")
+                ->delete();
+
+            $rows = DB::table('role_permissions')
+                ->where('resource', "{$mode}_{$kind}")
+                ->where('action', "{$mode}_{$oldCode}");
+            $roleIds = array_merge($roleIds, (clone $rows)->pluck('role_id')->all());
+            $rows->update(['action' => "{$mode}_{$newCode}"]);
+        }
+
+        $roleIds = array_values(array_unique($roleIds));
+        if ($roleIds === []) {
+            return;
+        }
+
+        $userIds = DB::table('user_role')->whereIn('role_id', $roleIds)->pluck('user_id')
+            ->merge(
+                DB::table('role_user_group')
+                    ->join('user_group_user', 'role_user_group.group_id', '=', 'user_group_user.group_id')
+                    ->whereIn('role_user_group.role_id', $roleIds)
+                    ->pluck('user_group_user.user_id')
+            );
+
+        DB::afterCommit(fn () => SessionInvalidator::usersExceptCurrentActor($userIds));
     }
 }

@@ -48,7 +48,7 @@ class WooCommerceAttributeFamilyGenerator
     // idempotent lookup key ได้ตรงๆ โดยไม่ต้องเพิ่ม column ใหม่แบบ
     // lazada_category_id/shopee_category_id/tiktok_category_id เพราะ
     // WooCommerce มี family เดียวเท่านั้นทั้งระบบ ไม่ต้องแยกต่อ category
-    private const FAMILY_CODE = 'woocommerce_family';
+    public const FAMILY_CODE = 'woocommerce_family';
 
     private const FAMILY_NAME = 'WooCommerce';
 

@@ -14,7 +14,9 @@ use App\Models\FamilyAttribute;
 use App\Models\Locale;
 use App\Services\Catalog\AttributeFamilyBulkGenerator;
 use App\Services\Catalog\DefaultAttributeFamilyAssigner;
+use App\Services\Catalog\WooCommerceAttributeFamilyGenerator;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -47,6 +49,12 @@ class AttributeFamilyController extends Controller
      * ผิดไปด้วย
      */
     private const SYSTEM_ATTRIBUTE_CODES = ['pcatname', 'psubcatname', 'productgroupname', 'producttype', 'price', 'qty'];
+
+    /**
+     * WooCommerceAttributeFamilyGenerator finds its family by this fixed code —
+     * renaming it would make the next sync create a second, duplicate family.
+     */
+    private const LOCKED_CODES = [WooCommerceAttributeFamilyGenerator::FAMILY_CODE];
 
     public function index(Request $request): Response
     {
@@ -201,6 +209,8 @@ class AttributeFamilyController extends Controller
                 ->get(),
             'canViewHistory' => auth()->user()?->hasPermission('attribute_families', 'view_history') ?? false,
             'canAssignDefaultFamily' => auth()->user()?->hasPermission('attribute_families', 'assign_default_family') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('attribute_families', $attributeFamily->code, self::LOCKED_CODES),
+            'codeLocked' => CodeRenameGuard::isLocked($attributeFamily->code, self::LOCKED_CODES),
         ]);
     }
 
@@ -232,6 +242,8 @@ class AttributeFamilyController extends Controller
 
     public function update(Request $request, AttributeFamily $attributeFamily): RedirectResponse
     {
+        $newCode = CodeRenameGuard::resolve($request, $attributeFamily, 'attribute_families', self::LOCKED_CODES);
+
         $validator = Validator::make($request->all(), [
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -246,11 +258,30 @@ class AttributeFamilyController extends Controller
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($attributeFamily);
         $oldAssignments = $this->familyAttributesSnapshot($attributeFamily->id);
+        $oldCode = $attributeFamily->code;
 
-        $attributeFamily->update([
-            'name' => $this->resolveName($translations, $validated['name'] ?? null),
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($attributeFamily, $validated, $translations, $request, $newCode, $oldCode) {
+            $attributeFamily->update([
+                'code' => $newCode ?? $oldCode,
+                'name' => $this->resolveName($translations, $validated['name'] ?? null),
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            // ตารางที่อ้าง family ด้วย code (string) ไม่ใช่ id — ตามไปเปลี่ยนด้วย
+            // ไม่งั้น import config / WooCommerce conversion เดิมจะหา family ไม่เจอ
+            if ($newCode !== null) {
+                // import_configs.family_code is a comma-separated list of codes
+                DB::table('import_configs')->where('family_code', 'like', '%'.$oldCode.'%')->get(['id', 'family_code'])
+                    ->each(function ($config) use ($oldCode, $newCode) {
+                        $codes = array_map('trim', explode(',', (string) $config->family_code));
+                        $next = array_map(fn ($code) => $code === $oldCode ? $newCode : $code, $codes);
+                        if ($next !== $codes) {
+                            DB::table('import_configs')->where('id', $config->id)->update(['family_code' => implode(',', $next)]);
+                        }
+                    });
+                DB::table('woo_conversions')->where('family_code', $oldCode)->update(['family_code' => $newCode]);
+            }
+        });
 
         $this->syncTranslations($attributeFamily, $translations);
 

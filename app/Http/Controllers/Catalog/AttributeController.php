@@ -12,14 +12,17 @@ use App\Models\AttributeTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
 use App\Services\Catalog\ApiAttributeOptionSync;
+use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Support\TranslationTracking;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -30,6 +33,42 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class AttributeController extends Controller
 {
     use HasVersionHistory;
+
+    /**
+     * Attribute codes the app reads by name (Attribute::idForCode(),
+     * `where('code', …)`, presenter/exporter/converter code lists, the
+     * master-data MIRROR_ATTRIBUTEs, the `master_products` view SQL, CSV
+     * import/export headers) — renaming any of them silently breaks that
+     * feature, so they stay locked.
+     */
+    private const LOCKED_CODES = [
+        // product identity / media / categories
+        'pid', 'pname', 'pbrand', 'pbaseunit', 'pimage', 'pgallery',
+        'pcatid', 'pcatname', 'psubcatname', 'productgroupname', 'producttype',
+        // pricing / stock
+        'price', 'price_std', 'price_recommend', 'qty', 'min_stock', 'current_stock',
+        // master-data mirrors (…Controller::MIRROR_ATTRIBUTE)
+        'business_type', 'commission_group', 'purchase_currency', 'pointtype', 'grade', 'vendor',
+        // ProductPresenter / WooCommerce exporter & converter / master_products view
+        'packaging_box', 'unitinfo', 'eol', 'product_details_features', 'spec_specifications',
+        'spec_features', 'spec_accessories', 'spec_packaging', 'warranty_period', 'how_to_use',
+        'warnings', 'weight_pcs', 'length_pcs', 'width_pcs', 'height_pcs', 'barcode_pcs',
+        'youtube_url', 'catalog_pdf', 'included_accessories', 'power_type',
+    ];
+
+    /**
+     * Marketplace-created attributes (`auto_created_platform`) are matched
+     * back by their derived code on the next mapping run — a renamed one
+     * would just be created again — so they're locked too.
+     *
+     * @return array<int, string>
+     */
+    private function lockedCodesFor(Attribute $attribute): array
+    {
+        return $attribute->auto_created_platform !== null
+            ? [...self::LOCKED_CODES, $attribute->code]
+            : self::LOCKED_CODES;
+    }
 
 
     public function index(Request $request): Response
@@ -255,6 +294,8 @@ class AttributeController extends Controller
                 'is_customized' => $option->is_customized,
             ]),
             'canViewHistory' => auth()->user()?->hasPermission('attributes', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('attributes', $attribute->code, $this->lockedCodesFor($attribute)),
+            'codeLocked' => CodeRenameGuard::isLocked($attribute->code, $this->lockedCodesFor($attribute)),
         ]);
     }
 
@@ -374,6 +415,9 @@ class AttributeController extends Controller
 
     public function update(Request $request, Attribute $attribute): RedirectResponse
     {
+        // role_permissions.action is varchar(50) and stores 'view_{code}' / 'edit_{code}'
+        $newCode = CodeRenameGuard::resolve($request, $attribute, 'attributes', $this->lockedCodesFor($attribute), maxLength: 45);
+
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'type' => ['required', 'in:text,textarea,price,number,boolean,select,multiselect,datetime,date,image,gallery,file,checkbox,video'],
@@ -396,6 +440,17 @@ class AttributeController extends Controller
         $oldApiSourceId = $attribute->api_source_id;
 
         [$masterSource, $apiSourceId] = $this->resolveSourceBinding($validated);
+
+        if ($newCode !== null) {
+            // Attribute Access permissions are keyed 'view_{code}' / 'edit_{code}'
+            $oldCode = $attribute->code;
+            DB::transaction(function () use ($attribute, $oldCode, $newCode) {
+                AttributeAccessPolicy::renameCodePermissions('attributes', $oldCode, $newCode);
+                $attribute->update(['code' => $newCode]);
+            });
+            // code ↔ id map is otherwise only rebuilt on create/delete
+            Attribute::bumpCodeMapVersion();
+        }
 
         $attribute->update([
             ...$validated,

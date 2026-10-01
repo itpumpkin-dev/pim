@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use App\Services\Catalog\CategoryCodeRenamer;
+use App\Services\CodeRenameGuard;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\AttributeFamily;
@@ -411,6 +413,8 @@ class CategoryController extends Controller
             // Direct children shown as a quick-jump list on the edit page.
             'subcategories' => $category->children()->orderBy('code')->get(['id', 'code', 'name', 'is_active']),
             'canViewHistory' => auth()->user()?->hasPermission('categories', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('categories', $category->code, CategoryCodeRenamer::lockedCodes()),
+            'codeLocked' => CodeRenameGuard::isLocked($category->code, CategoryCodeRenamer::lockedCodes()),
         ]);
     }
 
@@ -547,12 +551,14 @@ class CategoryController extends Controller
      */
     public function update(Request $request, Category $category): RedirectResponse
     {
+        $newCode = app(CategoryCodeRenamer::class)->resolve($request, $category, 'categories');
+
         $categoryFields = CategoryField::where('status', true)->get();
 
         $rules = [
-            // `code` is set once at creation and never editable afterwards —
-            // it is the key ProductCategoryLinker matches products on. Any
-            // `code` sent by an edit form is ignored.
+            // `code` is handled above by CategoryCodeRenamer (needs the
+            // `categories.edit_code` permission) — it is the key
+            // ProductCategoryLinker matches products on.
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
             'translations.*' => ['nullable', 'string', 'max:255'],
@@ -642,18 +648,27 @@ class CategoryController extends Controller
             ? $request->file('thumbnail')->store('category-thumbnails', 'public')
             : $category->thumbnail;
 
-        $category->update([
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $category->code),
-            'slug' => $validated['slug'] ?? null,
-            'display_type' => $validated['display_type'] ?? 'default',
-            'thumbnail' => $thumbnailPath,
-            'is_active' => $request->boolean('is_active', true),
-            'description' => $validated['description'],
-            'is_ai_translate' => $request->boolean('is_ai_translate'),
-            'parent_id' => $validated['parent_id'],
-            'additional_data' => $validated['additional_data'] ?? [],
-            'updated_by' => $request->user()?->id,
-        ]);
+        // rename + update together: CategoryCodeRenamer re-prefixes the subtree and
+        // rewrites the mirrored option / product value copies of the old code
+        DB::transaction(function () use ($category, $newCode, $translations, $validated, $thumbnailPath, $request) {
+            if ($newCode !== null) {
+                app(CategoryCodeRenamer::class)->rename($category, $newCode);
+            }
+
+            $category->update([
+                'code' => $newCode ?? $category->code,
+                'name' => $this->resolveName($translations, $validated['name'] ?? null, $newCode ?? $category->code),
+                'slug' => $validated['slug'] ?? null,
+                'display_type' => $validated['display_type'] ?? 'default',
+                'thumbnail' => $thumbnailPath,
+                'is_active' => $request->boolean('is_active', true),
+                'description' => $validated['description'],
+                'is_ai_translate' => $request->boolean('is_ai_translate'),
+                'parent_id' => $validated['parent_id'],
+                'additional_data' => $validated['additional_data'] ?? [],
+                'updated_by' => $request->user()?->id,
+            ]);
+        });
 
         $this->syncTranslations($category, $translations);
         $this->autoTranslate($category, $translations);

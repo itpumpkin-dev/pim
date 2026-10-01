@@ -8,9 +8,11 @@ use App\Models\AuditLog;
 use App\Models\ExportConfig;
 use App\Models\JobTracker;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\ImportExport\ImportExportRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -61,13 +63,26 @@ class ExportConfigController extends Controller
     {
         return Inertia::render('import-export/exports/edit', [
             'config' => $exportConfig,
+            'canEditCode' => CodeRenameGuard::canEdit('export_configs'),
+            'codeLocked' => false,
             'types' => ImportExportRegistry::TYPES,
         ]);
     }
 
     public function update(Request $request, ExportConfig $exportConfig): RedirectResponse
     {
+        $newCode = CodeRenameGuard::resolve($request, $exportConfig, 'export_configs');
+
         $validated = $this->validateConfig($request);
+
+        if ($newCode !== null) {
+            DB::transaction(function () use ($exportConfig, $newCode) {
+                $exportConfig->update(['code' => $newCode]);
+                // job history shows the profile by this snapshot — match on the
+                // FK, since config_code also holds unrelated labels for other jobs
+                DB::table('job_trackers')->where('export_config_id', $exportConfig->id)->update(['config_code' => $newCode]);
+            });
+        }
 
         $exportConfig->update([
             ...$validated,

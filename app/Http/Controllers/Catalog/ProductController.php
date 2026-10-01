@@ -136,7 +136,7 @@ class ProductController extends Controller
     // search() ด้านล่าง กับ BomController::update()) — หน้า /catalog/raw-materials
     // เดิมกับคอลัมน์ is_raw_material ยังคงอยู่ไม่ได้ถูกแตะ แค่ไม่มีอะไรมาอ่านค่า
     // มันต่อจากนี้แล้วเฉยๆ
-    private const RAW_MATERIAL_CATEGORY_CODE = 'v';
+    public const RAW_MATERIAL_CATEGORY_CODE = 'v';
 
     public function __construct(
         private readonly AttributeAccessPolicy $attributeAccess,

@@ -14,21 +14,41 @@ use App\Models\ShopeeSellerAccount;
 use App\Models\TikTokSellerAccount;
 use App\Services\Catalog\MarketplaceApiCatalog;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\Lazada\LazadaProductSyncService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class SalesPlatformController extends Controller
 {
+    /**
+     * The built-in marketplace integrations are identified by their platform
+     * code everywhere — firstOrCreate() in the sync actions below, the
+     * `match` in SyncProductToMarketplaceJob, `{code}_category_id` columns in
+     * MarketplaceSyncGate, routes/permissions like `marketplace_{code}` — so
+     * these can't be renamed.
+     */
+    private const LOCKED_PLATFORM_CODES = ['lazada', 'shopee', 'tiktok', 'woocommerce'];
+
     public function index(): Response
     {
+        $platforms = SalesPlatform::with(['shops' => fn ($q) => $q->orderBy('name')])
+            ->orderBy('name')
+            ->get();
+
+        // the page checks `sales_platforms.edit_code` itself; this only says
+        // which built-in rows stay locked regardless
+        $platforms->each(fn (SalesPlatform $platform) => $platform->setAttribute(
+            'code_locked',
+            CodeRenameGuard::isLocked($platform->code, self::LOCKED_PLATFORM_CODES),
+        ));
+
         return Inertia::render('catalog/salesPlatforms/index', [
-            'platforms' => SalesPlatform::with(['shops' => fn ($q) => $q->orderBy('name')])
-                ->orderBy('name')
-                ->get(),
+            'platforms' => $platforms,
         ]);
     }
 
@@ -119,14 +139,32 @@ class SalesPlatformController extends Controller
 
     public function updatePlatform(Request $request, SalesPlatform $salesPlatform): RedirectResponse
     {
+        $newCode = CodeRenameGuard::resolve($request, $salesPlatform, 'sales_platforms', self::LOCKED_PLATFORM_CODES, maxLength: 50);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $salesPlatform->update([
-            ...$validated,
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($salesPlatform, $validated, $newCode, $request) {
+            // attribute_groups.platform is a foreign key onto this code with no
+            // ON UPDATE CASCADE — detach those groups, rename, re-attach
+            $groupIds = $newCode !== null
+                ? DB::table('attribute_groups')->where('platform', $salesPlatform->code)->pluck('id')
+                : collect();
+            if ($groupIds->isNotEmpty()) {
+                DB::table('attribute_groups')->whereIn('id', $groupIds)->update(['platform' => null]);
+            }
+
+            $salesPlatform->update([
+                ...$validated,
+                'code' => $newCode ?? $salesPlatform->code,
+                'updated_by' => $request->user()?->id,
+            ]);
+
+            if ($groupIds->isNotEmpty()) {
+                DB::table('attribute_groups')->whereIn('id', $groupIds)->update(['platform' => $newCode]);
+            }
+        });
 
         return back()->with('success', 'Platform updated successfully.');
     }
@@ -170,6 +208,15 @@ class SalesPlatformController extends Controller
 
     public function updateShop(Request $request, SalesPlatformShop $shop): RedirectResponse
     {
+        // shop codes are unique per platform and never looked up by value
+        // (marketplace syncs match shops by seller account id)
+        $newCode = CodeRenameGuard::resolve(
+            $request,
+            $shop,
+            'sales_platforms',
+            uniqueScope: fn ($rule) => $rule->where('sales_platform_id', $shop->sales_platform_id),
+        );
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'lazada_seller_account_id' => ['nullable', 'integer'],
@@ -178,6 +225,7 @@ class SalesPlatformController extends Controller
 
         $shop->update([
             ...$validated,
+            'code' => $newCode ?? $shop->code,
             'updated_by' => $request->user()?->id,
         ]);
 

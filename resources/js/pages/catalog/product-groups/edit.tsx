@@ -37,6 +37,7 @@ import { WooCommerceCategoryPicker, type WooCommerceCategoryOption } from '@/com
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface GroupData {
     id: number;
@@ -58,7 +59,7 @@ interface GroupData {
     attribute_families: { id: number; name: string }[];
 }
 
-interface Props {
+interface Props extends CodeEditState {
     group: GroupData;
     thumbnailUrl: string | null;
     translations: Record<string, string>;
@@ -78,6 +79,8 @@ export default function ProductGroupEdit({
     businessTypes = [],
     availableFamilies = [],
     canViewHistory = false,
+    canEditCode = false,
+    codeLocked = false,
 }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -216,8 +219,17 @@ export default function ProductGroupEdit({
                             />
 
                             <FioriFormGroup title={t('generalTitle')}>
-                                <FioriField label={t('code')} htmlFor="pg-code" hint={t('codeLockedHelperText')}>
-                                    <TextField id="pg-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                                <FioriField label={t('code')} htmlFor="pg-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                                    <TextField
+                                        id="pg-code"
+                                        fullWidth
+                                        size="small"
+                                        value={data.code}
+                                        disabled={!canEditCode}
+                                        onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                        inputProps={{ maxLength: 100 }}
+                                        sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                                    />
                                 </FioriField>
 
                                 <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>

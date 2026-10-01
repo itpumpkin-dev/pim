@@ -15,8 +15,10 @@ import {
     Typography,
 } from '@mui/material';
 import { FormEvent, useState } from 'react';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx } from '@/components/fiori-form';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import { useTranslation } from 'react-i18next';
 
 interface AttributeGroup {
     id: number;
@@ -24,7 +26,7 @@ interface AttributeGroup {
     name?: string;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     group: AttributeGroup;
     translations: Record<string, string>;
     canViewHistory?: boolean;
@@ -36,7 +38,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'EDIT ATTRIBUTE GROUP', href: '#' },
 ];
 
-export default function AttributeGroupEdit({ group, translations, canViewHistory = false }: Props) {
+export default function AttributeGroupEdit({ group, translations, canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
+    const { t } = useTranslation('catalog');
     const [tabIndex, setTabIndex] = useState(0);
     const { data, setData, put, processing, errors, isDirty } = useForm({
         code: group.code || '',
@@ -102,8 +105,17 @@ export default function AttributeGroupEdit({ group, translations, canViewHistory
 
                 <Stack spacing={3} sx={{ maxWidth: 760 }}>
                     <FioriFormGroup title="General">
-                        <FioriField label="Code" htmlFor="attribute-group-code" hint="This code is generated automatically and can't be changed.">
-                            <TextField id="attribute-group-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        <FioriField label="Code" htmlFor="attribute-group-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                            <TextField
+                                id="attribute-group-code"
+                                fullWidth
+                                size="small"
+                                value={data.code}
+                                disabled={!canEditCode}
+                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                inputProps={{ maxLength: 45 }}
+                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                            />
                         </FioriField>
                     </FioriFormGroup>
 

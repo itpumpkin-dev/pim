@@ -24,6 +24,7 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriSwitchSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface ExportConfigItem {
     id: number;
@@ -34,12 +35,12 @@ interface ExportConfigItem {
     with_media: boolean;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     config: ExportConfigItem;
     types: string[];
 }
 
-export default function ExportEdit({ config, types }: Props) {
+export default function ExportEdit({ config, types, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -127,8 +128,11 @@ export default function ExportEdit({ config, types }: Props) {
                             label={tCatalog('code')}
                             fullWidth
                             value={data.code}
-                            disabled
-                            helperText={tCatalog('codeLockedHelperText')}
+                            disabled={!canEditCode}
+                            onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                            error={!!errors.code}
+                            helperText={errors.code || tCatalog(codeHintKey({ canEditCode, codeLocked }))}
+                            inputProps={{ maxLength: 100 }}
                         />
                         <FormControl fullWidth>
                             <InputLabel id="export-type-label">{t('typeLabel')}</InputLabel>

@@ -11,6 +11,7 @@ use App\Models\ImportConfig;
 use App\Models\JobTracker;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\SampleTemplateBuilder;
 use App\Services\ImportExport\SpreadsheetWriter;
@@ -174,6 +175,8 @@ class ImportConfigController extends Controller
     {
         return Inertia::render('import-export/imports/edit', [
             'config' => $importConfig,
+            'canEditCode' => CodeRenameGuard::canEdit('import_configs'),
+            'codeLocked' => false,
             'types' => ImportExportRegistry::TYPES,
             'requiredColumnsByType' => $this->requiredColumnsByType(),
             'columnLabelsByType' => $this->columnLabelsByType(),
@@ -182,7 +185,18 @@ class ImportConfigController extends Controller
 
     public function update(Request $request, ImportConfig $importConfig): RedirectResponse
     {
+        $newCode = CodeRenameGuard::resolve($request, $importConfig, 'import_configs');
+
         $validated = $this->validateConfig($request);
+
+        if ($newCode !== null) {
+            DB::transaction(function () use ($importConfig, $newCode) {
+                $importConfig->update(['code' => $newCode]);
+                // job history shows the profile by this snapshot — match on the
+                // FK, since config_code also holds unrelated labels for other jobs
+                DB::table('job_trackers')->where('import_config_id', $importConfig->id)->update(['config_code' => $newCode]);
+            });
+        }
 
         $importConfig->update([
             ...collect($validated)->except('file')->all(),

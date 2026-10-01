@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 const swatchTypeKeys: Record<string, string> = {
     text: 'swatchTypeText',
@@ -64,7 +65,7 @@ interface AttributeForm {
     [key: string]: string | boolean | Record<string, string>;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     attribute: Attribute;
     translations: Record<string, string>;
     options?: AttributeOptionItem[];
@@ -73,7 +74,7 @@ interface Props {
     canViewHistory?: boolean;
 }
 
-export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], apiSources = [], canViewHistory = false }: Props) {
+export default function AttributeEdit({ attribute, translations, options = [], masterSources = [], apiSources = [], canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -198,8 +199,17 @@ export default function AttributeEdit({ attribute, translations, options = [], m
 
                 <Stack spacing={2} sx={{ maxWidth: 760 }}>
                     <FioriFormGroup title={t('generalTitle')}>
-                        <FioriField label={t('code')} htmlFor="attribute-code" hint={t('codeLockedHelperText')}>
-                            <TextField id="attribute-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        <FioriField label={t('code')} htmlFor="attribute-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                            <TextField
+                                id="attribute-code"
+                                fullWidth
+                                size="small"
+                                value={data.code}
+                                disabled={!canEditCode}
+                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                inputProps={{ maxLength: 45 }}
+                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                            />
                         </FioriField>
 
                         <FioriField label={t('typeLabel')} htmlFor="attribute-type" required valueState={valueStateOf(errors.type)} message={errors.type}>

@@ -26,6 +26,7 @@ import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface ChannelItem {
     id: number;
@@ -52,7 +53,7 @@ interface CurrencyOption {
     name: string | null;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     channel: ChannelItem;
     translations: Record<string, string>;
     localeIds: number[];
@@ -63,7 +64,7 @@ interface Props {
     canViewHistory?: boolean;
 }
 
-export default function ChannelEdit({ channel, translations, localeIds, currencyIds, rootCategories, locales, currencies, canViewHistory = false }: Props) {
+export default function ChannelEdit({ channel, translations, localeIds, currencyIds, rootCategories, locales, currencies, canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -131,8 +132,17 @@ export default function ChannelEdit({ channel, translations, localeIds, currency
 
                 <Stack spacing={2}>
                     <FioriFormGroup title={t('generalTitle')}>
-                        <FioriField label={t('code')} htmlFor="channel-code" hint={t('codeLockedHelperText')}>
-                            <TextField id="channel-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        <FioriField label={t('code')} htmlFor="channel-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                            <TextField
+                                id="channel-code"
+                                fullWidth
+                                size="small"
+                                value={data.code}
+                                disabled={!canEditCode}
+                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                inputProps={{ maxLength: 50 }}
+                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                            />
                         </FioriField>
 
                         <FioriField label={t('rootCategoryOptional')} htmlFor="root-category">

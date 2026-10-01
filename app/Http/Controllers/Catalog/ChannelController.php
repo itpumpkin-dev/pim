@@ -11,6 +11,7 @@ use App\Models\ChannelTranslation;
 use App\Models\Currency;
 use App\Models\Locale;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -110,6 +111,8 @@ class ChannelController extends Controller
             'locales' => Locale::where('enabled', true)->get(['id', 'code', 'display_name']),
             'currencies' => Currency::orderBy('code')->get(['id', 'code', 'name']),
             'canViewHistory' => auth()->user()?->hasPermission('channels', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('channels'),
+            'codeLocked' => false,
         ]);
     }
 
@@ -120,6 +123,10 @@ class ChannelController extends Controller
 
     public function update(Request $request, Channel $channel): RedirectResponse
     {
+        // everything else references channels by id; 'default' is the key the
+        // product API (ProductLookupController) uses for channel-less values
+        $newCode = CodeRenameGuard::resolve($request, $channel, 'channels', maxLength: 50, reservedCodes: ['default']);
+
         $validated = $this->validateChannel($request);
 
         $oldTranslations = $this->currentTranslations($channel);
@@ -127,6 +134,7 @@ class ChannelController extends Controller
         $oldCurrencyIds = $channel->currencies()->pluck('currencies.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
 
         $channel->update([
+            'code' => $newCode ?? $channel->code,
             'root_category_id' => $validated['root_category_id'] ?? null,
             'updated_by' => $request->user()?->id,
         ]);

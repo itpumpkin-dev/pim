@@ -12,6 +12,7 @@ import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface CategoryFieldItem {
     id: number;
@@ -26,12 +27,12 @@ interface CategoryFieldItem {
     display_section: string | null;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     field: CategoryFieldItem;
     canViewHistory?: boolean;
 }
 
-export default function CategoryFieldEdit({ field, canViewHistory = false }: Props) {
+export default function CategoryFieldEdit({ field, canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -99,8 +100,17 @@ export default function CategoryFieldEdit({ field, canViewHistory = false }: Pro
 
                 <Stack spacing={2}>
                     <FioriFormGroup title="General Config">
-                        <FioriField label="Code" htmlFor="field-code" hint="This code is generated automatically and can't be changed.">
-                            <TextField id="field-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                        <FioriField label="Code" htmlFor="field-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                            <TextField
+                                id="field-code"
+                                fullWidth
+                                size="small"
+                                value={data.code}
+                                disabled={!canEditCode}
+                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                inputProps={{ maxLength: 100 }}
+                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                            />
                         </FioriField>
 
                         <FioriField label="Field Type" htmlFor="field-type" required>

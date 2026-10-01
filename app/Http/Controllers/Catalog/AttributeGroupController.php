@@ -8,7 +8,9 @@ use App\Models\AttributeGroup;
 use App\Models\AttributeGroupTranslation;
 use App\Models\AuditLog;
 use App\Models\Locale;
+use App\Services\Catalog\AttributeAccessPolicy;
 use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +22,15 @@ use Inertia\Response;
 class AttributeGroupController extends Controller
 {
     use HasVersionHistory;
+
+    /**
+     * Group codes the app looks up directly, so they can't be renamed:
+     * `general` / `pricing_packaging` are pinned by the product edit/show
+     * pages (SKU field, variants table), and each marketplace family
+     * generator does AttributeGroup::firstOrCreate(['code' => GROUP_CODE]) —
+     * a renamed one would just be recreated next sync.
+     */
+    private const LOCKED_CODES = ['general', 'pricing_packaging', 'lazada', 'shopee', 'tiktok', 'woocommerce'];
 
 
     public function index(Request $request): Response
@@ -121,6 +132,8 @@ class AttributeGroupController extends Controller
             'translations' => $attributeGroup->translations()->get()
                 ->mapWithKeys(fn (AttributeGroupTranslation $t) => [(string) $t->locale_id => $t->label]),
             'canViewHistory' => auth()->user()?->hasPermission('attribute_groups', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('attribute_groups', $attributeGroup->code, self::LOCKED_CODES),
+            'codeLocked' => CodeRenameGuard::isLocked($attributeGroup->code, self::LOCKED_CODES),
         ]);
     }
 
@@ -131,6 +144,9 @@ class AttributeGroupController extends Controller
 
     public function update(Request $request, AttributeGroup $attributeGroup): RedirectResponse
     {
+        // role_permissions.action is varchar(50) and stores 'view_{code}' / 'edit_{code}'
+        $newCode = CodeRenameGuard::resolve($request, $attributeGroup, 'attribute_groups', self::LOCKED_CODES, maxLength: 45);
+
         $validated = $request->validate([
             'name' => ['nullable', 'string', 'max:255'],
             'translations' => ['nullable', 'array'],
@@ -140,10 +156,17 @@ class AttributeGroupController extends Controller
         $translations = $validated['translations'] ?? [];
         $oldTranslations = $this->currentTranslations($attributeGroup);
 
-        $attributeGroup->update([
-            'name' => $this->resolveName($translations, $validated['name'] ?? null),
-            'updated_by' => $request->user()?->id,
-        ]);
+        DB::transaction(function () use ($attributeGroup, $newCode, $translations, $validated, $request) {
+            if ($newCode !== null) {
+                AttributeAccessPolicy::renameCodePermissions('attribute_groups', $attributeGroup->code, $newCode);
+            }
+
+            $attributeGroup->update([
+                'code' => $newCode ?? $attributeGroup->code,
+                'name' => $this->resolveName($translations, $validated['name'] ?? null),
+                'updated_by' => $request->user()?->id,
+            ]);
+        });
 
         $this->syncTranslations($attributeGroup, $translations);
 

@@ -113,9 +113,9 @@ class Attribute extends Model
      * Cached code => id lookup, for the many call sites that only need an
      * attribute's id (e.g. resolving 'pname'/'price'/'qty' to a column id
      * for a query) and previously ran a fresh `where('code', ...)->value('id')`
-     * query on every request. `code` is immutable after creation (see
-     * CodeGenerator::createWithRetry in AttributeController::store()), so
-     * only create/delete need to invalidate this — see bumpCodeMapVersion().
+     * query on every request. Only create/delete and a code rename (the
+     * `attributes.edit_code` permission, AttributeController::update()) change
+     * it — each bumps the version, see bumpCodeMapVersion().
      */
     public static function idForCode(string $code): ?int
     {
@@ -136,8 +136,8 @@ class Attribute extends Model
     }
 
     /**
-     * Call after creating or deleting an attribute (see
-     * AttributeController::store()/destroy()) so idForCode()/codeToIdMap()
+     * Call after creating, deleting or renaming an attribute (see
+     * AttributeController::store()/update()/destroy()) so idForCode()/codeToIdMap()
      * stop serving a stale set of codes.
      */
     public static function bumpCodeMapVersion(): void

@@ -27,6 +27,7 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface SubcategoryData {
     id: number;
@@ -37,7 +38,7 @@ interface SubcategoryData {
     category_id: number | null;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     subcategory: SubcategoryData;
     thumbnailUrl: string | null;
     translations: Record<string, string>;
@@ -45,7 +46,7 @@ interface Props {
     canViewHistory?: boolean;
 }
 
-export default function SubcategoryEdit({ subcategory, thumbnailUrl, translations, categories = [], canViewHistory = false }: Props) {
+export default function SubcategoryEdit({ subcategory, thumbnailUrl, translations, categories = [], canViewHistory = false, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const [tabIndex, setTabIndex] = useState(0);
@@ -123,8 +124,17 @@ export default function SubcategoryEdit({ subcategory, thumbnailUrl, translation
                             />
 
                             <FioriFormGroup title={t('generalTitle')}>
-                                <FioriField label={t('code')} htmlFor="sub-code" hint={t('codeLockedHelperText')}>
-                                    <TextField id="sub-code" fullWidth size="small" value={data.code} disabled sx={fioriFieldStateSx('none')} />
+                                <FioriField label={t('code')} htmlFor="sub-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
+                                    <TextField
+                                        id="sub-code"
+                                        fullWidth
+                                        size="small"
+                                        value={data.code}
+                                        disabled={!canEditCode}
+                                        onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                        inputProps={{ maxLength: 100 }}
+                                        sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                                    />
                                 </FioriField>
 
                                 <FioriField label={t('category')} valueState={valueStateOf(errors.category_id)} message={errors.category_id}>

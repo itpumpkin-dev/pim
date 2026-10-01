@@ -31,6 +31,7 @@ import {
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 interface ImportConfigItem {
     id: number;
@@ -48,14 +49,14 @@ interface ImportConfigItem {
     source_file_name: string | null;
 }
 
-interface Props {
+interface Props extends CodeEditState {
     config: ImportConfigItem;
     types: string[];
     requiredColumnsByType: Record<string, string[]>;
     columnLabelsByType: Record<string, Record<string, string>>;
 }
 
-export default function ImportEdit({ config, types, requiredColumnsByType, columnLabelsByType }: Props) {
+export default function ImportEdit({ config, types, requiredColumnsByType, columnLabelsByType, canEditCode = false, codeLocked = false }: Props) {
     const { t } = useTranslation('import_export');
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -153,8 +154,11 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
                                 label={tCatalog('code')}
                                 fullWidth
                                 value={data.code}
-                                disabled
-                                helperText={tCatalog('codeLockedHelperText')}
+                                disabled={!canEditCode}
+                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                error={!!errors.code}
+                                helperText={errors.code || tCatalog(codeHintKey({ canEditCode, codeLocked }))}
+                                inputProps={{ maxLength: 100 }}
                             />
                             <FormControl fullWidth>
                                 <InputLabel id="import-type-label">{t('typeLabel')}</InputLabel>

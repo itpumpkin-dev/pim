@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Catalog;
 
+use Illuminate\Support\Facades\DB;
+use App\Services\Catalog\CategoryCodeRenamer;
+use App\Services\CodeRenameGuard;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -151,12 +154,16 @@ class SubcategoryController extends Controller
             'translations' => $translations,
             'categories' => Category::whereNull('parent_id')->orderBy('name')->get(['id', 'name']),
             'canViewHistory' => auth()->user()?->hasPermission('subcategories', 'view_history') ?? false,
+            'canEditCode' => CodeRenameGuard::canEdit('subcategories', $subcategory->code, CategoryCodeRenamer::lockedCodes()),
+            'codeLocked' => CodeRenameGuard::isLocked($subcategory->code, CategoryCodeRenamer::lockedCodes()),
         ]);
     }
 
     public function update(Request $request, Category $subcategory): RedirectResponse
     {
         abort_unless($this->isSubcategory($subcategory), 404);
+
+        $newCode = app(CategoryCodeRenamer::class)->resolve($request, $subcategory, 'subcategories');
 
         $validated = $this->validatePayload($request, $subcategory);
 
@@ -166,16 +173,24 @@ class SubcategoryController extends Controller
             ? $request->file('thumbnail')->store('category-thumbnails', 'public')
             : $subcategory->thumbnail;
 
-        $subcategory->update([
-            // `code` is fixed after creation — never updated here.
-            'name' => $this->resolveName($translations, $validated['name'] ?? null, $subcategory->code),
-            'parent_id' => $validated['category_id'],
-            'thumbnail' => $thumbnailPath,
-            'description' => $validated['description'] ?? null,
-            'is_active' => $request->boolean('is_active', true),
-            'is_ai_translate' => $request->boolean('is_ai_translate'),
-            'updated_by' => $request->user()?->id,
-        ]);
+        // rename + update together: CategoryCodeRenamer re-prefixes the subtree and
+        // rewrites the mirrored option / product value copies of the old code
+        DB::transaction(function () use ($subcategory, $newCode, $translations, $validated, $thumbnailPath, $request) {
+            if ($newCode !== null) {
+                app(CategoryCodeRenamer::class)->rename($subcategory, $newCode);
+            }
+
+            $subcategory->update([
+                'code' => $newCode ?? $subcategory->code,
+                'name' => $this->resolveName($translations, $validated['name'] ?? null, $newCode ?? $subcategory->code),
+                'parent_id' => $validated['category_id'],
+                'thumbnail' => $thumbnailPath,
+                'description' => $validated['description'] ?? null,
+                'is_active' => $request->boolean('is_active', true),
+                'is_ai_translate' => $request->boolean('is_ai_translate'),
+                'updated_by' => $request->user()?->id,
+            ]);
+        });
 
         $this->syncTranslations($subcategory, $translations);
         $this->autoTranslate($subcategory, $translations);

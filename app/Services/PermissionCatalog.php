@@ -68,12 +68,31 @@ class PermissionCatalog
      * UserController gates editing *someone else's* account on this
      * permission. Declared here so it still appears in the Roles picker and
      * gets granted to Administrator by `permissions:sync`.
+     *
+     * `{resource}.edit_code`: renaming a record's code rides on that
+     * resource's regular update route; the controller only accepts a changed
+     * code from users holding this permission (see CodeRenameGuard).
      */
     private function addControllerEnforcedPermissions(array &$modules): void
     {
         $extra = [
             'system' => [
                 'users' => ['edit_users'],
+            ],
+            'catalog' => [
+                'attribute_families' => ['edit_code'],
+                'attribute_groups' => ['edit_code'],
+                'attributes' => ['edit_code'],
+                'categories' => ['edit_code'],
+                'subcategories' => ['edit_code'],
+                'product_groups' => ['edit_code'],
+                'category_fields' => ['edit_code'],
+                'channels' => ['edit_code'],
+                'sales_platforms' => ['edit_code'],
+            ],
+            'import-export' => [
+                'import_configs' => ['edit_code'],
+                'export_configs' => ['edit_code'],
             ],
         ];
 

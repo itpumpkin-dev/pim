@@ -46,6 +46,7 @@ import {
     fioriSwitchSx,
     fioriTabsSx,
 } from '@/lib/fiori-style';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 // วนสีตาม index ของ platform (ไม่ใช้สีตามแบรนด์) — เพราะ platform ในหน้านี้
 // admin สร้างเองได้อิสระ (ดูที่ storePlatform()) ไม่ได้มีแค่ Lazada/Shopee/
@@ -65,6 +66,8 @@ interface ShopItem {
     shopee_seller_account_id: string | null;
     tiktok_seller_account_id: number | null;
     is_active: boolean;
+    // true เมื่อระบบอ้าง code นี้ตรงๆ (ดู SalesPlatformController) — แก้ไม่ได้แม้มีสิทธิ์ edit_code
+    code_locked?: boolean;
 }
 
 interface PlatformItem {
@@ -72,6 +75,7 @@ interface PlatformItem {
     code: string;
     name: string;
     shops: ShopItem[];
+    code_locked?: boolean;
 }
 
 interface Props {
@@ -94,6 +98,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const canCreate = permissions.includes('sales_platforms.create_sales_platforms');
     const canEdit = permissions.includes('sales_platforms.edit_sales_platforms');
     const canDelete = permissions.includes('sales_platforms.delete_sales_platforms');
+    // แก้ code ได้เฉพาะคนที่มีสิทธิ์ sales_platforms.edit_code (เช็คซ้ำฝั่ง server
+    // ด้วย CodeRenameGuard ใน SalesPlatformController)
+    const canEditCodePermission = permissions.includes('sales_platforms.edit_code');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: tNav('catalog'), href: '#' },
@@ -108,6 +115,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [editingPlatform, setEditingPlatform] = useState<PlatformItem | null>(null);
     const [platformCode, setPlatformCode] = useState('');
     const [platformName, setPlatformName] = useState('');
+    const [platformCodeError, setPlatformCodeError] = useState<string | undefined>();
     const [deletePlatformId, setDeletePlatformId] = useState<number | null>(null);
     const [savingPlatform, setSavingPlatform] = useState(false);
     const [deletingPlatform, setDeletingPlatform] = useState(false);
@@ -117,6 +125,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
     const [editingShop, setEditingShop] = useState<ShopItem | null>(null);
     const [shopCode, setShopCode] = useState('');
     const [shopName, setShopName] = useState('');
+    const [shopCodeError, setShopCodeError] = useState<string | undefined>();
     const [shopActive, setShopActive] = useState(true);
     const [deleteShopId, setDeleteShopId] = useState<number | null>(null);
     const [savingShop, setSavingShop] = useState(false);
@@ -141,6 +150,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         setEditingPlatform(platform);
         setPlatformCode(platform.code);
         setPlatformName(platform.name);
+        setPlatformCodeError(undefined);
         setPlatformDialogOpen(true);
     };
 
@@ -148,8 +158,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         e.preventDefault();
         setSavingPlatform(true);
         if (editingPlatform) {
-            router.put(`/catalog/sales-platforms/${editingPlatform.id}`, { name: platformName }, {
+            router.put(`/catalog/sales-platforms/${editingPlatform.id}`, { code: platformCode, name: platformName }, {
                 onSuccess: () => setPlatformDialogOpen(false),
+                onError: (errors) => setPlatformCodeError(errors.code),
                 onFinish: () => setSavingPlatform(false),
             });
         } else {
@@ -173,6 +184,7 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         setEditingShop(shop);
         setShopCode(shop.code);
         setShopName(shop.name);
+        setShopCodeError(undefined);
         setShopActive(shop.is_active);
     };
 
@@ -180,8 +192,9 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         e.preventDefault();
         setSavingShop(true);
         if (editingShop) {
-            router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, { name: shopName, is_active: shopActive }, {
+            router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, { code: shopCode, name: shopName, is_active: shopActive }, {
                 onSuccess: () => setShopDialogPlatformId(null),
+                onError: (errors) => setShopCodeError(errors.code),
                 onFinish: () => setSavingShop(false),
             });
         } else if (shopDialogPlatformId) {
@@ -478,8 +491,11 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                     fullWidth
                                     size="small"
                                     value={platformCode}
-                                    disabled
-                                    helperText="This code is generated automatically and can't be changed."
+                                    disabled={!canEditCodePermission || !!editingPlatform.code_locked}
+                                    onChange={(e) => setPlatformCode(normalizeCodeInput(e.target.value))}
+                                    error={!!platformCodeError}
+                                    helperText={platformCodeError || t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingPlatform.code_locked }))}
+                                    inputProps={{ maxLength: 50 }}
                                 />
                             )}
                             <TextField
@@ -520,8 +536,11 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                     fullWidth
                                     size="small"
                                     value={shopCode}
-                                    disabled
-                                    helperText="This code is generated automatically and can't be changed."
+                                    disabled={!canEditCodePermission || !!editingShop.code_locked}
+                                    onChange={(e) => setShopCode(normalizeCodeInput(e.target.value))}
+                                    error={!!shopCodeError}
+                                    helperText={shopCodeError || t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingShop.code_locked }))}
+                                    inputProps={{ maxLength: 100 }}
                                 />
                             )}
                             <TextField
