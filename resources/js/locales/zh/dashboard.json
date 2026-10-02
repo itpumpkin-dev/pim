@@ -32,5 +32,22 @@
     "rank": "秩",
     "product": "产品",
     "category": "类别",
-    "filterByCategory": "按类别筛选"
+    "filterByCategory": "按类别筛选",
+    "allCategories": "所有类别",
+    "dateFrom": "从",
+    "dateTo": "到",
+    "clearFilters": "清除筛选条件",
+    "exportActivity": "出口活动",
+    "refresh": "刷新",
+    "manageUsers": "管理用户",
+    "manageRoles": "管理角色",
+    "failedJobsTooltip": "{{count}} 导入/导出作业失败",
+    "lowStock": "低库存产品",
+    "lowStockCaption": "示例数据",
+    "activityTrendChartTitle": "活动（过去 30 天）",
+    "activityCount": "活动",
+    "categoryPieChartTitle": "按类别浏览产品",
+    "noChartData": "数据不足。",
+    "viewAll": "查看全部",
+    "views": "浏览量"
 }
