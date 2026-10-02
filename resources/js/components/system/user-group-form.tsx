@@ -8,10 +8,14 @@ import {
     Checkbox,
     CircularProgress,
     Divider,
+    FormControlLabel,
+    Switch,
     TextField,
     Typography,
 } from '@mui/material';
 import { FormEventHandler } from 'react';
+import { useTranslation } from 'react-i18next';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx } from '@/lib/fiori-style';
 
@@ -41,11 +45,17 @@ interface RoleOption {
 }
 
 interface UserGroupFormProps {
+    /** Create only: prefilled into the Code field (next free group_N). */
+    suggestedCode?: string;
+    /** Edit only: whether the user holds user_groups.edit_code. */
+    canEditCode?: boolean;
     users: UserGroupUserOption[];
     roles: RoleOption[];
     group?: {
         id: number;
+        code: string;
         name: string;
+        is_active: boolean;
         description: string | null;
         user_ids: number[];
         role_ids: number[];
@@ -53,19 +63,26 @@ interface UserGroupFormProps {
 }
 
 interface UserGroupForm {
+    code: string;
     name: string;
     description: string;
+    is_active: boolean;
     users: number[];
     roles: number[];
-    [key: string]: string | number[];
+    [key: string]: string | boolean | number[];
 }
 
-export default function UserGroupFormPage({ users, roles, group }: UserGroupFormProps) {
+export default function UserGroupFormPage({ suggestedCode, canEditCode = false, users, roles, group }: UserGroupFormProps) {
     const isEdit = Boolean(group);
+    const { t: tCatalog } = useTranslation('catalog');
+    // Anyone may pick the code on create; renaming it later needs user_groups.edit_code.
+    const codeEditable = !isEdit || canEditCode;
 
     const { data, setData, post, put, processing, errors, clearErrors } = useForm<UserGroupForm>({
+        code: group?.code ?? suggestedCode ?? '',
         name: group?.name ?? '',
         description: group?.description ?? '',
+        is_active: group?.is_active ?? true,
         users: group?.user_ids ?? [],
         roles: group?.role_ids ?? [],
     });
@@ -171,6 +188,24 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                             <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
+                                    User Group Code *
+                                </Typography>
+                                <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={data.code}
+                                    disabled={!codeEditable}
+                                    placeholder="e.g. group_1"
+                                    onChange={(e) => {
+                                        setData('code', normalizeCodeInput(e.target.value));
+                                        clearErrors('code');
+                                    }}
+                                    error={Boolean(errors.code)}
+                                    helperText={errors.code ?? tCatalog(codeHintKey({ canEditCode: codeEditable }))}
+                                />
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                                     Name *
                                 </Typography>
                                 <TextField
@@ -203,6 +238,20 @@ export default function UserGroupFormPage({ users, roles, group }: UserGroupForm
                                     error={Boolean(errors.description)}
                                     helperText={errors.description}
                                 />
+                            </Box>
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
+                                    Status
+                                </Typography>
+                                <FormControlLabel
+                                    control={<Switch checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
+                                    label={data.is_active ? 'Active' : 'Inactive'}
+                                />
+                                {errors.is_active && (
+                                    <Typography variant="caption" color="error" display="block">
+                                        {errors.is_active}
+                                    </Typography>
+                                )}
                             </Box>
                             <Box>
                                 <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>

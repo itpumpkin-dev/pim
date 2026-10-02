@@ -49,12 +49,15 @@ interface RoleShopOption {
 }
 
 interface EditRoleProps {
+    canEditCode?: boolean;
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
     shops: RoleShopOption[];
     role: {
         id: number;
+        code: string;
         label: string;
+        is_active: boolean;
         is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
@@ -68,6 +71,7 @@ interface EditRoleProps {
 }
 
 export default function RoleEdit({
+    canEditCode = false,
     catalog,
     users,
     shops,
@@ -79,6 +83,7 @@ export default function RoleEdit({
 }: EditRoleProps) {
     return (
         <RoleFormPage
+            canEditCode={canEditCode}
             catalog={catalog}
             users={users}
             shops={shops}

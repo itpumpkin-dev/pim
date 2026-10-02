@@ -15,17 +15,20 @@ interface RoleOption {
 }
 
 interface EditUserGroupProps {
+    canEditCode?: boolean;
     users: UserGroupUserOption[];
     roles: RoleOption[];
     group: {
         id: number;
+        code: string;
         name: string;
+        is_active: boolean;
         description: string | null;
         user_ids: number[];
         role_ids: number[];
     };
 }
 
-export default function UserGroupEdit({ users, roles, group }: EditUserGroupProps) {
-    return <UserGroupFormPage users={users} roles={roles} group={group} />;
+export default function UserGroupEdit({ users, roles, group, canEditCode = false }: EditUserGroupProps) {
+    return <UserGroupFormPage users={users} roles={roles} group={group} canEditCode={canEditCode} />;
 }

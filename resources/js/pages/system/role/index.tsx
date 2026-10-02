@@ -24,6 +24,7 @@ import {
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
+import { formatDateTime } from '@/lib/format';
 
 interface PaginationData<T> {
     data: T[];
@@ -107,30 +108,49 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
         return () => clearTimeout(delayDebounceFn);
     }, [search]);
 
-    // Column pop-in priority (SAP Fiori responsive table): columns come from
-    // the server-driven gridConfig, so priority falls out of column order —
-    // the first (label) column identifies the row and always stays, the
-    // next two follow as space allows, the rest reflow into the pop-in area
-    // first. Row actions stay pinned like the identifying column.
+    // Column pop-in priority (SAP Fiori responsive table): the role name
+    // identifies the row and always stays, code/status follow as space
+    // allows, and the audit columns (created/updated on/by) reflow into the
+    // pop-in area first. Row actions stay pinned like the identifying column.
     type RoleRow = RoleIndexProps['gridData']['data'][number];
-    const columns: FioriResponsiveColumn<RoleRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
-        key,
-        header: t(column.label),
-        priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
-        render: (row) =>
-            column.type === 'boolean' ? (
-                <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
-            ) : key === 'label' ? (
-                <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
-            ) : (
-                row[key] || '-'
-            ),
-    }));
+    const columnPriority: Record<string, FioriResponsiveColumn<RoleRow>['priority']> = {
+        label: 'always',
+        code: 'high',
+        is_active: 'medium',
+    };
+    const rowOffset = (gridData.current_page - 1) * gridData.per_page;
+    const columns: FioriResponsiveColumn<RoleRow>[] = [
+        {
+            key: 'rowNumber',
+            header: t('fields.rowNumber'),
+            priority: 'high',
+            width: 80,
+            render: (row) => rowOffset + gridData.data.indexOf(row) + 1,
+        },
+        ...Object.entries(gridConfig.columns).map(([key, column]): FioriResponsiveColumn<RoleRow> => ({
+            key,
+            header: t(column.label),
+            priority: columnPriority[key] ?? 'low',
+            render: (row) =>
+                key === 'is_guest' ? (
+                    // A flag, not a status — yes/no rather than active/inactive.
+                    <FioriStatus label={row[key] ? t('yes') : t('no')} tone={row[key] ? 'information' : 'neutral'} />
+                ) : column.type === 'boolean' ? (
+                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+                ) : column.type === 'datetime' ? (
+                    formatDateTime(row[key])
+                ) : key === 'label' ? (
+                    <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
+                ) : (
+                    row[key] || '-'
+                ),
+        })),
+    ];
 
     if (visibleActions.length > 0) {
         columns.push({
             key: 'actions',
-            header: '',
+            header: t('actionsHeader'),
             priority: 'always',
             align: 'right',
             render: (row) => (

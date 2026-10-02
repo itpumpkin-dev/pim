@@ -87,12 +87,12 @@ class UserController extends Controller
     private function summaryRelations(): array
     {
         return [
-            'roles:id,label',
+            'roles:id,label,is_active',
             'roles.permissions' => function ($query) {
                 $query->where('granted', true)->select(['id', 'role_id', 'resource', 'action']);
             },
-            'groups:id,name',
-            'groups.roles:id,label',
+            'groups:id,name,is_active',
+            'groups.roles:id,label,is_active',
             'groups.roles.permissions' => function ($query) {
                 $query->where('granted', true)->select(['id', 'role_id', 'resource', 'action']);
             },
@@ -109,7 +109,8 @@ class UserController extends Controller
         return [
             'id' => $role->id,
             'label' => $role->label,
-            'permissions' => $role->permissions->map(fn (RolePermission $permission) => [
+            // An inactive role grants nothing (see User::getAllPermissions()).
+            'permissions' => ($role->is_active ? $role->permissions : collect())->map(fn (RolePermission $permission) => [
                 'resource' => $permission->resource,
                 'action' => $permission->action,
             ])->values(),
@@ -138,7 +139,10 @@ class UserController extends Controller
             'groups' => $user->groups->map(fn (UserGroup $group) => [
                 'id' => $group->id,
                 'name' => $group->name,
-                'roles' => $group->roles->map(fn (Role $role) => $this->mapRoleSummary($role))->values(),
+                // An inactive group grants nothing (see User::getAllPermissions()).
+                'roles' => $group->is_active
+                    ? $group->roles->map(fn (Role $role) => $this->mapRoleSummary($role))->values()
+                    : [],
             ])->values(),
             'effective_permissions' => $user->getAllPermissions(),
         ];

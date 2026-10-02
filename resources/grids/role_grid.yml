@@ -4,18 +4,49 @@ datagrid:
       type: eloquent
       class: App\Models\Role
     columns:
-      label:
-        label: fields.label
+      code:
+        label: fields.roleCode
         type: string
+        sortable: true
+      label:
+        label: fields.roleName
+        type: string
+        sortable: true
+      is_active:
+        label: fields.roleStatus
+        type: boolean
         sortable: true
       is_guest:
         label: fields.isGuest
         type: boolean
         sortable: true
+      created_at:
+        label: fields.createdOn
+        type: datetime
+        sortable: true
+      # *_by_code / *_by_name are resolved from created_by/updated_by in
+      # RoleController::index — not real columns, so not sortable.
+      created_by_code:
+        label: fields.createdByCode
+        type: string
+      created_by_name:
+        label: fields.createdByName
+        type: string
+      updated_at:
+        label: fields.updatedOn
+        type: datetime
+        sortable: true
+      updated_by_code:
+        label: fields.updatedByCode
+        type: string
+      updated_by_name:
+        label: fields.updatedByName
+        type: string
     filters:
       global:
         type: string
         fields:
+          - code
           - label
     actions:
       update:

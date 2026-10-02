@@ -17,9 +17,15 @@ class LocaleTranslationFile extends Model
         'locale_code',
         'namespace',
         'content',
+        // Dot-paths (within this namespace) whose value is the same as the
+        // English source on purpose — a translator returned it unchanged, or
+        // an admin saved it that way — so they count as translated even
+        // though they can't be told apart from an untranslated fallback.
+        'identical_keys',
     ];
 
     protected $casts = [
         'content' => 'array',
+        'identical_keys' => 'array',
     ];
 }

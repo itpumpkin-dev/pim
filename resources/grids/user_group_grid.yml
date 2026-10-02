@@ -4,14 +4,45 @@ datagrid:
       type: eloquent
       class: App\Models\UserGroup
     columns:
-      name:
-        label: fields.name
+      code:
+        label: fields.groupCode
         type: string
         sortable: true
+      name:
+        label: fields.groupName
+        type: string
+        sortable: true
+      is_active:
+        label: fields.groupStatus
+        type: boolean
+        sortable: true
+      created_at:
+        label: fields.createdOn
+        type: datetime
+        sortable: true
+      # *_by_code / *_by_name are resolved from created_by/updated_by in
+      # UserGroupController::index — not real columns, so not sortable.
+      created_by_code:
+        label: fields.createdByCode
+        type: string
+      created_by_name:
+        label: fields.createdByName
+        type: string
+      updated_at:
+        label: fields.updatedOn
+        type: datetime
+        sortable: true
+      updated_by_code:
+        label: fields.updatedByCode
+        type: string
+      updated_by_name:
+        label: fields.updatedByName
+        type: string
     filters:
       global:
         type: string
         fields:
+          - code
           - name
     actions:
       update:

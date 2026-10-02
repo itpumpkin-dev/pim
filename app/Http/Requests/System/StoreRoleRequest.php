@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\System;
 
+use App\Services\CodeRenameGuard;
+use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StoreRoleRequest extends FormRequest
 {
@@ -22,8 +25,11 @@ class StoreRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
+            // unique: checks soft-deleted roles too, matching the DB unique index.
+            'code' => ['required', 'string', 'max:100', 'regex:'.CodeRenameGuard::PATTERN, 'unique:roles,code'],
             'label' => ['required', 'string', 'max:100', 'unique:roles,label'],
             'is_guest' => ['boolean'],
+            'is_active' => ['required', 'boolean'],
 
             'permissions' => ['array'],
             'permissions.*' => ['array'],
@@ -37,6 +43,36 @@ class StoreRoleRequest extends FormRequest
 
             'restricted_platforms' => ['array'],
             'restricted_platforms.*' => ['integer', 'exists:sales_platforms,id'],
+        ];
+    }
+
+    /**
+     * A role's status is enforced (inactive roles grant nothing), so two
+     * roles must stay active: Administrator, or admins could lock themselves
+     * out; and the guest role, since without an active guest role anonymous
+     * visitors fall back to unrestricted access (Role::guest()).
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                if ($this->boolean('is_active')) {
+                    return;
+                }
+                if ($this->boolean('is_guest')) {
+                    $validator->errors()->add('is_active', 'The guest role must stay active.');
+                }
+                if ($this->input('label') === Role::ADMINISTRATOR_LABEL) {
+                    $validator->errors()->add('is_active', 'The Administrator role cannot be deactivated.');
+                }
+            },
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'code.regex' => 'The code may only contain letters, numbers, underscores (_) and dashes (-).',
         ];
     }
 }

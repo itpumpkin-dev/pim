@@ -1,5 +1,6 @@
 {
     "language": "Language",
+    "scrollToTop": "ກັບຂຶ້ນເທິງສຸດ",
     "toggleSidebar": "Toggle sidebar",
     "permissionsChangedLoggingOut": "Your access permissions have changed. Your unsaved work has been auto-saved as a draft — you'll be logged out in a moment. Please log in again.",
     "packLabel": "{{qty}} {{unit}}/pack",

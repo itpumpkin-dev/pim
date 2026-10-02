@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Button,
@@ -24,6 +24,7 @@ import {
     fioriIconButtonSx,
     fioriSearchFieldSx,
 } from '@/lib/fiori-style';
+import { formatDateTime } from '@/lib/format';
 
 interface PaginationData<T> {
     data: T[];
@@ -107,30 +108,52 @@ export default function UserGroupIndex({ gridConfig, gridData, filters }: UserGr
         return () => clearTimeout(delayDebounceFn);
     }, [search]);
 
-    // Column pop-in priority (SAP Fiori responsive table): columns come from
-    // the server-driven gridConfig, so priority falls out of column order —
-    // the first (name) column identifies the row and always stays, the next
-    // two follow as space allows, the rest reflow into the pop-in area
-    // first. Row actions stay pinned like the identifying column.
+    // Column pop-in priority (SAP Fiori responsive table): the group name
+    // identifies the row and always stays, code/status follow as space
+    // allows, and the audit columns (created/updated on/by) reflow into the
+    // pop-in area first. Row actions stay pinned like the identifying column.
     type GroupRow = UserGroupIndexProps['gridData']['data'][number];
-    const columns: FioriResponsiveColumn<GroupRow>[] = Object.entries(gridConfig.columns).map(([key, column], index) => ({
-        key,
-        header: t(column.label),
-        priority: index === 0 ? 'always' : index === 1 ? 'high' : index === 2 ? 'medium' : 'low',
-        render: (row) =>
-            column.type === 'boolean' ? (
-                <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
-            ) : key === 'name' ? (
-                <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
-            ) : (
-                row[key] || '-'
-            ),
-    }));
+    const columnPriority: Record<string, FioriResponsiveColumn<GroupRow>['priority']> = {
+        name: 'always',
+        code: 'high',
+        is_active: 'medium',
+    };
+    const rowOffset = (gridData.current_page - 1) * gridData.per_page;
+    const columns: FioriResponsiveColumn<GroupRow>[] = [
+        {
+            key: 'rowNumber',
+            header: t('fields.rowNumber'),
+            priority: 'high',
+            width: 80,
+            render: (row) => rowOffset + gridData.data.indexOf(row) + 1,
+        },
+        ...Object.entries(gridConfig.columns).map(([key, column]): FioriResponsiveColumn<GroupRow> => ({
+            key,
+            header: t(column.label),
+            priority: columnPriority[key] ?? 'low',
+            render: (row) =>
+                column.type === 'boolean' ? (
+                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+                ) : column.type === 'datetime' ? (
+                    formatDateTime(row[key])
+                ) : key === 'code' || key === 'name' ? (
+                    // Code/name open the group's read-only permission list.
+                    <Link
+                        href={`/system/userGroup/${row.id}/permissions`}
+                        style={{ color: FIORI.brand, fontWeight: key === 'name' ? 600 : undefined, textDecoration: 'none' }}
+                    >
+                        {row[key] || '-'}
+                    </Link>
+                ) : (
+                    row[key] || '-'
+                ),
+        })),
+    ];
 
     if (visibleActions.length > 0) {
         columns.push({
             key: 'actions',
-            header: '',
+            header: t('actionsHeader'),
             priority: 'always',
             align: 'right',
             render: (row) => (

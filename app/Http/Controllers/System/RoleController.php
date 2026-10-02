@@ -13,6 +13,8 @@ use App\Models\Role;
 use App\Models\RolePermission;
 use App\Models\SalesPlatformShop;
 use App\Models\User;
+use App\Services\CodeGenerator;
+use App\Services\CodeRenameGuard;
 use App\Services\GridManager;
 use App\Services\PermissionCatalog;
 use App\Services\SessionInvalidator;
@@ -27,9 +29,27 @@ class RoleController extends Controller
     {
         $grid = new GridManager('role_grid');
 
+        $gridData = $grid->getData($request, fn ($query) => $query->with([
+            'creator:id,employee_id,username,first_name,last_name',
+            'updater:id,employee_id,username,first_name,last_name',
+        ]));
+        $gridData->getCollection()->transform(fn (Role $role) => [
+            'id' => $role->id,
+            'code' => $role->code,
+            'label' => $role->label,
+            'is_active' => $role->is_active,
+            'is_guest' => $role->is_guest,
+            'created_at' => $role->created_at?->toIso8601String(),
+            'created_by_code' => $role->creator?->employee_id,
+            'created_by_name' => $role->creator ? ($role->creator->name ?: $role->creator->username) : null,
+            'updated_at' => $role->updated_at?->toIso8601String(),
+            'updated_by_code' => $role->updater?->employee_id,
+            'updated_by_name' => $role->updater ? ($role->updater->name ?: $role->updater->username) : null,
+        ]);
+
         return Inertia::render('system/role/index', [
             'gridConfig' => $grid->getConfig(),
-            'gridData' => $grid->getData($request),
+            'gridData' => $gridData,
             'filters' => $request->only(['search', 'sort', 'dir']),
         ]);
     }
@@ -37,6 +57,8 @@ class RoleController extends Controller
     public function create(): Response
     {
         return Inertia::render('system/role/create', [
+            // Prefills the Code field; the admin may replace it.
+            'suggestedCode' => CodeGenerator::sequential('roles', 'role'),
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
             'shops' => $this->shopOptions(),
@@ -98,8 +120,12 @@ class RoleController extends Controller
         }
 
         $role = Role::create([
+            'code' => $request->code,
             'label' => $request->label,
+            'is_active' => $request->boolean('is_active'),
             'is_guest' => $request->boolean('is_guest'),
+            'created_by' => $request->user()?->id,
+            'updated_by' => $request->user()?->id,
         ]);
 
         $permissions = $request->input('permissions', []);
@@ -126,12 +152,15 @@ class RoleController extends Controller
         $role->load(['users:id']);
 
         return Inertia::render('system/role/edit', [
+            'canEditCode' => CodeRenameGuard::canEdit('roles'),
             'catalog' => (new PermissionCatalog())->getCatalog(),
             'users' => $this->userOptions(),
             'shops' => $this->shopOptions(),
             'role' => [
                 'id' => $role->id,
+                'code' => $role->code,
                 'label' => $role->label,
+                'is_active' => $role->is_active,
                 'is_guest' => $role->is_guest,
                 'permissions' => $this->groupedPermissions($role),
                 'user_ids' => $role->users->pluck('id'),
@@ -163,7 +192,23 @@ class RoleController extends Controller
             $this->clearOtherGuestRoles($role->id);
         }
 
-        $role->update(['label' => $request->label, 'is_guest' => $request->boolean('is_guest')]);
+        // Nothing looks a role up by its code (the Administrator role is found
+        // by label), so a rename needs no cascade — just roles.edit_code.
+        if ($newCode = CodeRenameGuard::resolve($request, $role, 'roles')) {
+            $role->code = $newCode;
+        }
+
+        $role->fill([
+            'label' => $request->label,
+            'is_active' => $request->boolean('is_active'),
+            'is_guest' => $request->boolean('is_guest'),
+        ]);
+        $statusChanged = $role->isDirty('is_active');
+        $roleChanged = $role->isDirty();
+        // Pivot/permission edits below don't dirty the row, so the
+        // updated_at/updated_by stamp is applied at the end, once we know
+        // whether anything changed at all.
+        $role->save();
 
         $oldPermissions = $this->groupedPermissions($role);
         $newPermissions = $request->input('permissions', []);
@@ -197,7 +242,8 @@ class RoleController extends Controller
         $newShopIds = array_map('intval', $request->input('shop_ids', []));
         $role->salesPlatformShops()->sync($newShopIds);
 
-        if ($this->idsChanged($oldShopIds, $newShopIds) || $this->idsChanged($oldRestrictedPlatformIds, $newRestrictedPlatformIds)) {
+        $shopsChanged = $this->idsChanged($oldShopIds, $newShopIds) || $this->idsChanged($oldRestrictedPlatformIds, $newRestrictedPlatformIds);
+        if ($shopsChanged) {
             AuditLog::record('shops_updated', $role, [
                 'shop_ids' => $oldShopIds,
                 'restricted_platform_ids' => $oldRestrictedPlatformIds,
@@ -207,10 +253,18 @@ class RoleController extends Controller
             ]);
         }
 
-        if ($permissionsChanged || $usersChanged) {
+        if ($roleChanged || $permissionsChanged || $usersChanged || $shopsChanged) {
+            $role->forceFill([
+                'updated_by' => $request->user()?->id,
+                'updated_at' => $role->freshTimestamp(),
+            ])->saveQuietly();
+        }
+
+        if ($permissionsChanged || $usersChanged || $statusChanged) {
             // Union of who was affected before the change and who is affected
             // now, so both users who lost the role and users who gained it
-            // are forced to re-authenticate.
+            // are forced to re-authenticate. A status flip turns every
+            // permission of the role on/off for all its holders.
             $nowAffectedUserIds = SessionInvalidator::roleUserIds($role);
             SessionInvalidator::usersExceptCurrentActor(array_merge($previouslyAffectedUserIds, $nowAffectedUserIds));
         }

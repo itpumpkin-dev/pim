@@ -27,6 +27,7 @@ class UpdateUserGroupRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:100', Rule::unique('user_groups', 'name')->ignore($userGroup->id)],
             'description' => ['required', 'string'],
+            'is_active' => ['required', 'boolean'],
 
             'users' => ['array'],
             'users.*' => ['integer', 'exists:users,id'],
