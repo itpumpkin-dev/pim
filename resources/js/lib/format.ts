@@ -15,3 +15,15 @@ export function formatDateRange(start: string | null, end: string | null): strin
     if (start) return `${formatDate(start)} –`;
     return `– ${formatDate(end as string)}`;
 }
+
+/** Locale-aware date + time from an ISO timestamp, or "-" when empty. */
+export function formatDateTime(value: string | null | undefined): string {
+    if (!value) return '-';
+    return new Date(value).toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}

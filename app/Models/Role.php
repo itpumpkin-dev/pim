@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Services\CodeGenerator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,11 +14,20 @@ class Role extends Model
 {
     use Auditable, SoftDeletes;
 
-    public $timestamps = false;
+    /** Can never be deactivated — it's how admins keep access to everything. */
+    public const ADMINISTRATOR_LABEL = 'Administrator';
 
     protected $fillable = [
+        'code',
         'label',
+        // An inactive role keeps its permissions/members but grants nothing —
+        // User::getAllPermissions()/isAdministrator()/allowedShopIds() only
+        // follow active roles. The Administrator and guest roles must stay
+        // active (StoreRoleRequest/UpdateRoleRequest).
+        'is_active',
         'is_guest',
+        'created_by',
+        'updated_by',
     ];
 
     /** Per-request memoization of allPermissions() — see that method's docblock. */
@@ -31,7 +42,32 @@ class Role extends Model
     {
         return [
             'is_guest' => 'boolean',
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Records created outside the admin form (seeders, registration's
+     * firstOrCreate, tests) don't pass a code — give them the next free
+     * "{prefix}_N" so the NOT NULL + unique code column is always satisfied.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $model) {
+            if (blank($model->code)) {
+                $model->code = CodeGenerator::sequential('roles', 'role');
+            }
+        });
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function users(): BelongsToMany

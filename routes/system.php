@@ -40,6 +40,8 @@ Route::middleware(['auth'])->prefix('system')->name('system.')->group(function (
     Route::get('userGroup', [UserGroupController::class, 'index'])->name('userGroup.index')->middleware('permission:user_groups,list_user_groups');
     Route::get('userGroup/create', [UserGroupController::class, 'create'])->name('userGroup.create')->middleware('permission:user_groups,create_user_groups');
     Route::post('userGroup', [UserGroupController::class, 'store'])->name('userGroup.store')->middleware('permission:user_groups,create_user_groups');
+    // Read-only list of everything the group grants — same gate as the list page it's opened from.
+    Route::get('userGroup/{userGroup}/permissions', [UserGroupController::class, 'permissions'])->name('userGroup.permissions')->middleware('permission:user_groups,list_user_groups');
     Route::get('userGroup/{userGroup}/edit', [UserGroupController::class, 'edit'])->name('userGroup.edit')->middleware('permission:user_groups,edit_user_groups');
     Route::put('userGroup/{userGroup}', [UserGroupController::class, 'update'])->name('userGroup.update')->middleware('permission:user_groups,edit_user_groups');
     Route::delete('userGroup/{userGroup}', [UserGroupController::class, 'destroy'])->name('userGroup.destroy')->middleware('permission:user_groups,delete_user_groups');

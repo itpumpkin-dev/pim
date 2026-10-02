@@ -23,9 +23,12 @@ class LocaleController extends Controller
     {
         $grid = new GridManager('locale_grid');
 
+        $gridData = $grid->getData($request);
+        $gridData->getCollection()->each(fn (Locale $locale) => $this->applyLiveProgress($locale));
+
         return Inertia::render('system/locale/index', [
             'gridConfig' => $grid->getConfig(),
-            'gridData' => $grid->getData($request),
+            'gridData' => $gridData,
             'filters' => $request->only(['search', 'sort', 'dir']),
             // Standalone auto-translation runs (job_type = 'translation'),
             // newest first — powers the "Translation Jobs" tab. Only the last
@@ -59,6 +62,38 @@ class LocaleController extends Controller
                     ];
                 }),
         ]);
+    }
+
+    /**
+     * Swaps the stored translation_total/translation_translated snapshot
+     * (written only by the last translate run) for the live coverage, so a
+     * locale that was 100% stops claiming "completed" once new English
+     * strings are added. Not persisted. Queued/translating rows keep the
+     * job's own counters so the progress bar still moves during a run.
+     */
+    private function applyLiveProgress(Locale $locale): void
+    {
+        if ($this->localeTranslationService->isSourceLocale($locale->code)
+            || in_array($locale->translation_status, ['queued', 'translating'], true)) {
+            return;
+        }
+
+        ['total' => $total, 'translated' => $translated] = $this->localeTranslationService->progress($locale->code);
+        if ($total === 0) {
+            return;
+        }
+
+        $locale->translation_total = $total;
+        $locale->translation_translated = $translated;
+        // A failed last run stays visible until the locale is actually
+        // complete — otherwise any earlier progress would mask the failure
+        // as "partial".
+        $locale->translation_status = match (true) {
+            $translated >= $total => 'completed',
+            $locale->translation_status === 'failed' => 'failed',
+            $translated === 0 => 'not_started',
+            default => 'partial',
+        };
     }
 
     public function create(): Response

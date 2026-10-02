@@ -7,6 +7,7 @@ use App\Models\Locale;
 use App\Models\LocaleTranslationFile;
 use App\Models\TranslationProvider;
 use App\Services\Translation\TranslationProviderRegistry;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
@@ -105,6 +106,7 @@ class LocaleTranslationService
 
         $sourceStrings = $this->readSourceFiles();
         $targetStrings = $this->readTargetStrings($locale->code);
+        $identical = $this->readIdenticalKeys($locale->code);
 
         $total = 0;
         foreach ($sourceStrings as $strings) {
@@ -122,6 +124,7 @@ class LocaleTranslationService
         $translated = $this->translateAll(
             $sourceStrings,
             $targetStrings,
+            $identical,
             $locale->code,
             $provider,
             function (int $newlyTranslated) use ($locale, &$translatedCount) {
@@ -130,7 +133,7 @@ class LocaleTranslationService
             },
         );
 
-        $this->writeTargetStrings($locale->code, $translated);
+        $this->writeTargetStrings($locale->code, $translated, $identical);
 
         $locale->update([
             'translation_status' => match (true) {
@@ -140,6 +143,64 @@ class LocaleTranslationService
             },
             'translation_completed_at' => now(),
         ]);
+    }
+
+    /**
+     * Live translation coverage for a locale, computed from what's actually
+     * stored right now — unlike the translation_total/translation_translated
+     * columns, which are a snapshot taken by the last translate() run and go
+     * stale as soon as new English strings are added or someone edits
+     * translations by hand. A key counts as translated when its value
+     * differs from English, or is identical on purpose (identical_keys).
+     * Cached on the source/target files' contents + identical_keys (every
+     * write goes to both DB and disk), so it's only recomputed after
+     * something actually changed.
+     *
+     * @return array{total: int, translated: int}
+     */
+    public function progress(string $code): array
+    {
+        $files = array_merge(
+            File::glob(resource_path('js/locales/' . self::SOURCE_LOCALE . '/*.json')),
+            File::glob(resource_path('js/locales/' . $code . '/*.json')),
+        );
+        // Content hashes, not mtimes/updated_at — those only have 1-second
+        // resolution, so two saves within the same second left a stale entry.
+        $fingerprint = md5(json_encode([
+            array_map(fn (string $file) => [$file, md5_file($file)], $files),
+            LocaleTranslationFile::where('locale_code', $code)->orderBy('namespace')->pluck('identical_keys', 'namespace'),
+        ]));
+
+        return Cache::remember(
+            "locale_progress:{$code}:{$fingerprint}",
+            now()->addDay(),
+            fn () => $this->computeProgress($code),
+        );
+    }
+
+    /**
+     * @return array{total: int, translated: int}
+     */
+    private function computeProgress(string $code): array
+    {
+        $identical = $this->readIdenticalKeys($code);
+        $total = 0;
+        $translated = 0;
+
+        foreach ($this->readSourceFiles() as $filename => $strings) {
+            $target = $this->readTargetNamespace($code, pathinfo($filename, PATHINFO_FILENAME)) ?? [];
+
+            foreach ($this->flatten($strings) as [$path, $sourceValue]) {
+                $total++;
+                $existing = $this->getNested($target, $path);
+
+                if ($existing !== null && ($existing !== $sourceValue || isset($identical[$filename][implode('.', $path)]))) {
+                    $translated++;
+                }
+            }
+        }
+
+        return ['total' => $total, 'translated' => $translated];
     }
 
     /**
@@ -238,13 +299,25 @@ class LocaleTranslationService
         $filename = $namespace . '.json';
         $content = $this->readTargetNamespace($localeCode, $namespace) ?? $this->readSourceFiles()[$filename] ?? [];
 
+        $source = $this->readSourceFiles()[$filename] ?? [];
+        $identical = $this->readIdenticalKeys($localeCode)[$filename] ?? [];
+
         $oldValues = [];
         foreach ($values as $path => $value) {
             $oldValues[$path] = $this->getNested($content, explode('.', $path));
             $this->setNested($content, explode('.', $path), $value);
+
+            // Saving a value that matches English is the admin confirming it
+            // needs no translation (e.g. "SKU") — remember that so it counts
+            // as translated in progress() and a re-run doesn't resend it.
+            if ($value === $this->getNested($source, explode('.', $path))) {
+                $identical[$path] = true;
+            } else {
+                unset($identical[$path]);
+            }
         }
 
-        $this->writeTargetStrings($localeCode, [$filename => $content]);
+        $this->writeTargetStrings($localeCode, [$filename => $content], [$filename => $identical]);
 
         return $oldValues;
     }
@@ -315,6 +388,20 @@ class LocaleTranslationService
     }
 
     /**
+     * @return array<string, array<string, true>> filename => set of dot-paths
+     */
+    private function readIdenticalKeys(string $code): array
+    {
+        $keys = [];
+
+        foreach (LocaleTranslationFile::where('locale_code', $code)->get(['namespace', 'identical_keys']) as $row) {
+            $keys[$row->namespace . '.json'] = array_fill_keys($row->identical_keys ?? [], true);
+        }
+
+        return $keys;
+    }
+
+    /**
      * One namespace's current content for a locale, or null if the DB has no
      * row for it and there's no file on disk either.
      *
@@ -363,13 +450,20 @@ class LocaleTranslationService
      * separate export step.
      *
      * @param array<string, array<string, mixed>> $strings keyed by filename
+     * @param array<string, array<string, true>>|null $identical filename => set of dot-paths to store as
+     *                                                           identical_keys; null leaves the column as-is
      */
-    private function writeTargetStrings(string $code, array $strings): void
+    private function writeTargetStrings(string $code, array $strings, ?array $identical = null): void
     {
         foreach ($strings as $filename => $content) {
+            $attributes = ['content' => $content];
+            if ($identical !== null) {
+                $attributes['identical_keys'] = array_keys($identical[$filename] ?? []);
+            }
+
             LocaleTranslationFile::updateOrCreate(
                 ['locale_code' => $code, 'namespace' => pathinfo($filename, PATHINFO_FILENAME)],
-                ['content' => $content],
+                $attributes,
             );
         }
 
@@ -395,10 +489,12 @@ class LocaleTranslationService
     /**
      * @param array<string, array<string, mixed>> $sourceStrings keyed by filename, then by (possibly nested) translation key
      * @param array<string, array<string, mixed>> $targetStrings the locale's current DB content, kept as-is wherever it already differs from source
+     * @param array<string, array<string, true>> $identical keys already confirmed identical to source (kept as-is
+     *                                                     too); strings the provider returns unchanged are added to it
      * @param callable(int): void $onChunkTranslated called with the number of *newly* translated strings after each successful chunk
      * @return array<string, array<string, mixed>>
      */
-    private function translateAll(array $sourceStrings, array $targetStrings, string $target, ?TranslationProvider $provider, callable $onChunkTranslated): array
+    private function translateAll(array $sourceStrings, array $targetStrings, array &$identical, string $target, ?TranslationProvider $provider, callable $onChunkTranslated): array
     {
         // Flatten every value across every file (files can nest objects, e.g.
         // grid.json's "fields"). Anything whose current target value already
@@ -409,6 +505,7 @@ class LocaleTranslationService
         $flatKeys = [];
         $flatValues = [];
         $flatPlaceholders = [];
+        $flatSources = [];
 
         $result = $sourceStrings;
         $alreadyTranslated = 0;
@@ -417,7 +514,7 @@ class LocaleTranslationService
             foreach ($this->flatten($strings) as [$path, $sourceValue]) {
                 $existing = $this->getNested($targetStrings[$filename] ?? [], $path);
 
-                if ($existing !== null && $existing !== $sourceValue) {
+                if ($existing !== null && ($existing !== $sourceValue || isset($identical[$filename][implode('.', $path)]))) {
                     $this->setNested($result[$filename], $path, $existing);
                     $alreadyTranslated++;
 
@@ -428,6 +525,7 @@ class LocaleTranslationService
                 $flatKeys[] = [$filename, $path];
                 $flatValues[] = $protected;
                 $flatPlaceholders[] = $placeholders;
+                $flatSources[] = $sourceValue;
             }
         }
 
@@ -447,6 +545,10 @@ class LocaleTranslationService
                 [$filename, $path] = $flatKeys[$i];
                 $value = $this->restorePlaceholders($translatedChunk[$position], $flatPlaceholders[$i]);
                 $this->setNested($result[$filename], $path, $value);
+
+                if ($value === $flatSources[$i]) {
+                    $identical[$filename][implode('.', $path)] = true;
+                }
             }
 
             $onChunkTranslated(count($indices));

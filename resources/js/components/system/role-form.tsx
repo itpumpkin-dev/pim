@@ -14,6 +14,7 @@ import {
     IconButton,
     InputAdornment,
     Popover,
+    Switch,
     Tab,
     Tabs,
     TextField,
@@ -24,6 +25,7 @@ import { FormEventHandler, useState, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx, fioriTabsSx } from '@/lib/fiori-style';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -88,12 +90,18 @@ interface Attribute {
 }
 
 interface RoleFormProps {
+    /** Create only: prefilled into the Code field (next free role_N). */
+    suggestedCode?: string;
+    /** Edit only: whether the user holds roles.edit_code. */
+    canEditCode?: boolean;
     catalog: Record<string, PermissionModule>;
     users: RoleUserOption[];
     shops: RoleShopOption[];
     role?: {
         id: number;
+        code: string;
         label: string;
+        is_active: boolean;
         is_guest?: boolean;
         permissions: Record<string, string[]>;
         user_ids: number[];
@@ -111,7 +119,9 @@ interface RoleFormProps {
 }
 
 interface RoleForm {
+    code: string;
     label: string;
+    is_active: boolean;
     is_guest: boolean;
     permissions: Record<string, string[]>;
     users: number[];
@@ -123,6 +133,8 @@ interface RoleForm {
 const TAB_KEYS = ['roleFormTabGeneral', 'roleFormTabPermissions', 'roleFormTabUsers', 'roleFormTabShops'];
 
 export default function RoleFormPage({
+    suggestedCode,
+    canEditCode = false,
     catalog,
     users,
     shops,
@@ -133,6 +145,11 @@ export default function RoleFormPage({
     platformAttributes,
 }: RoleFormProps) {
     const { t } = useTranslation('system');
+    const { t: tCatalog } = useTranslation('catalog');
+    // Anyone may pick the code on create; renaming it later needs roles.edit_code.
+    const codeEditable = !role || canEditCode;
+    // Mirrors StoreRoleRequest/UpdateRoleRequest: these two roles must stay active.
+    const isAdministratorRole = role?.label === 'Administrator';
     const isEdit = Boolean(role);
     const [tab, setTab] = useState(0);
     const [expandedAttrGroups, setExpandedAttrGroups] = useState(true);
@@ -184,7 +201,9 @@ export default function RoleFormPage({
     const [expandedActionsByResource, setExpandedActionsByResource] = useState<Record<string, boolean>>({});
 
     const { data, setData, post, put, processing, errors, clearErrors } = useForm<RoleForm>({
+        code: role?.code ?? suggestedCode ?? '',
         label: role?.label ?? '',
+        is_active: role?.is_active ?? true,
         is_guest: role?.is_guest ?? false,
         permissions: role?.permissions ?? {},
         users: role?.user_ids ?? [],
@@ -548,7 +567,9 @@ export default function RoleFormPage({
     // disagree. This mirrors that same order-insensitive comparison for
     // every field instead.
     const hasChanges = useMemo(() => {
+        if (data.code !== (role?.code ?? suggestedCode ?? '')) return true;
         if (data.label !== (role?.label ?? '')) return true;
+        if (data.is_active !== (role?.is_active ?? true)) return true;
         if (data.is_guest !== (role?.is_guest ?? false)) return true;
 
         const initialUserIds = new Set(role?.user_ids ?? []);
@@ -573,7 +594,7 @@ export default function RoleFormPage({
         }
 
         return permissionChanges.added.length > 0 || permissionChanges.removed.length > 0;
-    }, [data.label, data.is_guest, data.users, data.shop_ids, data.restricted_platforms, permissionChanges, role]);
+    }, [data.code, data.label, data.is_active, data.is_guest, data.users, data.shop_ids, data.restricted_platforms, permissionChanges, role]);
 
     // Column pop-in priority (SAP Fiori responsive table): the "Has Role"
     // checkbox is the control being edited here, so it stays always visible
@@ -863,6 +884,24 @@ export default function RoleFormPage({
                 {tab === 0 && (
                     <Box sx={{ maxWidth: 420 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
+                            Role Code *
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            value={data.code}
+                            disabled={!codeEditable}
+                            placeholder="e.g. role_1"
+                            onChange={(e) => {
+                                setData('code', normalizeCodeInput(e.target.value));
+                                clearErrors('code');
+                            }}
+                            error={Boolean(errors.code)}
+                            helperText={errors.code ?? tCatalog(codeHintKey({ canEditCode: codeEditable }))}
+                            sx={{ mb: 2.5 }}
+                        />
+
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
                             Role Name *
                         </Typography>
                         <TextField
@@ -877,9 +916,42 @@ export default function RoleFormPage({
                             helperText={errors.label}
                         />
 
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mt: 2.5, mb: 0.5 }}>
+                            Status
+                        </Typography>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={data.is_active}
+                                    disabled={isAdministratorRole || data.is_guest}
+                                    onChange={(e) => {
+                                        setData('is_active', e.target.checked);
+                                        clearErrors('is_active');
+                                    }}
+                                />
+                            }
+                            label={data.is_active ? 'Active' : 'Inactive'}
+                        />
+                        <Typography variant="caption" color={errors.is_active ? 'error' : 'text.secondary'} sx={{ display: 'block', mt: -0.5 }}>
+                            {errors.is_active ??
+                                (isAdministratorRole
+                                    ? 'The Administrator role is always active.'
+                                    : data.is_guest
+                                      ? 'The guest role must stay active.'
+                                      : 'An inactive role grants none of its permissions to its users and groups.')}
+                        </Typography>
+
                         <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${FIORI.border}` }}>
                             <FormControlLabel
-                                control={<Checkbox checked={data.is_guest} onChange={(e) => setData('is_guest', e.target.checked)} />}
+                                control={
+                                    <Checkbox
+                                        checked={data.is_guest}
+                                        onChange={(e) => {
+                                            // The guest role must be active (see the Status hint above).
+                                            setData((prev) => ({ ...prev, is_guest: e.target.checked, is_active: e.target.checked ? true : prev.is_active }));
+                                        }}
+                                    />
+                                }
                                 label="Guest role (applies to visitors who aren't logged in)"
                             />
                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 4, mt: -0.5 }}>

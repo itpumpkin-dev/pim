@@ -15,10 +15,11 @@ interface RoleOption {
 }
 
 interface CreateUserGroupProps {
+    suggestedCode: string;
     users: UserGroupUserOption[];
     roles: RoleOption[];
 }
 
-export default function UserGroupCreate({ users, roles }: CreateUserGroupProps) {
-    return <UserGroupFormPage users={users} roles={roles} />;
+export default function UserGroupCreate({ suggestedCode, users, roles }: CreateUserGroupProps) {
+    return <UserGroupFormPage suggestedCode={suggestedCode} users={users} roles={roles} />;
 }

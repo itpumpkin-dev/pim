@@ -223,6 +223,7 @@ class User extends Authenticatable
             "user:{$this->id}:permissions:v{$this->permissions_version}",
             function () {
                 $directPermissions = $this->roles()
+                    ->where('roles.is_active', true)
                     ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
                     ->where('role_permissions.granted', true)
                     ->select('role_permissions.resource', 'role_permissions.action')
@@ -232,8 +233,10 @@ class User extends Authenticatable
                     });
 
                 $groupPermissions = $this->groups()
+                    ->where('user_groups.is_active', true)
                     ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
                     ->join('roles', 'role_user_group.role_id', '=', 'roles.id')
+                    ->where('roles.is_active', true)
                     ->join('role_permissions', 'roles.id', '=', 'role_permissions.role_id')
                     ->where('role_permissions.granted', true)
                     ->select('role_permissions.resource', 'role_permissions.action')
@@ -277,11 +280,11 @@ class User extends Authenticatable
      */
     public function isAdministrator(): bool
     {
-        if ($this->roles->contains('label', 'Administrator')) {
+        if ($this->roles->contains(fn (Role $role) => $role->label === 'Administrator' && $role->is_active)) {
             return true;
         }
 
-        return $this->groups()->whereHas('roles', fn ($q) => $q->where('label', 'Administrator'))->exists();
+        return $this->groups()->where('user_groups.is_active', true)->whereHas('roles', fn ($q) => $q->where('label', 'Administrator')->where('roles.is_active', true))->exists();
     }
 
     public function hasAnyPermissionForResource(string $resource): bool
@@ -337,9 +340,12 @@ class User extends Authenticatable
         }
 
         $roleIds = array_values(array_unique(array_merge(
-            $this->roles()->pluck('roles.id')->all(),
+            $this->roles()->where('roles.is_active', true)->pluck('roles.id')->all(),
             $this->groups()
+                ->where('user_groups.is_active', true)
                 ->join('role_user_group', 'user_groups.id', '=', 'role_user_group.group_id')
+                ->join('roles', 'roles.id', '=', 'role_user_group.role_id')
+                ->where('roles.is_active', true)
                 ->pluck('role_user_group.role_id')
                 ->all()
         )));

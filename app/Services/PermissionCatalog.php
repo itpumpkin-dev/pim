@@ -78,6 +78,8 @@ class PermissionCatalog
         $extra = [
             'system' => [
                 'users' => ['edit_users'],
+                'user_groups' => ['edit_code'],
+                'roles' => ['edit_code'],
             ],
             'catalog' => [
                 'attribute_families' => ['edit_code'],
