@@ -4,6 +4,7 @@
     "toggleSidebar": "サイドバーを切り替え",
     "permissionsChangedLoggingOut": "アクセス権限が変更されました。未保存の作業は自動的に下書きとして保存されました。まもなくログアウトされます。再度ログインしてください。",
     "packLabel": "{{qty}} {{unit}}/パック",
+    "defaultPackUnit": "個",
     "exportThisProduct": "この商品をエクスポート",
     "settings": "設定",
     "logout": "ログアウト",

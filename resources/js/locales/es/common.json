@@ -26,6 +26,7 @@
     "searchJobPositions": "Puestos de trabajo",
     "permissionsChangedLoggingOut": "Sus permisos de acceso han cambiado. Su trabajo no guardado se ha guardado automáticamente como borrador — se cerrará su sesión en un momento. Por favor, inicie sesión nuevamente.",
     "packLabel": "{{qty}} {{unit}}/paquete",
+    "defaultPackUnit": "unidad",
     "exportThisProduct": "Exportar este producto",
     "popularBadge": "Popular",
     "settings": "Configuración",

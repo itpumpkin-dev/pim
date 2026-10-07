@@ -154,7 +154,7 @@ export const ProductCard = memo(function ProductCard({ product, popular = false 
                             {product.canViewPackaging !== false && (
                                 <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: 'text.secondary' }}>
                                     <Inventory2OutlinedIcon sx={{ fontSize: 16 }} />
-                                    <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit })}</Typography>
+                                    <Typography variant="caption">{t('packLabel', { qty: product.packQty, unit: product.packUnit || t('defaultPackUnit') })}</Typography>
                                 </Stack>
                             )}
                         </Stack>

@@ -41,7 +41,7 @@ test('maps a product\'s basic fields, falling back to sensible defaults when val
     expect($result[0]['name'])->toBe('SKU-1'); // falls back to sku
     expect($result[0]['brand'])->toBe('-');
     expect($result[0]['category'])->toBe('ทั่วไป');
-    expect($result[0]['packUnit'])->toBe('ชิ้น');
+    expect($result[0]['packUnit'])->toBe(''); // frontend fills in a localized default
     expect($result[0]['packQty'])->toBe(1);
     expect($result[0]['price'])->toBe(0.0);
 });
