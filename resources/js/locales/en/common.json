@@ -26,6 +26,7 @@
     "searchJobPositions": "Job positions",
     "permissionsChangedLoggingOut": "Your access permissions have changed. Your unsaved work has been auto-saved as a draft — you'll be logged out in a moment. Please log in again.",
     "packLabel": "{{qty}} {{unit}}/pack",
+    "defaultPackUnit": "item",
     "exportThisProduct": "Export this product",
     "popularBadge": "Popular",
     "settings": "Settings",

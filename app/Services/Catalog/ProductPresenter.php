@@ -241,7 +241,8 @@ class ProductPresenter
             'brand' => $get('pbrand') ?? '-',
             'category' => $categoryName ?? $get('pcatname') ?? 'ทั่วไป',
             'size' => $get('unitinfo') ?? '',
-            'packUnit' => $get('pbaseunit') ?? 'ชิ้น',
+            // ว่าง = ไม่มีหน่วย ให้ frontend ใช้ค่า default ตามภาษา (common:defaultPackUnit)
+            'packUnit' => $get('pbaseunit') ?? '',
             'packQty' => (int) ($get('packaging_box') ?? 1),
             'price' => $price,
             'description' => self::plainText($get('product_details_features')) ?? '-',

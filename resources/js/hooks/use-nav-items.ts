@@ -184,6 +184,8 @@ export function useMainNavItems(): NavItem[] {
                             {
                                 title: t('attributes'),
                                 url: '/catalog/attributes',
+                                // api-sources lives under /catalog/attributes/ but is its own nav entry
+                                excludeUrls: ['/catalog/attributes/api-sources'],
                                 permission: 'attributes.list_attributes',
                             },
                             {
