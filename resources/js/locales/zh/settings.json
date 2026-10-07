@@ -1,14 +1,14 @@
 {
     "profileInformation": "个人资料",
-    "profileInformationDesc": "更新您的姓名和电子邮件地址",
+    "profileInformationDesc": "更新您的姓名和邮箱地址",
     "username": "用户名",
     "firstName": "名字",
-    "lastName": "姓",
-    "emailAddress": "电子邮件地址",
+    "lastName": "姓氏",
+    "emailAddress": "邮箱地址",
     "save": "保存",
     "saved": "已保存",
-    "emailUnverified": "您的电子邮件地址尚未验证。",
+    "emailUnverified": "您的邮箱尚未验证。",
     "resendVerification": "点击此处重新发送验证邮件。",
-    "verificationSent": "新的验证链接已发送到您的电子邮件地址。",
+    "verificationSent": "新的验证链接已发送到您的邮箱。",
     "saving": "保存中..."
 }
