@@ -92,7 +92,7 @@
     "allStatuses": "所有状态",
     "allJobTypes": "所有任务类型",
     "sourceLocaleLabel": "源语言",
-    "sourceLocaleHelp": "此文件中“名称/描述”文本所使用的语言。导入的值会标记为该语言，而不会覆盖其他语言的翻译。",
+    "sourceLocaleHelp": "此文件中“名称/描述”文本所使用的语言。导入的数据将被标记为该语言，不会覆盖其他语言已有的翻译。",
     "wizardStepType": "类型",
     "wizardStepLanguage": "语言",
     "wizardStepFamily": "属性族",
