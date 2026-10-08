@@ -164,12 +164,11 @@ test('duplicate as a plain copy carries over attribute values and categories (un
     $category = Category::create(['code' => 'cat-'.uniqid(), 'name' => 'Test Category']);
     $source->categories()->sync([$category->id]);
 
-    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['as_template' => false]);
+    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['as_template' => false, 'sku' => 'COPY-SKU']);
 
     pcController()->duplicate($request, $source);
 
-    // CodeGenerator::sequential() ต่อท้ายด้วย "_{n}" เสมอ (ดู app/Services/CodeGenerator.php)
-    $duplicate = Product::where('sku', 'like', 'SRC-SKU-copy_%')->firstOrFail();
+    $duplicate = Product::where('sku', 'COPY-SKU')->firstOrFail();
     expect($duplicate->enabled)->toBeFalse();
     expect($duplicate->categories()->pluck('categories.id')->all())->toBe([$category->id]);
 });
@@ -179,14 +178,56 @@ test('duplicate as a template ("Save as Template") produces an empty structure w
     $category = Category::create(['code' => 'cat-'.uniqid(), 'name' => 'Test Category']);
     $source->categories()->sync([$category->id]);
 
-    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['as_template' => true]);
+    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['as_template' => true, 'sku' => 'TEMPLATE-NEW']);
 
     pcController()->duplicate($request, $source);
 
-    $template = Product::where('sku', 'like', 'TEMPLATE-SRC-copy_%')->firstOrFail();
+    $template = Product::where('sku', 'TEMPLATE-NEW')->firstOrFail();
     expect($template->enabled)->toBeFalse();
     expect($template->categories()->count())->toBe(0);
     expect(ProductValue::where('product_id', $template->id)->count())->toBe(0);
+});
+
+test('duplicate requires a new sku', function () {
+    $source = Product::create(['sku' => 'DUP-NO-SKU', 'type' => 'simple', 'enabled' => true]);
+
+    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['sku' => '   ']);
+
+    expect(fn () => pcController()->duplicate($request, $source))->toThrow(ValidationException::class);
+    expect(Product::count())->toBe(1);
+});
+
+test('duplicate rejects a sku that is already in use', function () {
+    $source = Product::create(['sku' => 'DUP-SRC', 'type' => 'simple', 'enabled' => true]);
+    Product::create(['sku' => 'DUP-TAKEN', 'type' => 'simple', 'enabled' => true]);
+
+    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['sku' => 'DUP-TAKEN', 'as_template' => true]);
+
+    expect(fn () => pcController()->duplicate($request, $source))->toThrow(ValidationException::class);
+    expect(Product::count())->toBe(2);
+});
+
+test('duplicate of a configurable product renames variant skus after the new parent sku', function () {
+    $source = Product::create(['sku' => 'CFG', 'type' => 'configurable', 'enabled' => true]);
+    Product::create(['sku' => 'CFG-RED', 'parent_id' => $source->id, 'type' => 'simple', 'enabled' => true]);
+    Product::create(['sku' => 'OTHER-BLUE', 'parent_id' => $source->id, 'type' => 'simple', 'enabled' => true]);
+
+    $request = Request::create("/catalog/products/{$source->id}/duplicate", 'POST', ['sku' => 'CFG2']);
+
+    pcController()->duplicate($request, $source);
+
+    $copy = Product::where('sku', 'CFG2')->firstOrFail();
+    expect(Product::where('parent_id', $copy->id)->orderBy('sku')->pluck('sku')->all())->toBe(['CFG2-OTHER-BLUE', 'CFG2-RED']);
+});
+
+test('checkSku reports available, taken and invalid skus', function () {
+    Product::create(['sku' => 'CHECK-TAKEN', 'type' => 'simple', 'enabled' => true]);
+
+    $check = fn (string $sku) => pcController()->checkSku(Request::create('/catalog/products/check-sku', 'GET', ['sku' => $sku]))->getData(true);
+
+    expect($check('CHECK-FREE'))->toBe(['available' => true, 'reason' => null]);
+    expect($check(' CHECK-TAKEN '))->toBe(['available' => false, 'reason' => 'taken']);
+    expect($check('bad sku!'))->toBe(['available' => false, 'reason' => 'invalid']);
 });
 
 test('update stores multiple videos for a "video" attribute as a JSON array, like gallery', function () {

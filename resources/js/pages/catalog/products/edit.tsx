@@ -1,6 +1,7 @@
 import { QuickAddOptionDialog } from '@/components/catalog/quick-add-option-dialog';
 import { FioriFormGroup, FioriMessageStrip, fioriComboBoxPaperSx, fioriComboBoxSx, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
 import { FioriMessageBox } from '@/components/fiori-message-box';
+import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FileUploadRowsList, FioriUploadDropzoneTile } from '@/components/fiori-upload-dropzone';
@@ -1807,6 +1808,29 @@ export default function ProductEdit({
     const [saveAsTemplateConfirmOpen, setSaveAsTemplateConfirmOpen] = useState(false);
     const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
     const [duplicating, setDuplicating] = useState(false);
+    // SKU ของสินค้าใหม่ที่ dialog ทำสำเนา/บันทึกเป็นเทมเพลตบังคับให้กรอก (ต้องไม่ซ้ำ)
+    // ก่อนถึงจะกดยืนยันได้ — ใช้ state ชุดเดียวร่วมกันเพราะเปิดได้ทีละ dialog
+    const [duplicateSku, setDuplicateSku] = useState('');
+    const [duplicateSkuError, setDuplicateSkuError] = useState<string | null>(null);
+    const duplicateSkuStatus = useSkuAvailability(duplicateSku, duplicateConfirmOpen || saveAsTemplateConfirmOpen);
+    const openDuplicateSkuDialog = (open: () => void) => {
+        setDuplicateSku('');
+        setDuplicateSkuError(null);
+        open();
+    };
+    const duplicateSkuField = (
+        <Box sx={{ mt: 2 }}>
+            <NewProductSkuField
+                value={duplicateSku}
+                onChange={(value) => {
+                    setDuplicateSku(value);
+                    setDuplicateSkuError(null);
+                }}
+                status={duplicateSkuStatus}
+                serverError={duplicateSkuError}
+            />
+        </Box>
+    );
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [queuingTranslations, setQueuingTranslations] = useState(false);
@@ -1822,12 +1846,14 @@ export default function ProductEdit({
         setDuplicating(true);
         router.post(
             `/catalog/products/${product.id}/duplicate`,
-            { as_template: options?.asTemplate ?? false },
+            { as_template: options?.asTemplate ?? false, sku: duplicateSku.trim() },
             {
                 // สำเร็จแล้ว backend redirect ไปหน้า Edit ของสำเนาใหม่เลย (ดู
                 // ProductController::duplicate()) เลยไม่ต้อง setDuplicateConfirmOpen(false)
                 // เอง — หน้าจะเปลี่ยนไปทั้งหน้าอยู่แล้ว
                 onError: (errs) => {
+                    // SKU ชน (มีคนแย่งไปใช้หลังเช็คล่วงหน้า) — โชว์ใต้ช่อง SKU ถ้า dialog ยังเปิดอยู่
+                    if (errs.sku) setDuplicateSkuError(errs.sku as string);
                     const fallback = (Object.values(errs)[0] as string | undefined) || t('duplicateProductError');
                     setPushResult({ severity: 'error', message: options?.errorMessage ? options.errorMessage(fallback) : fallback });
                 },
@@ -2034,7 +2060,7 @@ export default function ProductEdit({
                                             <MenuItem
                                                 onClick={() => {
                                                     setMoreMenuAnchor(null);
-                                                    setDuplicateConfirmOpen(true);
+                                                    openDuplicateSkuDialog(() => setDuplicateConfirmOpen(true));
                                                 }}
                                             >
                                                 <ContentCopyIcon fontSize="small" sx={{ mr: 1.5 }} />
@@ -2155,7 +2181,7 @@ export default function ProductEdit({
                                     <MenuItem
                                         onClick={() => {
                                             setSaveMenuAnchor(null);
-                                            setSaveAsTemplateConfirmOpen(true);
+                                            openDuplicateSkuDialog(() => setSaveAsTemplateConfirmOpen(true));
                                         }}
                                     >
                                         <ContentCopyIcon fontSize="small" sx={{ mr: 1.5 }} />
@@ -3249,8 +3275,10 @@ export default function ProductEdit({
                 confirmLabel={t('duplicateProduct')}
                 cancelLabel={t('cancel')}
                 confirmLoading={duplicating}
+                confirmDisabled={duplicateSkuStatus !== 'available'}
             >
                 {t('confirmDuplicateMessage')}
+                {duplicateSkuField}
             </FioriMessageBox>
 
             {/* Dialog ยืนยันการลบ — ยิงจากเมนู "More" */}
@@ -3322,8 +3350,10 @@ export default function ProductEdit({
                 confirmLabel={t('saveAsTemplate')}
                 cancelLabel={t('cancel')}
                 confirmLoading={processing || duplicating}
+                confirmDisabled={duplicateSkuStatus !== 'available'}
             >
                 {t('confirmSaveAsTemplateMessage')}
+                {duplicateSkuField}
             </FioriMessageBox>
 
             <Dialog open={pushConfirmShop !== null} onClose={closePushDialog}>

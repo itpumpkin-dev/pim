@@ -34,5 +34,9 @@
     "loggingOut": "Logging out...",
     "editableLocaleHint": "Showing the field for the language currently selected (top-right). Switch languages to edit the others.",
     "noActiveLocales": "No active locales configured.",
-    "unsavedChangesConfirm": "You have unsaved changes. Are you sure you want to leave this page? Your changes will be lost."
+    "unsavedChangesConfirm": "You have unsaved changes. Are you sure you want to leave this page? Your changes will be lost.",
+    "forbiddenTitle": "Access denied",
+    "forbiddenHint": "If you need access, please contact your system administrator.",
+    "forbiddenGoBack": "Go back",
+    "forbiddenGoDashboard": "Go to dashboard"
 }

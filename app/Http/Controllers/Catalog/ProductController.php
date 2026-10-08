@@ -52,6 +52,7 @@ use App\Services\WooCommerce\WooCommerceProductSyncService;
 use App\Services\WordPress\TranslatePressTranslationSyncService;
 use App\Services\WordPress\WordPressDatabase;
 use App\Services\WordPress\WordPressTunnel;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -1633,7 +1634,7 @@ class ProductController extends Controller
 
     /**
      * สร้างสินค้าใหม่โดย copy จากสินค้าเดิม: family/type/ค่า attribute/หมวดหมู่
-     * เหมือนกันหมด แต่ใช้ SKU ใหม่ที่ auto-generate ขึ้นมา จะเริ่มต้นเป็นสถานะ
+     * เหมือนกันหมด แต่ใช้ SKU ใหม่ที่ผู้ใช้กรอกมา (ต้องไม่ซ้ำ) จะเริ่มต้นเป็นสถานะ
      * disabled เสมอ (ไม่ว่าตัวต้นฉบับจะเปิดหรือปิดอยู่ก็ตาม) เพื่อไม่ให้สินค้า
      * ที่ยังไม่ได้ตรวจสอบดันไปออนไลน์โดยไม่ตั้งใจภายใต้ SKU ที่สอง — ผู้ใช้ต้อง
      * ไปตรวจสอบ/ปรับแก้ที่หน้า Edit เอง (ซึ่งจะพาไปที่นั่นต่อ) แล้วค่อยเปิดใช้งาน
@@ -1649,40 +1650,61 @@ class ProductController extends Controller
         // — กำหนดว่ามีฟิลด์ไหนให้กรอกบ้าง) ไม่ใช่ "สำเนาที่มีข้อมูลติดมาด้วย"
         $asTemplate = $request->boolean('as_template');
 
-        $duplicate = DB::transaction(function () use ($product, $request, $asTemplate) {
-            $newProduct = CodeGenerator::createWithRetry(
-                'products',
-                $product->sku.'-copy',
-                fn ($sku) => Product::create([
-                    'sku' => $sku,
+        // ผู้ใช้ต้องกรอก SKU ของสินค้าใหม่เองใน dialog ก่อนทำสำเนา/เทมเพลต (เดิม
+        // auto-generate เป็น "{sku}-copy_N" ซึ่งต้องไปแก้ทีหลังที่หน้า Edit ทุกครั้ง)
+        // — rule ชุดเดียวกับ store() ส่วน dialog เองก็เช็คซ้ำล่วงหน้าผ่าน checkSku()
+        // แล้ว แต่ต้องเช็คซ้ำที่นี่อีกรอบเผื่อมีคนแย่ง SKU เดียวกันไประหว่างนั้น
+        $request->merge(['sku' => trim((string) $request->input('sku', ''))]);
+        $validated = $request->validate([
+            'sku' => ['required', 'string', 'max:100', 'regex:'.self::SKU_REGEX, 'unique:products,sku'],
+        ], [
+            'sku.regex' => 'SKU may only contain letters, numbers, dashes (-) and underscores (_).',
+            'sku.unique' => 'This SKU is already in use.',
+        ]);
+
+        $duplicate = DB::transaction(function () use ($product, $request, $asTemplate, $validated) {
+            try {
+                $newProduct = Product::create([
+                    'sku' => $validated['sku'],
                     'family_id' => $product->family_id,
                     'type' => $product->type,
                     'enabled' => false,
                     'configurable_attributes' => $product->configurable_attributes,
                     'created_by' => $request->user()?->id,
                     'updated_by' => $request->user()?->id,
-                ]),
-                column: 'sku',
-            );
+                ]);
+            } catch (UniqueConstraintViolationException) {
+                // มีคนเอา SKU นี้ไปใช้ระหว่างที่ validate ผ่านแล้ว
+                throw ValidationException::withMessages(['sku' => 'This SKU is already in use.']);
+            }
 
             $this->copyProductData($product, $newProduct, copyValues: ! $asTemplate);
 
             if (strtolower($product->type) === 'configurable') {
                 foreach (Product::where('parent_id', $product->id)->get() as $variant) {
-                    $newVariant = CodeGenerator::createWithRetry(
-                        'products',
-                        $variant->sku.'-copy',
-                        fn ($sku) => Product::create([
-                            'sku' => $sku,
-                            'parent_id' => $newProduct->id,
-                            'family_id' => $variant->family_id,
-                            'type' => 'simple',
-                            'enabled' => false,
-                            'created_by' => $request->user()?->id,
-                            'updated_by' => $request->user()?->id,
-                        ]),
-                        column: 'sku',
-                    );
+                    // SKU ของ variant ตั้งตาม SKU ใหม่ของสินค้าแม่: ถ้า variant เดิม
+                    // ขึ้นต้นด้วย "{sku แม่เดิม}-" ก็สลับ prefix เป็น SKU ใหม่ (เช่น
+                    // OLD-RED -> NEW-RED) ไม่งั้นต่อท้าย SKU ใหม่ด้วย SKU variant เดิม
+                    $oldPrefix = $product->sku.'-';
+                    $suffix = str_starts_with($variant->sku, $oldPrefix)
+                        ? substr($variant->sku, strlen($oldPrefix))
+                        : $variant->sku;
+                    $variantSku = $newProduct->sku.'-'.$suffix;
+
+                    $createVariant = fn (string $sku) => Product::create([
+                        'sku' => $sku,
+                        'parent_id' => $newProduct->id,
+                        'family_id' => $variant->family_id,
+                        'type' => 'simple',
+                        'enabled' => false,
+                        'created_by' => $request->user()?->id,
+                        'updated_by' => $request->user()?->id,
+                    ]);
+
+                    // ชนกับ SKU ที่มีอยู่แล้ว (หรือยาวเกิน) ค่อย fallback ไปเลขรัน "_N"
+                    $newVariant = mb_strlen($variantSku) <= 100 && ! Product::where('sku', $variantSku)->exists()
+                        ? $createVariant($variantSku)
+                        : CodeGenerator::createWithRetry('products', $variantSku, $createVariant, column: 'sku');
 
                     $this->copyProductData($variant, $newVariant, copyValues: ! $asTemplate);
                 }
@@ -1702,6 +1724,27 @@ class ProductController extends Controller
             : "Duplicated as \"{$duplicate->sku}\" (disabled). Review and update before enabling.";
 
         return to_route('catalog.products.edit', $duplicate)->with('success', $message);
+    }
+
+    /**
+     * เช็คล่วงหน้าว่า SKU ที่ผู้ใช้กรอกใน dialog ทำสำเนา/บันทึกเป็นเทมเพลตใช้ได้
+     * ไหม (รูปแบบถูก + ยังไม่ซ้ำ) — ใช้แค่โชว์ผลระหว่างพิมพ์ ตัวตัดสินจริงยังเป็น
+     * validation ใน duplicate() เสมอ
+     */
+    public function checkSku(Request $request): JsonResponse
+    {
+        $sku = trim((string) $request->query('sku', ''));
+
+        if ($sku === '') {
+            return response()->json(['available' => false, 'reason' => 'required']);
+        }
+        if (mb_strlen($sku) > 100 || ! preg_match(self::SKU_REGEX, $sku)) {
+            return response()->json(['available' => false, 'reason' => 'invalid']);
+        }
+
+        $taken = Product::where('sku', $sku)->exists();
+
+        return response()->json(['available' => ! $taken, 'reason' => $taken ? 'taken' : null]);
     }
 
     /**

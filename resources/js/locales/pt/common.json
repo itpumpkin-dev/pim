@@ -8,5 +8,9 @@
     "exportThisProduct": "Export this product",
     "settings": "Configurações",
     "logout": "Sair",
-    "loggingOut": "Saindo..."
+    "loggingOut": "Saindo...",
+    "forbiddenTitle": "Acesso negado",
+    "forbiddenHint": "Se precisar de acesso, entre em contato com o administrador do sistema.",
+    "forbiddenGoBack": "Voltar",
+    "forbiddenGoDashboard": "Ir para o painel"
 }

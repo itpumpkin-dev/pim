@@ -41,6 +41,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products', [ProductController::class, 'index'])->name('products.index')->middleware('permission:products,list_products');
     Route::get('products/summary', [ProductController::class, 'summary'])->name('products.summary')->middleware('permission:products,list_products');
     Route::get('products/search', [ProductController::class, 'search'])->name('products.search')->middleware('permission:products,list_products');
+    Route::get('products/check-sku', [ProductController::class, 'checkSku'])->name('products.checkSku')->middleware('permission:products,create_products');
     Route::get('products/category-path', [ProductController::class, 'categoryPathBySku'])->name('products.categoryPath')->middleware('permission:products,list_products');
     // Cascading lookup for the "Master Categories" panel's หมวดหมู่ย่อย/กลุ่มสินค้า
     // fields (edit.tsx) — fetches just the children of a given parent code

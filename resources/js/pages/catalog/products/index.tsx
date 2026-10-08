@@ -44,6 +44,7 @@ import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, type FioriColumnPriority, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
 import { FioriMessageBox } from '@/components/fiori-message-box';
+import { NewProductSkuField, useSkuAvailability } from '@/components/catalog/new-product-sku-field';
 import { ManageColumnsDialog, type ManageColumnOption } from '@/components/manage-columns-dialog';
 import {
     ProductFilterDrawer,
@@ -258,15 +259,26 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
     // (ไม่ต้องเป็น Set) ก็พอ
     const [duplicateProductId, setDuplicateProductId] = useState<number | null>(null);
     const [duplicating, setDuplicating] = useState(false);
+    // SKU ของสินค้าใหม่ — บังคับกรอกเองและต้องไม่ซ้ำก่อนถึงจะกดทำสำเนาได้
+    const [duplicateSku, setDuplicateSku] = useState('');
+    const [duplicateSkuError, setDuplicateSkuError] = useState<string | null>(null);
+    const duplicateSkuStatus = useSkuAvailability(duplicateSku, duplicateProductId !== null);
+
+    const openDuplicateDialog = (id: number) => {
+        setDuplicateSku('');
+        setDuplicateSkuError(null);
+        setDuplicateProductId(id);
+    };
 
     const duplicateProduct = () => {
         if (duplicateProductId === null) return;
         setDuplicating(true);
         router.post(
             `/catalog/products/${duplicateProductId}/duplicate`,
-            {},
+            { sku: duplicateSku.trim() },
             {
                 onSuccess: () => setDuplicateProductId(null),
+                onError: (errs) => setDuplicateSkuError((errs.sku as string | undefined) ?? (Object.values(errs)[0] as string | undefined) ?? t('duplicateProductError')),
                 onFinish: () => setDuplicating(false),
             },
         );
@@ -733,7 +745,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     {canCreate && (
                         <Tooltip title={t('duplicateProduct')}>
                             <span>
-                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDuplicateProductId(row.id)}>
+                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => openDuplicateDialog(row.id)}>
                                     <Icon name="copy" fontSize="small" />
                                 </IconButton>
                             </span>
@@ -1147,8 +1159,20 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                 confirmLabel={t('duplicateProduct')}
                 cancelLabel={t('cancel')}
                 confirmLoading={duplicating}
+                confirmDisabled={duplicateSkuStatus !== 'available'}
             >
                 {t('confirmDuplicateMessage')}
+                <Box sx={{ mt: 2 }}>
+                    <NewProductSkuField
+                        value={duplicateSku}
+                        onChange={(value) => {
+                            setDuplicateSku(value);
+                            setDuplicateSkuError(null);
+                        }}
+                        status={duplicateSkuStatus}
+                        serverError={duplicateSkuError}
+                    />
+                </Box>
             </FioriMessageBox>
             <ProductFilterDrawer
                 open={filterDrawerOpen}

@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\ForbiddenResponder;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\EnsureFreshPermissions;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -55,6 +56,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 return back(303)->with([
                     'status' => __('messages.session_expired'),
                 ]);
+            }
+
+            if ($response->getStatusCode() === 403) {
+                return ForbiddenResponder::handle($response, $exception, $request);
             }
 
             return $response;

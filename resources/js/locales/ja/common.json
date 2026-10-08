@@ -8,5 +8,9 @@
     "exportThisProduct": "この商品をエクスポート",
     "settings": "設定",
     "logout": "ログアウト",
-    "loggingOut": "ログアウト中..."
+    "loggingOut": "ログアウト中...",
+    "forbiddenTitle": "アクセス権限がありません",
+    "forbiddenHint": "アクセスが必要な場合は、システム管理者にお問い合わせください。",
+    "forbiddenGoBack": "戻る",
+    "forbiddenGoDashboard": "ダッシュボードへ"
 }

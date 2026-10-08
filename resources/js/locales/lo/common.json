@@ -8,5 +8,9 @@
     "exportThisProduct": "Export this product",
     "settings": "ການຕັ້ງຄ່າ",
     "logout": "ອອກຈາກລະບົບ",
-    "loggingOut": "ກຳລັງອອກຈາກລະບົບ..."
+    "loggingOut": "ກຳລັງອອກຈາກລະບົບ...",
+    "forbiddenTitle": "ບໍ່ມີສິດເຂົ້າເຖິງ",
+    "forbiddenHint": "ຫາກຕ້ອງການໃຊ້ງານ ກະລຸນາຕິດຕໍ່ຜູ້ດູແລລະບົບເພື່ອຂໍສິດ",
+    "forbiddenGoBack": "ກັບຄືນ",
+    "forbiddenGoDashboard": "ໄປໜ້າແດຊບອດ"
 }

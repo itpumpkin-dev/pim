@@ -34,5 +34,9 @@
     "loggingOut": "Cerrando sesión...",
     "editableLocaleHint": "Mostrando el campo del idioma seleccionado actualmente (arriba a la derecha). Cambie de idioma para editar los demás.",
     "noActiveLocales": "No hay idiomas activos configurados.",
-    "unsavedChangesConfirm": "Tiene cambios sin guardar. ¿Está seguro de que desea salir de esta página? Sus cambios se perderán."
+    "unsavedChangesConfirm": "Tiene cambios sin guardar. ¿Está seguro de que desea salir de esta página? Sus cambios se perderán.",
+    "forbiddenTitle": "Acceso denegado",
+    "forbiddenHint": "Si necesita acceso, comuníquese con el administrador del sistema.",
+    "forbiddenGoBack": "Volver",
+    "forbiddenGoDashboard": "Ir al panel"
 }

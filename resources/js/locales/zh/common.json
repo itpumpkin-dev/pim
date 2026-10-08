@@ -34,5 +34,9 @@
     "popularBadge": "热门",
     "editableLocaleHint": "显示当前所选语言（右上角）的字段。切换语言以编辑其他语言。",
     "noActiveLocales": "未配置启用的语言。",
-    "unsavedChangesConfirm": "您有未保存的更改。确定要离开此页面吗？更改将会丢失。"
+    "unsavedChangesConfirm": "您有未保存的更改。确定要离开此页面吗？更改将会丢失。",
+    "forbiddenTitle": "无访问权限",
+    "forbiddenHint": "如需访问，请联系系统管理员。",
+    "forbiddenGoBack": "返回",
+    "forbiddenGoDashboard": "前往仪表板"
 }
