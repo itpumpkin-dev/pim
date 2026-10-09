@@ -9,6 +9,7 @@ return [
         'sku' => 'SKU',
         'type' => 'Type',
         'enabled' => 'Enabled',
+        'status' => 'Product Status',
         'code' => 'Code',
         'name' => 'Name',
         'description' => 'Description',

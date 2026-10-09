@@ -3,6 +3,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { Autocomplete, Box, Button, Drawer, IconButton, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUSES, type ProductStatus } from '@/lib/product-status';
 
 export interface ProductFamilyOption {
     id: number;
@@ -23,6 +24,7 @@ export interface ProductFilters {
     name?: string;
     family_id?: number | '';
     enabled?: '' | '1' | '0';
+    status?: '' | ProductStatus;
     type?: '' | 'simple' | 'configurable';
     [key: string]: string | number | undefined;
 }
@@ -58,6 +60,7 @@ export function ProductFilterDrawer({
     onApply: (filters: ProductFilters, attributeFilters: AttributeFilterRow[]) => void;
 }) {
     const { t } = useTranslation('grid');
+    const { t: tCatalog } = useTranslation('catalog');
     const [draftFilters, setDraftFilters] = useState<ProductFilters>(filters);
     const [draftAttrFilters, setDraftAttrFilters] = useState<AttributeFilterRow[]>(attributeFilters);
 
@@ -84,6 +87,7 @@ export function ProductFilterDrawer({
         if (draftFilters.name) cleaned.name = draftFilters.name;
         if (draftFilters.family_id) cleaned.family_id = draftFilters.family_id;
         if (draftFilters.enabled) cleaned.enabled = draftFilters.enabled;
+        if (draftFilters.status) cleaned.status = draftFilters.status;
         if (draftFilters.type) cleaned.type = draftFilters.type;
 
         const cleanedAttrFilters = draftAttrFilters.filter((row) => row.attribute_id !== '' && row.value !== '');
@@ -155,7 +159,7 @@ export function ProductFilterDrawer({
 
                     <Box>
                         <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {t('filterDrawerStatus')}
+                            {tCatalog('publishing')}
                         </Typography>
                         <Select
                             fullWidth
@@ -167,8 +171,32 @@ export function ProductFilterDrawer({
                             <MenuItem value="">
                                 <em>{t('filterDrawerSelect')}</em>
                             </MenuItem>
-                            <MenuItem value="1">{t('enabled')}</MenuItem>
-                            <MenuItem value="0">{t('disabled')}</MenuItem>
+                            <MenuItem value="1">{tCatalog('published')}</MenuItem>
+                            <MenuItem value="0">{tCatalog('unpublished')}</MenuItem>
+                        </Select>
+                    </Box>
+
+                    {/* ว่าง = ทุกสถานะยกเว้น Delete (ฝั่ง backend ซ่อน Delete ไว้
+                        โดยตั้งต้น — ดู ProductController::index()) */}
+                    <Box>
+                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                            {tCatalog('productStatus')}
+                        </Typography>
+                        <Select
+                            fullWidth
+                            size="small"
+                            displayEmpty
+                            value={draftFilters.status ?? ''}
+                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value as ProductFilters['status'] }))}
+                        >
+                            <MenuItem value="">
+                                <em>{t('filterDrawerSelect')}</em>
+                            </MenuItem>
+                            {PRODUCT_STATUSES.map((status) => (
+                                <MenuItem key={status} value={status}>
+                                    {tCatalog(PRODUCT_STATUS_LABEL_KEYS[status])}
+                                </MenuItem>
+                            ))}
                         </Select>
                     </Box>
 

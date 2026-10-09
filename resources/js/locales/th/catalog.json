@@ -920,5 +920,13 @@
     "productSavedSuccess": "บันทึกสินค้าสำเร็จแล้ว",
     "selectAllMatching": "เลือกทั้งหมดที่ตรงกับคำค้น ({{count}})",
     "clearSelection": "ล้างการเลือก",
-    "allAttributeGroupsAssigned": "กำหนดครบทุกกลุ่มแล้ว"
+    "allAttributeGroupsAssigned": "กำหนดครบทุกกลุ่มแล้ว",
+    "productStatus": "สถานะสินค้า",
+    "productStatusActive": "Active",
+    "productStatusHold": "Hold",
+    "productStatusDelete": "Delete",
+    "productStatusNew": "New",
+    "publishing": "การเผยแพร่",
+    "published": "เผยแพร่",
+    "unpublished": "ไม่เผยแพร่"
 }

@@ -64,6 +64,7 @@ import {
     fioriTableRowSx,
     percentToneFiori,
 } from '@/lib/fiori-style';
+import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from '@/lib/product-status';
 
 interface GridColumn {
     label: string;
@@ -85,6 +86,7 @@ interface ProductRow {
     sku: string;
     type: string;
     enabled: boolean;
+    status?: string | null;
     parent_id?: number | null;
     parent_sku?: string | null;
     created_at?: string | null;
@@ -157,12 +159,13 @@ interface Props {
 }
 
 const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
-const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'type', 'complete', 'translation_complete', 'created_at', 'updated_at'];
+const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'product_status', 'type', 'complete', 'translation_complete', 'created_at', 'updated_at'];
 
 /** map key คอลัมน์ที่โชว์ใน UI -> คอลัมน์จริงในตาราง `products` ที่ sort ได้ (อ้างอิงจาก resources/grids/product_grid.yml) */
 const SORTABLE_FIELDS: Record<string, string> = {
     sku: 'sku',
     status: 'enabled',
+    product_status: 'status',
     type: 'type',
     created_at: 'created_at',
     updated_at: 'updated_at',
@@ -468,10 +471,20 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             },
             {
                 key: 'status',
-                label: t('status'),
+                label: t('publishing'),
                 render: (row) => (
-                    <FioriStatus label={row.enabled ? t('enabled') : t('disabled')} tone={row.enabled ? 'success' : 'neutral'} />
+                    <FioriStatus label={row.enabled ? t('published') : t('unpublished')} tone={row.enabled ? 'success' : 'neutral'} />
                 ),
+            },
+            {
+                key: 'product_status',
+                label: t('productStatus'),
+                render: (row) =>
+                    isProductStatus(row.status) ? (
+                        <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[row.status])} tone={PRODUCT_STATUS_TONES[row.status]} />
+                    ) : (
+                        '-'
+                    ),
             },
             {
                 key: 'type',
@@ -536,7 +549,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         [allColumns],
     );
 
-    // ตรงกับ ProductRowExporter::columns() (sku, family_code, type, enabled,
+    // ตรงกับ ProductRowExporter::columns() (sku, type, enabled, status,
     // แล้วตามด้วยทุก attribute ที่ view ได้) — เป็นชุดคอลัมน์จริงของไฟล์ export CSV
     // คนละชุดกับ columnsCatalog ที่ใช้แสดงผลใน grid ด้านบน
     const exportColumnCatalog: ExportColumnOption[] = useMemo(
@@ -544,7 +557,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             { code: 'sku', label: t('sku') },
             { code: 'family_code', label: t('attributeFamily') },
             { code: 'type', label: t('type') },
-            { code: 'enabled', label: t('status') },
+            { code: 'enabled', label: t('publishing') },
+            { code: 'status', label: t('productStatus') },
             ...attributes.map((a) => ({ code: a.code, label: a.label || a.code })),
         ],
         [attributes, t],
