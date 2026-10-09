@@ -36,6 +36,8 @@ export interface Product {
     packQty: number;
     price: number;
     tag?: string;
+    /** มีค่าเมื่อ tag แปลได้ — ดู lib/product-tag.ts */
+    tagKey?: string;
     tagColor?: 'error' | 'success' | 'warning';
     description: string;
     highlights: string[];

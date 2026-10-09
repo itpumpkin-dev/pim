@@ -261,7 +261,10 @@ class ProductPresenter
         }
 
         if ($get('eol') === '1') {
+            // tag = ข้อความ fallback (ภาษาไทย) ส่วน tagKey ให้ frontend แปลตาม
+            // ภาษาที่เลือก (common:productTag.discontinued — ดู lib/product-tag.ts)
             $result['tag'] = 'เลิกผลิต';
+            $result['tagKey'] = 'discontinued';
             $result['tagColor'] = 'error';
         }
 

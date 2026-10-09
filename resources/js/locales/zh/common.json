@@ -3,7 +3,7 @@
     "toggleSidebar": "切换侧边栏",
     "permissionsChangedLoggingOut": "您的访问权限已更改。未保存的内容已自动保存为草稿，系统将在片刻后注销，请重新登录。",
     "packLabel": "{{qty}} {{unit}}/包",
-    "defaultPackUnit": "件",
+    "defaultPackUnit": "支",
     "exportThisProduct": "导出此产品",
     "settings": "设置",
     "logout": "退出登录",
@@ -37,5 +37,18 @@
     "forbiddenTitle": "无访问权限",
     "forbiddenHint": "如需访问，请联系系统管理员。",
     "forbiddenGoBack": "返回",
-    "forbiddenGoDashboard": "前往仪表板"
+    "forbiddenGoDashboard": "前往仪表板",
+    "productTag": {
+        "discontinued": "已停产"
+    },
+    "productDetail": {
+        "backToHome": "返回首页",
+        "editInfo": "编辑信息",
+        "printInfo": "打印信息",
+        "carton": "箱",
+        "packSize": "包装规格",
+        "specifications": "规格参数",
+        "brand": "品牌",
+        "category": "类别"
+    }
 }

@@ -12,5 +12,18 @@
     "forbiddenTitle": "ບໍ່ມີສິດເຂົ້າເຖິງ",
     "forbiddenHint": "ຫາກຕ້ອງການໃຊ້ງານ ກະລຸນາຕິດຕໍ່ຜູ້ດູແລລະບົບເພື່ອຂໍສິດ",
     "forbiddenGoBack": "ກັບຄືນ",
-    "forbiddenGoDashboard": "ໄປໜ້າແດຊບອດ"
+    "forbiddenGoDashboard": "ໄປໜ້າແດຊບອດ",
+    "productTag": {
+        "discontinued": "ເຊົາຜະລິດ"
+    },
+    "productDetail": {
+        "backToHome": "ກັບໜ້າຫຼັກ",
+        "editInfo": "ແກ້ໄຂຂໍ້ມູນ",
+        "printInfo": "ພິມຂໍ້ມູນ",
+        "carton": "ລັງ",
+        "packSize": "ຂະໜາດບັນຈຸ",
+        "specifications": "ຂໍ້ມູນສະເພາະ",
+        "brand": "ແບຣນ",
+        "category": "ໝວດໝູ່"
+    }
 }

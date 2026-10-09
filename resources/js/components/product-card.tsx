@@ -9,11 +9,13 @@ import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
 import { Box, Chip, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useProductTagLabel } from '@/lib/product-tag';
 
 // Memoised: the storefront home grid mounts 150+ of these and grows the
 // visible slice on scroll — without this, every card re-renders on each batch.
 export const ProductCard = memo(function ProductCard({ product, popular = false }: { product: Product; popular?: boolean }) {
     const { t } = useTranslation();
+    const tagLabel = useProductTagLabel();
     const Icon = product.icon ?? getCategoryIcon(product.category);
     const [imageFailed, setImageFailed] = useState(false);
     const [hovering, setHovering] = useState(false);
@@ -71,7 +73,7 @@ export const ProductCard = memo(function ProductCard({ product, popular = false 
             >
                 {product.tag && (
                     <Chip
-                        label={product.tag}
+                        label={tagLabel(product)}
                         color={product.tagColor}
                         size="small"
                         sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 600 }}

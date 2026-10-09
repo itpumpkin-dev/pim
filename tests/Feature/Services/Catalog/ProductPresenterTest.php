@@ -131,6 +131,7 @@ test('eol=1 adds an error-colored "เลิกผลิต" tag; anything else 
     $result = ProductPresenter::mapMany(collect([$discontinued, $active]));
 
     expect($result[0])->toHaveKey('tag', 'เลิกผลิต');
+    expect($result[0])->toHaveKey('tagKey', 'discontinued');
     expect($result[0]['tagColor'])->toBe('error');
     expect($result[1])->not->toHaveKey('tag');
 });

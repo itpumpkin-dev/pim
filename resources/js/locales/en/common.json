@@ -38,5 +38,18 @@
     "forbiddenTitle": "Access denied",
     "forbiddenHint": "If you need access, please contact your system administrator.",
     "forbiddenGoBack": "Go back",
-    "forbiddenGoDashboard": "Go to dashboard"
+    "forbiddenGoDashboard": "Go to dashboard",
+    "productTag": {
+        "discontinued": "Discontinued"
+    },
+    "productDetail": {
+        "backToHome": "Back to Home",
+        "editInfo": "Edit Info",
+        "printInfo": "Print Info",
+        "carton": "carton",
+        "packSize": "Pack Size",
+        "specifications": "Specifications",
+        "brand": "Brand",
+        "category": "Category"
+    }
 }

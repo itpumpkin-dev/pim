@@ -12,5 +12,18 @@
     "forbiddenTitle": "Acesso negado",
     "forbiddenHint": "Se precisar de acesso, entre em contato com o administrador do sistema.",
     "forbiddenGoBack": "Voltar",
-    "forbiddenGoDashboard": "Ir para o painel"
+    "forbiddenGoDashboard": "Ir para o painel",
+    "productTag": {
+        "discontinued": "Descontinuado"
+    },
+    "productDetail": {
+        "backToHome": "Voltar ao início",
+        "editInfo": "Editar informações",
+        "printInfo": "Imprimir informações",
+        "carton": "caixa",
+        "packSize": "Tamanho da embalagem",
+        "specifications": "Especificações",
+        "brand": "Marca",
+        "category": "Categoria"
+    }
 }

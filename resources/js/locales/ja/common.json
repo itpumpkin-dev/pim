@@ -12,5 +12,18 @@
     "forbiddenTitle": "アクセス権限がありません",
     "forbiddenHint": "アクセスが必要な場合は、システム管理者にお問い合わせください。",
     "forbiddenGoBack": "戻る",
-    "forbiddenGoDashboard": "ダッシュボードへ"
+    "forbiddenGoDashboard": "ダッシュボードへ",
+    "productTag": {
+        "discontinued": "生産終了"
+    },
+    "productDetail": {
+        "backToHome": "ホームに戻る",
+        "editInfo": "情報を編集",
+        "printInfo": "情報を印刷",
+        "carton": "箱",
+        "packSize": "梱包仕様",
+        "specifications": "仕様",
+        "brand": "ブランド",
+        "category": "カテゴリー"
+    }
 }

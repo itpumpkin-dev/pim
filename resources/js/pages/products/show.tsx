@@ -8,6 +8,7 @@ import { useElementWidth } from '@/hooks/use-element-width';
 import { useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
 import { computeBentoLayout, findBentoGaps, gridArea, packBento, scaleBentoItems, type BentoItem } from '@/lib/bento';
 import { getCategoryIcon } from '@/lib/category-icon';
+import { useProductTagLabel } from '@/lib/product-tag';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -24,6 +25,7 @@ import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { alpha, AppBar, Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableRow, Toolbar, Typography } from '@mui/material';
 import { keyframes } from '@emotion/react';
 import { cloneElement, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Plays once whenever this page mounts (i.e. every time Inertia navigates
 // here) — without it the bento grid just pops in the instant data arrives,
@@ -112,6 +114,8 @@ function factCell(area: GridArea, variantIndex: number, FactIcon: IconType, valu
 
 export default function ProductShow({ product, related }: { product: Product | null; related: Product[] }) {
     const { auth } = usePage<SharedData>().props;
+    const tagLabel = useProductTagLabel();
+    const { t } = useTranslation();
     const [imageFailed, setImageFailed] = useState(false);
     const { ref: bentoRef, width: bentoWidth } = useElementWidth<HTMLDivElement>();
 
@@ -206,7 +210,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                 <Stack spacing={2} alignItems="flex-start" sx={{ p: { xs: 2, md: 4 } }}>
                     <Typography variant="h6">ไม่พบสินค้าที่คุณต้องการ</Typography>
                     <Button component={Link} href="/" startIcon={<ArrowBackIcon />}>
-                        กลับหน้า Home
+                        {t('productDetail.backToHome')}
                     </Button>
                 </Stack>
 
@@ -291,7 +295,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                             sx={{ bgcolor: alpha('#fff', 0.08), color: '#fff', border: 1, borderColor: alpha('#fff', 0.1) }}
                         />
                     )}
-                    {product.tag && <Chip size="small" label={product.tag} color={product.tagColor} sx={{ fontWeight: 700 }} />}
+                    {product.tag && <Chip size="small" label={tagLabel(product)} color={product.tagColor} sx={{ fontWeight: 700 }} />}
                 </Stack>
             </Box>
             <Stack direction="row" spacing={1.5} sx={{ position: 'relative', zIndex: 1, mt: 2 }}>
@@ -300,14 +304,14 @@ export default function ProductShow({ product, related }: { product: Product | n
                     startIcon={<EditOutlinedIcon />}
                     sx={{ borderRadius: 999, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
                 >
-                    แก้ไขข้อมูล
+                    {t('productDetail.editInfo')}
                 </Button>
                 <Button
                     variant="outlined"
                     startIcon={<PrintOutlinedIcon />}
                     sx={{ borderRadius: 999, color: '#fff', borderColor: alpha('#fff', 0.3), '&:hover': { borderColor: '#fff' } }}
                 >
-                    พิมพ์ข้อมูล
+                    {t('productDetail.printInfo')}
                 </Button>
             </Stack>
         </Box>
@@ -330,7 +334,7 @@ export default function ProductShow({ product, related }: { product: Product | n
             <Stack direction="row" spacing={0.75} alignItems="center">
                 <TuneOutlinedIcon fontSize="small" sx={{ color: '#9CA3AF' }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9CA3AF' }}>
-                    ข้อมูลจำเพาะ
+                    {t('productDetail.specifications')}
                 </Typography>
             </Stack>
             <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.5, ...clampSx(2) }}>
@@ -369,7 +373,7 @@ export default function ProductShow({ product, related }: { product: Product | n
         >
             {product.tag && (
                 <Chip
-                    label={product.tag}
+                    label={tagLabel(product)}
                     color={product.tagColor}
                     size="small"
                     sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 700 }}
@@ -481,11 +485,11 @@ export default function ProductShow({ product, related }: { product: Product | n
             <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
                 {product.packQty}
                 <Typography component="span" variant="body1" sx={{ fontWeight: 700, opacity: 0.75, ml: 0.5 }}>
-                    {product.packUnit}/ลัง
+                    {product.packUnit}/{t('productDetail.carton')}
                 </Typography>
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                ขนาดบรรจุ {product.size}
+                {t('productDetail.packSize')} {product.size}
             </Typography>
         </Box>
     );
@@ -581,13 +585,13 @@ export default function ProductShow({ product, related }: { product: Product | n
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, 'แบรนด์') },
+        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, t('productDetail.brand')) },
     });
     cells.push({
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, product.category, 'หมวดหมู่') },
+        data: { key: 'category', type: 'info', render: (area) => factCell(area, 1, Icon, product.category, t('productDetail.category')) },
     });
 
     if (product.color) {
@@ -624,8 +628,8 @@ export default function ProductShow({ product, related }: { product: Product | n
         Object.keys(product.specs).length > 0
             ? Object.entries(product.specs).map(([label, value]) => ({ label, value }))
             : [
-                  { label: 'แบรนด์', value: product.brand },
-                  { label: 'หมวดหมู่', value: product.category },
+                  { label: t('productDetail.brand'), value: product.brand },
+                  { label: t('productDetail.category'), value: product.category },
               ];
 
     return (
@@ -669,7 +673,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                 }}
             >
                 <Button component={Link} href="/" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
-                    กลับ
+                    {t('productDetail.backToHome')}
                 </Button>
 
                 <Box
