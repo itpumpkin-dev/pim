@@ -90,7 +90,7 @@ test('columns() always offers the category columns first, even when scoped to a 
 
     $columns = (new ProductRowImporter(null, null, 'mf_cat_family'))->columns();
 
-    expect(array_slice($columns, 0, 7))->toBe([
-        'sku', 'type', 'enabled', 'pcatname', 'psubcatname', 'productgroupname', 'mf_cat_attr',
+    expect(array_slice($columns, 0, 8))->toBe([
+        'sku', 'type', 'enabled', 'status', 'pcatname', 'psubcatname', 'productgroupname', 'mf_cat_attr',
     ]);
 });

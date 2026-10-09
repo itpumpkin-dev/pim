@@ -22,7 +22,7 @@ class ProductRowImporter implements RowImporterInterface
 {
     // ไม่มี 'family_code' ในนี้ตั้งใจ — ไม่ตั้ง family_id จาก import อีกต่อไป
     // (ดู docblock ของ importRow() ตรง Product::updateOrCreate())
-    public const FIXED_COLUMNS = ['sku', 'type', 'enabled'];
+    public const FIXED_COLUMNS = ['sku', 'type', 'enabled', 'status'];
 
     // attribute ระบบที่ importRow() ใช้ผูกสินค้าเข้าต้นไม้หมวดหมู่ (ดู
     // ProductCategoryLinker::linkFromCodes()) — ไม่เคยอยู่ใน family ไหน เลยต้อง
@@ -287,6 +287,14 @@ class ProductRowImporter implements RowImporterInterface
         $enabledRaw = strtolower(trim((string) ($row['enabled'] ?? '1')));
         $enabled = in_array($enabledRaw, ['1', 'true', 'yes'], true);
 
+        // สถานะสินค้า (products.status) — ไม่บังคับ: ช่องว่าง/ไม่มีคอลัมน์ =
+        // ไม่แตะค่าเดิมของสินค้าที่มีอยู่แล้ว ส่วนสินค้าใหม่ได้ 'new' ตาม
+        // default ของคอลัมน์ (ดู Product::$attributes)
+        $statusRaw = strtolower(trim((string) ($row['status'] ?? '')));
+        if ($statusRaw !== '' && !in_array($statusRaw, Product::STATUSES, true)) {
+            throw new RowImportException('status must be one of: '.implode(', ', Product::STATUSES));
+        }
+
         // SKU เดียวกันซ้ำในไฟล์เดียวกัน — ยัง import ตามปกติ (แถวหลังทับแถว
         // ก่อนเหมือนเดิม) แต่แจ้ง warning ให้รู้ตัว ไม่งั้นค่าของแถวแรกหายเงียบๆ
         $earlierRow = $this->firstRowBySku[$sku] ?? null;
@@ -305,6 +313,7 @@ class ProductRowImporter implements RowImporterInterface
             [
                 'type' => $type,
                 'enabled' => $enabled,
+                ...($statusRaw !== '' ? ['status' => $statusRaw] : []),
             ]
         );
 

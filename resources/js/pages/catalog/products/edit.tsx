@@ -16,6 +16,7 @@ import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import {
     FIORI,
+    FioriStatus,
     fioriCardSx,
     fioriDefaultSx,
     fioriEmphasizedSx,
@@ -27,6 +28,7 @@ import {
     fioriToggleButtonGroupSx,
 } from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
+import { PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES, PRODUCT_STATUSES, type ProductStatus } from '@/lib/product-status';
 import { mappedChipSx, UI_BORDER } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import type { FormDataConvertible } from '@inertiajs/core';
@@ -215,6 +217,7 @@ interface Product {
     family_code: string;
     type: string;
     enabled: boolean;
+    status: ProductStatus;
     configurable_attributes?: number[];
     shopee_category_id?: number | null;
     lazada_category_id?: number | null;
@@ -291,6 +294,7 @@ interface ProductForm {
     family_id: number;
     type: string;
     enabled: boolean;
+    status: ProductStatus;
     values: Record<string | number, Record<string, Record<string, Record<string | number, AttributeValue>>>>;
     variants: VariantItem[];
     configurable_attributes: number[];
@@ -546,6 +550,7 @@ export default function ProductEdit({
         family_id: product.family_id,
         type: (product.type || 'simple').toLowerCase(),
         enabled: Boolean(product.enabled),
+        status: product.status ?? 'new',
         values: initialValues,
         variants: variants,
         configurable_attributes: product.configurable_attributes ?? [],
@@ -2718,13 +2723,39 @@ export default function ProductEdit({
                                                     display="block"
                                                     sx={{ mb: 0.5 }}
                                                 >
-                                                    {t('status')}
+                                                    {t('publishing')}
                                                 </Typography>
                                                 <Switch
                                                     sx={fioriSwitchSx}
                                                     checked={data.enabled}
                                                     onChange={(e) => setData('enabled', e.target.checked)}
                                                 />
+                                            </Box>
+
+                                            {/* สถานะสินค้าใน PIM (products.status) — แยกจาก Switch
+                                                enabled ด้านบนที่คุมหน้าร้าน/Marketplace ตัวนี้เป็นแค่ป้าย
+                                                สถานะ ไม่ได้ไป push/deactivate อะไรเอง */}
+                                            <Box>
+                                                <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                                                    {t('productStatus')}
+                                                </Typography>
+                                                <TextField
+                                                    select
+                                                    value={data.status}
+                                                    onChange={(e) => setData('status', e.target.value as ProductStatus)}
+                                                    size="small"
+                                                    fullWidth
+                                                    error={Boolean(errors.status)}
+                                                    helperText={errors.status}
+                                                    sx={fioriFieldStateSx(valueStateOf(errors.status))}
+                                                    SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
+                                                >
+                                                    {PRODUCT_STATUSES.map((status) => (
+                                                        <MenuItem key={status} value={status}>
+                                                            <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[status])} tone={PRODUCT_STATUS_TONES[status]} />
+                                                        </MenuItem>
+                                                    ))}
+                                                </TextField>
                                             </Box>
 
                                             {/* เดิมมีช่อง "Product Type" (Simple/Configurable) เป็น dropdown ให้แก้

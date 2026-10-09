@@ -35,7 +35,7 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
 
     public function rows(ExportConfig $config): \Generator
     {
-        $attributeCodes = array_slice($this->columns(), 4);
+        $attributeCodes = array_slice($this->columns(), count(ProductRowImporter::FIXED_COLUMNS));
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
         foreach (Product::with('family')->orderBy('id')->cursor() as $product) {
@@ -58,6 +58,7 @@ class ProductRowExporter implements RowExporterInterface, HasMediaFiles
                 'family_code' => $product->family?->code ?? '',
                 'type' => $product->type,
                 'enabled' => $product->enabled ? '1' : '0',
+                'status' => $product->status,
             ];
 
             foreach ($attributesByCode as $code => $attribute) {

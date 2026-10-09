@@ -47,7 +47,7 @@ class SampleTemplateBuilder
     private static function exampleRow(string $type): array
     {
         return match ($type) {
-            'products' => ['sku' => 'SKU-0001', 'type' => 'simple', 'enabled' => '1'],
+            'products' => ['sku' => 'SKU-0001', 'type' => 'simple', 'enabled' => '1', 'status' => 'new'],
             'categories' => [
                 'code' => 'shoes', 'name' => 'Shoes', 'slug' => 'shoes', 'description' => 'Footwear', 'parent_code' => '',
                 'display_type' => 'default', 'thumbnail' => '', 'is_active' => '1',

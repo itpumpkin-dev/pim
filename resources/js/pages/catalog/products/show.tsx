@@ -30,6 +30,7 @@ import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { useLocale } from '@/hooks/use-locale';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FIORI, FioriStatus, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
+import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from '@/lib/product-status';
 import { UI_BORDER } from '@/lib/ui-style';
 
 interface AttributeOption {
@@ -66,6 +67,7 @@ interface Product {
     family_code: string;
     type: string;
     enabled: boolean;
+    status?: string | null;
     shopee_category_id?: number | null;
     lazada_category_id?: number | null;
     tiktok_category_id?: number | null;
@@ -402,7 +404,14 @@ export default function ProductShow({
                                 </Select>
                             </Box>
 
-                            <FioriStatus label={product.enabled ? 'Active' : 'Inactive'} tone={product.enabled ? 'success' : 'neutral'} />
+                            <FioriStatus label={product.enabled ? t('published') : t('unpublished')} tone={product.enabled ? 'success' : 'neutral'} />
+
+                            {isProductStatus(product.status) && (
+                                <FioriStatus
+                                    label={`${t('productStatus')}: ${t(PRODUCT_STATUS_LABEL_KEYS[product.status])}`}
+                                    tone={PRODUCT_STATUS_TONES[product.status]}
+                                />
+                            )}
 
                             <Box
                                 component="a"

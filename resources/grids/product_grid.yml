@@ -18,8 +18,13 @@ datagrid:
         sortable: true
         filterable: true
       enabled:
-        label: Status
+        label: Publishing
         type: boolean
+        sortable: true
+        filterable: true
+      status:
+        label: Product Status
+        type: select
         sortable: true
         filterable: true
       created_at:

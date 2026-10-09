@@ -920,5 +920,13 @@
     "productSavedSuccess": "Product saved successfully.",
     "selectAllMatching": "Select all matching ({{count}})",
     "clearSelection": "Clear selection",
-    "allAttributeGroupsAssigned": "All groups already assigned"
+    "allAttributeGroupsAssigned": "All groups already assigned",
+    "productStatus": "Product Status",
+    "productStatusActive": "Active",
+    "productStatusHold": "Hold",
+    "productStatusDelete": "Delete",
+    "productStatusNew": "New",
+    "publishing": "Publishing",
+    "published": "Published",
+    "unpublished": "Unpublished"
 }

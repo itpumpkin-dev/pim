@@ -15,12 +15,25 @@ class Product extends Model
 {
     use Auditable;
 
+    /**
+     * สถานะสินค้าใน PIM (คอลัมน์ `status`) — แยกจาก `enabled` ที่คุมหน้าร้าน/
+     * Marketplace ดู migration 2026_10_08_000001_add_status_to_products_table
+     */
+    public const STATUSES = ['active', 'hold', 'delete', 'new'];
+
+    public const STATUS_DELETE = 'delete';
+
+    protected $attributes = [
+        'status' => 'new',
+    ];
+
     protected $fillable = [
         'sku',
         'parent_id',
         'family_id',
         'type',
         'enabled',
+        'status',
         'configurable_attributes',
         'shopee_category_id',
         'lazada_category_id',

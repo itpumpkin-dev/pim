@@ -42,6 +42,7 @@ use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
+use App\Services\ImportExport\Importers\ProductRowImporter;
 use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Marketplace\MarketplaceSyncDispatcher;
@@ -199,6 +200,13 @@ class ProductController extends Controller
             // `products`
             if ($categoryId) {
                 $query->whereHas('categories', fn ($q) => $q->where('categories.id', $categoryId));
+            }
+
+            // สินค้าสถานะ Delete ซ่อนจากรายการโดยตั้งต้น — จะโผล่ก็ต่อเมื่อกรอง
+            // "Product Status" เองเท่านั้น (filters[status] ถูก applyFilters()
+            // ของ GridManager จัดการให้แล้วเป็น exact match)
+            if (($filtersInput['status'] ?? '') === '') {
+                $query->where('status', '!=', Product::STATUS_DELETE);
             }
         });
 
@@ -1224,7 +1232,7 @@ class ProductController extends Controller
             array_unshift($selectedColumns, 'sku');
         }
 
-        $attributeCodes = array_slice($allColumns, 4);
+        $attributeCodes = array_slice($allColumns, count(ProductRowImporter::FIXED_COLUMNS));
         $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
 
         $query = Product::with('family')->orderBy('id');
@@ -1269,6 +1277,7 @@ class ProductController extends Controller
                         'family_code' => $product->family?->code ?? '',
                         'type' => $product->type,
                         'enabled' => $product->enabled ? '1' : '0',
+                        'status' => $product->status,
                     ], array_flip($selectedColumns));
 
                     foreach ($attributesByCode as $code => $attribute) {
@@ -2769,6 +2778,7 @@ class ProductController extends Controller
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
                 'enabled' => (bool) $product->enabled,
+                'status' => $product->status,
                 'configurable_attributes' => $product->configurable_attributes ?? [],
                 'shopee_category_id' => $product->shopee_category_id,
                 'lazada_category_id' => $product->lazada_category_id,
@@ -3500,6 +3510,7 @@ class ProductController extends Controller
             'family_id' => ['nullable', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
+            'status' => ['sometimes', 'required', Rule::in(Product::STATUSES)],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
             'shopee_category_id' => ['nullable', 'integer', 'exists:shopee_categories,id'],
@@ -3612,6 +3623,7 @@ class ProductController extends Controller
                 'family_id' => $validated['family_id'] ?? null,
                 'type' => strtolower($validated['type']),
                 'enabled' => $validated['enabled'],
+                'status' => $validated['status'] ?? $product->status,
                 'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
                 'shopee_category_id' => $validated['shopee_category_id'] ?? null,
                 'lazada_category_id' => $validated['lazada_category_id'] ?? null,

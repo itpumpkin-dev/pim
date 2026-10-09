@@ -374,15 +374,15 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                 <Stack spacing={3}>
                     <FioriFormGroup title={t('productInfo')} sx={{ maxWidth: 760 }}>
                         {/* สถานะ */}
-                        <FioriField label={t('status')}>
+                        <FioriField label={t('publishing')}>
                             <Stack direction="row" spacing={3}>
                                 <FormControlLabel
                                     control={<Checkbox checked={data.enabled === true} onChange={() => setData('enabled', true)} />}
-                                    label={t('active')}
+                                    label={t('published')}
                                 />
                                 <FormControlLabel
                                     control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
-                                    label={t('nonActive')}
+                                    label={t('unpublished')}
                                 />
                             </Stack>
                         </FioriField>

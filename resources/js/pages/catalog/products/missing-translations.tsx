@@ -184,11 +184,11 @@ export default function MissingTranslations({ rows, totalProducts, locales, attr
         },
         {
             key: 'status',
-            header: t('missingTranslationsColStatus'),
+            header: t('publishing'),
             priority: 'medium',
             render: (row) => (
                 <Chip
-                    label={row.enabled ? t('enabled') : t('disabled')}
+                    label={row.enabled ? t('published') : t('unpublished')}
                     size="small"
                     variant={row.enabled ? 'filled' : 'outlined'}
                     sx={row.enabled ? { ...mappedChipSx, height: 20, fontSize: '0.7rem' } : { ...naChipSx, height: 20, fontSize: '0.7rem' }}
