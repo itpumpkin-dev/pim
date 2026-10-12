@@ -13,7 +13,7 @@ import {
     Stack,
     Typography,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { FioriMessageBox } from '@/components/fiori-message-box';
@@ -157,16 +157,20 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
         );
     };
 
+    // key จาก index ตรงๆ — เดิมใช้ error_log.indexOf(entry) ต่อแถว ซึ่งเป็น
+    // O(n²) ทุกครั้งที่ render (ทุก 2 วินาทีตอน poll) ทำให้หน้าค้างเมื่อ log ยาว
+    const errorLogRows = useMemo(() => (job.error_log ?? []).map((entry, key) => ({ ...entry, key })), [job.error_log]);
+
     // Column pop-in priority (SAP Fiori responsive table): the row number
     // identifies which record the error belongs to and always stays; the
     // level chip is the primary indicator and follows next; the message
     // text reflows into the pop-in area first since it's the most verbose.
-    const errorLogColumns: FioriResponsiveColumn<ErrorLogEntry>[] = [
+    const errorLogColumns: FioriResponsiveColumn<ErrorLogEntry & { key: number }>[] = [
         {
             key: 'row',
             header: t('row'),
             priority: 'always',
-            render: (entry) => entry.row,
+            render: (entry) => entry.row || '-',
         },
         {
             key: 'level',
@@ -307,8 +311,8 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                             variant="plain"
                             size="small"
                             columns={errorLogColumns}
-                            rows={job.error_log}
-                            getRowKey={(entry) => job.error_log!.indexOf(entry)}
+                            rows={errorLogRows}
+                            getRowKey={(entry) => entry.key}
                         />
                     ) : (
                         <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('noErrors')}</Typography>

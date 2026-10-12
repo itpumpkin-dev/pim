@@ -139,10 +139,70 @@ class JobTracker extends Model
         $this->appendLogEntry($row, $message, 'warning');
     }
 
+    /**
+     * error_log เป็นคอลัมน์ JSON ก้อนเดียวที่ถูกเขียนทับทั้งก้อนทุกครั้งที่
+     * save — import ที่ทุกแถวมี warning (เช่น 2 หมื่นแถว) เคยทำให้ก้อนนี้โตเป็น
+     * หลาย MB เขียนซ้ำทุก 25 แถว (import ช้าลงเรื่อยๆ) และหน้า Job Tracker ที่
+     * poll ทุก 2 วินาทีค้าง — เลยเก็บแค่ MAX_LOG_ENTRIES รายการแรก ที่เกินจากนั้น
+     * นับรวมไว้ใน entry สรุปตัวสุดท้ายตัวเดียว (row 0, omitted_* = จำนวนที่ตัดทิ้ง)
+     */
+    public const MAX_LOG_ENTRIES = 500;
+
     private function appendLogEntry(int $row, string $message, string $level): void
     {
         $log = $this->error_log ?? [];
         $log[] = ['row' => $row, 'message' => $message, 'level' => $level];
-        $this->error_log = $log;
+        $this->error_log = self::capLog($log);
+    }
+
+    /**
+     * ตัด log ให้เหลือ MAX_LOG_ENTRIES รายการแรก + entry สรุปตัวเดียวท้ายสุด
+     * (รวมนับต่อจาก summary เดิมถ้ามี) — ใช้ทั้งตอน append และ migration
+     * ที่ตัด log ของงานเก่าที่ยาวเกินมาตั้งแต่ก่อนมีเพดานนี้
+     *
+     * @param  array<int, array<string, mixed>>  $log
+     * @return array<int, array<string, mixed>>
+     */
+    public static function capLog(array $log): array
+    {
+        // entry สรุปเดิม (ถ้ามี) อยู่ที่ตำแหน่ง MAX ไม่ใช่ท้ายสุดเสมอ — entry ใหม่ที่
+        // เพิ่ง append ต่อท้ายไปอยู่หลังมัน เลยต้องหาจากทั้ง log
+        $summary = null;
+        foreach ($log as $i => $entry) {
+            if (is_array($entry) && array_key_exists('omitted_errors', $entry)) {
+                $summary = $entry;
+                unset($log[$i]);
+            }
+        }
+        $log = array_values($log);
+
+        if (count($log) <= self::MAX_LOG_ENTRIES && $summary === null) {
+            return $log;
+        }
+
+        $summary ??= ['omitted_errors' => 0, 'omitted_warnings' => 0];
+        $jobLevel = [];
+        foreach (array_splice($log, self::MAX_LOG_ENTRIES) as $extra) {
+            // ข้อความระดับงาน (row 0 เช่น "Job failed: ...") มีแค่ไม่กี่ตัวแต่สำคัญ
+            // ที่สุด — เก็บไว้เสมอ ไม่นับรวมเข้า summary
+            if (($extra['row'] ?? null) === 0) {
+                $jobLevel[] = $extra;
+                continue;
+            }
+            $summary['omitted_'.(($extra['level'] ?? 'error') === 'warning' ? 'warnings' : 'errors')]++;
+        }
+        array_push($log, ...$jobLevel);
+
+        $summary['row'] = 0;
+        $summary['level'] = $summary['omitted_errors'] > 0 ? 'error' : 'warning';
+        $summary['message'] = sprintf(
+            'Log limited to the first %d entries — %d more error(s) and %d more warning(s) were not recorded.',
+            self::MAX_LOG_ENTRIES,
+            $summary['omitted_errors'],
+            $summary['omitted_warnings'],
+        );
+        $log[] = $summary;
+
+        return $log;
     }
 }
