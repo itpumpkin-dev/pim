@@ -73,3 +73,10 @@ test('two labels that normalize to the same key: the later column code wins', fu
 
     expect(RowHeaderNormalizer::normalize(['NAME' => 'x'], $columnLabels))->toBe(['b' => 'x']);
 });
+
+test('accepts several labels per code, so a header in any locale maps back to the code', function () {
+    $labels = ['sku' => ['SKU', 'รหัสสินค้า (SKU)'], 'status' => ['Product Status', 'สถานะสินค้า']];
+    $row = ['รหัสสินค้า (SKU)' => 'W-1', 'Product Status' => 'active'];
+
+    expect(RowHeaderNormalizer::normalize($row, $labels))->toBe(['sku' => 'W-1', 'status' => 'active']);
+});

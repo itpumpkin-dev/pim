@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Category;
 use App\Models\ImportConfig;
 use App\Models\JobTracker;
+use App\Models\Locale;
 use App\Services\ImportExport\ImportExportRegistry;
 use App\Services\ImportExport\RowHeaderNormalizer;
 use App\Services\ImportExport\SpreadsheetReader;
@@ -47,7 +48,13 @@ class ProcessImportJob implements ShouldQueue
         $tracker->update(['status' => 'processing', 'started_at' => now()]);
 
         $importer = ImportExportRegistry::importer($config->type, $tracker->user, $tracker->id, $config->family_code);
-        $columnLabels = $importer->columnLabels();
+        // หัวคอลัมน์ในไฟล์อาจเป็นภาษาไหนก็ได้ที่ผู้ใช้ดาวน์โหลด template มา
+        // (เช่น "รหัสสินค้า (SKU)") — job นี้รันใต้ APP_LOCALE ของ worker เลย
+        // ต้องรู้จัก label ของทุกภาษา ไม่ใช่แค่ภาษาเดียว
+        $columnLabels = RowHeaderNormalizer::labelsForAllLocales(
+            fn () => $importer->columnLabels(),
+            array_merge(['th', 'en'], Locale::where('enabled', true)->pluck('code')->all()),
+        );
 
         $rowNumber = 1; // header is row 1, data starts at row 2
         $created = 0;
