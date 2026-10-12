@@ -4,8 +4,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import PersonIcon from '@mui/icons-material/Person';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
-import { Alert, Avatar, Box, Button, Checkbox, CircularProgress, Dialog, DialogContent, Divider, FormControlLabel, IconButton, MenuItem, TextField, Typography } from '@mui/material';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import { Alert, Avatar, Box, Button, Checkbox, CircularProgress, Dialog, DialogContent, Divider, FormControlLabel, IconButton, InputAdornment, MenuItem, TextField, Typography } from '@mui/material';
 import { ChangeEvent, FormEventHandler, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 
 interface ManagerOption {
@@ -76,6 +79,9 @@ function RequiredMark() {
 }
 
 export default function CreateUserDialog({ open, onClose, managerOptions = [] }: CreateUserDialogProps) {
+    const { t } = useTranslation('system');
+    // ลูกตาแสดง/ซ่อนรหัสผ่าน แยกต่อช่อง (Password / Password (repeat)) — แบบเดียวกับหน้า Edit User
+    const [visiblePasswords, setVisiblePasswords] = useState<Partial<Record<keyof CreateUserForm, boolean>>>({});
     const { data, setData, post, processing, errors, reset, clearErrors, setError } = useForm<CreateUserForm>({
         username: '',
         employee_id: '',
@@ -183,6 +189,7 @@ export default function CreateUserDialog({ open, onClose, managerOptions = [] }:
         setFetchMessage(null);
         setPhotoUrl(null);
         setAvatarPreview(null);
+        setVisiblePasswords({});
         onClose();
     };
 
@@ -194,21 +201,47 @@ export default function CreateUserDialog({ open, onClose, managerOptions = [] }:
         });
     };
 
-    const textInput = (key: keyof CreateUserForm, type = 'text') => (
-        <TextField
-            fullWidth
-            size="small"
-            type={type}
-            value={data[key]}
-            onChange={(e) => {
-                setData(key, e.target.value);
-                clearErrors(key);
-            }}
-            error={Boolean(errors[key])}
-            helperText={errors[key]}
-            autoComplete={type === 'password' ? 'new-password' : 'off'}
-        />
-    );
+    const textInput = (key: keyof CreateUserForm, type = 'text') => {
+        const isPassword = type === 'password';
+        const visible = isPassword && Boolean(visiblePasswords[key]);
+
+        return (
+            <TextField
+                fullWidth
+                size="small"
+                type={visible ? 'text' : type}
+                value={data[key]}
+                onChange={(e) => {
+                    setData(key, e.target.value);
+                    clearErrors(key);
+                }}
+                error={Boolean(errors[key])}
+                helperText={errors[key]}
+                autoComplete={isPassword ? 'new-password' : 'off'}
+                slotProps={
+                    isPassword
+                        ? {
+                              input: {
+                                  endAdornment: (
+                                      <InputAdornment position="end">
+                                          <IconButton
+                                              aria-label={visible ? t('hidePassword') : t('showPassword')}
+                                              onClick={() => setVisiblePasswords((prev) => ({ ...prev, [key]: !prev[key] }))}
+                                              edge="end"
+                                              size="small"
+                                              tabIndex={-1}
+                                          >
+                                              {visible ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                          </IconButton>
+                                      </InputAdornment>
+                                  ),
+                              },
+                          }
+                        : undefined
+                }
+            />
+        );
+    };
 
     return (
         <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth component="form" onSubmit={submit}>
