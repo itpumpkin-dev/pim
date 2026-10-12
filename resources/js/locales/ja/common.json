@@ -25,5 +25,7 @@
         "specifications": "仕様",
         "brand": "ブランド",
         "category": "カテゴリー"
-    }
+    },
+    "scrollLeft": "左へスクロール",
+    "scrollRight": "右へスクロール"
 }

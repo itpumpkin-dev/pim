@@ -25,5 +25,7 @@
         "specifications": "Especificações",
         "brand": "Marca",
         "category": "Categoria"
-    }
+    },
+    "scrollLeft": "Rolar para a esquerda",
+    "scrollRight": "Rolar para a direita"
 }

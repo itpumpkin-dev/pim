@@ -36,6 +36,8 @@ export interface Product {
     packQty: number;
     price: number;
     tag?: string;
+    /** products.status — ดู lib/product-status.ts */
+    status?: string | null;
     /** มีค่าเมื่อ tag แปลได้ — ดู lib/product-tag.ts */
     tagKey?: string;
     tagColor?: 'error' | 'success' | 'warning';

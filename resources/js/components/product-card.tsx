@@ -10,6 +10,7 @@ import { Box, Chip, IconButton, Paper, Stack, Typography } from '@mui/material';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useProductTagLabel } from '@/lib/product-tag';
+import { isProductStatus, PRODUCT_STATUS_CHIP_COLORS, PRODUCT_STATUS_LABEL_KEYS } from '@/lib/product-status';
 
 // Memoised: the storefront home grid mounts 150+ of these and grows the
 // visible slice on scroll — without this, every card re-renders on each batch.
@@ -135,9 +136,20 @@ export const ProductCard = memo(function ProductCard({ product, popular = false 
                 </Box>
 
                 <Box sx={{ p: 2 }}>
-                    <Typography variant="caption" color="text.secondary">
-                        {product.brand} · {product.category}
-                    </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
+                            {product.brand} · {product.category}
+                        </Typography>
+                        {isProductStatus(product.status) && (
+                            <Chip
+                                label={t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
+                                color={PRODUCT_STATUS_CHIP_COLORS[product.status]}
+                                variant="outlined"
+                                size="small"
+                                sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600, flexShrink: 0 }}
+                            />
+                        )}
+                    </Stack>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, minHeight: 40 }}>
                         {product.name}
                     </Typography>

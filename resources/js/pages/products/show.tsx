@@ -9,6 +9,7 @@ import { useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
 import { computeBentoLayout, findBentoGaps, gridArea, packBento, scaleBentoItems, type BentoItem } from '@/lib/bento';
 import { getCategoryIcon } from '@/lib/category-icon';
 import { useProductTagLabel } from '@/lib/product-tag';
+import { isProductStatus, PRODUCT_STATUS_CHIP_COLORS, PRODUCT_STATUS_LABEL_KEYS } from '@/lib/product-status';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -296,6 +297,14 @@ export default function ProductShow({ product, related }: { product: Product | n
                         />
                     )}
                     {product.tag && <Chip size="small" label={tagLabel(product)} color={product.tagColor} sx={{ fontWeight: 700 }} />}
+                    {isProductStatus(product.status) && (
+                        <Chip
+                            size="small"
+                            label={t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
+                            color={PRODUCT_STATUS_CHIP_COLORS[product.status]}
+                            sx={{ fontWeight: 700 }}
+                        />
+                    )}
                 </Stack>
             </Box>
             <Stack direction="row" spacing={1.5} sx={{ position: 'relative', zIndex: 1, mt: 2 }}>

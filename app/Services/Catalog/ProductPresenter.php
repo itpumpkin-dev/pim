@@ -237,6 +237,8 @@ class ProductPresenter
         $result = [
             'id' => $product->id,
             'sku' => $product->sku,
+            // สถานะสินค้าใน PIM (active/hold/delete/new) — โชว์เป็น chip บนการ์ด
+            'status' => $product->status,
             'name' => $get('pname') ?? $product->sku,
             'brand' => $get('pbrand') ?? '-',
             'category' => $categoryName ?? $get('pcatname') ?? 'ทั่วไป',

@@ -50,5 +50,7 @@
         "specifications": "规格参数",
         "brand": "品牌",
         "category": "类别"
-    }
+    },
+    "scrollLeft": "向左滚动",
+    "scrollRight": "向右滚动"
 }

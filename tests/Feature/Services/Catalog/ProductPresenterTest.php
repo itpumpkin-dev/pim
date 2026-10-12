@@ -243,3 +243,11 @@ test('a multi-group spec attribute resolves to its primary (lowest id) group val
 
     expect($result[0]['specs'])->toHaveKey('ข้อมูลจำเพาะ', 'From lower group');
 });
+
+test('passes the product status through for the storefront status chip', function () {
+    $product = Product::create(['sku' => 'SKU-STATUS', 'status' => 'hold']);
+
+    $result = ProductPresenter::mapMany(collect([$product]));
+
+    expect($result[0]['status'])->toBe('hold');
+});

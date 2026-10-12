@@ -172,27 +172,103 @@ function CategoryStrip({
     selected: string | null;
     onSelect: (label: string) => void;
 }) {
+    const { t } = useTranslation();
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    // โชว์ลูกศรเฉพาะฝั่งที่ยังเลื่อนไปได้จริง — คำนวณใหม่ทุกครั้งที่เลื่อน/ขนาด
+    // เปลี่ยน/รายการหมวดหมู่เปลี่ยน (-1 กันเศษ subpixel ตอนเลื่อนสุดขวา)
+    const updateArrows = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        setCanScrollLeft(el.scrollLeft > 0);
+        setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    };
+
+    useEffect(() => {
+        updateArrows();
+        const el = scrollRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(updateArrows);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [categories]);
+
+    const scrollByPage = (direction: -1 | 1) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: 'smooth' });
+    };
+
+    const arrowSx = (side: 'left' | 'right') => ({
+        position: 'absolute' as const,
+        [side]: 0,
+        top: 'calc(50% - 4px)',
+        transform: 'translateY(-50%)',
+        zIndex: 2,
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+        boxShadow: 2,
+        '&:hover': { bgcolor: 'action.hover' },
+    });
+
+    const fadeSx = (side: 'left' | 'right') => ({
+        position: 'absolute' as const,
+        [side]: 0,
+        top: 0,
+        bottom: 8,
+        width: 64,
+        pointerEvents: 'none' as const,
+        zIndex: 1,
+        background: (theme: { palette: { background: { default: string } } }) =>
+            `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, ${theme.palette.background.default}, transparent)`,
+    });
+
     return (
-        <Stack direction="row" spacing={1.5} sx={{ overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 6 } }}>
-            {categories.map(({ label, icon: Icon }) => (
-                <Chip
-                    key={label}
-                    icon={<Icon fontSize="small" />}
-                    label={label}
-                    variant={selected === label ? 'filled' : 'outlined'}
-                    color={selected === label ? 'primary' : 'default'}
-                    onClick={() => onSelect(label)}
-                    sx={{
-                        flexShrink: 0,
-                        py: 2.5,
-                        px: 0.5,
-                        borderRadius: 3,
-                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                        '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 },
-                    }}
-                />
-            ))}
-        </Stack>
+        <Box sx={{ position: 'relative' }}>
+            {canScrollLeft && <Box sx={fadeSx('left')} />}
+            {canScrollLeft && (
+                <IconButton size="small" onClick={() => scrollByPage(-1)} aria-label={t('scrollLeft')} sx={arrowSx('left')}>
+                    <ArrowBackIosNewIcon fontSize="small" />
+                </IconButton>
+            )}
+
+            <Stack
+                ref={scrollRef}
+                onScroll={updateArrows}
+                direction="row"
+                spacing={1.5}
+                sx={{ overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 6 } }}
+            >
+                {categories.map(({ label, icon: Icon }) => (
+                    <Chip
+                        key={label}
+                        icon={<Icon fontSize="small" />}
+                        label={label}
+                        variant={selected === label ? 'filled' : 'outlined'}
+                        color={selected === label ? 'primary' : 'default'}
+                        onClick={() => onSelect(label)}
+                        sx={{
+                            flexShrink: 0,
+                            py: 2.5,
+                            px: 0.5,
+                            borderRadius: 3,
+                            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 },
+                        }}
+                    />
+                ))}
+            </Stack>
+
+            {canScrollRight && <Box sx={fadeSx('right')} />}
+            {canScrollRight && (
+                <IconButton size="small" onClick={() => scrollByPage(1)} aria-label={t('scrollRight')} sx={arrowSx('right')}>
+                    <ArrowForwardIosIcon fontSize="small" />
+                </IconButton>
+            )}
+        </Box>
     );
 }
 

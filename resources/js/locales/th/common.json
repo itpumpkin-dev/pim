@@ -51,5 +51,7 @@
         "specifications": "ข้อมูลจำเพาะ",
         "brand": "แบรนด์",
         "category": "หมวดหมู่"
-    }
+    },
+    "scrollLeft": "เลื่อนไปทางซ้าย",
+    "scrollRight": "เลื่อนไปทางขวา"
 }

@@ -58,3 +58,17 @@ test('update rejects a status outside active/hold/delete/new', function () {
 
     expect($product->fresh()->status)->toBe('new');
 });
+
+test('changing only the status bumps the storefront cache version', function () {
+    $product = Product::create(['sku' => 'STATUS-BUMP-1', 'type' => 'simple', 'enabled' => true, 'status' => 'active']);
+    $before = Product::storefrontVersion();
+
+    app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => 'STATUS-BUMP-1',
+        'type' => 'simple',
+        'enabled' => true,
+        'status' => 'hold',
+    ]), $product);
+
+    expect(Product::storefrontVersion())->not->toBe($before);
+});

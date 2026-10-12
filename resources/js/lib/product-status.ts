@@ -23,6 +23,14 @@ export const PRODUCT_STATUS_TONES: Record<ProductStatus, FioriTone> = {
     new: 'information',
 };
 
+/** สีของ MUI <Chip> (หน้า storefront) ให้ตรงกับ PRODUCT_STATUS_TONES */
+export const PRODUCT_STATUS_CHIP_COLORS: Record<ProductStatus, 'success' | 'warning' | 'error' | 'info'> = {
+    active: 'success',
+    hold: 'warning',
+    delete: 'error',
+    new: 'info',
+};
+
 export function isProductStatus(value: unknown): value is ProductStatus {
     return typeof value === 'string' && (PRODUCT_STATUSES as string[]).includes(value);
 }

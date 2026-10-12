@@ -4129,6 +4129,11 @@ class ProductController extends Controller
             if ($valuesChanged || $categoryChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
                 event(new ProductDataChanged($product->id, $product->enabled));
                 Product::bumpStorefrontVersion();
+            } elseif ($product->wasChanged('status')) {
+                // status โชว์เป็น chip บนหน้า storefront แต่ไม่เกี่ยวกับ Marketplace
+                // — ล้างแค่ cache หน้าร้าน ไม่ยิง ProductDataChanged (ซึ่งจะไป
+                // trigger auto push/deactivate)
+                Product::bumpStorefrontVersion();
             }
 
             // ซิงค์ Variants (ลูกๆ ที่เป็น Cartesian Product)

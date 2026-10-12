@@ -51,5 +51,7 @@
         "specifications": "Especificaciones",
         "brand": "Marca",
         "category": "Categoría"
-    }
+    },
+    "scrollLeft": "Desplazar a la izquierda",
+    "scrollRight": "Desplazar a la derecha"
 }

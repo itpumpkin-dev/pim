@@ -51,5 +51,7 @@
         "specifications": "Specifications",
         "brand": "Brand",
         "category": "Category"
-    }
+    },
+    "scrollLeft": "Scroll left",
+    "scrollRight": "Scroll right"
 }
