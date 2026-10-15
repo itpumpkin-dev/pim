@@ -311,7 +311,7 @@ export default function Dashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('dashboard')} />
-            <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: FIORI.pageBg, minHeight: '100%', color: FIORI.textPrimary, fontFamily: '"Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}>
+            <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: FIORI.pageBg, minHeight: '100%', color: FIORI.textPrimary }}>
 
                 {/* Content Header */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'start', mb: 3 }}>

@@ -18,10 +18,9 @@ interface RichTextEditorProps {
     valueState?: 'none' | 'error';
 }
 
-// เฉพาะภาษาละติน/ไทย ตรงกับ stack จริงที่ theme.ts ตั้งให้ <body> ของทั้งแอป —
-// เนื้อหาที่พิมพ์ในนี้ (ชื่อ/รายละเอียดสินค้าภาษาไทยเป็นหลัก) เลยไม่หลุดไปใช้ฟอนต์
-// เริ่มต้นของ browser ข้าง iframe ที่ไม่มีกลีบไทยรองรับ
-const CONTENT_FONT_FAMILY = '"72","Sarabun",ui-sans-serif,system-ui,sans-serif';
+// ตรงกับ stack ที่ theme.ts ตั้งให้ <body> ของทั้งแอป — iframe ไม่ได้รับ CSS ของหน้าแอป
+// เลยต้อง @import Roboto/Sarabun เองใน contentStyle() ด้านล่าง
+const CONTENT_FONT_FAMILY = '"Roboto","Sarabun",sans-serif';
 
 // TinyMCE เรนเดอร์เนื้อหาที่แก้ไขได้ใน <iframe> ของมันเอง (คนละ document กับ
 // หน้าแอป) — CSS custom property แบบ var(--fiori-*) ที่ประกาศไว้ที่ :root ของ
@@ -35,6 +34,7 @@ const CONTENT_PALETTE = {
 function contentStyle(mode: 'light' | 'dark'): string {
     const p = CONTENT_PALETTE[mode];
     return `
+        @import url('https://fonts.bunny.net/css?family=roboto:300,400,500,700,900|sarabun:300,400,500,600,700,800');
         body {
             margin: 0;
             padding: 10px 12px;
