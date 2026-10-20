@@ -48,6 +48,67 @@ class ProductCategoryLinker
     }
 
     /**
+     * หมวดหมู่ที่สินค้าผูกอยู่แต่ "หลุดเส้นทาง" ที่เลือกไว้ใน pcatname/psubcatname/
+     * productgroupname ($codes) — ของค้างจากการเปลี่ยนหมวดหมู่รอบก่อนๆ ที่ linkFromCodes()
+     * (เพิ่มอย่างเดียว) ไม่เคยถอดออก ทำให้สินค้าอยู่ 2 กลุ่มสินค้าพร้อมกันและได้ตระกูล
+     * แอตทริบิวต์ของกลุ่มเก่าปนมาด้วย
+     *
+     * เก็บไว้ถ้า (1) อยู่ใน $codes หรือ (2) เป็นลูกหลานของรหัสที่ลึกที่สุดใน $codes — กรณีหลัง
+     * คือระดับที่ไม่ได้เลือกไว้ (เช่นมีแค่หมวดหมู่ย่อย แต่ import ผูกกลุ่มสินค้าใต้หมวดหมู่ย่อย
+     * นั้นไว้) ซึ่งยังสอดคล้องกับเส้นทางเดิม ไม่ใช่ของค้าง
+     *
+     * @param  array<int, string>  $codes
+     * @return array<int, int>
+     */
+    public static function staleCategoryIds(Product $product, array $codes): array
+    {
+        $codes = array_values(array_unique(array_filter($codes, fn ($code) => is_string($code) && $code !== '')));
+        if (empty($codes)) {
+            return [];
+        }
+
+        $linkedIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->all();
+        if (empty($linkedIds)) {
+            return [];
+        }
+
+        $parentOf = Category::pluck('parent_id', 'id')->all();
+        $chosenIds = Category::whereIn('code', $codes)->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (empty($chosenIds)) {
+            return [];
+        }
+
+        $depth = function (int $id) use ($parentOf): int {
+            $d = 0;
+            $seen = [];
+            for ($cur = $parentOf[$id] ?? null; $cur !== null && ! isset($seen[$cur]); $cur = $parentOf[$cur] ?? null) {
+                $seen[$cur] = true;
+                $d++;
+            }
+
+            return $d;
+        };
+        $deepest = collect($chosenIds)->sortByDesc($depth)->first();
+
+        $isDescendantOf = function (int $id, int $ancestor) use ($parentOf): bool {
+            $seen = [];
+            for ($cur = $parentOf[$id] ?? null; $cur !== null && ! isset($seen[$cur]); $cur = $parentOf[$cur] ?? null) {
+                if ((int) $cur === $ancestor) {
+                    return true;
+                }
+                $seen[$cur] = true;
+            }
+
+            return false;
+        };
+
+        return array_values(array_filter(
+            $linkedIds,
+            fn (int $id) => ! in_array($id, $chosenIds, true) && ! $isDescendantOf($id, $deepest),
+        ));
+    }
+
+    /**
      * ทำงานตรงข้ามกับ linkFromCodes(): ตอนนี้ต้นไม้ `categories` คือที่เดียวที่
      * แอดมินใช้เลือกหมวดหมู่ในหน้า Edit Product (dropdown เก่าอย่าง
      * pcatid/pcatname/psubcatname/productgroupname ถูกเอาออกจากฟอร์มไปแล้ว

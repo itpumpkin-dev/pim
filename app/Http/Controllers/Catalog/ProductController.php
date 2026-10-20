@@ -2072,6 +2072,14 @@ class ProductController extends Controller
         }
 
         ProductCategoryLinker::linkFromCodes($product, $newCodes);
+
+        // ถอดหมวดหมู่ที่ค้างมาจากการเปลี่ยนหมวดหมู่รอบก่อนๆ ด้วย ไม่ใช่แค่ตัวที่ถูกแทนที่ในรอบนี้
+        // ($removedCodes ด้านบน) — ไม่งั้นสินค้าจะอยู่ 2 กลุ่มสินค้าพร้อมกัน และหน้าแก้ไขยังโชว์
+        // แอตทริบิวต์ของกลุ่มเก่าปนอยู่ (ดู ProductCategoryLinker::staleCategoryIds())
+        $staleCategoryIds = collect(ProductCategoryLinker::staleCategoryIds($product, $newCodes))->diff($protectedCategoryIds);
+        if ($staleCategoryIds->isNotEmpty()) {
+            $product->categories()->detach($staleCategoryIds->all());
+        }
     }
 
     /**
@@ -3727,20 +3735,28 @@ class ProductController extends Controller
             // ทิ้งหมด → detach category ทั้งหมดของสินค้า (บั๊กจริง: กด Save ของแผง
             // Master Categories แล้ว พอกด Save Product ตระกูลแอตทริบิวต์หายต้องกด
             // บันทึกแผงนี้ใหม่อีกรอบ)
-            $masterCategoryCodes = $masterCategoryAttributeIds
+            $masterCategoryCodeByAttribute = $masterCategoryAttributeIds
+                ->filter(fn ($attributeId) => isset($values["{$attributeId}|ungrouped"]['global']))
+                ->mapWithKeys(fn ($attributeId) => [$attributeId => $attributeId])
                 ->map(function ($attributeId) use ($values) {
                     $localeValues = $values["{$attributeId}|ungrouped"]['global'] ?? [];
                     if (! is_array($localeValues)) {
                         return null;
                     }
-                    $default = $localeValues['default'] ?? null;
-                    if (is_string($default) && $default !== '') {
-                        return $default;
+                    // หน้าแก้ไขปัจจุบันส่งค่าที่ 'default' เสมอ (ดู masterCategoryValueKeys ใน
+                    // edit.tsx) — มี key นี้ = ใช้ค่านี้ แม้จะว่าง (ผู้ใช้ล้างเอง) ไม่ไปหยิบค่าเก่า
+                    // จากช่องภาษาที่ค้างอยู่แทน fallback ไปช่องภาษาเฉพาะ client รุ่นเก่าที่ไม่ส่ง 'default'
+                    if (array_key_exists('default', $localeValues)) {
+                        $default = $localeValues['default'];
+
+                        return is_string($default) && $default !== '' ? $default : null;
                     }
 
                     return collect($localeValues)->first(fn ($code) => is_string($code) && $code !== '');
-                })
+                });
+            $masterCategoryCodes = $masterCategoryCodeByAttribute
                 ->filter(fn ($code) => is_string($code) && $code !== '')
+                ->values()
                 ->all();
             // ไม่ส่ง $newCategoryIds เป็น $protectedCategoryIds อีกต่อไป (ต่างจาก
             // เดิม) — เหตุผลเดิมของ guard นี้คือกันไม่ให้ไปถอด category ที่ผู้ใช้
@@ -4154,6 +4170,23 @@ class ProductController extends Controller
                     }
                 }
             }
+
+            // หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ต้องมีค่าเดียว (แถว locale_id = NULL) — แถวที่ผูก
+            // ภาษาไว้เป็นของค้างจากหน้าแก้ไขรุ่นก่อน ที่เขียนค่าที่เลือกลงช่องภาษาที่กำลังแก้ (attribute
+            // ทั้ง 3 ตัวถูกติ๊ก is_locale_based) ขณะที่การผูกหมวดหมู่ด้านบนอ่านจากแถว NULL → หน้าจอ
+            // โชว์กลุ่มใหม่ แต่สินค้ายังผูกกลุ่มเก่า ลบทิ้งทุกครั้งที่บันทึก ให้เหลือค่าเดียวกับที่ผูกจริง
+            foreach ($masterCategoryCodeByAttribute as $attributeId => $code) {
+                $canonical = ['product_id' => $product->id, 'attribute_id' => $attributeId, 'attribute_group_id' => null, 'channel_id' => null, 'locale_id' => null];
+                if (is_string($code) && $code !== '') {
+                    ProductValue::updateOrCreate($canonical, ['value' => $code]);
+                } else {
+                    ProductValue::where($canonical)->delete();
+                }
+            }
+            ProductValue::where('product_id', $product->id)
+                ->whereIn('attribute_id', $masterCategoryCodeByAttribute->keys())
+                ->whereNotNull('locale_id')
+                ->delete();
 
             $newProductValues = $this->productValueSnapshot($product->id, $touchedAttributeIds);
             $valuesChanged = $this->recordProductValueChanges($product, $oldProductValues, $newProductValues);

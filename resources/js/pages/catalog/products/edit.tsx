@@ -688,6 +688,13 @@ export default function ProductEdit({
         localeKey: attr.is_locale_based ? String(activeLocaleId) : 'default',
     });
 
+    // หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า เก็บ "รหัส" หมวดหมู่ ไม่ใช่ข้อความที่ต้องแปล — อ่าน/เขียนที่
+    // 'global'/'default' เสมอ แม้ attribute จะถูกติ๊ก is_locale_based ไว้ (เป็นอยู่จริงใน DB)
+    // เดิมใช้ getValueKeys() ค่าที่เลือกเลยไปลงช่องของภาษาที่กำลังแก้ ขณะที่ backend ผูกหมวดหมู่
+    // จากช่อง 'default' (ค่าเก่า) — หน้าจอโชว์กลุ่มสินค้าใหม่แต่สินค้ายังผูกกลุ่มเก่า แอตทริบิวต์
+    // เลยยังเป็นของกลุ่มเก่าหลังกดบันทึก (ดู ProductController::update())
+    const masterCategoryValueKeys = { channelKey: 'global', localeKey: 'default' } as const;
+
     // pcatname/psubcatname/productgroupname เป็น system attribute ที่ปกติไม่ใช่
     // channel/locale-based (ค่าอยู่ใต้ 'global'/'default' เสมอ) แต่เผื่อมีใครไปติ๊ก
     // เปิด is_channel_based/is_locale_based ให้ตัวใดตัวหนึ่งทีหลังผ่านหน้าแก้ไข
@@ -698,7 +705,7 @@ export default function ProductEdit({
     // อ่านค่าว่างเปล่าไปเงียบๆ ทั้งที่ผู้ใช้เลือกไว้แล้วจริงๆ
     const selectedMasterCategoryCode = (attr?: AttributeItem): string => {
         if (!attr) return '';
-        const { channelKey, localeKey } = getValueKeys(attr);
+        const { channelKey, localeKey } = masterCategoryValueKeys;
         // fallback ไปที่ 'default' เหมือน renderMasterCategoryField() ด้านล่าง —
         // pcatname/psubcatname/productgroupname เก็บค่าจริงไว้ที่ channel/locale
         // 'global'/'default' เสมอ (ดู ProductCategoryLinker) แต่ถ้า attribute
@@ -743,8 +750,8 @@ export default function ProductEdit({
     // "เลือกกลุ่มสินค้า" (เปิดจากลิงก์ใน Tips) เพราะ 2 ที่นี้ render ฟิลด์ชุด
     // เดียวกันเป๊ะ — กันไม่ให้ปุ่มแก้ไขนี้ต้องเขียนซ้ำสองที่แล้วเผลอเบี้ยวกันทีหลัง
     const renderMasterCategoryField = (attr: AttributeItem) => {
-        const { channelKey, localeKey } = getValueKeys(attr);
-        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? data.values[attr.id]?.['ungrouped']?.[channelKey]?.['default'] ?? '';
+        const { channelKey, localeKey } = masterCategoryValueKeys;
+        const val = data.values[attr.id]?.['ungrouped']?.[channelKey]?.[localeKey] ?? '';
         const activeLocaleCode = locales.find((l) => l.id === activeLocaleId)?.code || 'en';
         const isProductGroupField = attr.code === 'productgroupname';
         const selectedCode = isProductGroupField ? selectedMasterCategoryCode(attr) : '';
@@ -914,8 +921,7 @@ export default function ProductEdit({
             const [categoryAttr, subcatAttr, groupAttr] = masterCategoryAttributes;
             const clear = (attr?: AttributeItem) => {
                 if (!attr) return;
-                const keys = getValueKeys(attr);
-                setAttributeValue(attr.id, 'ungrouped', keys.channelKey, keys.localeKey, '');
+                setAttributeValue(attr.id, 'ungrouped', masterCategoryValueKeys.channelKey, masterCategoryValueKeys.localeKey, '');
             };
             if (attributeId === categoryAttr?.id) {
                 clear(subcatAttr);
