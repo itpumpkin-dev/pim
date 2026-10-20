@@ -2975,9 +2975,9 @@ export default function ProductEdit({
                                                     disabled={data.status !== 'active'}
                                                     onChange={(e) => setData('enabled', e.target.checked)}
                                                 />
-                                                <Typography variant="caption" color={data.status === 'active' ? 'text.secondary' : 'warning.main'} display="block">
+                                                {/* <Typography variant="caption" color={data.status === 'active' ? 'text.secondary' : 'warning.main'} display="block">
                                                     {data.status === 'active' ? t('publishingHelp') : t('publishingRequiresActive')}
-                                                </Typography>
+                                                </Typography> */}
                                             </Box>
 
                                             {/* แสดงที่หน้า Home (products.show_on_home) — แยกจาก "การเผยแพร่"
@@ -2997,9 +2997,9 @@ export default function ProductEdit({
                                                     checked={data.show_on_home}
                                                     onChange={(e) => setData('show_on_home', e.target.checked)}
                                                 />
-                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                {/* <Typography variant="caption" color="text.secondary" display="block">
                                                     {t('showOnHomeHelp')}
-                                                </Typography>
+                                                </Typography> */}
                                             </Box>
 
                                             {/* สถานะสินค้าใน PIM (products.status) — แยกจาก Switch
@@ -3032,9 +3032,9 @@ export default function ProductEdit({
                                                     ))}
                                                 </TextField>
                                                 {/* สถานะนี้คนละเรื่องกับ 2 สวิตช์ด้านบน — บอกให้ชัด โดยเฉพาะ "Delete" ที่ไม่ได้ลบจริง */}
-                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                {/* <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                                                     {data.status === 'delete' ? t('productStatusDeleteHelp') : t('productStatusHelp')}
-                                                </Typography>
+                                                </Typography> */}
                                             </Box>
 
                                             {/* เดิมมีช่อง "Product Type" (Simple/Configurable) เป็น dropdown ให้แก้
