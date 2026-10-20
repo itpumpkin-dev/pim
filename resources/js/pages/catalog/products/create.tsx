@@ -25,7 +25,6 @@ import {
     Autocomplete,
     Box,
     Button,
-    Checkbox,
     Chip,
     CircularProgress,
     Dialog,
@@ -33,7 +32,6 @@ import {
     DialogContent,
     DialogTitle,
     FormControl,
-    FormControlLabel,
     IconButton,
     MenuItem,
     Paper,
@@ -122,8 +120,10 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
     ];
 
     const { data, setData, post, processing, errors, isDirty } = useForm<ProductForm>({
-        enabled: true,
-        show_on_home: true,
+        // สินค้าใหม่เริ่มที่ "ไม่เผยแพร่" + "ไม่แสดงที่หน้า Home" เสมอ — ไม่มีให้เลือกในหน้านี้แล้ว
+        // เปิดทีหลังได้ที่หน้าแก้ไขสินค้า (หรือปุ่ม "บันทึกและเผยแพร่") หลังกรอกข้อมูลครบ
+        enabled: false,
+        show_on_home: false,
         type: 'simple',
         sku: '',
         product_type_code: '',
@@ -375,33 +375,6 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
 
                 <Stack spacing={3}>
                     <FioriFormGroup title={t('productInfo')} sx={{ maxWidth: 760 }}>
-                        {/* สถานะ */}
-                        <FioriField label={t('publishing')}>
-                            <Stack direction="row" spacing={3}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.enabled === true} onChange={() => setData('enabled', true)} />}
-                                    label={t('published')}
-                                />
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
-                                    label={t('unpublished')}
-                                />
-                            </Stack>
-                        </FioriField>
-
-                        {/* แสดงที่หน้า Home — แยกจาก "การเผยแพร่" (Marketplace) ด้านบน */}
-                        <FioriField label={t('showOnHome')}>
-                            <Stack direction="row" spacing={3}>
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.show_on_home === true} onChange={() => setData('show_on_home', true)} />}
-                                    label={t('showOnHomeYes')}
-                                />
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.show_on_home === false} onChange={() => setData('show_on_home', false)} />}
-                                    label={t('showOnHomeNo')}
-                                />
-                            </Stack>
-                        </FioriField>
 
                         {/* เดิมมีช่อง "ประเภทสินค้า" (Simple/Configurable) อยู่ตรงนี้ — เอาออก
                             ตามที่ user ขอ เพราะชนชื่อกับฟิลด์ "ประเภทสินค้า" (แอตทริบิวต์

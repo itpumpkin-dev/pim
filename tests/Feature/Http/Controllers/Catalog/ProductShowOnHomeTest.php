@@ -49,7 +49,7 @@ test('update leaves show_on_home alone when not sent', function () {
 
 test('changing only show_on_home bumps the storefront cache without triggering marketplace sync', function () {
     Event::fake([ProductDataChanged::class]);
-    $product = Product::create(['sku' => 'HOME-BUMP-1', 'type' => 'simple', 'enabled' => true, 'show_on_home' => true]);
+    $product = Product::create(['sku' => 'HOME-BUMP-1', 'type' => 'simple', 'enabled' => true, 'show_on_home' => true, 'status' => 'active']);
     $before = Product::storefrontVersion();
 
     app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [

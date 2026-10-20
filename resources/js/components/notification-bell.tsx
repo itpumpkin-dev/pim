@@ -165,7 +165,13 @@ export function NotificationBell() {
                             onClick={() => {
                                 markOneRead(n);
                                 handleClose();
-                                if (n.url) router.visit(n.url);
+                                // ลิงก์ดาวน์โหลดไฟล์ (เช่น ส่งออกด่วน — QuickExportProductsJob) ไม่ใช่หน้า
+                                // Inertia — router.visit() จะได้ไฟล์กลับมาแทน page response ต้องให้
+                                // เบราว์เซอร์โหลดตรงๆ
+                                if (n.url) {
+                                    if (/\/download(\?|$)/.test(n.url)) window.location.assign(n.url);
+                                    else router.visit(n.url);
+                                }
                             }}
                             sx={{
                                 alignItems: 'flex-start',

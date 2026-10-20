@@ -5,5 +5,11 @@
     "None of the selected product(s) are enabled for publishing — turn on \"Publishing\" first.": "สินค้าที่เลือกทั้งหมดปิดการเผยแพร่อยู่ — เปิด \"การเผยแพร่\" ก่อน",
     "Queued push for :products product(s) across :shops channel(s).": "เข้าคิวส่งสินค้า :products รายการ ไปยัง :shops ช่องทางแล้ว",
     "Skipped :count product(s) not enabled for publishing.": "ข้ามสินค้า :count รายการที่ปิดการเผยแพร่อยู่",
-    "This product is not enabled for publishing — push cancelled.": "สินค้านี้ปิดการเผยแพร่อยู่ — ยกเลิกการส่ง"
+    "This product is not enabled for publishing — push cancelled.": "สินค้านี้ปิดการเผยแพร่อยู่ — ยกเลิกการส่ง",
+    "Preparing your export file — you will be notified (bell icon) when it is ready to download.": "กำลังเตรียมไฟล์ส่งออก — ระบบจะแจ้งที่กระดิ่งเมื่อไฟล์พร้อมดาวน์โหลด",
+    "Product export is ready": "ไฟล์ส่งออกสินค้าพร้อมแล้ว",
+    ":count product(s) exported — click to download.": "ส่งออกสินค้า :count รายการแล้ว — กดเพื่อดาวน์โหลด",
+    "Product export failed": "ส่งออกสินค้าไม่สำเร็จ",
+    "Status cannot be changed back to New once the product has left New.": "สถานะสินค้าที่ออกจาก New ไปแล้ว ไม่สามารถเปลี่ยนกลับเป็น New ได้",
+    "Only products with status Active can be published.": "เผยแพร่ได้เฉพาะสินค้าที่มีสถานะ Active"
 }

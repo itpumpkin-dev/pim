@@ -1706,7 +1706,50 @@ export default function ProductEdit({
      *                        reads it) so the request is correct regardless
      *                        of React's state-update timing.
      */
-    const performSave = (options?: { forceDisabled?: boolean; translateOtherLocales?: boolean; onSuccess?: () => void }) => {
+    // ---------------------------------------------------------------- เตือนเมื่อเปลี่ยนหมวดหมู่
+    // หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า กำหนดตระกูลแอตทริบิวต์ (= ฟิลด์ที่ต้องกรอก) — เปลี่ยนแล้ว
+    // บันทึก ฟิลด์ของกลุ่มเดิมอาจถูกซ่อนและมีฟิลด์บังคับใหม่ เลยถามยืนยันพร้อมรายละเอียดก่อนบันทึก
+    // (ถามตอนบันทึก ไม่ใช่ทุกครั้งที่เลือก เพราะต้องเลือกไล่ 3 ขั้นกว่าจะรู้ผลจริง)
+    const currentMasterCodes = masterCategoryAttributes.map((attr) => selectedMasterCategoryCode(attr));
+    const [savedMasterCodes, setSavedMasterCodes] = useState<string[]>(currentMasterCodes);
+    const masterCategoryChanged = currentMasterCodes.join('|') !== savedMasterCodes.join('|');
+    type SaveOptions = { forceDisabled?: boolean; translateOtherLocales?: boolean; onSuccess?: () => void; skipMasterCategoryCheck?: boolean };
+    const [checkingMasterImpact, setCheckingMasterImpact] = useState(false);
+    const [masterImpact, setMasterImpact] = useState<{
+        options?: SaveOptions;
+        error?: boolean;
+        removed_families?: { id: number; name: string }[];
+        added_families?: { id: number; name: string }[];
+        hidden_filled_count?: number;
+        hidden_filled?: string[];
+        new_required_empty_count?: number;
+    } | null>(null);
+
+    const performSave = (options?: SaveOptions) => {
+        if (masterCategoryChanged && !options?.skipMasterCategoryCheck) {
+            const params = new URLSearchParams();
+            currentMasterCodes.forEach((code) => params.append('codes[]', code));
+            setCheckingMasterImpact(true);
+            fetch(`/catalog/products/${product.id}/master-category-impact?${params.toString()}`, { headers: { Accept: 'application/json' } })
+                .then(async (res) => {
+                    if (!res.ok) throw new Error(String(res.status));
+                    const body = await res.json();
+                    // ไม่กระทบตระกูลเลย (เช่น ย้ายไปกลุ่มที่ใช้ตระกูลชุดเดียวกัน) — บันทึกได้เลยไม่ต้องถาม
+                    if (!body.changes_families) {
+                        doSave({ ...options, skipMasterCategoryCheck: true });
+                        return;
+                    }
+                    setMasterImpact({ ...body, options });
+                })
+                // ตรวจไม่ได้ ก็ยังเตือนแบบทั่วไปไว้ก่อน ไม่ปล่อยให้บันทึกเงียบๆ
+                .catch(() => setMasterImpact({ error: true, options }))
+                .finally(() => setCheckingMasterImpact(false));
+            return;
+        }
+        doSave(options);
+    };
+
+    const doSave = (options?: SaveOptions) => {
         setConflictMessage(null);
         if (options?.forceDisabled) setData('enabled', false);
         // PHP ไม่รองรับการ parse body แบบ multipart/form-data สำหรับ request แบบ PUT
@@ -1742,6 +1785,7 @@ export default function ProductEdit({
                 // ตรงนี้เอง ดู useForm.d.ts's setDefaults()
                 setDefaults();
                 baselineValuesRef.current = data.values;
+                setSavedMasterCodes(currentMasterCodes);
                 options?.onSuccess?.();
             },
             // แบนเนอร์ "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก" (ดู errors block ด้านล่าง)
@@ -2327,7 +2371,7 @@ export default function ProductEdit({
                                     เลย disabled โดยอัตโนมัติจนกว่าจะมีการแก้ไขจริงสักฟิลด์ */}
                                 <Button
                                     type="submit"
-                                    disabled={processing || !isDirty}
+                                    disabled={processing || checkingMasterImpact || !isDirty}
                                     startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
                                     sx={{ ...fioriEmphasizedSx, px: 2.5 }}
                                 >
@@ -2375,13 +2419,21 @@ export default function ProductEdit({
                                     saveAndPublish() จริง */}
                                 {canEditSalesChannels && (
                                     <MenuItem
+                                        disabled={data.status !== 'active'}
                                         onClick={() => {
                                             setSaveMenuAnchor(null);
                                             setPublishConfirmOpen(true);
                                         }}
                                     >
                                         <PublishIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                        {t('saveAndPublish')}
+                                        <Box>
+                                            {t('saveAndPublish')}
+                                            {data.status !== 'active' && (
+                                                <Typography variant="caption" color="text.secondary" display="block">
+                                                    {t('publishingRequiresActive')}
+                                                </Typography>
+                                            )}
+                                        </Box>
                                     </MenuItem>
                                 )}
                                 <Divider />
@@ -2916,13 +2968,15 @@ export default function ProductEdit({
                                                 >
                                                     {t('publishing')}
                                                 </Typography>
+                                                {/* เผยแพร่ได้เฉพาะสถานะ Active (backend บังคับซ้ำ — ดู Product::canPublishWithStatus()) */}
                                                 <Switch
                                                     sx={fioriSwitchSx}
                                                     checked={data.enabled}
+                                                    disabled={data.status !== 'active'}
                                                     onChange={(e) => setData('enabled', e.target.checked)}
                                                 />
-                                                <Typography variant="caption" color="text.secondary" display="block">
-                                                    {t('publishingHelp')}
+                                                <Typography variant="caption" color={data.status === 'active' ? 'text.secondary' : 'warning.main'} display="block">
+                                                    {data.status === 'active' ? t('publishingHelp') : t('publishingRequiresActive')}
                                                 </Typography>
                                             </Box>
 
@@ -2958,7 +3012,11 @@ export default function ProductEdit({
                                                 <TextField
                                                     select
                                                     value={data.status}
-                                                    onChange={(e) => setData('status', e.target.value as ProductStatus)}
+                                                    onChange={(e) => {
+                                                        const status = e.target.value as ProductStatus;
+                                                        // ไม่ใช่ Active (Hold/Delete) = ไม่เผยแพร่ทันที
+                                                        setData((prev) => ({ ...prev, status, enabled: status === 'active' ? prev.enabled : false }));
+                                                    }}
                                                     size="small"
                                                     fullWidth
                                                     error={Boolean(errors.status)}
@@ -2967,7 +3025,8 @@ export default function ProductEdit({
                                                     SelectProps={{ IconComponent: KeyboardArrowDownIcon }}
                                                 >
                                                     {PRODUCT_STATUSES.map((status) => (
-                                                        <MenuItem key={status} value={status}>
+                                                        // ออกจาก New ไปแล้ว (สถานะที่บันทึกไว้) เลือก New กลับไม่ได้ — ดู Product::canChangeStatus()
+                                                        <MenuItem key={status} value={status} disabled={status === 'new' && product.status !== 'new'}>
                                                             <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[status])} tone={PRODUCT_STATUS_TONES[status]} />
                                                         </MenuItem>
                                                     ))}
@@ -3125,6 +3184,12 @@ export default function ProductEdit({
                                                     <Box sx={{ mb: 2 }}>
                                                         <FioriMessageStrip severity="error">{sectionSaveError.message}</FioriMessageStrip>
                                                     </Box>
+                                                )}
+                                                {/* เตือนทันทีที่ค่าต่างจากที่บันทึกไว้ — รายละเอียดจริงจะถามอีกครั้งตอนกดบันทึก */}
+                                                {masterCategoryChanged && (
+                                                    <FioriMessageStrip severity="warning" sx={{ mb: 2 }}>
+                                                        {t('masterCategoryChangedNotice')}
+                                                    </FioriMessageStrip>
                                                 )}
                                                 <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
                                                     {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
@@ -3622,6 +3687,72 @@ export default function ProductEdit({
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* ยืนยันการเปลี่ยนหมวดหมู่ — ดู performSave() */}
+            <FioriMessageBox
+                open={masterImpact !== null}
+                onCancel={() => setMasterImpact(null)}
+                onConfirm={() => {
+                    const options = masterImpact?.options;
+                    setMasterImpact(null);
+                    doSave({ ...options, skipMasterCategoryCheck: true });
+                }}
+                title={t('masterCategoryChangeTitle')}
+                severity="warning"
+                confirmLabel={t('masterCategoryConfirmSave')}
+                cancelLabel={t('cancel')}
+                confirmLoading={processing}
+            >
+                <Typography variant="body2">{t('masterCategoryChangeIntro')}</Typography>
+                {masterImpact?.error && (
+                    <Typography variant="body2" sx={{ mt: 1.5 }}>
+                        {t('masterCategoryImpactUnavailable')}
+                    </Typography>
+                )}
+                {(masterImpact?.removed_families?.length ?? 0) > 0 && (
+                    <Box sx={{ mt: 1.5 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                            {t('masterCategoryRemovedFamilies')}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                            {masterImpact?.removed_families?.map((f) => (
+                                <Chip key={f.id} size="small" label={f.name} sx={{ bgcolor: FIORI.errorBg, color: FIORI.error, fontWeight: 600 }} />
+                            ))}
+                        </Stack>
+                    </Box>
+                )}
+                {(masterImpact?.added_families?.length ?? 0) > 0 && (
+                    <Box sx={{ mt: 1.5 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                            {t('masterCategoryAddedFamilies')}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                            {masterImpact?.added_families?.map((f) => (
+                                <Chip key={f.id} size="small" label={f.name} sx={{ bgcolor: FIORI.successBg, color: FIORI.success, fontWeight: 600 }} />
+                            ))}
+                        </Stack>
+                    </Box>
+                )}
+                {(masterImpact?.hidden_filled_count ?? 0) > 0 && (
+                    <FioriMessageStrip severity="warning" sx={{ mt: 2 }}>
+                        <Typography variant="body2" fontWeight={600}>
+                            {t('masterCategoryHiddenFilled', { count: masterImpact?.hidden_filled_count ?? 0 })}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                            {(masterImpact?.hidden_filled ?? []).join(', ')}
+                            {(masterImpact?.hidden_filled_count ?? 0) > (masterImpact?.hidden_filled?.length ?? 0) ? ' …' : ''}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                            {t('masterCategoryHiddenNote')}
+                        </Typography>
+                    </FioriMessageStrip>
+                )}
+                {(masterImpact?.new_required_empty_count ?? 0) > 0 && (
+                    <FioriMessageStrip severity="information" sx={{ mt: 1.5 }}>
+                        {t('masterCategoryNewRequired', { count: masterImpact?.new_required_empty_count ?? 0 })}
+                    </FioriMessageStrip>
+                )}
+            </FioriMessageBox>
 
             {/* Dialog ยืนยันก่อน Save Draft — ดู saveDraft()'s docblock */}
             <FioriMessageBox

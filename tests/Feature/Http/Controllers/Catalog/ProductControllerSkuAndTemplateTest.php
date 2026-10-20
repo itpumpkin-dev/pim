@@ -74,7 +74,7 @@ test('update rejects changing sku to a value with disallowed characters', functi
 
 test('update grandfathers a legacy sku that predates the character rule as long as it is left unchanged', function () {
     // สินค้าเก่าที่มี SKU ไม่ตรง pattern ใหม่อยู่แล้ว (สมมติสร้างไว้ก่อนมีกฎนี้)
-    $product = Product::create(['sku' => 'LEGACY SKU/OLD', 'type' => 'simple', 'enabled' => false]);
+    $product = Product::create(['sku' => 'LEGACY SKU/OLD', 'type' => 'simple', 'enabled' => false, 'status' => 'active']);
 
     // Save ปกติที่ฟิลด์ SKU ถูก disabled ไว้ในหน้า UI — ค่าที่ส่งกลับมาเหมือนเดิม
     $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
@@ -96,7 +96,7 @@ test('update grandfathers a legacy sku with stray whitespace AND a disallowed ch
     // ผู้ใช้ไม่ได้แตะ SKU เลย (ฟิลด์ถูก disabled) แล้วก็จะไปบังคับ regex กับ SKU
     // เดิมที่มีอักขระต้องห้ามอยู่แล้ว ทำให้ save ไม่ผ่านไปตลอดกาล เพราะแก้ SKU เอง
     // ไม่ได้อีกต่อไป
-    $product = Product::create(['sku' => 'BAD SKU/1 ', 'type' => 'simple', 'enabled' => false]);
+    $product = Product::create(['sku' => 'BAD SKU/1 ', 'type' => 'simple', 'enabled' => false, 'status' => 'active']);
 
     $request = Request::create("/catalog/products/{$product->id}", 'PUT', [
         'sku' => 'BAD SKU/1 ',
@@ -110,7 +110,7 @@ test('update grandfathers a legacy sku with stray whitespace AND a disallowed ch
 });
 
 test('update grandfathers an unchanged legacy variant sku that predates the character rule', function () {
-    $product = Product::create(['sku' => 'CONFIG-PARENT', 'type' => 'configurable', 'enabled' => false]);
+    $product = Product::create(['sku' => 'CONFIG-PARENT', 'type' => 'configurable', 'enabled' => false, 'status' => 'active']);
     $variant = Product::create(['sku' => 'BAD VARIANT/1', 'parent_id' => $product->id, 'type' => 'simple', 'enabled' => false]);
 
     $request = Request::create("/catalog/products/{$product->id}", 'PUT', [

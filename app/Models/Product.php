@@ -23,6 +23,28 @@ class Product extends Model
 
     public const STATUS_DELETE = 'delete';
 
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_NEW = 'new';
+
+    /**
+     * เผยแพร่ (enabled — push ไป Marketplace) ได้เฉพาะสินค้าสถานะ Active — New/Hold/Delete
+     * บังคับเป็นไม่เผยแพร่เสมอ ใช้ร่วมกันทุกทางที่เขียน enabled/status (หน้าแก้ไข, สร้าง,
+     * "บันทึกและเผยแพร่", นำเข้าไฟล์)
+     */
+    public static function canPublishWithStatus(?string $status): bool
+    {
+        return $status === self::STATUS_ACTIVE;
+    }
+
+    /**
+     * ออกจาก New ไปแล้ว (เช่น เป็น Active) ย้อนกลับมา New ไม่ได้ — สถานะอื่นสลับกันได้ตามปกติ
+     */
+    public static function canChangeStatus(?string $from, string $to): bool
+    {
+        return ! ($to === self::STATUS_NEW && $from !== null && $from !== self::STATUS_NEW);
+    }
+
     protected $attributes = [
         'status' => 'new',
     ];

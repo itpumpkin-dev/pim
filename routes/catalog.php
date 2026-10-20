@@ -50,6 +50,7 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/master-category-options', [ProductController::class, 'masterCategoryOptions'])->name('products.masterCategoryOptions')->middleware('permission:products,edit_products');
     Route::get('products/resolve-category-by-code', [ProductController::class, 'resolveCategoryByCode'])->name('products.resolveCategoryByCode')->middleware('permission:products,edit_products');
     Route::get('products/quick-export', [ProductController::class, 'quickExport'])->name('products.quickExport')->middleware('permission:products,list_products');
+    Route::get('products/quick-export/{jobTracker}/download', [ProductController::class, 'downloadQuickExport'])->name('products.quickExport.download')->middleware('permission:products,list_products');
     Route::post('products/push-bulk', [ProductController::class, 'pushBulk'])->name('products.pushBulk')->middleware('permission:products,edit_products');
     Route::post('products/deactivate-bulk', [ProductController::class, 'deactivateBulk'])->name('products.deactivateBulk')->middleware('permission:products,edit_products');
     Route::get('product-translations', [ProductController::class, 'missingTranslations'])->name('products.missingTranslations')->middleware('permission:product_translations,list_product_translations');
@@ -58,6 +59,11 @@ Route::middleware(['auth'])->prefix('catalog')->name('catalog.')->group(function
     Route::get('products/create', [ProductController::class, 'create'])->name('products.create')->middleware('permission:products,create_products');
     Route::post('products', [ProductController::class, 'store'])->name('products.store')->middleware('permission:products,create_products');
     Route::get('products/{product}/edit', [ProductController::class, 'edit'])->name('products.edit')->middleware('permission:products,edit_products');
+    // ทางเข้าด้วยรหัสสินค้า (/catalog/products/sku/{sku}) — redirect ไปหน้าที่ใช้ id (URL หลักยังเป็น id
+    // เพราะ SKU แก้ไขได้) where('.*') ให้ SKU ที่มี "/" ใช้ได้ด้วย ต้องอยู่ก่อน products/{product}
+    // ผลกระทบของการเปลี่ยนหมวดหมู่ต่อแอตทริบิวต์ ก่อนบันทึก (อ่านอย่างเดียว) — ดู masterCategoryImpact()
+    Route::get('products/{product}/master-category-impact', [ProductController::class, 'masterCategoryImpact'])->name('products.masterCategoryImpact')->middleware('permission:products,edit_products');
+    Route::get('products/sku/{sku}', [ProductController::class, 'showBySku'])->where('sku', '.*')->name('products.showBySku')->middleware('permission:products,list_products');
     Route::get('products/{product}', [ProductController::class, 'show'])->name('products.show')->middleware('permission:products,list_products');
     Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update')->middleware('permission:products,edit_products');
     // Per-panel saves on the edit screen — each persists just its own slice so

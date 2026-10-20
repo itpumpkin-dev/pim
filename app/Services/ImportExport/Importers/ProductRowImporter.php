@@ -308,11 +308,19 @@ class ProductRowImporter implements RowImporterInterface
         // ซึ่งไม่ fallback ไปที่ family_id เดิมอีกต่อไปแล้วเช่นกัน ตั้งค่านี้ตรงๆ
         // ที่นี่จะโดนเพิกเฉยเงียบๆ ถ้าหมวดหมู่ที่ผูกไว้ยังไม่มีตระกูลผูกอยู่ ทำให้
         // สินค้าที่ import มาไม่เห็น attribute field ไหนเลยในหน้า Edit อย่างงงๆ
+        // กติกาเดียวกับหน้าแก้ไข (ดู Product::canChangeStatus()/canPublishWithStatus()) — ออกจาก New
+        // ไปแล้วย้อนกลับไม่ได้ และเผยแพร่ได้เฉพาะสถานะ Active (สถานะอื่น = ไม่เผยแพร่เสมอ)
+        $existingStatus = Product::where('sku', $sku)->value('status');
+        if ($statusRaw !== '' && ! Product::canChangeStatus($existingStatus, $statusRaw)) {
+            throw new RowImportException("status cannot be changed back to 'new' (current status: '{$existingStatus}')");
+        }
+        $finalStatus = $statusRaw !== '' ? $statusRaw : ($existingStatus ?? Product::STATUS_NEW);
+
         $product = Product::updateOrCreate(
             ['sku' => $sku],
             [
                 'type' => $type,
-                'enabled' => $enabled,
+                'enabled' => $enabled && Product::canPublishWithStatus($finalStatus),
                 ...($statusRaw !== '' ? ['status' => $statusRaw] : []),
             ]
         );

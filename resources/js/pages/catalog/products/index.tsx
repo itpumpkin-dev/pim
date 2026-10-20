@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import ViewColumnOutlinedIcon from '@mui/icons-material/ViewColumnOutlined';
 import FileUploadOutlinedIcon from '@mui/icons-material/FileUploadOutlined';
@@ -97,6 +97,8 @@ interface ProductRow {
     image_url?: string | null;
     completeness?: number | null;
     translation_completeness?: number | null;
+    /** ผู้ใช้ของ audit log รายการล่าสุด (ProductController::index()) */
+    updated_by_name?: string | null;
     attribute_values?: Record<string, unknown>;
     sales_channels?: { total: number; platforms: Record<string, number> };
     published_shop_ids?: number[];
@@ -158,8 +160,36 @@ interface Props {
     salesChannels: SalesChannelGroup[];
 }
 
-const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns';
-const DEFAULT_SELECTED_COLUMNS = ['sku', 'image', 'name', 'family', 'status', 'product_status', 'type', 'complete', 'translation_complete', 'created_at', 'updated_at'];
+// v2: เปลี่ยนชุดคอลัมน์ตั้งต้น — bump key ให้ทุกคนได้ชุดใหม่ครั้งหนึ่ง (ชุดเดิมที่เคยเก็บไว้ใน v1 ไม่ถูกใช้แล้ว)
+const PRODUCT_COLUMNS_STORAGE_KEY = 'pim.products.columns.v2';
+/**
+ * คอลัมน์ตั้งต้นตามลำดับที่แสดง — attribute อ้างด้วย "attr:{code}" (id ของ attribute ต่างกันได้
+ * ระหว่าง environment) แล้วแปลงเป็น key จริง `attr_{id}` ใน defaultColumnKeys()
+ * สถานะ, รหัสสินค้า, ชื่อสินค้า, ประเภทสินค้า, หน่วย, ชื่อหมวดสินค้า, ชื่อหมวดย่อย, กลุ่มสินค้า,
+ * ชื่อแบรนด์, แก้ไขล่าสุดเมื่อ, แก้ไขล่าสุดโดย
+ */
+const DEFAULT_COLUMN_SPEC = [
+    'product_status',
+    'sku',
+    'name',
+    'attr:producttype',
+    'attr:pbaseunit',
+    'attr:pcatname',
+    'attr:psubcatname',
+    'attr:productgroupname',
+    'attr:pbrand',
+    'updated_at',
+    'updated_by',
+];
+
+function defaultColumnKeys(attributes: { id: number; code: string }[]): string[] {
+    const idByCode = new Map(attributes.map((a) => [a.code, a.id]));
+    return DEFAULT_COLUMN_SPEC.flatMap((spec) => {
+        if (!spec.startsWith('attr:')) return [spec];
+        const id = idByCode.get(spec.slice(5));
+        return id === undefined ? [] : [`attr_${id}`];
+    });
+}
 
 /** map key คอลัมน์ที่โชว์ใน UI -> คอลัมน์จริงในตาราง `products` ที่ sort ได้ (อ้างอิงจาก resources/grids/product_grid.yml) */
 const SORTABLE_FIELDS: Record<string, string> = {
@@ -221,6 +251,8 @@ interface ColumnDef {
     label: string;
     render: (row: ProductRow) => ReactNode;
     headerRender?: () => ReactNode;
+    /** ส่งต่อไป FioriResponsiveColumn.minWidth */
+    minWidth?: number | string;
 }
 
 /**
@@ -445,7 +477,23 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         const systemColumns: ColumnDef[] = [
             { key: 'id', label: t('id'), render: (row) => row.id },
             { key: 'parent', label: t('parent'), render: (row) => row.parent_sku || '-' },
-            { key: 'sku', label: t('sku'), render: (row) => row.sku },
+            {
+                key: 'sku',
+                label: t('sku'),
+                // SKU เช่น "SP50446-10" เคยถูกตัดเป็น 2 บรรทัดที่ขีด — กว้างขั้นต่ำ + ไม่ขึ้นบรรทัดใหม่
+                minWidth: 140,
+                // ลิงก์ไปหน้าดูสินค้า (catalog/products/{id}) — เป็น <a> จริง จะได้ ctrl/กลางคลิกเปิดแท็บใหม่ได้
+                render: (row) => (
+                    <Box
+                        component={Link}
+                        href={`/catalog/products/${row.id}`}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                        sx={{ color: FIORI.brand, fontWeight: 600, whiteSpace: 'nowrap', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                    >
+                        {row.sku}
+                    </Box>
+                ),
+            },
             {
                 key: 'image',
                 label: t('image'),
@@ -531,13 +579,16 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
             },
             { key: 'created_at', label: t('createdAt'), render: (row) => formatDateTime(row.created_at) },
             { key: 'updated_at', label: t('updatedAt'), render: (row) => formatDateTime(row.updated_at) },
+            { key: 'updated_by', label: t('updatedBy'), render: (row) => row.updated_by_name || '-' },
         ];
 
         const attributeColumns: ColumnDef[] = attributes
             .filter((attr) => attr.code !== 'name')
             .map((attr) => ({
                 key: `attr_${attr.id}`,
-                label: attr.label,
+                // producttype: ชื่อของ attribute ใน DB เป็น "หมวดหมู่สินค้า" ซึ่งชนกับหมวดหมู่ (pcatname) —
+                // ใช้ข้อความเดียวกับหน้าแก้ไขสินค้า ("ประเภทสินค้า") แทน
+                label: attr.code === 'producttype' ? t('masterProductTypeFieldLabel') : attr.label,
                 render: (row) => renderAttributeCellValue(attr.type, row.attribute_values?.[attr.id], row.name || row.sku),
             }));
 
@@ -564,8 +615,9 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         [attributes, t],
     );
 
+    const defaultSelectedColumns = useMemo(() => defaultColumnKeys(attributes), [attributes]);
     const [selectedColumnKeys, setSelectedColumnKeys] = useState<string[]>(() => {
-        if (typeof window === 'undefined') return DEFAULT_SELECTED_COLUMNS;
+        if (typeof window === 'undefined') return defaultSelectedColumns;
         try {
             const stored = window.localStorage.getItem(PRODUCT_COLUMNS_STORAGE_KEY);
             if (stored) {
@@ -575,14 +627,14 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         } catch {
             // ข้อมูลใน storage เพี้ยน ก็ข้ามไปเลย
         }
-        return DEFAULT_SELECTED_COLUMNS;
+        return defaultSelectedColumns;
     });
 
     useEffect(() => {
         const validKeys = new Set(allColumns.map((c) => c.key));
         const filtered = selectedColumnKeys.filter((k) => validKeys.has(k));
         if (filtered.length !== selectedColumnKeys.length) {
-            setSelectedColumnKeys(filtered.length > 0 ? filtered : DEFAULT_SELECTED_COLUMNS);
+            setSelectedColumnKeys(filtered.length > 0 ? filtered : defaultSelectedColumns);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allColumns]);
@@ -687,27 +739,32 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
         }
     };
 
+    // สร้างไฟล์ในคิว (QuickExportProductsJob) แล้วแจ้งที่กระดิ่งเมื่อพร้อม — เดิมดาวน์โหลดตรงๆ
+    // (window.location) ไฟล์ทั้งระบบเกินเวลาของ request ตอนนี้ backend redirect กลับมาพร้อม flash
+    // "กำลังเตรียมไฟล์" เลยใช้ router.get ให้อยู่หน้าเดิม ไม่โหลดหน้าใหม่
+    const [queuingExport, setQueuingExport] = useState(false);
     const handleQuickExport = () => {
-        const params = new URLSearchParams();
-        params.set('format', exportFormat.toLowerCase());
-        exportColumns.forEach((col) => params.append('columns[]', col.code));
+        const params: Record<string, string | string[] | number> = {
+            format: exportFormat.toLowerCase(),
+            columns: exportColumns.map((col) => col.code),
+        };
         if (selectedIds.length > 0) {
             // ถ้าเลือกแถวไว้ชัดเจนแล้ว หมายความว่าต้องการแค่สินค้าเหล่านี้เท่านั้น —
             // ตัวเลือก type/category ด้านล่างจะถูก disable ไว้ในสถานะนี้ (ดู prop
-            // `disabled` ของ Autocomplete) เลยไม่ต้องส่งไปด้วย ถึงแม้จะยังมีค่าเก่า
-            // ค้างอยู่ใน state ก่อนหน้าที่จะเลือกก็ตาม
-            selectedIds.forEach((id) => params.append('ids[]', String(id)));
+            // `disabled` ของ Autocomplete) เลยไม่ต้องส่งไปด้วย
+            params.ids = selectedIds.map(String);
         } else {
-            if (search) {
-                params.set('search', search);
-            }
-            exportTypes.forEach((type) => params.append('types[]', type));
-            if (exportCategory) {
-                params.set('category_id', String(exportCategory.id));
-            }
+            if (search) params.search = search;
+            params.types = exportTypes;
+            if (exportCategory) params.category_id = exportCategory.id;
         }
-        window.location.href = `/catalog/products/quick-export?${params.toString()}`;
-        setQuickExportOpen(false);
+        setQueuingExport(true);
+        router.get('/catalog/products/quick-export', params, {
+            preserveState: true,
+            preserveScroll: true,
+            onSuccess: () => setQuickExportOpen(false),
+            onFinish: () => setQueuingExport(false),
+        });
     };
 
     const currentPage = gridData.current_page ?? 1;
@@ -741,6 +798,7 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     col.label
                 ),
                 priority: productColumnPriority(col.key),
+                minWidth: col.minWidth,
                 render: col.render,
             };
         }),
@@ -990,6 +1048,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                                     {...params}
                                     label={t('exportColumns')}
                                     placeholder={exportColumns.length === 0 ? t('exportAllColumns') : undefined}
+                                    // placeholder โชว์เฉพาะตอนโฟกัสช่อง — บอกให้เห็นตลอดว่าไม่เลือก = ส่งออกทุกคอลัมน์
+                                    helperText={exportColumns.length === 0 ? t('exportAllColumnsHint') : undefined}
                                     size="small"
                                 />
                             )}
@@ -1039,6 +1099,8 @@ export default function ProductIndex({ gridConfig, gridData, filters, attributes
                     <Button
                         onClick={handleQuickExport}
                         variant="contained"
+                        disabled={queuingExport}
+                        startIcon={queuingExport ? <CircularProgress size={14} color="inherit" /> : undefined}
                         sx={{ ...fioriEmphasizedSx, px: 3 }}
                     >
                         {t('download')}

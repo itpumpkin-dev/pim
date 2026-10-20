@@ -68,3 +68,21 @@ test('export includes the status column and still exports the first attribute co
     expect($row['status'])->toBe('delete');
     expect($row)->toHaveKey('aaa_ps_first_attr');
 });
+
+test('import publishes only Active products', function () {
+    (new ProductRowImporter())->importRow(['sku' => 'PS-IMP-PUB-A', 'type' => 'simple', 'enabled' => '1', 'status' => 'active'], psImportConfig());
+    (new ProductRowImporter())->importRow(['sku' => 'PS-IMP-PUB-H', 'type' => 'simple', 'enabled' => '1', 'status' => 'hold'], psImportConfig());
+    (new ProductRowImporter())->importRow(['sku' => 'PS-IMP-PUB-N', 'type' => 'simple', 'enabled' => '1'], psImportConfig());
+
+    expect(Product::where('sku', 'PS-IMP-PUB-A')->value('enabled'))->toBeTrue();
+    expect(Product::where('sku', 'PS-IMP-PUB-H')->value('enabled'))->toBeFalse();
+    expect(Product::where('sku', 'PS-IMP-PUB-N')->value('enabled'))->toBeFalse();
+});
+
+test('import refuses to move a product back to New', function () {
+    Product::create(['sku' => 'PS-IMP-BACK', 'type' => 'simple', 'enabled' => true, 'status' => 'active']);
+
+    expect(fn () => (new ProductRowImporter())->importRow(['sku' => 'PS-IMP-BACK', 'type' => 'simple', 'enabled' => '1', 'status' => 'new'], psImportConfig()))
+        ->toThrow(RowImportException::class);
+    expect(Product::where('sku', 'PS-IMP-BACK')->value('status'))->toBe('active');
+});

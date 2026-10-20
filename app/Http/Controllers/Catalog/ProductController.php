@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Catalog;
 use App\Events\ProductDataChanged;
 use App\Http\Controllers\Concerns\HasVersionHistory;
 use App\Http\Controllers\Controller;
+use App\Jobs\QuickExportProductsJob;
 use App\Jobs\AutoTranslateProductValueJob;
 use App\Jobs\SyncProductToMarketplaceJob;
 use App\Models\AssociationType;
@@ -41,9 +42,7 @@ use App\Services\Catalog\MasterAttributeOptionSync;
 use App\Services\Catalog\ProductCategoryLinker;
 use App\Services\CodeGenerator;
 use App\Services\GridManager;
-use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\Importers\ProductRowImporter;
-use App\Services\ImportExport\SpreadsheetWriter;
 use App\Services\Lazada\LazadaProductSyncService;
 use App\Services\Marketplace\MarketplaceSyncDispatcher;
 use App\Services\Marketplace\MarketplaceSyncGate;
@@ -63,12 +62,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProductController extends Controller
 {
@@ -250,15 +248,14 @@ class ProductController extends Controller
 
         $values = ProductValue::whereIn('product_id', $productIds)
             ->whereNull('channel_id')
-            ->where(function ($query) use ($activeLocaleId) {
-                $query->whereNull('locale_id');
-                if ($activeLocaleId) {
-                    $query->orWhere('locale_id', $activeLocaleId);
-                }
-            })
-            ->when(
-                $activeLocaleId,
-                fn ($query) => $query->orderByRaw('CASE WHEN locale_id = ? THEN 0 ELSE 1 END ASC', [$activeLocaleId]),
+            // ทุกภาษา แล้วเรียงลำดับความสำคัญ: ภาษาที่ใช้อยู่ → ไม่ระบุภาษา → ภาษาอื่น (id ต่ำสุด)
+            // เดิมดึงแค่ภาษาที่ใช้อยู่ + ไม่ระบุภาษา ค่าที่กรอกในหน้าแก้ไขเป็นภาษาไทยอย่างเดียว (เช่น
+            // แบรนด์/หน่วย) เลยโชว์ว่างทันทีที่ผู้ใช้สลับหน้าจอเป็นภาษาอื่น ข้ามค่าว่างด้วย
+            ->whereNotNull('value')
+            ->where('value', '!=', '')
+            ->orderByRaw(
+                'CASE WHEN locale_id = ? THEN 0 WHEN locale_id IS NULL THEN 1 ELSE 2 END ASC, locale_id ASC',
+                [$activeLocaleId ?? 0],
             )
             ->get(['product_id', 'attribute_id', 'value']);
 
@@ -312,7 +309,35 @@ class ProductController extends Controller
 
         $translationCompletenessByProduct = $this->translationCompletenessByProduct($gridData->getCollection());
 
-        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct, $publishedShopIdsByProduct, $translationCompletenessByProduct) {
+        // "แก้ไขล่าสุดโดย" — ตาราง products ไม่มีคอลัมน์ updated_by (ค่าที่ส่งไปตอน update() ไม่ได้
+        // ถูกบันทึกเลย) ใช้ผู้ใช้ของ audit log รายการล่าสุดของสินค้าแทน ซึ่งเป็นตัวเดียวกับที่ทำให้
+        // updated_at ขยับ
+        $lastEditorByProduct = DB::table('audit_logs')
+            ->leftJoin('users', 'users.id', '=', 'audit_logs.user_id')
+            ->where('audit_logs.auditable_type', Product::class)
+            ->whereIn('audit_logs.auditable_id', $productIds)
+            ->orderBy('audit_logs.auditable_id')
+            ->orderByDesc('audit_logs.id')
+            ->selectRaw("DISTINCT ON (audit_logs.auditable_id) audit_logs.auditable_id, NULLIF(TRIM(CONCAT_WS(' ', users.first_name, users.last_name)), '') AS full_name, users.username")
+            ->get()
+            ->mapWithKeys(fn ($r) => [$r->auditable_id => $r->full_name ?: $r->username]);
+
+        // คอลัมน์ attribute แบบ select โชว์ชื่อตัวเลือก (ตามภาษาที่ใช้อยู่ → admin_label) แทนรหัส — เช่น "ชื่อหมวดสินค้า"
+        // ที่เดิมโชว์ "d001" ดึงเฉพาะรหัสที่มีอยู่ในหน้านี้
+        $selectAttributeIds = $allAttributes->where('type', 'select')->pluck('id')->all();
+        $selectCodes = [];
+        foreach ($valueByKey as $key => $raw) {
+            [, $attributeId] = explode('-', $key, 2);
+            if (in_array((int) $attributeId, $selectAttributeIds, true) && is_string($raw) && $raw !== '') {
+                $selectCodes[] = $raw;
+            }
+        }
+        $optionLabelByKey = empty($selectCodes) ? collect() : AttributeOption::whereIn('attribute_id', $selectAttributeIds)
+            ->whereIn('code', array_values(array_unique($selectCodes)))
+            ->get(['id', 'attribute_id', 'code', 'admin_label'])
+            ->mapWithKeys(fn ($o) => [$o->attribute_id.'|'.$o->code => $o->translations->firstWhere('locale_id', $activeLocaleId)?->label ?: ($o->admin_label ?: $o->code)]);
+
+        $items = $gridData->getCollection()->map(function ($product) use ($valueByKey, $nameAttributeId, $imageAttributeIdByFamily, $allAttributes, $parentSkus, $familyAttributeIdsByFamily, $salesChannelsByProduct, $publishedShopIdsByProduct, $translationCompletenessByProduct, $lastEditorByProduct, $optionLabelByKey) {
             $product->family_code = $product->family ? ($product->family->name ?: $product->family->code) : '-';
 
             $familyAttributeIds = $familyAttributeIdsByFamily->get($product->family_id) ?? collect();
@@ -352,8 +377,13 @@ class ProductController extends Controller
 
             $product->translation_completeness = $translationCompletenessByProduct[$product->id] ?? null;
 
-            $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey) {
+            $product->updated_by_name = $lastEditorByProduct->get($product->id);
+
+            $product->attribute_values = $allAttributes->mapWithKeys(function (Attribute $attribute) use ($product, $valueByKey, $optionLabelByKey) {
                 $rawValue = $valueByKey[$product->id.'-'.$attribute->id] ?? null;
+                if ($attribute->type === 'select' && is_string($rawValue) && $optionLabelByKey->has($attribute->id.'|'.$rawValue)) {
+                    return [$attribute->id => $optionLabelByKey->get($attribute->id.'|'.$rawValue)];
+                }
 
                 return [$attribute->id => $this->formatAttributeValue($attribute, $rawValue)];
             });
@@ -1199,11 +1229,11 @@ class ProductController extends Controller
     }
 
     /**
-     * "quick export" แบบ synchronous สำหรับตาราง product — ดาวน์โหลดไฟล์ทันที
-     * ไม่ต้องผ่านขั้นตอน export-config/job-tracker เหมือนปกติ จะ export
-     * เฉพาะแถวที่ติ๊กเลือกไว้ถ้ามี ไม่งั้นก็ export ตามฟิลเตอร์ค้นหาปัจจุบัน
+     * "ส่งออกด่วน" ของตาราง product — เข้าคิว (QuickExportProductsJob) แล้วแจ้งที่กระดิ่งเมื่อไฟล์
+     * พร้อม เดิมสร้างไฟล์ใน request เลย ไฟล์ทั้งระบบ (~730 คอลัมน์) เกิน max_execution_time
+     * export เฉพาะแถวที่ติ๊กไว้ถ้ามี ไม่งั้นตามฟิลเตอร์ค้นหาปัจจุบัน (ดู ProductQuickExporter)
      */
-    public function quickExport(Request $request): BinaryFileResponse
+    public function quickExport(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'format' => ['required', 'in:csv,xls,xlsx'],
@@ -1217,89 +1247,34 @@ class ProductController extends Controller
             'category_id' => ['nullable', 'integer'],
         ]);
 
-        $format = $validated['format'];
-        $ids = $validated['ids'] ?? [];
+        $tracker = JobTracker::create([
+            'job_type' => 'export',
+            'entity_type' => 'products',
+            'config_code' => 'quick_export',
+            'status' => 'queued',
+            'user_id' => $request->user()?->id,
+        ]);
 
-        $allColumns = (new ProductRowExporter($request->user()))->columns();
-        // ถ้าไม่ได้เลือกคอลัมน์มา (ว่างหรือไม่ส่งมาเลย) ก็ถือว่าเอาทุกคอลัมน์
-        // เหมือนชุดเต็มของ ProductRowExporter — ถ้าเลือกมาก็เอาแค่ที่ตรงกัน
-        // (เรียงตามลำดับใน $allColumns โดย sku จะถูกเก็บไว้เสมอ เพื่อให้ทุกแถว
-        // ที่ export ออกมายังมี identity อยู่ ถึงแม้แอดมินจะไม่ได้ติ๊ก sku ไว้)
-        $selectedColumns = ! empty($validated['columns'])
-            ? array_values(array_intersect($allColumns, $validated['columns']))
-            : $allColumns;
-        if (! in_array('sku', $selectedColumns, true)) {
-            array_unshift($selectedColumns, 'sku');
-        }
+        QuickExportProductsJob::dispatch($tracker->id, $validated);
 
-        $attributeCodes = array_slice($allColumns, count(ProductRowImporter::FIXED_COLUMNS));
-        $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get()->keyBy('code');
+        return back()->with('success', __('Preparing your export file — you will be notified (bell icon) when it is ready to download.'));
+    }
 
-        $query = Product::with('family')->orderBy('id');
-        if (! empty($ids)) {
-            // ถ้ามีการติ๊กเลือกแถวมาชัดเจน หมายความว่าเอาแค่สินค้ากลุ่มนี้เท่านั้น —
-            // search กับฟิลเตอร์ type/category ด้านล่างเป็นแค่วิธีเลือก "ชุด"
-            // สินค้าอีกแบบหนึ่งในระดับ dialog ไม่ใช่เงื่อนไขเสริมที่ซ้อนทับกับ
-            // การเลือกที่ชัดเจนอยู่แล้ว เลยข้ามทั้งหมดไปเมื่อมี IDs ส่งมา
-            // (ตรงกับฝั่ง frontend ที่จะหยุดส่งค่าพวกนี้ด้วยเช่นกัน
-            // — ดูที่ handleQuickExport())
-            $query->whereIn('id', $ids);
-        } else {
-            if (! empty($validated['search'])) {
-                $query->where('sku', 'ilike', '%'.$validated['search'].'%');
-            }
+    /**
+     * ลิงก์ดาวน์โหลดจากการแจ้งเตือนของ QuickExportProductsJob — เฉพาะเจ้าของงานเท่านั้น
+     */
+    public function downloadQuickExport(Request $request, JobTracker $jobTracker): StreamedResponse
+    {
+        abort_unless(
+            $jobTracker->config_code === 'quick_export'
+                && $jobTracker->user_id === $request->user()?->id
+                && $jobTracker->status === 'completed'
+                && $jobTracker->result_file_path
+                && Storage::disk('local')->exists($jobTracker->result_file_path),
+            404
+        );
 
-            if (! empty($validated['types'])) {
-                $query->whereIn('type', $validated['types']);
-            }
-
-            if (! empty($validated['category_id'])) {
-                $query->whereHas('categories', fn ($q) => $q->where('categories.id', $validated['category_id']));
-            }
-        }
-
-        // ใช้วิธี chunk แทนการ query ProductValue ทีละสินค้า (ปัญหา N+1 ที่ทำให้
-        // export ไฟล์ใหญ่ๆ ช้ามาก) — ดึงค่ามาเป็นแบทช์ครั้งละ 500 สินค้า
-        // ในขณะที่ `cursor()` ยังช่วยคุมไม่ให้สินค้าทั้งหมดโหลดเข้า memory รวดเดียว
-        $rows = (function () use ($query, $attributesByCode, $selectedColumns) {
-            foreach ($query->cursor()->chunk(500) as $products) {
-                $valuesByProduct = ProductValue::whereIn('product_id', $products->pluck('id'))
-                    ->whereNull('channel_id')
-                    ->whereNull('locale_id')
-                    ->get(['product_id', 'attribute_id', 'value'])
-                    ->groupBy('product_id');
-
-                foreach ($products as $product) {
-                    $values = $valuesByProduct->get($product->id, collect())->pluck('value', 'attribute_id');
-
-                    $row = array_intersect_key([
-                        'sku' => $product->sku,
-                        'family_code' => $product->family?->code ?? '',
-                        'type' => $product->type,
-                        'enabled' => $product->enabled ? '1' : '0',
-                        'status' => $product->status,
-                    ], array_flip($selectedColumns));
-
-                    foreach ($attributesByCode as $code => $attribute) {
-                        if (in_array($code, $selectedColumns, true)) {
-                            $row[$code] = $values->get($attribute->id, '');
-                        }
-                    }
-
-                    yield $row;
-                }
-            }
-        })();
-
-        Storage::disk('local')->makeDirectory('tmp-exports');
-        $tempRelativePath = 'tmp-exports/'.Str::uuid().'.'.$format;
-        $tempAbsolutePath = Storage::disk('local')->path($tempRelativePath);
-
-        SpreadsheetWriter::write($tempAbsolutePath, $format, $selectedColumns, $rows, ',');
-
-        $downloadName = 'products_'.now()->format('Ymd_His').'.'.$format;
-
-        return response()->download($tempAbsolutePath, $downloadName)->deleteFileAfterSend(true);
+        return Storage::disk('local')->download($jobTracker->result_file_path, basename($jobTracker->result_file_path));
     }
 
     private function formatAttributeValue(Attribute $attribute, ?string $rawValue): mixed
@@ -1548,7 +1523,8 @@ class ProductController extends Controller
             $parentProduct = Product::create([
                 'sku' => $validated['sku'],
                 'type' => $validated['type'],
-                'enabled' => $validated['enabled'],
+                // สินค้าใหม่เริ่มที่สถานะ New เสมอ (Product::$attributes) — เผยแพร่ได้เฉพาะ Active
+                'enabled' => $validated['enabled'] && Product::canPublishWithStatus(Product::STATUS_NEW),
                 'show_on_home' => $validated['show_on_home'] ?? false,
                 'configurable_attributes' => $validated['configurable_attributes'] ?? null,
                 'created_by' => $request->user()?->id,
@@ -1828,6 +1804,90 @@ class ProductController extends Controller
     public function show(Product $product): Response
     {
         return Inertia::render('catalog/products/show', $this->buildProductFormProps($product));
+    }
+
+    /**
+     * ผลกระทบของการเปลี่ยน หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ก่อนบันทึกจริง — หน้าแก้ไขสินค้าเรียก
+     * ตอนกดบันทึกแล้วค่า 3 ตัวนี้ต่างจากที่บันทึกไว้ เพื่อเตือนผู้ใช้ว่าตระกูลแอตทริบิวต์ (= ฟิลด์ที่
+     * ต้องกรอก) จะเปลี่ยนอย่างไร ไม่บันทึกอะไร
+     *
+     * หมวดหมู่หลังบันทึก = หมวดหมู่ตามรหัสที่เลือก + หมวดหมู่ที่ผูกอยู่แล้วซึ่งไม่ถูกถอด (ดู
+     * relinkMasterCategoryCodes()/ProductCategoryLinker::staleCategoryIds()) ไม่เลือกเลย = ถอดหมด
+     * ช่องที่ "จะถูกซ่อน" = attribute ของตระกูลที่ถูกเอาออกซึ่งไม่มีในตระกูลใหม่ และมีค่ากรอกไว้แล้ว
+     * (ค่ายังอยู่ใน DB ไม่ได้ถูกลบ — เปลี่ยนกลับเมื่อไหร่ก็เห็นอีกครั้ง)
+     */
+    public function masterCategoryImpact(Request $request, Product $product): JsonResponse
+    {
+        $validated = $request->validate([
+            'codes' => ['nullable', 'array', 'max:3'],
+            'codes.*' => ['nullable', 'string', 'max:100'],
+        ]);
+        $codes = array_values(array_filter($validated['codes'] ?? [], fn ($c) => is_string($c) && $c !== ''));
+
+        $currentFamilyIds = $this->familyAttributeResolver->effectiveFamilyIds($product);
+
+        if (empty($codes)) {
+            $nextCategoryIds = [];
+        } else {
+            $linkedIds = $product->categories()->pluck('categories.id')->map(fn ($id) => (int) $id)->all();
+            $staleIds = ProductCategoryLinker::staleCategoryIds($product, $codes);
+            $chosenIds = Category::whereIn('code', $codes)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            $nextCategoryIds = array_values(array_unique(array_merge(array_diff($linkedIds, $staleIds), $chosenIds)));
+        }
+        $nextFamilyIds = $this->familyAttributeResolver->familyIdsForCategoryIds($nextCategoryIds);
+
+        $removedFamilyIds = array_values(array_diff($currentFamilyIds, $nextFamilyIds));
+        $addedFamilyIds = array_values(array_diff($nextFamilyIds, $currentFamilyIds));
+
+        $attributeIdsOf = fn (array $familyIds) => empty($familyIds)
+            ? []
+            : FamilyAttribute::whereIn('family_id', $familyIds)->pluck('attribute_id')->map(fn ($id) => (int) $id)->unique()->all();
+        $currentAttributeIds = $attributeIdsOf($currentFamilyIds);
+        $nextAttributeIds = $attributeIdsOf($nextFamilyIds);
+        $droppedAttributeIds = array_values(array_diff($currentAttributeIds, $nextAttributeIds));
+        $newAttributeIds = array_values(array_diff($nextAttributeIds, $currentAttributeIds));
+
+        $filledAttributeIds = ProductValue::where('product_id', $product->id)
+            ->whereNotNull('value')->where('value', '!=', '')->where('value', '!=', '[]')
+            ->distinct()->pluck('attribute_id')->map(fn ($id) => (int) $id)->all();
+
+        $hiddenFilled = Attribute::whereIn('id', array_intersect($droppedAttributeIds, $filledAttributeIds))->orderBy('id')->get();
+        $newRequiredEmptyCount = Attribute::whereIn('id', array_diff($newAttributeIds, $filledAttributeIds))->where('is_required', true)->count();
+
+        $familyNames = AttributeFamily::whereIn('id', array_merge($currentFamilyIds, $nextFamilyIds))->get(['id', 'code', 'name'])->keyBy('id');
+        $describe = fn (array $ids) => collect($ids)->map(fn ($id) => $familyNames->get($id))->filter()
+            ->map(fn ($f) => ['id' => $f->id, 'name' => $f->name ?: $f->code])->values()->all();
+
+        return response()->json([
+            'changes_families' => ! empty($removedFamilyIds) || ! empty($addedFamilyIds),
+            'removed_families' => $describe($removedFamilyIds),
+            'added_families' => $describe($addedFamilyIds),
+            'hidden_filled_count' => $hiddenFilled->count(),
+            'hidden_filled' => $hiddenFilled->take(10)->map(fn (Attribute $a) => $a->name ?: $a->code)->values()->all(),
+            'new_required_empty_count' => $newRequiredEmptyCount,
+        ]);
+    }
+
+    /**
+     * เปิดหน้าดูสินค้าด้วยรหัสสินค้า แทน id ภายใน — ไว้ส่งลิงก์ให้คนอื่น/พิมพ์เข้าเอง แล้ว redirect
+     * ไป products.show ตามปกติ ตรงตัวก่อน (SKU ยาวเหมือนกันแต่ต่างตัวพิมพ์เล็ก/ใหญ่ถือเป็นคนละ
+     * ตัวได้) ไม่เจอค่อยหาแบบไม่สนตัวพิมพ์ ถ้าแบบไม่สนตัวพิมพ์เจอมากกว่า 1 ตัวถือว่าไม่เจอ
+     * แทนที่จะเดาเปิดตัวใดตัวหนึ่ง query string (เช่น ?platform=) ส่งต่อไปด้วย
+     */
+    public function showBySku(Request $request, string $sku): RedirectResponse
+    {
+        $sku = trim($sku);
+        $productId = Product::where('sku', $sku)->value('id');
+
+        if ($productId === null) {
+            $matches = Product::whereRaw('LOWER(sku) = LOWER(?)', [$sku])->limit(2)->pluck('id');
+            abort_unless($matches->count() === 1, 404);
+            $productId = $matches->first();
+        }
+
+        $query = $request->getQueryString();
+
+        return redirect(route('catalog.products.show', $productId).($query ? '?'.$query : ''));
     }
 
     /**
@@ -3597,6 +3657,14 @@ class ProductController extends Controller
             ->pluck('sku', 'id')
             ->map(fn ($sku) => trim((string) $sku));
 
+        // ออกจาก New ไปแล้ว ย้อนกลับมา New ไม่ได้ (ดู Product::canChangeStatus())
+        $validator->after(function ($validator) use ($request, $product) {
+            $requested = $request->input('status');
+            if (is_string($requested) && ! Product::canChangeStatus($product->status, $requested)) {
+                $validator->errors()->add('status', __('Status cannot be changed back to New once the product has left New.'));
+            }
+        });
+
         $validator->after(function ($validator) use ($request) {
             $validAttributeIds = null;
 
@@ -3661,7 +3729,10 @@ class ProductController extends Controller
                 'sku' => $validated['sku'],
                 'family_id' => $validated['family_id'] ?? null,
                 'type' => strtolower($validated['type']),
-                'enabled' => $validated['enabled'],
+                // เผยแพร่ได้เฉพาะสถานะ Active — เปลี่ยนเป็น Hold/Delete (หรือยังเป็น New) = ไม่เผยแพร่ทันที
+                // enabled ที่เปลี่ยนเป็น false จะไป trigger ProductDataChanged → ยกเลิกการขายบน
+                // Marketplace อัตโนมัติ (QueueAutoMarketplaceSync) เหมือนปิดสวิตช์เอง
+                'enabled' => $validated['enabled'] && Product::canPublishWithStatus($validated['status'] ?? $product->status),
                 'show_on_home' => $validated['show_on_home'] ?? (bool) $product->show_on_home,
                 'status' => $validated['status'] ?? $product->status,
                 'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
@@ -4238,6 +4309,7 @@ class ProductController extends Controller
                         $childProduct->update([
                             'sku' => $variantData['sku'],
                             'enabled' => $product->enabled,
+                            'status' => $product->status,
                             'show_on_home' => (bool) $product->show_on_home,
                             'updated_by' => $request->user()?->id,
                         ]);
@@ -4253,6 +4325,7 @@ class ProductController extends Controller
                             'family_id' => $product->family_id,
                             'type' => 'simple',
                             'enabled' => $product->enabled,
+                            'status' => $product->status,
                             'show_on_home' => (bool) $product->show_on_home,
                             'created_by' => $request->user()?->id,
                             'updated_by' => $request->user()?->id,
@@ -4481,6 +4554,11 @@ class ProductController extends Controller
         ]);
 
         $shopIds = collect($validated['published_shop_ids'] ?? [])->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        // เผยแพร่ได้เฉพาะสถานะ Active (อ่านจาก DB — "บันทึกและเผยแพร่" บันทึกฟอร์มก่อนเรียกตัวนี้)
+        if (! Product::canPublishWithStatus($product->fresh()->status)) {
+            return back()->with('error', __('Only products with status Active can be published.'));
+        }
 
         DB::transaction(function () use ($request, $product, $shopIds) {
             $this->assertNotStale($request, Product::where('id', $product->id)->lockForUpdate()->firstOrFail());

@@ -19,8 +19,8 @@ test('a newly created product starts with status new', function () {
     expect(Product::where('sku', 'STATUS-NEW-1')->value('status'))->toBe('new');
 });
 
-test('update saves the chosen status without touching enabled', function () {
-    $product = Product::create(['sku' => 'STATUS-HOLD-1', 'type' => 'simple', 'enabled' => true]);
+test('changing the status to hold unpublishes the product immediately', function () {
+    $product = Product::create(['sku' => 'STATUS-HOLD-1', 'type' => 'simple', 'enabled' => true, 'status' => 'active']);
 
     app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [
         'sku' => 'STATUS-HOLD-1',
@@ -31,7 +31,7 @@ test('update saves the chosen status without touching enabled', function () {
 
     $product->refresh();
     expect($product->status)->toBe('hold');
-    expect($product->enabled)->toBeTrue();
+    expect($product->enabled)->toBeFalse();
 });
 
 test('update keeps the current status when the request does not send one', function () {
@@ -71,4 +71,44 @@ test('changing only the status bumps the storefront cache version', function () 
     ]), $product);
 
     expect(Product::storefrontVersion())->not->toBe($before);
+});
+
+test('an Active product keeps publishing when saved', function () {
+    $product = Product::create(['sku' => 'STATUS-ACTIVE-1', 'type' => 'simple', 'enabled' => false, 'status' => 'active']);
+
+    app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => 'STATUS-ACTIVE-1', 'type' => 'simple', 'enabled' => true, 'status' => 'active',
+    ]), $product);
+
+    expect($product->fresh()->enabled)->toBeTrue();
+});
+
+test('a New product cannot be published', function () {
+    $product = Product::create(['sku' => 'STATUS-NEW-PUB', 'type' => 'simple', 'enabled' => false]);
+
+    app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => 'STATUS-NEW-PUB', 'type' => 'simple', 'enabled' => true, 'status' => 'new',
+    ]), $product);
+
+    expect($product->fresh()->enabled)->toBeFalse();
+});
+
+test('status cannot go back to New once it has left New', function () {
+    $product = Product::create(['sku' => 'STATUS-BACK-1', 'type' => 'simple', 'enabled' => false, 'status' => 'active']);
+
+    expect(fn () => app(ProductController::class)->update(Request::create("/catalog/products/{$product->id}", 'PUT', [
+        'sku' => 'STATUS-BACK-1', 'type' => 'simple', 'enabled' => false, 'status' => 'new',
+    ]), $product))->toThrow(ValidationException::class);
+
+    expect($product->fresh()->status)->toBe('active');
+});
+
+test('the publish action refuses a product that is not Active', function () {
+    $product = Product::create(['sku' => 'STATUS-PUB-HOLD', 'type' => 'simple', 'enabled' => false, 'status' => 'hold']);
+    $this->actingAs(\App\Models\User::factory()->create());
+
+    app(ProductController::class)->publish(Request::create("/catalog/products/{$product->id}/publish", 'POST', []), $product);
+
+    expect($product->fresh()->enabled)->toBeFalse();
+    expect(session('error'))->not->toBeNull();
 });

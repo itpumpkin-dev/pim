@@ -47,6 +47,20 @@ class EffectiveFamilyAttributeResolver
             ? $product->categories->pluck('id')
             : $product->categories()->pluck('categories.id');
 
+        return $this->familyIdsForCategoryIds($categoryIds->all());
+    }
+
+    /**
+     * ตระกูลของชุดหมวดหมู่ที่ให้มา เรียงแบบเดียวกับ effectiveFamilyIds() — แยกออกมาให้หน้าแก้ไข
+     * สินค้าถามล่วงหน้าได้ว่า "ถ้าเปลี่ยนเป็นหมวดหมู่ชุดนี้ จะได้ตระกูลอะไร" ก่อนบันทึกจริง (ดู
+     * ProductController::masterCategoryImpact())
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return array<int, int>
+     */
+    public function familyIdsForCategoryIds(array $categoryIds): array
+    {
+        $categoryIds = collect($categoryIds)->map(fn ($id) => (int) $id)->unique()->values();
         if ($categoryIds->isEmpty()) {
             return [];
         }
