@@ -78,11 +78,11 @@
     "saveAndPublish": "Guardar y publicar",
     "saveAndTranslate": "Guardar y traducir a otros idiomas",
     "productSavedTranslationQueued": "Producto guardado: la traducción a los demás idiomas vacíos se ha puesto en cola.",
-    "saveAsTemplate": "Guardar como plantilla",
+    "saveAsTemplate": "Duplicar solo la estructura",
     "confirmSaveDraft": "Confirmar guardar borrador",
     "confirmSaveDraftMessage": "Esto guardará los cambios actuales y siempre pondrá el producto como \"deshabilitado\" (no publicado). ¿Continuar?",
-    "confirmSaveAsTemplate": "Confirmar guardar como plantilla",
-    "confirmSaveAsTemplateMessage": "Esto guardará los cambios actuales en este producto y luego creará una copia deshabilitada como plantilla. ¿Continuar?",
+    "confirmSaveAsTemplate": "Confirmar duplicar solo la estructura",
+    "confirmSaveAsTemplateMessage": "Primero se guardan los cambios de este producto y luego se crea un producto nuevo con la misma estructura (familia de atributos y tipo) pero sin datos. El nuevo producto tendrá la publicación desactivada. ¿Continuar?",
     "autosaveDraftFoundTitle": "Se encontró un borrador guardado automáticamente",
     "autosaveDraftFoundMessage": "Encontramos trabajo guardado automáticamente el {{time}} (probablemente de una sesión que terminó inesperadamente). ¿Desea restaurarlo?",
     "restoreDraft": "Restaurar borrador",
@@ -946,8 +946,11 @@
     "editScopeChipTooltip": "Idioma y canal cuyos valores está editando — haga clic para cambiar",
     "editingLocaleHelp": "Al cambiarlo también cambia el idioma de toda la aplicación.",
     "productActionsTitle": "Acciones del producto",
-    "duplicateProductHelp": "Crear un producto nuevo (SKU nuevo) copiado de este.",
+    "duplicateProductHelp": "Crear un producto nuevo (SKU nuevo) copiando todos los datos de este.",
     "queueTranslationsHelp": "Poner en cola la traducción automática de los campos aún vacíos en otros idiomas.",
     "deleteProductHelp": "Eliminar este producto y sus variantes de forma permanente. No se puede deshacer.",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "saveAsTemplateHelp": "Crear un producto nuevo (SKU nuevo) con la misma estructura pero sin datos — primero se guardan los cambios de este producto.",
+    "productStatusHelp": "Solo se usa para etiquetar y filtrar dentro del PIM — no afecta a los marketplaces ni a la página de Inicio.",
+    "productStatusDeleteHelp": "\"Delete\" solo oculta el producto de la lista de productos. No se elimina ni se retira de los marketplaces."
 }

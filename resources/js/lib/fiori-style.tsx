@@ -210,6 +210,42 @@ export const fioriTabsSx: SxProps<Theme> = {
 };
 
 /**
+ * Variant of fioriTabsSx where the selected tab is a soft brand-tinted "pill"
+ * (rounded fill + faint brand ring) instead of the 3px underline indicator.
+ * Tabs sit vertically centred in the strip with a small gap between them, so
+ * the fill reads as a chip rather than a block glued to the bottom hairline.
+ * Spread onto `<Tabs sx={{ ...fioriTabsFilledSx, px: 2 }}>`.
+ */
+export const fioriTabsFilledSx: SxProps<Theme> = {
+    minHeight: 52,
+    borderBottom: `1px solid ${FIORI.border}`,
+    '& .MuiTabs-indicator': { display: 'none' },
+    '& .MuiTabs-flexContainer': { gap: 0.5, alignItems: 'center', height: '100%' },
+    '& .MuiTabs-scroller': { display: 'flex', alignItems: 'center' },
+    '& .MuiTab-root': {
+        textTransform: 'none',
+        fontWeight: 500,
+        fontSize: '0.875rem',
+        minHeight: 34,
+        height: 34,
+        px: 1.75,
+        my: 1,
+        borderRadius: '8px',
+        color: FIORI.textSecondary,
+        transition: 'color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease',
+        '&:hover': { color: FIORI.textPrimary, backgroundColor: FIORI.hover },
+        '&.Mui-selected': {
+            color: FIORI.brand,
+            fontWeight: 600,
+            backgroundColor: FIORI.brandBg,
+            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${FIORI.brand} 28%, transparent)`,
+        },
+        '&.Mui-selected:hover': { backgroundColor: FIORI.brandBg },
+        '&.Mui-focusVisible': { outline: `2px solid ${FIORI.brand}`, outlineOffset: 1 },
+    },
+};
+
+/**
  * SAP Fiori (Horizon) "Toggle Button" for a MUI `<ToggleButtonGroup>` /
  * `<ToggleButton>`: compact segmented control — non-uppercase labels, muted
  * text on a surface, `hover` tint, and a pressed state that is a pale brand

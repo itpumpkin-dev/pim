@@ -25,7 +25,7 @@ import {
     fioriIconButtonSx,
     fioriNegativeSx,
     fioriSwitchSx,
-    fioriTabsSx,
+    fioriTabsFilledSx,
     fioriToggleButtonGroupSx,
 } from '@/lib/fiori-style';
 import { localizedLabel, type Translation } from '@/lib/localized-label';
@@ -571,6 +571,9 @@ export default function ProductEdit({
         initialValues[productTypeAttribute.id] = (productValues[productTypeAttribute.id] as any) || {};
     }
 
+    // สำเนาของ defaults.values ของ useForm() (Inertia ไม่เปิดให้อ่าน defaults) — ใช้ตอนเติมค่าที่
+    // โหลดมาตอนสลับภาษา/ช่องทางเข้า baseline ของ isDirty ด้วย (ดู effect ที่ fetch attribute-values)
+    const baselineValuesRef = useRef(initialValues);
     const { data, setData, post, transform, processing, errors, isDirty, setDefaults } = useForm<ProductForm>({
         sku: product.sku || '',
         family_id: product.family_id,
@@ -1599,8 +1602,8 @@ export default function ProductEdit({
                 // placement ตัวเองเท่านั้น ไม่ใช่ทุก group ได้ค่าเดียวกันหมด
                 const serverValues = json.values as Record<string, Record<string, string | null> | undefined>;
 
-                setData((prev) => {
-                    const nextValues = { ...prev.values };
+                const mergeServerValues = (values: ProductForm['values']): ProductForm['values'] => {
+                    const nextValues = { ...values };
                     assignedGroups.forEach((g) => {
                         const groupKey = g.id === 0 ? 'ungrouped' : String(g.id);
                         g.attributes.forEach((attr) => {
@@ -1621,8 +1624,15 @@ export default function ProductEdit({
                             };
                         });
                     });
-                    return { ...prev, values: nextValues };
-                });
+                    return nextValues;
+                };
+
+                // ค่าที่โหลดมาเป็นค่า "ที่บันทึกไว้แล้ว" ของ scope นี้ ไม่ใช่การแก้ไข — ต้องเติมเข้า
+                // baseline ของ isDirty ด้วย ไม่งั้นแค่สลับภาษา/ช่องทางก็กลายเป็น "มีการแก้ไขที่ยังไม่
+                // บันทึก" (ปุ่มบันทึกกดได้, ออกจากหน้าโดนเตือน, Push โดนบล็อกให้บันทึกก่อน)
+                baselineValuesRef.current = mergeServerValues(baselineValuesRef.current);
+                setDefaults('values', baselineValuesRef.current);
+                setData((prev) => ({ ...prev, values: mergeServerValues(prev.values) }));
             })
             .catch(() => {
                 // แค่พยายาม fetch ใหม่ ถ้าพลาดก็ปล่อยค่าที่โหลดไว้แล้วไว้เหมือนเดิม ไม่ต้องทำอะไรเพิ่ม
@@ -1725,6 +1735,7 @@ export default function ProductEdit({
                 // Product จะไม่มีวัน disabled กลับเลยหลัง save ถ้าไม่รีเซ็ต baseline
                 // ตรงนี้เอง ดู useForm.d.ts's setDefaults()
                 setDefaults();
+                baselineValuesRef.current = data.values;
                 options?.onSuccess?.();
             },
             // แบนเนอร์ "กรุณาแก้ไขข้อผิดพลาดก่อนบันทึก" (ดู errors block ด้านล่าง)
@@ -1968,6 +1979,7 @@ export default function ProductEdit({
                     // ปุ่ม Save Product จะโผล่ enabled กลับมาเฉยๆ ทั้งที่ทุกอย่างที่
                     // เห็นอยู่ถูก save/publish ไปแล้วจริงๆ ครบถ้วน
                     setDefaults();
+                    baselineValuesRef.current = data.values;
                 },
                 onFinish: () => setPublishing(false),
             },
@@ -2038,19 +2050,19 @@ export default function ProductEdit({
                 {/* แถบแท็บบนสุด */}
                 <Box
                     sx={{
-                        bgcolor: '#fff',
+                        bgcolor: FIORI.surface,
                         // borderBottom: `1px solid ${UI_BORDER}`,
                         px: { xs: 2, md: 4 },
                     }}
                 >
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsSx}>
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsFilledSx}>
                         <Tab label={t('generalTitle')} />
                         {canViewHistory && <Tab label={t('historyTab')} />}
                     </Tabs>
                 </Box>
 
                 {/* แถบเครื่องมือย่อยใต้หัวข้อ */}
-                <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: '#fff', borderBottom: '1px solid #f1f5f9', mb: 0.5 }}>
+                <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}`, mb: 0.5 }}>
                     <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
                         <Stack direction="row" spacing={1} alignItems="center">
                             {/* ย้ายมาจากปุ่มข้อความฝั่งขวา (เดิมอยู่รวมกับ Publish/Save Product) มา
@@ -2218,6 +2230,29 @@ export default function ProductEdit({
                                                         </Typography>
                                                     </Box>
                                                 )}
+                                                {/* "ทำสำเนาเฉพาะโครงสร้าง" (เดิม "บันทึกเป็นเทมเพลต" ในเมนูของปุ่มบันทึก) —
+                                                    ย้ายมาไว้คู่กับ "ทำสำเนา" เพราะเป็นการทำสำเนาเหมือนกัน ต่างแค่ไม่คัดลอก
+                                                    ค่าใดๆ (asTemplate — ดู saveAsTemplate()) gate ด้วย canDuplicateProduct
+                                                    ตัวเดียวกันเพราะ endpoint duplicate เช็ค products.create_products */}
+                                                {canDuplicateProduct && (
+                                                    <Box>
+                                                        <Button
+                                                            fullWidth
+                                                            variant="outlined"
+                                                            startIcon={<ContentCopyIcon fontSize="small" />}
+                                                            onClick={() => {
+                                                                setMoreDrawerOpen(false);
+                                                                openDuplicateSkuDialog(() => setSaveAsTemplateConfirmOpen(true));
+                                                            }}
+                                                            sx={{ ...fioriDefaultSx, justifyContent: 'flex-start' }}
+                                                        >
+                                                            {t('saveAsTemplate')}
+                                                        </Button>
+                                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                            {t('saveAsTemplateHelp')}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
                                                 {canQueueTranslations && (
                                                     <Box>
                                                         <Button
@@ -2274,7 +2309,12 @@ export default function ProductEdit({
                                 ให้ toolbar รกด้วยปุ่มแยกอีกหลายปุ่ม (View Page ย้ายมาจากปุ่ม
                                 "ดูสินค้า" เดิมที่เคยแยกอยู่ต่างหากตรงนี้ — Publish ก็ย้ายเข้ามารวมที่
                                 นี่เหมือนกัน ดู saveAndPublish() ด้านล่าง) */}
-                            <ButtonGroup variant="contained">
+                            {/* เส้นคั่นระหว่างปุ่มของ ButtonGroup ใช้สี theme.primary (ส้ม) เป็นค่าตั้งต้น — ปุ่มถูก
+                                ทาสีแบรนด์ Fiori (น้ำเงิน) ทับไว้ เส้นเลยโผล่เป็นสีส้มแดง ใช้เส้นขาวโปร่งแทน */}
+                            <ButtonGroup
+                                variant="contained"
+                                sx={{ '& .MuiButtonGroup-grouped:not(:last-of-type)': { borderColor: 'rgba(255, 255, 255, 0.35)' } }}
+                            >
                                 {/* กัน traffic ตอนไม่มีอะไรให้บันทึกจริงๆ — isDirty มาจาก useForm()
                                     เทียบ data ปัจจุบันกับค่าตั้งต้นตอนโหลดหน้า (รวมถึง data.values
                                     ที่ทุกฟิลด์ attribute เขียนผ่าน setAttributeValue อยู่แล้ว) ปุ่มนี้
@@ -2336,26 +2376,6 @@ export default function ProductEdit({
                                     >
                                         <PublishIcon fontSize="small" sx={{ mr: 1.5 }} />
                                         {t('saveAndPublish')}
-                                    </MenuItem>
-                                )}
-                                {/* saveAsTemplate() ลง duplicateProduct() ต่อหลัง save สำเร็จ —
-                                    endpoint นั้นเช็ค products.create_products ฝั่ง server เหมือน
-                                    "ทำสำเนา" ใน More menu ด้านบน เลย gate MenuItem นี้ด้วย
-                                    canDuplicateProduct ตัวเดียวกัน ไม่ให้โชว์ปุ่มที่กดแล้วต้องพังแน่ๆ
-                                    ที่ขั้นตอน duplicate ถ้าสิทธิ์เปลี่ยนกลางเซสชัน (เช่น role โดนแก้
-                                    ระหว่างที่หน้านี้เปิดค้างอยู่) duplicateProduct()'s onError จะโชว์
-                                    ผ่าน pushResult snackbar ว่าการแก้ไขที่ save ไปแล้วไม่ได้หาย
-                                    เพียงแต่ขั้นตอนทำสำเนาต่างหากที่พัง (ดู duplicateProduct()'s
-                                    $errorMessage) */}
-                                {canDuplicateProduct && (
-                                    <MenuItem
-                                        onClick={() => {
-                                            setSaveMenuAnchor(null);
-                                            openDuplicateSkuDialog(() => setSaveAsTemplateConfirmOpen(true));
-                                        }}
-                                    >
-                                        <ContentCopyIcon fontSize="small" sx={{ mr: 1.5 }} />
-                                        {t('saveAsTemplate')}
                                     </MenuItem>
                                 )}
                                 <Divider />
@@ -2457,7 +2477,7 @@ export default function ProductEdit({
                                 sx={{
                                     mb: 1,
                                     borderRadius: 0,
-                                    bgcolor: '#fff',
+                                    bgcolor: FIORI.surface,
                                     position: 'sticky',
                                     // ติดอยู่บนสุดของ scroll container ของตัวเอง (กล่อง
                                     // "Scrollable Body" ด้านบน) — กล่องนั้นเป็นสิ่งเดียวที่
@@ -2472,7 +2492,7 @@ export default function ProductEdit({
                                     onChange={(_, v) => scrollToGroup(v)}
                                     variant="scrollable"
                                     scrollButtons="auto"
-                                    sx={{ ...fioriTabsSx, px: 2 }}
+                                    sx={{ ...fioriTabsFilledSx, px: 2 }}
                                 >
                                     {assignedGroups.map((group) => (
                                         <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
@@ -2633,7 +2653,7 @@ export default function ProductEdit({
                                                         groupSectionRefs.current[idx] = el;
                                                     }}
                                                     variant="outlined"
-                                                    sx={{ p: 3, borderRadius: 2, bgcolor: '#fff', scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
+                                                    sx={{ p: 3, borderRadius: 2, bgcolor: FIORI.surface, scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
                                                 >
                                                     <Stack
                                                         direction="row"
@@ -2946,6 +2966,10 @@ export default function ProductEdit({
                                                         </MenuItem>
                                                     ))}
                                                 </TextField>
+                                                {/* สถานะนี้คนละเรื่องกับ 2 สวิตช์ด้านบน — บอกให้ชัด โดยเฉพาะ "Delete" ที่ไม่ได้ลบจริง */}
+                                                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                                                    {data.status === 'delete' ? t('productStatusDeleteHelp') : t('productStatusHelp')}
+                                                </Typography>
                                             </Box>
 
                                             {/* เดิมมีช่อง "Product Type" (Simple/Configurable) เป็น dropdown ให้แก้
@@ -3052,6 +3076,55 @@ export default function ProductEdit({
                                                 />
                                             </Box>
                                         </FioriFormGroup>
+
+                                        {/* แผง "Master Categories" — หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ย้ายมา
+                                        แทนที่บล็อค Categories/Brand เดิม (จัดการทางหน้า Master แทนแล้ว — ดู
+                                        catalog/categories/*, catalog/product-groups/*) เหลือแค่ 3 attribute
+                                        ธรรมดา (pcatname/psubcatname/productgroupname) ที่ options mirror ต้นไม้
+                                        categories มาเป๊ะๆ ผ่าน categories.code (ดู ProductCategoryLinker) ไม่ได้
+                                        ผูก attribute_family ไหนเลย เลยแยก panel ของตัวเองแทนที่จะปนใน groupsData
+                                        ทั่วไป (ดู ProductController::buildProductFormProps()) — บังคับเลือกตาม
+                                        step (หมวดหมู่ -> หมวดหมู่ย่อย -> กลุ่มสินค้า เห็นทีละขั้นเท่านั้น ดู
+                                        cascadedMasterCategoryAttributes/handleMasterCategoryChange ด้านบน) มีปุ่ม
+                                        Save แยกของตัวเอง (เหมือน Sales Channels) ไม่ต้อง submit ทั้งฟอร์มใหญ่ —
+                                        ฝั่ง backend (ProductController::updateMasterCategories()) จะ sync เข้า
+                                        ต้นไม้ categories จริงให้เอง (เรียก ProductCategoryLinker::linkFromCodes())
+                                        ซึ่งเป็นตัวที่ effectiveFamilyIds() ใช้อยู่แล้ว — ถ้ากลุ่มสินค้าที่เลือกมี
+                                        ตระกูลแอตทริบิวต์ผูกไว้ (ดู Category::attributeFamilies()) แอตทริบิวต์ของ
+                                        ตระกูลนั้นจะโผล่มาให้กรอกทันทีตอนเปิดแก้ไขสินค้านี้รอบถัดไป — เหมือนกับที่
+                                        field Family เคยมีผลแบบเดียวกันตอน save+reload มาก่อน ไม่ต้อง fetch สดๆ
+                                        ก่อน save แต่อย่างใด
+
+                                        สิทธิ์ "แก้ไข" แยกของตัวเอง (resource `master_categories`) ไม่ได้พ่วงกับ
+                                        products.edit_products ทั่วไปอีกต่อไป — แผงนี้ยังโชว์ให้ดูได้เสมอ (ไม่มี
+                                        view แยกแบบ Sales Channels เพราะไม่มีเหตุผลต้องซ่อนจากการดู) แค่ไม่มีสิทธิ์
+                                        แก้จะปิด Save + ปิด interaction ทั้งหมดในแผงแทน (pointerEvents) */}
+                                        {cascadedMasterCategoryAttributes.length > 0 && (
+                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
+                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
+                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
+                                                        {t('masterCategoriesBlockTitle')}
+                                                    </Typography>
+                                                    {canEditMasterCategories &&
+                                                        !canEditProducts &&
+                                                        sectionSaveButton('master-categories', () => {
+                                                            const payload: Record<string, FormDataConvertible> = {};
+                                                            masterCategoryAttributes.forEach((attr) => {
+                                                                payload[attr.code] = selectedMasterCategoryCode(attr);
+                                                            });
+                                                            saveSection('master-categories', payload);
+                                                        })}
+                                                </Stack>
+                                                {sectionSaveError?.section === 'master-categories' && !masterCategoryPickerOpen && (
+                                                    <Box sx={{ mb: 2 }}>
+                                                        <FioriMessageStrip severity="error">{sectionSaveError.message}</FioriMessageStrip>
+                                                    </Box>
+                                                )}
+                                                <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
+                                                    {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
+                                                </Stack>
+                                            </Paper>
+                                        )}
 
                                         {/* แผง Sales Channels — มีสิทธิ์แยกของตัวเอง (sales_channels) ไม่ได้
                                         พ่วงกับ products.edit_products ทั่วไปอีกต่อไป ไม่มี view = ไม่โชว์
@@ -3239,32 +3312,35 @@ export default function ProductEdit({
                                                                                     {canPushOrDeactivate && (
                                                                                         // ปิด "การเผยแพร่" (ค่าที่บันทึกแล้ว — backend เช็คจาก DB) = push ไม่ได้
                                                                                         // ดู ProductController::queueMarketplaceSync()
-                                                                                        <span
-                                                                                            // ปุ่มที่ disabled ไม่รับ click — กันไม่ให้ click ทะลุไปติ๊กแถว
-                                                                                            onClick={(e) => e.stopPropagation()}
+                                                                                        <Tooltip
                                                                                             title={
                                                                                                 product.enabled
                                                                                                     ? t('pushToPlatformIconTooltip', { platform: group.platform })
                                                                                                     : t('pushDisabledNotPublishing')
                                                                                             }
                                                                                         >
-                                                                                            <IconButton
-                                                                                                size="small"
-                                                                                                disabled={!product.enabled}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setPushConfirmShop({
-                                                                                                        id: ch.shop_id as number,
-                                                                                                        name: ch.name || ch.code,
-                                                                                                        platform: group.platform,
-                                                                                                    });
-                                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                                }}
-                                                                                                sx={{ color: FIORI.textSecondary }}
+                                                                                            <span
+                                                                                                // ปุ่มที่ disabled ไม่รับ click — กันไม่ให้ click ทะลุไปติ๊กแถว
+                                                                                                onClick={(e) => e.stopPropagation()}
                                                                                             >
-                                                                                                <PublishIcon fontSize="small" />
-                                                                                            </IconButton>
-                                                                                        </span>
+                                                                                                <IconButton
+                                                                                                    size="small"
+                                                                                                    disabled={!product.enabled}
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        setPushConfirmShop({
+                                                                                                            id: ch.shop_id as number,
+                                                                                                            name: ch.name || ch.code,
+                                                                                                            platform: group.platform,
+                                                                                                        });
+                                                                                                        checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                                    }}
+                                                                                                    sx={{ color: FIORI.textSecondary }}
+                                                                                                >
+                                                                                                    <PublishIcon fontSize="small" />
+                                                                                                </IconButton>
+                                                                                            </span>
+                                                                                        </Tooltip>
                                                                                     )}
                                                                                     {/* ต่างจาก Push (โชว์ได้ตลอดอย่างปลอดภัย — เพราะมันแค่สร้าง
                                                                             หรืออัปเดต) ปุ่ม Deactivate จะมีความหมายก็ต่อเมื่อมีของ
@@ -3274,22 +3350,23 @@ export default function ProductEdit({
                                                                             "never been pushed — nothing to deactivate" จาก
                                                                             backend แทนที่จะไม่โชว์ปุ่มไปเลยตั้งแต่แรก */}
                                                                                     {canPushOrDeactivate && ch.is_live && (
-                                                                                        <IconButton
-                                                                                            size="small"
-                                                                                            title={t('deactivateOnPlatformIconTooltip', { platform: group.platform })}
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                setDeactivateConfirmShop({
-                                                                                                    id: ch.shop_id as number,
-                                                                                                    name: ch.name || ch.code,
-                                                                                                    platform: group.platform,
-                                                                                                });
-                                                                                                checkPlatformStatus(ch.shop_id as number, group.platform);
-                                                                                            }}
-                                                                                            sx={{ color: 'text.secondary' }}
-                                                                                        >
-                                                                                            <UnpublishedIcon fontSize="small" />
-                                                                                        </IconButton>
+                                                                                        <Tooltip title={t('deactivateOnPlatformIconTooltip', { platform: group.platform })}>
+                                                                                            <IconButton
+                                                                                                size="small"
+                                                                                                onClick={(e) => {
+                                                                                                    e.stopPropagation();
+                                                                                                    setDeactivateConfirmShop({
+                                                                                                        id: ch.shop_id as number,
+                                                                                                        name: ch.name || ch.code,
+                                                                                                        platform: group.platform,
+                                                                                                    });
+                                                                                                    checkPlatformStatus(ch.shop_id as number, group.platform);
+                                                                                                }}
+                                                                                                sx={{ color: 'text.secondary' }}
+                                                                                            >
+                                                                                                <UnpublishedIcon fontSize="small" />
+                                                                                            </IconButton>
+                                                                                        </Tooltip>
                                                                                     )}
                                                                                     {/* ตอนนี้รองรับแค่ Shopee เท่านั้น (ดู key `delete` ใน
                                                                             PLATFORM_ROUTES กับ ShopeeProductSyncService::delete()) —
@@ -3301,25 +3378,26 @@ export default function ProductEdit({
                                                                                     {canPushOrDeactivate &&
                                                                                         ch.is_live &&
                                                                                         group.platform.toLowerCase() === 'shopee' && (
-                                                                                            <IconButton
-                                                                                                size="small"
-                                                                                                title={t('deleteListingButton') + ` — ${group.platform}`}
-                                                                                                onClick={(e) => {
-                                                                                                    e.stopPropagation();
-                                                                                                    setDeleteListingConfirmShop({
-                                                                                                        id: ch.shop_id as number,
-                                                                                                        name: ch.name || ch.code,
-                                                                                                        platform: group.platform,
-                                                                                                    });
-                                                                                                    checkPlatformStatus(
-                                                                                                        ch.shop_id as number,
-                                                                                                        group.platform,
-                                                                                                    );
-                                                                                                }}
-                                                                                                sx={{ color: 'error.main' }}
-                                                                                            >
-                                                                                                <DeleteForeverIcon fontSize="small" />
-                                                                                            </IconButton>
+                                                                                            <Tooltip title={t('deleteListingButton') + ` — ${group.platform}`}>
+                                                                                                <IconButton
+                                                                                                    size="small"
+                                                                                                    onClick={(e) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        setDeleteListingConfirmShop({
+                                                                                                            id: ch.shop_id as number,
+                                                                                                            name: ch.name || ch.code,
+                                                                                                            platform: group.platform,
+                                                                                                        });
+                                                                                                        checkPlatformStatus(
+                                                                                                            ch.shop_id as number,
+                                                                                                            group.platform,
+                                                                                                        );
+                                                                                                    }}
+                                                                                                    sx={{ color: 'error.main' }}
+                                                                                                >
+                                                                                                    <DeleteForeverIcon fontSize="small" />
+                                                                                                </IconButton>
+                                                                                            </Tooltip>
                                                                                         )}
                                                                                 </Box>
                                                                             );
@@ -3334,55 +3412,6 @@ export default function ProductEdit({
                                                             {t('noSalesChannelsAvailableEdit')}
                                                         </Typography>
                                                     )}
-                                                </Stack>
-                                            </Paper>
-                                        )}
-
-                                        {/* แผง "Master Categories" — หมวดหมู่/หมวดหมู่ย่อย/กลุ่มสินค้า ย้ายมา
-                                        แทนที่บล็อค Categories/Brand เดิม (จัดการทางหน้า Master แทนแล้ว — ดู
-                                        catalog/categories/*, catalog/product-groups/*) เหลือแค่ 3 attribute
-                                        ธรรมดา (pcatname/psubcatname/productgroupname) ที่ options mirror ต้นไม้
-                                        categories มาเป๊ะๆ ผ่าน categories.code (ดู ProductCategoryLinker) ไม่ได้
-                                        ผูก attribute_family ไหนเลย เลยแยก panel ของตัวเองแทนที่จะปนใน groupsData
-                                        ทั่วไป (ดู ProductController::buildProductFormProps()) — บังคับเลือกตาม
-                                        step (หมวดหมู่ -> หมวดหมู่ย่อย -> กลุ่มสินค้า เห็นทีละขั้นเท่านั้น ดู
-                                        cascadedMasterCategoryAttributes/handleMasterCategoryChange ด้านบน) มีปุ่ม
-                                        Save แยกของตัวเอง (เหมือน Sales Channels) ไม่ต้อง submit ทั้งฟอร์มใหญ่ —
-                                        ฝั่ง backend (ProductController::updateMasterCategories()) จะ sync เข้า
-                                        ต้นไม้ categories จริงให้เอง (เรียก ProductCategoryLinker::linkFromCodes())
-                                        ซึ่งเป็นตัวที่ effectiveFamilyIds() ใช้อยู่แล้ว — ถ้ากลุ่มสินค้าที่เลือกมี
-                                        ตระกูลแอตทริบิวต์ผูกไว้ (ดู Category::attributeFamilies()) แอตทริบิวต์ของ
-                                        ตระกูลนั้นจะโผล่มาให้กรอกทันทีตอนเปิดแก้ไขสินค้านี้รอบถัดไป — เหมือนกับที่
-                                        field Family เคยมีผลแบบเดียวกันตอน save+reload มาก่อน ไม่ต้อง fetch สดๆ
-                                        ก่อน save แต่อย่างใด
-
-                                        สิทธิ์ "แก้ไข" แยกของตัวเอง (resource `master_categories`) ไม่ได้พ่วงกับ
-                                        products.edit_products ทั่วไปอีกต่อไป — แผงนี้ยังโชว์ให้ดูได้เสมอ (ไม่มี
-                                        view แยกแบบ Sales Channels เพราะไม่มีเหตุผลต้องซ่อนจากการดู) แค่ไม่มีสิทธิ์
-                                        แก้จะปิด Save + ปิด interaction ทั้งหมดในแผงแทน (pointerEvents) */}
-                                        {cascadedMasterCategoryAttributes.length > 0 && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Stack direction="row" alignItems="center" sx={{ mb: 2 }}>
-                                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
-                                                        {t('masterCategoriesBlockTitle')}
-                                                    </Typography>
-                                                    {canEditMasterCategories &&
-                                                        !canEditProducts &&
-                                                        sectionSaveButton('master-categories', () => {
-                                                            const payload: Record<string, FormDataConvertible> = {};
-                                                            masterCategoryAttributes.forEach((attr) => {
-                                                                payload[attr.code] = selectedMasterCategoryCode(attr);
-                                                            });
-                                                            saveSection('master-categories', payload);
-                                                        })}
-                                                </Stack>
-                                                {sectionSaveError?.section === 'master-categories' && !masterCategoryPickerOpen && (
-                                                    <Box sx={{ mb: 2 }}>
-                                                        <FioriMessageStrip severity="error">{sectionSaveError.message}</FioriMessageStrip>
-                                                    </Box>
-                                                )}
-                                                <Stack spacing={2} sx={!canEditMasterCategories ? { pointerEvents: 'none', opacity: 0.6 } : undefined}>
-                                                    {cascadedMasterCategoryAttributes.map(renderMasterCategoryField)}
                                                 </Stack>
                                             </Paper>
                                         )}
@@ -4104,8 +4133,8 @@ function GalleryThumb({ item, disabled, onRemove }: { item: string | File; disab
                         position: 'absolute',
                         top: -8,
                         right: -8,
-                        bgcolor: '#fff',
-                        border: '1px solid #e2e8f0',
+                        bgcolor: FIORI.surface,
+                        border: `1px solid ${FIORI.border}`,
                         width: 20,
                         height: 20,
                         '&:hover': { bgcolor: '#fee2e2' },
@@ -4152,8 +4181,8 @@ function VideoThumb({ item, disabled, onRemove }: { item: string | File; disable
                         position: 'absolute',
                         top: -8,
                         right: -8,
-                        bgcolor: '#fff',
-                        border: '1px solid #e2e8f0',
+                        bgcolor: FIORI.surface,
+                        border: `1px solid ${FIORI.border}`,
                         width: 20,
                         height: 20,
                         '&:hover': { bgcolor: '#fee2e2' },
@@ -5038,8 +5067,8 @@ const RenderAttributeInput = memo(function RenderAttributeInput({
                                         position: 'absolute',
                                         top: -8,
                                         right: -8,
-                                        bgcolor: '#fff',
-                                        border: '1px solid #e2e8f0',
+                                        bgcolor: FIORI.surface,
+                                        border: `1px solid ${FIORI.border}`,
                                         width: 20,
                                         height: 20,
                                         '&:hover': { bgcolor: '#fee2e2' },

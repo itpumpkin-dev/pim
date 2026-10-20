@@ -78,11 +78,11 @@
     "saveAndPublish": "Save and Publish",
     "saveAndTranslate": "Save and translate other languages",
     "productSavedTranslationQueued": "Product saved — translation into the other empty languages has been queued.",
-    "saveAsTemplate": "Save as Template",
+    "saveAsTemplate": "Duplicate structure only",
     "confirmSaveDraft": "Confirm Save Draft",
     "confirmSaveDraftMessage": "This will save your current changes and always set the product to \"disabled\" (unpublished). Continue?",
-    "confirmSaveAsTemplate": "Confirm Save as Template",
-    "confirmSaveAsTemplateMessage": "This will save your current changes to this product, then create a new disabled copy of it as a template. Continue?",
+    "confirmSaveAsTemplate": "Confirm duplicate structure only",
+    "confirmSaveAsTemplateMessage": "This saves your changes to this product first, then creates a new product with the same structure (attribute family and type) but no data. The new product will have publishing turned off. Continue?",
     "autosaveDraftFoundTitle": "Auto-saved draft found",
     "autosaveDraftFoundMessage": "We found work auto-saved at {{time}} (likely from a session that ended unexpectedly). Restore it?",
     "restoreDraft": "Restore Draft",
@@ -965,8 +965,11 @@
     "editScopeChipTooltip": "Language and channel you are editing values for — click to change",
     "editingLocaleHelp": "Changing this also switches the whole app's display language.",
     "productActionsTitle": "Product actions",
-    "duplicateProductHelp": "Create a new product (new SKU) copied from this one.",
+    "duplicateProductHelp": "Create a new product (new SKU) copying all data from this one.",
     "queueTranslationsHelp": "Queue automatic translation of fields that are still empty in other languages.",
     "deleteProductHelp": "Permanently delete this product and its variants. This cannot be undone.",
-    "close": "Close"
+    "close": "Close",
+    "saveAsTemplateHelp": "Create a new product (new SKU) with the same structure but none of the data — this product's changes are saved first.",
+    "productStatusHelp": "Used only for labelling and filtering inside the PIM — does not affect marketplaces or the Home page.",
+    "productStatusDeleteHelp": "\"Delete\" only hides the product from the product list. It is not actually deleted or taken down from marketplaces."
 }

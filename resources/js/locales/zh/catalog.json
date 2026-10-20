@@ -57,11 +57,11 @@
     "saveAndPublish": "保存并发布",
     "saveAndTranslate": "保存并翻译其他语言",
     "productSavedTranslationQueued": "产品已保存——已加入其他缺少翻译语言的翻译队列。",
-    "saveAsTemplate": "另存为模板",
+    "saveAsTemplate": "仅复制结构",
     "confirmSaveDraft": "确认保存草稿",
     "confirmSaveDraftMessage": "此操作将保存您当前的修改，并将产品始终设置为“已停用”（未发布）状态。是否继续？",
-    "confirmSaveAsTemplate": "确认另存为模板",
-    "confirmSaveAsTemplateMessage": "此操作将保存当前产品的修改，并创建一个新的“已停用”产品副本作为模板。是否继续？",
+    "confirmSaveAsTemplate": "确认仅复制结构",
+    "confirmSaveAsTemplateMessage": "将先保存此商品的修改，然后创建一个结构（属性族和类型）相同但不含任何数据的新商品。新商品的发布将处于关闭状态。是否继续？",
     "autosaveDraftFoundTitle": "发现自动保存的草稿",
     "autosaveDraftFoundMessage": "发现于 {{time}} 自动保存的内容(可能是会话意外中断所致)。是否恢复？",
     "restoreDraft": "恢复草稿",
@@ -962,8 +962,11 @@
     "editScopeChipTooltip": "当前正在编辑的语言和渠道 — 点击可更改",
     "editingLocaleHelp": "更改此项也会切换整个系统的显示语言。",
     "productActionsTitle": "商品操作",
-    "duplicateProductHelp": "以此商品为基础复制创建新商品（新 SKU）。",
+    "duplicateProductHelp": "以此商品为基础创建新商品（新 SKU），并复制全部数据。",
     "queueTranslationsHelp": "为其他语言中仍为空的字段排队自动翻译。",
     "deleteProductHelp": "永久删除此商品及其所有变体，无法恢复。",
-    "close": "关闭"
+    "close": "关闭",
+    "saveAsTemplateHelp": "创建结构相同但不含任何数据的新商品（新 SKU）— 会先保存此商品的修改。",
+    "productStatusHelp": "仅用于 PIM 内部的标记和筛选 — 不影响电商平台或首页。",
+    "productStatusDeleteHelp": "“Delete”仅在商品列表中隐藏此商品，不会真正删除，也不会从电商平台下架。"
 }
