@@ -32,6 +32,14 @@ class EffectiveFamilyAttributeResolver
      *                            แสดงก่อน) รองรับได้มากกว่า 1 ตระกูลพร้อมกันเสมอ —
      *                            ดู resolveEffectiveFamilyAttributes() สำหรับวิธี
      *                            รวม attribute ของหลายตระกูลเข้าด้วยกัน
+     *
+     * สินค้าผูกกับหลายระดับพร้อมกัน (หมวดหมู่ → หมวดหมู่ย่อย → กลุ่มสินค้า — ดู
+     * ProductCategoryLinker) และ sort_order นับแยกต่อหมวดหมู่ (ทุกหมวดหมู่เริ่มที่ 0)
+     * เดิมเรียงด้วย sort_order อย่างเดียว ตระกูลของคนละหมวดหมู่ที่ sort_order เท่ากัน
+     * เลยออกมาลำดับไหนก็ได้ (PostgreSQL ไม่การันตีลำดับของค่าที่เท่ากัน) — เช่นตระกูล
+     * "สเปค" ที่ผูกไว้ที่หมวดหมู่แม่ด้วย แซงตระกูล "พื้นฐาน" ที่กลุ่มสินค้าตั้งเป็นตัว
+     * แรก ตอนนี้หมวดหมู่ที่เฉพาะเจาะจงกว่า (ลึกกว่า = กลุ่มสินค้า) มาก่อน แล้วค่อย
+     * sort_order ภายในหมวดหมู่นั้น — ลำดับที่ตั้งในหน้าแก้ไขกลุ่มสินค้าจึงเป็นหลักเสมอ
      */
     public function effectiveFamilyIds(Product $product): array
     {
@@ -39,13 +47,61 @@ class EffectiveFamilyAttributeResolver
             ? $product->categories->pluck('id')
             : $product->categories()->pluck('categories.id');
 
+        if ($categoryIds->isEmpty()) {
+            return [];
+        }
+
+        $depthByCategory = $this->categoryDepths($categoryIds->all());
+
         return DB::table('category_attribute_family')
             ->whereIn('category_id', $categoryIds)
-            ->orderBy('sort_order')
+            ->get(['category_id', 'family_id', 'sort_order'])
+            ->sortBy([
+                fn ($a, $b) => ($depthByCategory[$b->category_id] ?? 0) <=> ($depthByCategory[$a->category_id] ?? 0),
+                fn ($a, $b) => $a->sort_order <=> $b->sort_order,
+                fn ($a, $b) => $a->category_id <=> $b->category_id,
+            ])
             ->pluck('family_id')
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * ความลึกของแต่ละหมวดหมู่ในต้นไม้ (root = 0) — ไล่ parent_id ขึ้นไปทีละชั้น
+     * ต้นไม้หมวดหมู่ตื้น (3–4 ชั้น) เลยใช้ query ต่อชั้นได้โดยไม่ต้องพึ่ง recursive CTE
+     *
+     * @param  array<int, int>  $categoryIds
+     * @return array<int, int>
+     */
+    private function categoryDepths(array $categoryIds): array
+    {
+        $parentOf = [];
+        $pending = $categoryIds;
+        while ($pending !== []) {
+            $rows = DB::table('categories')->whereIn('id', $pending)->pluck('parent_id', 'id');
+            $pending = [];
+            foreach ($rows as $id => $parentId) {
+                $parentOf[$id] = $parentId;
+                if ($parentId !== null && ! array_key_exists($parentId, $parentOf)) {
+                    $pending[] = $parentId;
+                }
+            }
+            $pending = array_values(array_unique(array_diff($pending, array_keys($parentOf))));
+        }
+
+        $depths = [];
+        foreach ($categoryIds as $id) {
+            $depth = 0;
+            $seen = [];
+            for ($cur = $parentOf[$id] ?? null; $cur !== null && ! isset($seen[$cur]); $cur = $parentOf[$cur] ?? null) {
+                $seen[$cur] = true;
+                $depth++;
+            }
+            $depths[$id] = $depth;
+        }
+
+        return $depths;
     }
 
     /**
