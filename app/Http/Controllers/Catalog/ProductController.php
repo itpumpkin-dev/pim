@@ -1483,6 +1483,7 @@ class ProductController extends Controller
             // ไหนให้กรอกเลยนอกจาก SKU (ดู buildProductFormProps())
             'type' => ['required', 'in:simple,configurable'],
             'enabled' => ['required', 'boolean'],
+            'show_on_home' => ['sometimes', 'boolean'],
             // ประเภทสินค้า (producttype attribute — mirror จาก master
             // product_types) เลือกได้เลยตอนสร้าง แต่ไม่บังคับ — ยังไม่ผูก
             // ProductValue ตัวนี้จนกว่าจะบันทึกสำเร็จ (ดูด้านล่าง)
@@ -1548,6 +1549,7 @@ class ProductController extends Controller
                 'sku' => $validated['sku'],
                 'type' => $validated['type'],
                 'enabled' => $validated['enabled'],
+                'show_on_home' => $validated['show_on_home'] ?? false,
                 'configurable_attributes' => $validated['configurable_attributes'] ?? null,
                 'created_by' => $request->user()?->id,
                 'updated_by' => $request->user()?->id,
@@ -1580,6 +1582,7 @@ class ProductController extends Controller
                         'family_id' => $parentProduct->family_id,
                         'type' => 'simple',
                         'enabled' => $parentProduct->enabled,
+                        'show_on_home' => $parentProduct->show_on_home,
                         'created_by' => $request->user()?->id,
                         'updated_by' => $request->user()?->id,
                     ]);
@@ -2778,6 +2781,7 @@ class ProductController extends Controller
                 'family_code' => $family ? ($family->name ?: ucfirst($family->code)) : 'Default',
                 'type' => ucfirst($product->type),
                 'enabled' => (bool) $product->enabled,
+                'show_on_home' => (bool) $product->show_on_home,
                 'status' => $product->status,
                 'configurable_attributes' => $product->configurable_attributes ?? [],
                 'shopee_category_id' => $product->shopee_category_id,
@@ -2838,6 +2842,9 @@ class ProductController extends Controller
             // ที่มีทั้งคู่) เพราะแผงนี้เป็นแค่ข้อมูลจัดหมวดหมู่พื้นฐาน ไม่มีเหตุผลต้องซ่อน
             // จากการดู — ดู docblock ของ migration backfill_master_categories_permissions
             'canEditMasterCategories' => auth()->user()?->hasPermission('master_categories', 'edit_master_categories') ?? false,
+            // บอกหน้าแก้ไขว่าบันทึกแล้วระบบจะส่ง/ยกเลิกบน marketplace ให้อัตโนมัติหรือไม่
+            // (QueueAutoMarketplaceSync) — ใช้เตือนในกล่องยืนยัน "บันทึกร่าง"
+            'marketplaceAutoSync' => (bool) config('services.marketplace_sync.auto_enabled'),
             // ให้ frontend แปล attribute.master_source (โค้ดดิบ เช่น 'brands')
             // เป็นชื่อที่อ่านง่ายสำหรับ chip "Master: ..." บน field ของ attribute
             // นั้นๆ — รูปแบบเดียวกับที่ AttributeController ส่งให้หน้าแก้ไข
@@ -3231,6 +3238,15 @@ class ProductController extends Controller
             ], 403);
         }
 
+        // ปิด "การเผยแพร่" (enabled) อยู่ = ไม่ให้ push ขึ้น marketplace — ไม่งั้น listing
+        // จะขึ้นไปทั้งที่สวิตช์ปิด แล้วโดน auto-sync deactivate กลับในการบันทึกครั้งถัดไป
+        // (QueueAutoMarketplaceSync) ส่วน deactivate/delete ยังทำได้ตามปกติ
+        if ($action === 'push' && ! $product->enabled) {
+            return response()->json([
+                'message' => __('This product is not enabled for publishing — turn on "Publishing" and save before pushing.'),
+            ], 422);
+        }
+
         $isPublished = $product->platformShops()->where('sales_platform_shops.id', $shop->id)->exists();
         if (! $isPublished) {
             return response()->json([
@@ -3346,6 +3362,15 @@ class ProductController extends Controller
             return back()->with('error', "You don't have access to any of the selected shop(s).");
         }
 
+        // ข้ามสินค้าที่ปิด "การเผยแพร่" (enabled) อยู่ — เหตุผลเดียวกับ
+        // queueMarketplaceSync() ไม่ติ๊กร้านให้ด้วย
+        $skippedCount = $products->where('enabled', false)->count();
+        $products = $products->where('enabled', true)->values();
+
+        if ($products->isEmpty()) {
+            return back()->with('error', __('None of the selected product(s) are enabled for publishing — turn on "Publishing" first.'));
+        }
+
         $shopIds = $shops->pluck('id')->all();
 
         foreach ($products as $product) {
@@ -3356,7 +3381,12 @@ class ProductController extends Controller
             }
         }
 
-        return back()->with('success', "Queued push for {$products->count()} product(s) across {$shops->count()} channel(s).");
+        $message = __('Queued push for :products product(s) across :shops channel(s).', ['products' => $products->count(), 'shops' => $shops->count()]);
+        if ($skippedCount > 0) {
+            $message .= ' '.__('Skipped :count product(s) not enabled for publishing.', ['count' => $skippedCount]);
+        }
+
+        return back()->with('success', $message);
     }
 
     /**
@@ -3510,6 +3540,7 @@ class ProductController extends Controller
             'family_id' => ['nullable', 'exists:attribute_families,id'],
             'type' => ['required', 'in:simple,configurable,Simple,Configurable'],
             'enabled' => ['required', 'boolean'],
+            'show_on_home' => ['sometimes', 'boolean'],
             'status' => ['sometimes', 'required', Rule::in(Product::STATUSES)],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['exists:categories,id'],
@@ -3623,6 +3654,7 @@ class ProductController extends Controller
                 'family_id' => $validated['family_id'] ?? null,
                 'type' => strtolower($validated['type']),
                 'enabled' => $validated['enabled'],
+                'show_on_home' => $validated['show_on_home'] ?? (bool) $product->show_on_home,
                 'status' => $validated['status'] ?? $product->status,
                 'configurable_attributes' => $validated['configurable_attributes'] ?? $product->configurable_attributes,
                 'shopee_category_id' => $validated['shopee_category_id'] ?? null,
@@ -4129,10 +4161,10 @@ class ProductController extends Controller
             if ($valuesChanged || $categoryChanged || $product->wasChanged(['sku', 'family_id', 'type', 'enabled'])) {
                 event(new ProductDataChanged($product->id, $product->enabled));
                 Product::bumpStorefrontVersion();
-            } elseif ($product->wasChanged('status')) {
-                // status โชว์เป็น chip บนหน้า storefront แต่ไม่เกี่ยวกับ Marketplace
-                // — ล้างแค่ cache หน้าร้าน ไม่ยิง ProductDataChanged (ซึ่งจะไป
-                // trigger auto push/deactivate)
+            } elseif ($product->wasChanged(['status', 'show_on_home'])) {
+                // status (chip บนหน้า storefront) และ show_on_home (แสดงที่หน้า Home
+                // หรือไม่) ไม่เกี่ยวกับ Marketplace — ล้างแค่ cache หน้าร้าน ไม่ยิง
+                // ProductDataChanged (ซึ่งจะไป trigger auto push/deactivate)
                 Product::bumpStorefrontVersion();
             }
 
@@ -4173,6 +4205,7 @@ class ProductController extends Controller
                         $childProduct->update([
                             'sku' => $variantData['sku'],
                             'enabled' => $product->enabled,
+                            'show_on_home' => (bool) $product->show_on_home,
                             'updated_by' => $request->user()?->id,
                         ]);
                     } else {
@@ -4187,6 +4220,7 @@ class ProductController extends Controller
                             'family_id' => $product->family_id,
                             'type' => 'simple',
                             'enabled' => $product->enabled,
+                            'show_on_home' => (bool) $product->show_on_home,
                             'created_by' => $request->user()?->id,
                             'updated_by' => $request->user()?->id,
                         ]);

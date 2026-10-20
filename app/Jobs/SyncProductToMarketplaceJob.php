@@ -46,6 +46,11 @@ class SyncProductToMarketplaceJob implements ShouldQueue
         $record->update(['status' => 'processing']);
 
         try {
+            // ด่านสุดท้าย — สวิตช์ "การเผยแพร่" อาจถูกปิดระหว่างที่ job รอคิวอยู่
+            if ($record->action === 'push' && ! $record->product->enabled) {
+                throw new \RuntimeException(__('This product is not enabled for publishing — push cancelled.'));
+            }
+
             $service = match ($record->platform) {
                 'lazada' => LazadaProductSyncService::forShop($record->shop),
                 'shopee' => ShopeeProductSyncService::forShop($record->shop),

@@ -80,6 +80,7 @@ interface Props {
 interface ProductForm {
     [key: string]: FormDataConvertible;
     enabled: boolean;
+    show_on_home: boolean;
     type: string;
     sku: string;
     product_type_code: string;
@@ -122,6 +123,7 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
 
     const { data, setData, post, processing, errors, isDirty } = useForm<ProductForm>({
         enabled: true,
+        show_on_home: true,
         type: 'simple',
         sku: '',
         product_type_code: '',
@@ -383,6 +385,20 @@ export default function ProductCreate({ attributes, productTypeAttribute }: Prop
                                 <FormControlLabel
                                     control={<Checkbox checked={data.enabled === false} onChange={() => setData('enabled', false)} />}
                                     label={t('unpublished')}
+                                />
+                            </Stack>
+                        </FioriField>
+
+                        {/* แสดงที่หน้า Home — แยกจาก "การเผยแพร่" (Marketplace) ด้านบน */}
+                        <FioriField label={t('showOnHome')}>
+                            <Stack direction="row" spacing={3}>
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.show_on_home === true} onChange={() => setData('show_on_home', true)} />}
+                                    label={t('showOnHomeYes')}
+                                />
+                                <FormControlLabel
+                                    control={<Checkbox checked={data.show_on_home === false} onChange={() => setData('show_on_home', false)} />}
+                                    label={t('showOnHomeNo')}
                                 />
                             </Stack>
                         </FioriField>

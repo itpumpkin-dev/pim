@@ -19,7 +19,7 @@ use Inertia\Response;
 /**
  * Public-facing product pages (home, product detail). Unlike
  * Catalog\ProductController, these routes carry no auth/permission
- * middleware, so only enabled, sellable (type=simple) products are ever
+ * middleware, so only show_on_home, sellable (type=simple) products are ever
  * queried or exposed here.
  *
  * show() still honours Attribute Access permissions when a viewer happens to
@@ -51,7 +51,7 @@ class StorefrontController extends Controller
             'storefront:home:v'.Product::storefrontVersion().':'.$localeCode,
             self::CACHE_TTL_SECONDS,
             function () use ($localeCode) {
-                $products = Product::where('enabled', true)->where('type', 'simple')->orderBy('id')->get();
+                $products = Product::where('show_on_home', true)->where('type', 'simple')->orderBy('id')->get();
 
                 $mapped = ProductPresenter::mapMany($products, $localeCode);
 
@@ -81,7 +81,7 @@ class StorefrontController extends Controller
 
     /**
      * Top 10 products by storefront click count, restricted to products
-     * still enabled/sellable (same set as $mappedProducts), most-viewed first.
+     * still shown on Home/sellable (same set as $mappedProducts), most-viewed first.
      */
     private function topViewedProducts(array $mappedProducts): array
     {
@@ -129,7 +129,7 @@ class StorefrontController extends Controller
 
     private function buildShowPayload(int $id, string $localeCode, ?User $viewer): array
     {
-        $product = Product::where('id', $id)->where('enabled', true)->where('type', 'simple')->first();
+        $product = Product::where('id', $id)->where('show_on_home', true)->where('type', 'simple')->first();
 
         if (!$product) {
             return [
@@ -165,7 +165,7 @@ class StorefrontController extends Controller
 
         $related = Product::whereIn('id', $relatedIds)
             ->where('id', '!=', $product->id)
-            ->where('enabled', true)
+            ->where('show_on_home', true)
             ->where('type', 'simple')
             ->limit(4)
             ->get();

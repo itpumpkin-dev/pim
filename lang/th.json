@@ -1,4 +1,9 @@
 {
     "You do not have permission to change this code.": "คุณไม่มีสิทธิ์เปลี่ยนรหัสนี้",
-    "Users with the Administrator role cannot be deleted.": "ไม่สามารถลบผู้ใช้ที่มีบทบาท Administrator ได้"
+    "Users with the Administrator role cannot be deleted.": "ไม่สามารถลบผู้ใช้ที่มีบทบาท Administrator ได้",
+    "This product is not enabled for publishing — turn on \"Publishing\" and save before pushing.": "สินค้านี้ปิดการเผยแพร่อยู่ — เปิด \"การเผยแพร่\" แล้วบันทึกก่อนจึงจะส่งได้",
+    "None of the selected product(s) are enabled for publishing — turn on \"Publishing\" first.": "สินค้าที่เลือกทั้งหมดปิดการเผยแพร่อยู่ — เปิด \"การเผยแพร่\" ก่อน",
+    "Queued push for :products product(s) across :shops channel(s).": "เข้าคิวส่งสินค้า :products รายการ ไปยัง :shops ช่องทางแล้ว",
+    "Skipped :count product(s) not enabled for publishing.": "ข้ามสินค้า :count รายการที่ปิดการเผยแพร่อยู่",
+    "This product is not enabled for publishing — push cancelled.": "สินค้านี้ปิดการเผยแพร่อยู่ — ยกเลิกการส่ง"
 }

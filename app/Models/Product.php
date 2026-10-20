@@ -33,6 +33,7 @@ class Product extends Model
         'family_id',
         'type',
         'enabled',
+        'show_on_home',
         'status',
         'configurable_attributes',
         'shopee_category_id',
@@ -50,6 +51,7 @@ class Product extends Model
     {
         return [
             'enabled' => 'boolean',
+            'show_on_home' => 'boolean',
             'parent_id' => 'integer',
             'configurable_attributes' => 'array',
             'is_raw_material' => 'boolean',
