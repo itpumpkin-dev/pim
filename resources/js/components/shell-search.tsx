@@ -154,14 +154,38 @@ export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [objectResults, setObjectResults] = useState<ObjectResults>(EMPTY_RESULTS);
+    const [focused, setFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const requestIdRef = useRef(0);
 
     const showField = !isCompact || mobileOpen;
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
     useEffect(() => {
         if (showField && isCompact) inputRef.current?.focus();
     }, [showField, isCompact]);
+
+    // Ctrl+K (⌘K on macOS) jumps to the search field from anywhere — on
+    // compact layouts it first expands the collapsed magnifier button, and the
+    // effect above focuses the input once it mounts. Matches on e.code (the
+    // physical key) rather than e.key, because with the Thai keyboard layout
+    // active the K key reports e.key === 'า' and the browser's own Ctrl+K
+    // (address-bar search) would fire instead.
+    useEffect(() => {
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.code !== 'KeyK' || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+            e.preventDefault();
+            if (isCompact && !mobileOpen) {
+                setMobileOpen(true);
+                return;
+            }
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        };
+
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => window.removeEventListener('keydown', onKeyDown, true);
+    }, [isCompact, mobileOpen]);
 
     // Object suggestions come from the server — debounced the same way
     // ProductPicker (resources/js/components/product-picker.tsx) debounces
@@ -337,7 +361,11 @@ export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
                     inputRef={inputRef}
                     variant="standard"
                     placeholder={t('search')}
-                    onBlur={() => isCompact && !query && setMobileOpen(false)}
+                    onFocus={() => setFocused(true)}
+                    onBlur={() => {
+                        setFocused(false);
+                        if (isCompact && !query) setMobileOpen(false);
+                    }}
                     InputProps={{
                         ...params.InputProps,
                         disableUnderline: true,
@@ -345,6 +373,26 @@ export function ShellSearch({ shell, isCompact }: ShellSearchProps) {
                         endAdornment: (
                             <>
                                 {loading && <CircularProgress size={14} thickness={5} sx={{ color: shell.textColor, mr: 0.5 }} />}
+                                {!loading && !focused && !query && (
+                                    <Box
+                                        component="kbd"
+                                        sx={{
+                                            flexShrink: 0,
+                                            px: 0.75,
+                                            py: 0.125,
+                                            fontFamily: 'inherit',
+                                            fontSize: 11,
+                                            lineHeight: 1.4,
+                                            color: shell.textColor,
+                                            opacity: 0.7,
+                                            border: `1px solid ${shell.searchBorder}`,
+                                            borderRadius: '4px',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        {isMac ? '⌘K' : 'Ctrl K'}
+                                    </Box>
+                                )}
                                 {params.InputProps.endAdornment}
                             </>
                         ),

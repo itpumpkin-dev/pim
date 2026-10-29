@@ -83,22 +83,29 @@ export function RouteLoadingSkeleton() {
                 justifyContent: 'center',
             }}
         >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {[-0.3, -0.1, 0.1].map((delay) => (
-                    <Box
-                        key={delay}
-                        sx={{
-                            height: 12,
-                            width: 12,
-                            mr: delay === 0.1 ? 0 : '6px',
-                            borderRadius: '6px',
-                            bgcolor: 'rgba(0, 112, 242, 0.35)',
-                            animation: `${pulse} 1.5s infinite ease-in-out`,
-                            animationDelay: `${delay}s`,
-                        }}
-                    />
-                ))}
-            </Box>
+            <PulseDots />
+        </Box>
+    );
+}
+
+/** The three pulsing brand-blue dots — shared with LocaleSwitchOverlay. */
+export function PulseDots({ size = 12 }: { size?: number }) {
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {[-0.3, -0.1, 0.1].map((delay) => (
+                <Box
+                    key={delay}
+                    sx={{
+                        height: size,
+                        width: size,
+                        mr: delay === 0.1 ? 0 : `${size / 2}px`,
+                        borderRadius: `${size / 2}px`,
+                        bgcolor: 'rgba(0, 112, 242, 0.35)',
+                        animation: `${pulse} 1.5s infinite ease-in-out`,
+                        animationDelay: `${delay}s`,
+                    }}
+                />
+            ))}
         </Box>
     );
 }

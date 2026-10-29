@@ -1,5 +1,6 @@
 import AppLogoIcon from '@/components/app-logo-icon';
 import LocaleDropdown from '@/components/locale-dropdown';
+import { LocaleSwitchOverlay } from '@/components/locale-switch-overlay';
 import { ProductCard } from '@/components/product-card';
 import SplashScreen from '@/components/splash-screen';
 import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
@@ -502,6 +503,7 @@ export default function Home({
             </Box>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
+                <LocaleSwitchOverlay />
                 <HeroCarousel />
 
                 <Box>

@@ -1,3 +1,4 @@
+import { LocaleSwitchOverlay } from '@/components/locale-switch-overlay';
 import { RouteLoadingSkeleton } from '@/components/route-loading-skeleton';
 import { Box } from '@mui/material';
 import * as React from 'react';
@@ -16,6 +17,7 @@ export function AppContent({ variant = 'header', children, ...props }: AppConten
             >
                 {children}
                 <RouteLoadingSkeleton />
+                <LocaleSwitchOverlay />
             </Box>
         );
     }
@@ -28,6 +30,7 @@ export function AppContent({ variant = 'header', children, ...props }: AppConten
         >
             {children}
             <RouteLoadingSkeleton />
+            <LocaleSwitchOverlay />
         </Box>
     );
 }

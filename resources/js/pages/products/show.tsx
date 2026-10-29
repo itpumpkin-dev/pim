@@ -1,6 +1,7 @@
 import AppLogoIcon from '@/components/app-logo-icon';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import LocaleDropdown from '@/components/locale-dropdown';
+import { LocaleSwitchOverlay } from '@/components/locale-switch-overlay';
 import { ProductCard } from '@/components/product-card';
 import { RouteTopProgressBar } from '@/components/route-top-progress-bar';
 import { currency, productImageUrl, type IconType, type Product } from '@/data/products';
@@ -681,6 +682,7 @@ export default function ProductShow({ product, related }: { product: Product | n
                     animation: `${pageEnter} 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
                 }}
             >
+                <LocaleSwitchOverlay />
                 <Button component={Link} href="/" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
                     {t('productDetail.backToHome')}
                 </Button>
