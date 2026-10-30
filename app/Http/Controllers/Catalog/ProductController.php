@@ -1251,11 +1251,13 @@ class ProductController extends Controller
             'job_type' => 'export',
             'entity_type' => 'products',
             'config_code' => 'quick_export',
-            'status' => 'queued',
+            // 'pending' ตามที่ import/export อื่นใช้ — หน้า Job Tracker poll/แสดง loading เฉพาะ pending/processing
+            'status' => 'pending',
             'user_id' => $request->user()?->id,
         ]);
 
-        QuickExportProductsJob::dispatch($tracker->id, $validated);
+        // locale ของหน้าจอผู้ใช้ — worker รันด้วย APP_LOCALE หัวคอลัมน์จะได้เป็นภาษาที่ผู้ใช้เห็น
+        QuickExportProductsJob::dispatch($tracker->id, $validated + ['locale' => app()->getLocale()]);
 
         return back()->with('success', __('Preparing your export file — you will be notified (bell icon) when it is ready to download.'));
     }

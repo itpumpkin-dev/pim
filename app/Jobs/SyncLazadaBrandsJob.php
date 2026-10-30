@@ -61,7 +61,12 @@ class SyncLazadaBrandsJob implements ShouldQueue
             return;
         }
 
-        $tracker->update(['status' => 'processing', 'started_at' => now()]);
+                // ยกเลิกไปตั้งแต่ยังรอคิว (JobTrackerController::cancel()) — ไม่ต้องเริ่มทำ
+        if ($tracker->status === 'cancelled') {
+            return;
+        }
+
+$tracker->update(['status' => 'processing', 'started_at' => now()]);
 
         $client = new LazadaClient($account);
         $seenIds = [];

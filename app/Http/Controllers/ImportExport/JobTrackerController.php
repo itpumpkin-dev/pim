@@ -91,7 +91,19 @@ class JobTrackerController extends Controller
         abort_unless(in_array($jobTracker->status, ['pending', 'processing'], true) || $translationsPending, 422);
 
         if (!$jobTracker->cancel_requested_at) {
-            $jobTracker->update(['cancel_requested_at' => now()]);
+            // ยังรอคิวอยู่ (worker ยังไม่หยิบ) = ไม่มีแถวไหนให้รอจบ ปิดเป็น cancelled เลย ไม่งั้นค้าง
+            // "กำลังยกเลิก" ไปจนกว่า worker จะว่าง — ตัว job เช็ค status นี้ตอนเริ่มแล้วข้ามไป
+            // where status = pending ใน UPDATE เดียว ไม่ใช่เช็คจาก $jobTracker ที่อ่านมาก่อน — ถ้า worker
+            // เพิ่งเปลี่ยนเป็น processing ไปในจังหวะนั้น จะได้ 0 แถว แล้วตกไปขอยกเลิกระหว่างรันแทน
+            // ไม่งั้นหน้าจะขึ้นว่ายกเลิกแล้วทั้งที่งานยังรันอยู่
+            $previousStatus = $jobTracker->status;
+            $closed = JobTracker::where('id', $jobTracker->id)
+                ->where('status', 'pending')
+                ->update(['cancel_requested_at' => now(), 'status' => 'cancelled', 'completed_at' => now()]);
+            if ($closed === 0) {
+                JobTracker::where('id', $jobTracker->id)->update(['cancel_requested_at' => now()]);
+            }
+            $jobTracker->refresh();
 
             // JobTracker isn't Auditable — deliberately so, since
             // ProcessImportJob/ProcessExportJob's own frequent progress
@@ -99,7 +111,8 @@ class JobTrackerController extends Controller
             // audit_logs. This one human-initiated action is worth a
             // record on its own, though.
             AuditLog::record('job_cancelled', $jobTracker, null, [
-                'status' => $jobTracker->status,
+                // สถานะตอนกดยกเลิก (ก่อนเปลี่ยน) — จะได้รู้ว่างานยังรอคิวหรือรันไปแล้ว
+                'status' => $previousStatus,
                 'job_type' => $jobTracker->job_type,
                 'entity_type' => $jobTracker->entity_type,
             ]);

@@ -7,6 +7,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import {
     Box,
     Button,
+    CircularProgress,
     Grid,
     LinearProgress,
     Paper,
@@ -233,6 +234,27 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                         )}
                     </Stack>
                 </Stack>
+
+                {/* งานยังไม่จบ — บอกให้ชัดว่ากำลังรอคิว/กำลังทำ เพราะตัวเลขด้านล่างอาจค้างที่ 0
+                    จนจบ (เช่น ส่งออกด่วนอัปเดตจำนวนแถวตอนเขียนไฟล์เสร็จทีเดียว) */}
+                {isActive && (
+                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 2.5, mb: 3, overflow: 'hidden', position: 'relative' }}>
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <CircularProgress size={28} thickness={4.5} sx={{ color: FIORI.brand, flexShrink: 0 }} />
+                            <Box>
+                                <Typography fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                    {job.status === 'pending' ? t('jobWaitingInQueue') : t('jobRunning')}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                                    {t('jobAutoRefreshHint')}
+                                </Typography>
+                            </Box>
+                        </Stack>
+                        <LinearProgress
+                            sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, bgcolor: FIORI.hover, '& .MuiLinearProgress-bar': { bgcolor: FIORI.brand } }}
+                        />
+                    </Paper>
+                )}
 
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                     <Grid item xs={12} sm={4}>

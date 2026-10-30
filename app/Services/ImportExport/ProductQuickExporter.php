@@ -3,11 +3,13 @@
 namespace App\Services\ImportExport;
 
 use App\Models\Attribute;
+use App\Models\Locale;
 use App\Models\Product;
 use App\Models\ProductValue;
 use App\Models\User;
 use App\Services\ImportExport\Exporters\ProductRowExporter;
 use App\Services\ImportExport\Importers\ProductRowImporter;
+use Illuminate\Support\Traits\Localizable;
 
 /**
  * "ส่งออกด่วน" ของหน้ารายการสินค้า — เดิมอยู่ใน ProductController::quickExport() และสร้าง
@@ -17,11 +19,15 @@ use App\Services\ImportExport\Importers\ProductRowImporter;
  */
 class ProductQuickExporter
 {
+    use Localizable;
+
     /**
      * @param  array{format:string, ids?:array<int,int>, search?:?string, columns?:array<int,string>, types?:array<int,string>, category_id?:?int}  $params
+     * @param  (callable(int): void)|null  $afterChunk  เรียกหลังเขียนครบแต่ละชุด 500 แถว (ส่งจำนวนแถวสะสม) — QuickExportProductsJob
+     *         ใช้เช็คคำขอยกเลิก แล้ว throw JobCancelledException ออกมาจาก generator นี้
      * @return int จำนวนแถวที่เขียน
      */
-    public function write(?User $user, array $params, string $absolutePath): int
+    public function write(?User $user, array $params, string $absolutePath, ?callable $afterChunk = null): int
     {
         $format = $params['format'];
         $ids = $params['ids'] ?? [];
@@ -43,7 +49,7 @@ class ProductQuickExporter
             array_slice($allColumns, count(ProductRowImporter::FIXED_COLUMNS)),
             fn ($code) => isset($selectedSet[$code]),
         ));
-        $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get(['id', 'code'])->keyBy('code');
+        $attributesByCode = Attribute::whereIn('code', $attributeCodes)->get(['id', 'code', 'name'])->keyBy('code');
 
         $query = Product::with('family')->orderBy('id');
         if (! empty($ids)) {
@@ -65,7 +71,7 @@ class ProductQuickExporter
         $attributeIds = $attributesByCode->pluck('id')->all();
         $rowCount = 0;
 
-        $rows = (function () use ($query, $attributesByCode, $attributeIds, $selectedSet, $defaultLocaleId, &$rowCount) {
+        $rows = (function () use ($query, $attributesByCode, $attributeIds, $selectedSet, $defaultLocaleId, $afterChunk, &$rowCount) {
             foreach ($query->cursor()->chunk(500) as $products) {
                 // ทุกภาษา ไม่ใช่แค่ locale_id NULL — attribute เกือบทั้งหมดเป็น locale-based
                 // ProductRowExporter::pickValues() เลือกค่าหลักให้
@@ -95,11 +101,63 @@ class ProductQuickExporter
                     $rowCount++;
                     yield $row;
                 }
+
+                if ($afterChunk) {
+                    $afterChunk($rowCount);
+                }
             }
         })();
 
-        SpreadsheetWriter::write($absolutePath, $format, $selectedColumns, $rows, ',');
+        // หัวคอลัมน์เป็นชื่อ (ภาษาที่ผู้ใช้เปิดหน้าจออยู่) แทน code — ไฟล์ยังนำเข้ากลับได้เพราะ
+        // RowHeaderNormalizer แปลงชื่อกลับเป็น code ให้ตอน import (ชื่อที่ชนกันใช้ code แทน ดู headerLabels())
+        $headers = $this->headerLabels($selectedColumns, $attributesByCode, $params['locale'] ?? app()->getLocale());
+        SpreadsheetWriter::write($absolutePath, $format, $selectedColumns, $rows, ',', $headers);
 
         return $rowCount;
+    }
+
+    /**
+     * index => ชื่อหัวคอลัมน์ ตามลำดับ $columns — attribute ใช้ label ของ locale นั้น
+     * (ไม่มีก็ name แล้วค่อย code) คอลัมน์คงที่ใช้ import.columns.* ชุดเดียวกับ template นำเข้า
+     *
+     * ชื่อไม่ได้บังคับ unique — ถ้าสองคอลัมน์ได้ชื่อเดียวกัน (หรือชื่อไปตรงกับ code ของอีกคอลัมน์)
+     * ตอนนำเข้ากลับ RowHeaderNormalizer จะ map ทั้งคู่ไป code เดียว ค่าคอลัมน์หนึ่งทับอีกคอลัมน์
+     * แบบเงียบๆ คอลัมน์ที่ชนกันเลยใช้ code ดิบ ซึ่ง normalizer รับตรงๆ อยู่แล้ว
+     *
+     * @param  array<int, string>  $columns
+     * @return array<int, string>
+     */
+    private function headerLabels(array $columns, \Illuminate\Support\Collection $attributesByCode, string $locale): array
+    {
+        $localeId = Locale::idForCode($locale);
+
+        $labels = $this->withLocale($locale, fn () => array_map(function (string $code) use ($attributesByCode, $localeId) {
+            $attribute = $attributesByCode->get($code);
+            if (! $attribute) {
+                $label = __("import.columns.{$code}");
+
+                return $label === "import.columns.{$code}" ? $code : $label;
+            }
+
+            $translation = $localeId ? $attribute->translations->firstWhere('locale_id', $localeId) : null;
+
+            return ($translation && trim((string) $translation->label) !== '')
+                ? $translation->label
+                : ($attribute->getRawOriginal('name') ?: $code);
+        }, $columns));
+
+        // key แบบเดียวกับ RowHeaderNormalizer::key() — ตัวพิมพ์/ช่องว่างต่างกันก็นับว่าชนกัน
+        $key = fn (string $value) => mb_strtolower(trim($value));
+        $labelCounts = array_count_values(array_map($key, $labels));
+        $codeKeys = array_flip(array_map($key, $columns));
+
+        foreach ($labels as $i => $label) {
+            $k = $key($label);
+            if ($labelCounts[$k] > 1 || (isset($codeKeys[$k]) && $k !== $key($columns[$i]))) {
+                $labels[$i] = $columns[$i];
+            }
+        }
+
+        return $labels;
     }
 }

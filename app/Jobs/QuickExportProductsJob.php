@@ -39,13 +39,37 @@ class QuickExportProductsJob implements ShouldQueue
             return;
         }
 
-        $tracker->update(['status' => 'processing', 'started_at' => now()]);
+        // pending → processing แบบมีเงื่อนไข ไม่ใช่อ่าน status แล้วค่อยเขียน — กันชนกับ
+        // JobTrackerController::cancel() ที่ปิดงาน pending เป็น cancelled ในจังหวะเดียวกัน
+        // ได้ 0 แถว = ถูกยกเลิกไปตั้งแต่ยังรอคิว ไม่ต้องเริ่มทำ
+        $started = JobTracker::where('id', $tracker->id)
+            ->where('status', 'pending')
+            ->update(['status' => 'processing', 'started_at' => now()]);
+        if ($started === 0) {
+            return;
+        }
 
         $format = $this->params['format'];
         $relativePath = "exports/{$tracker->id}/products_".now()->format('Ymd_His').".{$format}";
         Storage::disk('local')->makeDirectory(dirname($relativePath));
 
-        $rowCount = $exporter->write($tracker->user, $this->params, Storage::disk('local')->path($relativePath));
+        // ยกเลิกระหว่างรัน (cancel_requested_at) — เช็คทุกชุด 500 แถวจาก DB ตรงๆ เพราะคำขอยกเลิก
+        // มาจากอีก request แล้ว throw ออกมาจาก generator ใน exporter แบบเดียวกับ ProcessExportJob
+        $checkCancelled = function (int $rowCount) use ($tracker) {
+            $tracker->update(['total_rows_processed' => $rowCount]);
+            if (JobTracker::where('id', $tracker->id)->whereNotNull('cancel_requested_at')->exists()) {
+                throw new JobCancelledException();
+            }
+        };
+
+        try {
+            $rowCount = $exporter->write($tracker->user, $this->params, Storage::disk('local')->path($relativePath), $checkCancelled);
+        } catch (JobCancelledException) {
+            Storage::disk('local')->delete($relativePath);
+            $tracker->update(['status' => 'cancelled', 'completed_at' => now()]);
+
+            return;
+        }
 
         $tracker->update([
             'status' => 'completed',

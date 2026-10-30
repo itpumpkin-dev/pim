@@ -10,25 +10,26 @@ class SpreadsheetWriter
     /**
      * @param array<int, string> $columns
      * @param iterable<array<string, mixed>> $rows
+     * @param array<int, string>|null $headers หัวคอลัมน์ที่จะเขียนแทน $columns (ลำดับเดียวกัน) — null = ใช้ $columns
      */
-    public static function write(string $absolutePath, string $format, array $columns, iterable $rows, string $separator = ','): void
+    public static function write(string $absolutePath, string $format, array $columns, iterable $rows, string $separator = ',', ?array $headers = null): void
     {
         if ($format === 'csv') {
-            self::writeCsv($absolutePath, $columns, $rows, $separator);
+            self::writeCsv($absolutePath, $columns, $rows, $separator, $headers ?? $columns);
             return;
         }
 
-        self::writeSpreadsheet($absolutePath, $format, $columns, $rows);
+        self::writeSpreadsheet($absolutePath, $format, $columns, $rows, $headers ?? $columns);
     }
 
-    private static function writeCsv(string $path, array $columns, iterable $rows, string $separator): void
+    private static function writeCsv(string $path, array $columns, iterable $rows, string $separator, array $headers): void
     {
         $handle = fopen($path, 'w');
         if ($handle === false) {
             throw new \RuntimeException("Unable to write file: {$path}");
         }
 
-        fputcsv($handle, $columns, $separator);
+        fputcsv($handle, $headers, $separator);
 
         foreach ($rows as $row) {
             $line = [];
@@ -41,13 +42,13 @@ class SpreadsheetWriter
         fclose($handle);
     }
 
-    private static function writeSpreadsheet(string $path, string $format, array $columns, iterable $rows): void
+    private static function writeSpreadsheet(string $path, string $format, array $columns, iterable $rows, array $headers): void
     {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
-        foreach ($columns as $i => $col) {
-            $sheet->setCellValue([$i + 1, 1], $col);
+        foreach ($headers as $i => $header) {
+            $sheet->setCellValue([$i + 1, 1], $header);
         }
 
         $rowIndex = 2;

@@ -45,7 +45,12 @@ class ProcessImportJob implements ShouldQueue
             return;
         }
 
-        $tracker->update(['status' => 'processing', 'started_at' => now()]);
+                // ยกเลิกไปตั้งแต่ยังรอคิว (JobTrackerController::cancel()) — ไม่ต้องเริ่มทำ
+        if ($tracker->status === 'cancelled') {
+            return;
+        }
+
+$tracker->update(['status' => 'processing', 'started_at' => now()]);
 
         $importer = ImportExportRegistry::importer($config->type, $tracker->user, $tracker->id, $config->family_code);
         // หัวคอลัมน์ในไฟล์อาจเป็นภาษาไหนก็ได้ที่ผู้ใช้ดาวน์โหลด template มา
