@@ -32,7 +32,7 @@ export default function AppLogo({ collapsed = false }: { collapsed?: boolean }) 
                             textOverflow: 'ellipsis',
                         }}
                     >
-                        PIM<span style={{ color: 'var(--sapBrandColor)' }}>Pumpkin</span>
+                        PIM<span style={{ color: '#FF7F50' }}>Pumpkin</span>
                     </span>
                 </span>
             )}

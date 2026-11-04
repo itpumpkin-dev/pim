@@ -63,7 +63,8 @@
 
 .brandAccent {
     font-weight: 800;
-    color: var(--sapBrandColor);
+    /* brand orange, same as the home page hero */
+    color: #ff7f50;
 }
 
 .toolbarActions {
