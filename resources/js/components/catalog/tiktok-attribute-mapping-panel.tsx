@@ -1,8 +1,8 @@
-import { ListSubheader, MenuItem, Select } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingTargetSelect } from '@/components/catalog/marketplace-mapping-ui';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
+import { useTranslation } from 'react-i18next';
 
 // v1 รองรับแค่ TikTok attribute ที่ติดแฟล็ก is_customizable เท่านั้น (ผู้ขาย
 // พิมพ์ค่าเองได้อิสระ) — ดูที่ TikTokAttributeMappingController::update()
@@ -12,18 +12,7 @@ import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-
 // ล่วงหน้าเฉพาะเจาะจง ไม่ใช่ค่าอิสระ — เป็น scope decision เดียวกับที่ใช้
 // กับหน้า mapping ของ Shopee/Lazada อยู่แล้ว
 
-type TargetField =
-    | 'name'
-    | 'price'
-    | 'qty'
-    | 'weight'
-    | 'length'
-    | 'width'
-    | 'height'
-    | 'description'
-    | 'video'
-    | 'tiktok_attribute'
-    | '';
+type TargetField = 'name' | 'price' | 'qty' | 'weight' | 'length' | 'width' | 'height' | 'description' | 'video' | 'tiktok_attribute' | '';
 
 // ฟิลด์แบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่าจะชนะ"
 // ส่งค่าตรงเข้า payload สร้าง/อัปเดตสินค้าของ TikTok เอง (title/price/
@@ -37,7 +26,7 @@ const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'len
 // ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับฟิลด์
 // payload ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป TikTok product-attribute
 // ต้องแนบด้วยว่า *ตัวไหน* — เลยเข้ารหัสเป็น prefix นี้ + id (เช่น
-// "tiktok_attribute:100335") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้
+// "tiktok_attribute:100335") เพื่อให้ Select ตัวเดียวแทนทั้งสองแบบได้
 // โดยไม่ต้องมี control ตัวที่สอง
 const TIKTOK_ATTRIBUTE_PREFIX = 'tiktok_attribute:';
 
@@ -145,29 +134,32 @@ export function TikTokAttributeMappingPanel({ attributes, tiktokAttributes, cove
             syncing={mapping.syncing}
             onSync={mapping.syncFromPlatform}
             renderMapToCell={(row) => (
-                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
-                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                    <ListSubheader>{t('tiktokPayloadFieldsGroup')}</ListSubheader>
-                    {STRUCTURED_FIELDS.map((field) => (
-                        <MenuItem
-                            key={field}
-                            value={field}
-                            // ฟิลด์วิดีโอของ TikTok ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
-                            // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
-                            // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
-                            disabled={field === 'video' && row.type !== 'video'}
-                        >
-                            {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>])}
-                        </MenuItem>
-                    ))}
-                    <ListSubheader>{t('tiktokAttributesGroup')}</ListSubheader>
-                    {tiktokAttributes.map((ta) => (
-                        <MenuItem key={ta.id} value={`${TIKTOK_ATTRIBUTE_PREFIX}${ta.id}`} disabled={!ta.is_customizable}>
-                            {ta.name}
-                            {!ta.is_customizable ? ` ${t('tiktokSelectUnsupported')}` : ''}
-                        </MenuItem>
-                    ))}
-                </Select>
+                <MappingTargetSelect
+                    value={buildTargetValue(row)}
+                    onChange={(value) => applySelectValue(row, value)}
+                    emptyLabel={t('notUsed')}
+                    groups={[
+                        {
+                            header: t('tiktokPayloadFieldsGroup'),
+                            options: STRUCTURED_FIELDS.map((field) => ({
+                                value: field,
+                                label: t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'tiktok_attribute'>]),
+                                // ฟิลด์วิดีโอของ TikTok ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
+                                // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
+                                // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
+                                disabled: field === 'video' && row.type !== 'video',
+                            })),
+                        },
+                        {
+                            header: t('tiktokAttributesGroup'),
+                            options: tiktokAttributes.map((ta) => ({
+                                value: `${TIKTOK_ATTRIBUTE_PREFIX}${ta.id}`,
+                                label: !ta.is_customizable ? `${ta.name} ${t('tiktokSelectUnsupported')}` : ta.name,
+                                disabled: !ta.is_customizable,
+                            })),
+                        },
+                    ]}
+                />
             )}
         />
     );

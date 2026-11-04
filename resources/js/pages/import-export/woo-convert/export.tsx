@@ -1,27 +1,14 @@
+import { FioriField, FioriFormGroup, FioriMessageStrip } from '@/components/fiori-form';
 import { ProductPicker, type ProductOption } from '@/components/product-picker';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DownloadIcon from '@mui/icons-material/Download';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    FormControl,
-    FormControlLabel,
-    FormHelperText,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Head, Link, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import { Button, CheckBox, Option, Select, Title } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface LocaleOption {
     code: string;
@@ -65,8 +52,8 @@ export default function WooExport({ locales, families, shops }: Props) {
     const [products, setProducts] = useState<ProductOption[]>([]);
     const hasProductSelection = products.length > 0;
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         const params = new URLSearchParams();
         params.set('locale', locale);
         params.set('format', format);
@@ -83,130 +70,128 @@ export default function WooExport({ locales, families, shops }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooExportTitle')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 720, mx: 'auto', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooExportTitle')}</Typography>
-                    <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+            <form onSubmit={submit} className={styles.page} style={{ maxWidth: 720, marginInline: 'auto' }}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('wooExportTitle')}
+                    </Title>
+                    <Button icon="nav-back" onClick={() => router.visit('/import-export/woo-convert')}>
                         {tCatalog('back')}
                     </Button>
-                </Stack>
+                </div>
 
-                <Alert severity="info" sx={{ mb: 3, whiteSpace: 'pre-line' }}>
+                <FioriMessageStrip severity="information" style={{ marginBottom: '1.5rem', whiteSpace: 'pre-line' }}>
                     {t('wooExportIntro')}
-                </Alert>
+                </FioriMessageStrip>
 
-                <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportLanguageSectionTitle')}</Typography>
-                        <Stack spacing={3}>
-                            <FormControl fullWidth required>
-                                <InputLabel id="woo-export-locale-label">{t('wooExportLocale')}</InputLabel>
-                                <Select
-                                    labelId="woo-export-locale-label"
-                                    label={t('wooExportLocale')}
-                                    value={locale}
-                                    onChange={(e) => setLocale(e.target.value)}
-                                >
-                                    {locales.map((l) => (
-                                        <MenuItem key={l.code} value={l.code}>{l.display_name || l.code}</MenuItem>
-                                    ))}
-                                </Select>
-                                <FormHelperText>{t('wooExportLocaleHelp')}</FormHelperText>
-                            </FormControl>
+                <div className={styles.stack}>
+                    <FioriFormGroup title={t('wooExportLanguageSectionTitle')}>
+                        <FioriField
+                            label={t('wooExportLocale')}
+                            htmlFor="woo-export-locale"
+                            required
+                            hint={t('wooExportLocaleHelp')}
+                            labelWidth={160}
+                        >
+                            <Select
+                                id="woo-export-locale"
+                                className={styles.fullWidth}
+                                required
+                                value={locale}
+                                onChange={(e) => setLocale(e.detail.selectedOption.value ?? locale)}
+                            >
+                                {locales.map((l) => (
+                                    <Option key={l.code} value={l.code}>
+                                        {l.display_name || l.code}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
 
-                            <FormControl fullWidth>
-                                <InputLabel id="woo-export-shop-label">{t('wooExportShop')}</InputLabel>
-                                <Select
-                                    labelId="woo-export-shop-label"
-                                    label={t('wooExportShop')}
-                                    value={shopId}
-                                    onChange={(e) => setShopId(e.target.value)}
-                                >
-                                    <MenuItem value=""><em>{t('wooExportShopNone')}</em></MenuItem>
-                                    {shops.map((shop) => (
-                                        <MenuItem key={shop.id} value={String(shop.id)}>{shop.name}</MenuItem>
-                                    ))}
-                                </Select>
-                                <FormHelperText>
-                                    {t('wooExportShopHelp')}
-                                    {' '}
-                                    <Link href="/catalog/sales-platforms" style={{ color: 'inherit', fontWeight: 600 }}>
+                        <FioriField
+                            label={t('wooExportShop')}
+                            htmlFor="woo-export-shop"
+                            labelWidth={160}
+                            hint={
+                                <>
+                                    {t('wooExportShopHelp')}{' '}
+                                    <Link href="/catalog/sales-platforms" style={{ color: 'var(--sapLinkColor)', fontWeight: 600 }}>
                                         {t('wooExportManageShopsLink')}
                                     </Link>
-                                </FormHelperText>
-                            </FormControl>
-                        </Stack>
-                    </Paper>
-
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportProductsSectionTitle')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 1.5 }}>
-                            {t('wooExportProductsHelp')}
-                        </Typography>
-                        <ProductPicker value={products} onChange={setProducts} />
-                    </Paper>
-
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3, opacity: hasProductSelection ? 0.5 : 1 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportFilterSectionTitle')}</Typography>
-                        {hasProductSelection && (
-                            <Alert severity="info" sx={{ mb: 2 }}>{t('wooExportFiltersIgnored')}</Alert>
-                        )}
-                        <Stack spacing={2}>
-                            <FormControl fullWidth disabled={hasProductSelection}>
-                                <InputLabel id="woo-export-family-label">{t('wooConvertFamilyCode')}</InputLabel>
-                                <Select
-                                    labelId="woo-export-family-label"
-                                    label={t('wooConvertFamilyCode')}
-                                    value={familyCode}
-                                    onChange={(e) => setFamilyCode(e.target.value)}
-                                >
-                                    <MenuItem value=""><em>{t('wooExportAllFamilies')}</em></MenuItem>
-                                    {families.map((family) => (
-                                        <MenuItem key={family.code} value={family.code}>{family.name} ({family.code})</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={enabledOnly}
-                                        disabled={hasProductSelection}
-                                        onChange={(e) => setEnabledOnly(e.target.checked)}
-                                    />
-                                }
-                                label={t('wooExportEnabledOnly')}
-                            />
-                        </Stack>
-                    </Paper>
-
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooExportFormatSectionTitle')}</Typography>
-                        <FormControl fullWidth>
-                            <InputLabel id="woo-export-format-label">{t('fileFormat')}</InputLabel>
+                                </>
+                            }
+                        >
                             <Select
-                                labelId="woo-export-format-label"
-                                label={t('fileFormat')}
-                                value={format}
-                                onChange={(e) => setFormat(e.target.value as 'csv' | 'xlsx')}
+                                id="woo-export-shop"
+                                className={styles.fullWidth}
+                                value={shopId}
+                                onChange={(e) => setShopId(e.detail.selectedOption.value ?? '')}
                             >
-                                <MenuItem value="csv">CSV</MenuItem>
-                                <MenuItem value="xlsx">XLSX</MenuItem>
+                                <Option value="">{t('wooExportShopNone')}</Option>
+                                {shops.map((shop) => (
+                                    <Option key={shop.id} value={String(shop.id)}>
+                                        {shop.name}
+                                    </Option>
+                                ))}
                             </Select>
-                        </FormControl>
-                    </Paper>
-                </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('wooExportProductsSectionTitle')} description={t('wooExportProductsHelp')}>
+                        <ProductPicker value={products} onChange={setProducts} />
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('wooExportFilterSectionTitle')} style={{ opacity: hasProductSelection ? 0.5 : 1 }}>
+                        {hasProductSelection && <FioriMessageStrip severity="information">{t('wooExportFiltersIgnored')}</FioriMessageStrip>}
+                        <FioriField label={t('wooConvertFamilyCode')} htmlFor="woo-export-family" labelWidth={160}>
+                            <Select
+                                id="woo-export-family"
+                                className={styles.fullWidth}
+                                disabled={hasProductSelection}
+                                value={familyCode}
+                                onChange={(e) => setFamilyCode(e.detail.selectedOption.value ?? '')}
+                            >
+                                <Option value="">{t('wooExportAllFamilies')}</Option>
+                                {families.map((family) => (
+                                    <Option key={family.code} value={family.code}>
+                                        {family.name} ({family.code})
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
+                        <CheckBox
+                            text={t('wooExportEnabledOnly')}
+                            checked={enabledOnly}
+                            disabled={hasProductSelection}
+                            onChange={(e) => setEnabledOnly(e.target.checked)}
+                        />
+                    </FioriFormGroup>
+
+                    <FioriFormGroup title={t('wooExportFormatSectionTitle')}>
+                        <FioriField label={t('fileFormat')} htmlFor="woo-export-format" labelWidth={160}>
+                            <Select
+                                id="woo-export-format"
+                                className={styles.fullWidth}
+                                value={format}
+                                onChange={(e) => setFormat((e.detail.selectedOption.value ?? format) as 'csv' | 'xlsx')}
+                            >
+                                <Option value="csv">CSV</Option>
+                                <Option value="xlsx">XLSX</Option>
+                            </Select>
+                        </FioriField>
+                    </FioriFormGroup>
+                </div>
 
                 <Button
-                    type="submit"
-                    fullWidth
-                    size="large"
+                    design="Emphasized"
+                    icon="download"
                     disabled={!locale}
-                    startIcon={<DownloadIcon />}
-                    sx={{ ...fioriEmphasizedSx, mt: 3, py: 1.25 }}
+                    onClick={() => submit()}
+                    style={{ width: '100%', marginTop: '1.5rem' }}
                 >
                     {t('wooExportSubmit')}
                 </Button>
-            </Box>
+            </form>
         </AppLayout>
     );
 }

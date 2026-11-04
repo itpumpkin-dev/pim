@@ -1,13 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
-import { PALETTE } from '@/theme';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { Avatar, Box, Paper, Stack, Tab, Tabs, Typography } from '@mui/material';
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriCardSx, fioriTabsSx } from '@/lib/fiori-style';
+import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
+import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/react';
+import { Label, Tab, TabContainer, Title } from '@ui5/webcomponents-react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { MasterListPage } from '../master-crud';
 
 interface Operation {
     method: string;
@@ -35,16 +36,6 @@ interface Props {
     platforms: Record<string, PlatformApi>;
 }
 
-// ใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับที่ใช้กับ avatar ของ platform ที่อื่น (กล่องข้อมูลใน
-// dashboard, salesPlatforms/index.tsx) — ที่นี่กำหนดลำดับตายตัวไว้เลยเพราะ key
-// ของ platform พวกนี้ hardcode ไว้แล้ว (ต่างจาก salesPlatforms/index.tsx ที่ admin สร้างเอง)
-const PLATFORM_COLORS: Record<string, string> = {
-    shopee: PALETTE.highlight,
-    lazada: PALETTE.accent,
-    tiktok: PALETTE.primary,
-    woocommerce: PALETTE.secondary,
-};
-
 export default function MarketplaceApiUsage({ platforms }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
@@ -58,98 +49,81 @@ export default function MarketplaceApiUsage({ platforms }: Props) {
     const [activeKey, setActiveKey] = useState(platformKeys[0] ?? '');
     const active = platforms[activeKey];
 
+    const mono = { fontFamily: 'monospace', wordBreak: 'break-word' } as const;
+    const fieldLabel = (text: string) => (
+        <Label showColon={false} style={{ fontWeight: 600 }}>
+            {text}
+        </Label>
+    );
+
     const columns: FioriResponsiveColumn<Operation>[] = [
         {
             key: 'method',
             header: t('apiOperationMethod'),
             priority: 'always',
             width: 90,
-            render: (op) => (
-                <Typography component="span" variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, color: FIORI.textPrimary }}>
-                    {op.method}
-                </Typography>
-            ),
+            render: (op) => <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 'var(--sapFontSmallSize)' }}>{op.method}</span>,
         },
         {
             key: 'endpoint',
             header: t('apiOperationEndpoint'),
             priority: 'always',
             minWidth: 220,
-            render: (op) => (
-                <Typography component="span" variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textPrimary, wordBreak: 'break-word' }}>
-                    {op.endpoint}
-                </Typography>
-            ),
+            render: (op) => <span style={mono}>{op.endpoint}</span>,
         },
         {
             key: 'purpose',
             header: t('apiOperationPurpose'),
             priority: 'high',
             minWidth: 240,
-            render: (op) => <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{op.purpose}</Typography>,
+            render: (op) => op.purpose,
         },
         {
             key: 'write',
             header: '',
             priority: 'medium',
-            render: (op) => <FioriStatus label={op.write ? t('apiWriteOperation') : t('apiReadOperation')} tone={op.write ? 'warning' : 'information'} />,
+            render: (op) => (
+                <FioriStatus label={op.write ? t('apiWriteOperation') : t('apiReadOperation')} tone={op.write ? 'warning' : 'information'} />
+            ),
         },
         {
             key: 'source',
             header: t('apiOperationSource'),
             priority: 'low',
-            render: (op) => (
-                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary, wordBreak: 'break-word' }}>
-                    {op.source}
-                </Typography>
-            ),
+            render: (op) => <span style={{ ...mono, fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>{op.source}</span>,
         },
     ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('apiUsageTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <SalesChannelSectionTabs active="apiUsage" />
-
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {t('apiUsageTitle')}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25, maxWidth: 760 }}>
-                        {t('apiUsageSubtitle')}
-                    </Typography>
-                </Box>
-
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Tabs
-                        value={activeKey}
-                        onChange={(_, value: string) => setActiveKey(value)}
-                        sx={{ ...fioriTabsSx, px: 2 }}
+            <MasterListPage before={<SalesChannelSectionTabs active="apiUsage" />} title={t('apiUsageTitle')} intro={t('apiUsageSubtitle')}>
+                <div
+                    style={{
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        overflow: 'hidden',
+                    }}
+                >
+                    <TabContainer
+                        collapsed
+                        onTabSelect={(e) => {
+                            const key = e.detail.tab.dataset.key;
+                            if (key) setActiveKey(key);
+                        }}
                     >
                         {platformKeys.map((key) => (
-                            <Tab
-                                key={key}
-                                value={key}
-                                iconPosition="start"
-                                icon={
-                                    <Avatar sx={{ width: 22, height: 22, fontSize: '0.7rem', fontWeight: 700, bgcolor: PLATFORM_COLORS[key] ?? FIORI.brand }}>
-                                        {platforms[key].label.charAt(0).toUpperCase()}
-                                    </Avatar>
-                                }
-                                label={platforms[key].label}
-                            />
+                            <Tab key={key} data-key={key} text={platforms[key].label} selected={key === activeKey} />
                         ))}
-                    </Tabs>
+                    </TabContainer>
 
                     {active && (
-                        <Box sx={{ p: 2.5 }}>
-                            <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 1.5, md: 4 }} sx={{ mb: 3 }}>
-                                <Box>
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, fontWeight: 600 }}>
-                                        {t('apiConfigured')}
-                                    </Typography>
-                                    <Box sx={{ mt: 0.5 }}>
+                        <div style={{ padding: '1.25rem' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 2rem', marginBottom: '1.5rem' }}>
+                                <div>
+                                    {fieldLabel(t('apiConfigured'))}
+                                    <div style={{ marginTop: '0.25rem' }}>
                                         {active.configured === null ? (
                                             <FioriStatus label={t('apiConfiguredUnknown')} tone="neutral" />
                                         ) : active.configured ? (
@@ -157,44 +131,36 @@ export default function MarketplaceApiUsage({ platforms }: Props) {
                                         ) : (
                                             <FioriStatus label={t('apiNotConfigured')} tone="error" />
                                         )}
-                                    </Box>
-                                </Box>
-                                <Box>
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, fontWeight: 600 }}>
-                                        {t('apiAuthMethod')}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary, mt: 0.5 }}>
-                                        {active.auth}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, fontWeight: 600 }}>
-                                        {t('apiTokenSource')}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: FIORI.textPrimary, mt: 0.5 }}>
-                                        {active.tokenSource}
-                                    </Typography>
-                                </Box>
-                            </Stack>
+                                    </div>
+                                </div>
+                                <div>
+                                    {fieldLabel(t('apiAuthMethod'))}
+                                    <div style={{ marginTop: '0.25rem' }}>{active.auth}</div>
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    {fieldLabel(t('apiTokenSource'))}
+                                    <div style={{ marginTop: '0.25rem' }}>{active.tokenSource}</div>
+                                </div>
+                            </div>
 
-                            <Stack spacing={3}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                 {active.groups.map((group) => (
-                                    <Box key={group.label}>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                                    <div key={group.label}>
+                                        <Title level="H4" size="H6" style={{ marginBottom: '0.5rem' }}>
                                             {group.label}
-                                        </Typography>
+                                        </Title>
                                         <FioriResponsiveTable
                                             columns={columns}
                                             rows={group.operations}
                                             getRowKey={(op) => `${op.method}:${op.endpoint}`}
                                         />
-                                    </Box>
+                                    </div>
                                 ))}
-                            </Stack>
-                        </Box>
+                            </div>
+                        </div>
                     )}
-                </Paper>
-            </Box>
+                </div>
+            </MasterListPage>
         </AppLayout>
     );
 }

@@ -1,4 +1,4 @@
-import { Box, Chip, CircularProgress, Collapse, Stack, Typography } from '@mui/material';
+import { BusyIndicator, Tag } from '@ui5/webcomponents-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -22,9 +22,15 @@ export function CategoryProductsExpander({ categoryId, count }: { categoryId: nu
 
     if (count === 0) {
         return (
-            <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+            <span
+                style={{
+                    fontSize: 'var(--sapFontSmallSize)',
+                    fontStyle: 'italic',
+                    color: 'var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor))',
+                }}
+            >
                 {t('noProductsInCategory')}
-            </Typography>
+            </span>
         );
     }
 
@@ -40,22 +46,20 @@ export function CategoryProductsExpander({ categoryId, count }: { categoryId: nu
     };
 
     return (
-        <Box>
-            <Chip
-                label={t('productsInCategory', { count })}
-                size="small"
-                variant="outlined"
-                onClick={toggle}
-                sx={{ cursor: 'pointer' }}
-            />
-            <Collapse in={expanded}>
-                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                    {loading && <CircularProgress size={14} />}
+        <div>
+            <Tag interactive design="Neutral" onClick={toggle} aria-expanded={expanded}>
+                {t('productsInCategory', { count })}
+            </Tag>
+            {expanded && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.25rem', marginTop: '0.5rem' }}>
+                    {loading && <BusyIndicator active delay={0} size="S" />}
                     {products?.map((p) => (
-                        <Chip key={p.id} label={p.sku} size="small" />
+                        <Tag key={p.id} design="Neutral" hideStateIcon>
+                            {p.sku}
+                        </Tag>
                     ))}
-                </Stack>
-            </Collapse>
-        </Box>
+                </div>
+            )}
+        </div>
     );
 }

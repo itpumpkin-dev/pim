@@ -1,47 +1,24 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Box,
-    Button,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Tab,
-    Tabs,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import { Button, FlexBox, Icon, Input, Option, Select, Tab, TabContainer, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { GridFilterDrawer, type FilterValue } from '@/components/grid-filter-drawer';
 import { BulkGenerateDialog } from './bulk-generate-dialog';
 import { ManageDefaultsTab } from './manage-defaults-tab';
-import {
-    FIORI,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-    fioriTabsSx,
-} from '@/lib/fiori-style';
 
 interface GridColumn {
     label: string;
@@ -177,7 +154,7 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
     // คอลัมน์ actions ก็ตรึงไว้เหมือนคอลัมน์ที่ใช้ระบุแถวเช่นกัน
     const columns: FioriResponsiveColumn<AttributeFamilyRow>[] = [
         { key: 'id', header: t('fields.id'), priority: 'low', render: (row) => row.id },
-        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography> },
+        { key: 'code', header: t('fields.code'), priority: 'always', render: (row) => <Text style={{ fontWeight: 'bold' }}>{row.code}</Text> },
         { key: 'name', header: t('fields.name'), priority: 'high', render: (row) => row.name || ucfirst(row.code) },
         {
             key: 'actions',
@@ -185,27 +162,35 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributeFamilies/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={t('rowActions.edit')}
+                            accessibleName={t('rowActions.edit')}
+                            onClick={() => router.visit(`/catalog/attributeFamilies/${row.id}/edit`)}
+                        />
                     )}
                     {canCreate && (
-                        <Tooltip title={t('rowActions.duplicate')}>
-                            <span>
-                                <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDuplicateFamilyId(row.id)}>
-                                    <ContentCopyIcon fontSize="small" />
-                                </IconButton>
-                            </span>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="copy"
+                            tooltip={t('rowActions.duplicate')}
+                            accessibleName={t('rowActions.duplicate')}
+                            onClick={() => setDuplicateFamilyId(row.id)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteFamilyId(row.id)}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            tooltip={t('rowActions.delete')}
+                            accessibleName={t('rowActions.delete')}
+                            onClick={() => setDeleteFamilyId(row.id)}
+                        />
                     )}
-                </Stack>
+                </FlexBox>
             ),
         },
     ];
@@ -213,41 +198,33 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributeFamiliesTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
                 {/* หัวข้อและปุ่มสร้างใหม่ */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {tCatalog('attributeFamiliesTitle')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H3">{tCatalog('attributeFamiliesTitle')}</Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)', marginTop: '0.125rem', display: 'block' }}>
                             {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Box>
+                        </Text>
+                    </div>
                     {canCreate && (
-                        <Stack direction="row" spacing={1.5}>
-                            <Button
-                                variant="outlined"
-                                onClick={() => setBulkGenerateOpen(true)}
-                                sx={{ ...fioriDefaultSx, px: 2.5, py: 1 }}
-                            >
-                                {tCatalog('generateFromProductGroups')}
-                            </Button>
-                            <Button
-                                variant="contained"
-                                onClick={() => router.visit('/catalog/attributeFamilies/create')}
-                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                            >
+                        <FlexBox wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
+                            <Button onClick={() => setBulkGenerateOpen(true)}>{tCatalog('generateFromProductGroups')}</Button>
+                            <Button design="Emphasized" icon="add" onClick={() => router.visit('/catalog/attributeFamilies/create')}>
                                 {tCatalog('createAttributeFamily')}
                             </Button>
-                        </Stack>
+                        </FlexBox>
                     )}
-                </Stack>
+                </FlexBox>
 
-                <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ ...fioriTabsSx, mb: 3 }}>
-                    <Tab value="list" label={tCatalog('attributeFamiliesListTab')} />
-                    <Tab value="manage" label={tCatalog('attributeFamiliesManageTab')} />
-                </Tabs>
+                <TabContainer
+                    collapsed
+                    onTabSelect={(event) => setTab(event.detail.tabIndex === 1 ? 'manage' : 'list')}
+                    style={{ marginBottom: '1.5rem' }}
+                >
+                    <Tab text={tCatalog('attributeFamiliesListTab')} selected={tab === 'list'} />
+                    <Tab text={tCatalog('attributeFamiliesManageTab')} selected={tab === 'manage'} />
+                </TabContainer>
 
                 {tab === 'manage' && (
                     <ManageDefaultsTab
@@ -260,97 +237,81 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
 
                 {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
                 {tab === 'list' && (
-                <Paper elevation={0} sx={fioriCardSx}>
-                    {/* แถบเครื่องมือ */}
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={tCatalog('search')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                    <div
+                        style={{
+                            background: 'var(--sapGroup_ContentBackground)',
+                            border: '1px solid var(--sapGroup_ContentBorderColor)',
+                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {/* แถบเครื่องมือ */}
+                        <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', padding: '1rem' }}>
+                            <Input
+                                value={search}
+                                onInput={(event) => setSearch(event.target.value)}
+                                placeholder={tCatalog('search')}
+                                icon={<Icon name="search" />}
+                                style={{ minWidth: 240 }}
+                            />
+
+                            <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
+                                <Button icon="filter" onClick={() => setFilterDrawerOpen(true)}>
+                                    {t('filter')}
+                                    {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
+                                </Button>
+                                <Select
+                                    value={String(perPage)}
+                                    onChange={(e) => handlePerPageChange(Number(e.detail.selectedOption.value))}
+                                    style={{ width: '5rem' }}
+                                >
+                                    {perPageOptions.map((n) => (
+                                        <Option key={n} value={String(n)}>
+                                            {n}
+                                        </Option>
+                                    ))}
+                                </Select>
+                                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('perPage')}</Text>
+                                <Text>{currentPage}</Text>
+                                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('pageOf', { lastPage })}</Text>
+
+                                <FlexBox style={{ gap: '0.125rem' }}>
+                                    <Button design="Transparent" icon="sys-first-page" disabled={currentPage <= 1} onClick={() => goToPage(1)} />
+                                    <Button
+                                        design="Transparent"
+                                        icon="slim-arrow-left"
+                                        disabled={currentPage <= 1}
+                                        onClick={() => goToPage(currentPage - 1)}
+                                    />
+                                    <Button
+                                        design="Transparent"
+                                        icon="slim-arrow-right"
+                                        disabled={currentPage >= lastPage}
+                                        onClick={() => goToPage(currentPage + 1)}
+                                    />
+                                    <Button
+                                        design="Transparent"
+                                        icon="sys-last-page"
+                                        disabled={currentPage >= lastPage}
+                                        onClick={() => goToPage(lastPage)}
+                                    />
+                                </FlexBox>
+                            </FlexBox>
+                        </FlexBox>
+
+                        <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
+
+                        {/* ตาราง */}
+                        <FioriResponsiveTable
+                            variant="plain"
+                            columns={columns}
+                            rows={gridData.data}
+                            getRowKey={(row) => row.id}
+                            emptyMessage={tCatalog('noAttributeFamiliesFound')}
                         />
-
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<FilterListIcon />}
-                                onClick={() => setFilterDrawerOpen(true)}
-                                sx={fioriDefaultSx}
-                            >
-                                {t('filter')}
-                                {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
-                            </Button>
-
-                            <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                                }}
-                            >
-                                {perPageOptions.map((n) => (
-                                    <MenuItem key={n} value={n}>{n}</MenuItem>
-                                ))}
-                            </Select>
-
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('perPage')}
-                            </Typography>
-
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                            >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
-
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('pageOf', { lastPage })}
-                            </Typography>
-
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
-
-                    {/* ตาราง */}
-                    <FioriResponsiveTable
-                        variant="plain"
-                        columns={columns}
-                        rows={gridData.data}
-                        getRowKey={(row) => row.id}
-                        emptyMessage={tCatalog('noAttributeFamiliesFound')}
-                    />
-                </Paper>
+                    </div>
                 )}
-            </Box>
+            </div>
 
             {/* ไดอะล็อกยืนยันการลบ */}
             <FioriMessageBox
@@ -373,27 +334,21 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
                 confirmLoading={deleting}
                 confirmDisabled={deleteUsageLoading}
             >
-                <Stack spacing={1}>
-                    <Typography variant="body2">{tCatalog('confirmDeleteAttributeFamilyMessage')}</Typography>
-                    {deleteUsageLoading && (
-                        <Typography variant="body2" color="text.secondary">
-                            {tCatalog('checkingAttributeFamilyUsage')}
-                        </Typography>
-                    )}
+                <FlexBox direction="Column" style={{ gap: '0.5rem' }}>
+                    <Text>{tCatalog('confirmDeleteAttributeFamilyMessage')}</Text>
+                    {deleteUsageLoading && <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{tCatalog('checkingAttributeFamilyUsage')}</Text>}
                     {!deleteUsageLoading && deleteUsage && (deleteUsage.product_group_count > 0 || deleteUsage.product_count > 0) && (
-                        <Typography variant="body2" color="error.main" fontWeight={600}>
+                        <Text style={{ color: 'var(--sapNegativeColor)', fontWeight: 'bold' }}>
                             {tCatalog('attributeFamilyInUseWarning', {
                                 groups: deleteUsage.product_group_count,
                                 products: deleteUsage.product_count,
                             })}
-                        </Typography>
+                        </Text>
                     )}
                     {!deleteUsageLoading && deleteUsage && deleteUsage.product_group_count === 0 && deleteUsage.product_count === 0 && (
-                        <Typography variant="body2" color="text.secondary">
-                            {tCatalog('attributeFamilyNotInUse')}
-                        </Typography>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{tCatalog('attributeFamilyNotInUse')}</Text>
                     )}
-                </Stack>
+                </FlexBox>
             </FioriMessageBox>
 
             {/* ไดอะล็อกยืนยันการทำสำเนา */}
@@ -403,10 +358,14 @@ export default function AttributeFamilyIndex({ gridConfig, gridData, filters, ot
                 onConfirm={() => {
                     if (duplicateFamilyId !== null) {
                         setDuplicating(true);
-                        router.post(`/catalog/attributeFamilies/${duplicateFamilyId}/duplicate`, {}, {
-                            onSuccess: () => setDuplicateFamilyId(null),
-                            onFinish: () => setDuplicating(false),
-                        });
+                        router.post(
+                            `/catalog/attributeFamilies/${duplicateFamilyId}/duplicate`,
+                            {},
+                            {
+                                onSuccess: () => setDuplicateFamilyId(null),
+                                onFinish: () => setDuplicating(false),
+                            },
+                        );
                     }
                 }}
                 title={tCatalog('confirmDuplication')}

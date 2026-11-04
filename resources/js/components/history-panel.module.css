@@ -1,0 +1,36 @@
+.panel {
+    padding: 0 1rem;
+}
+
+.pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.pageBox {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.25rem);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-bottom: 1.25rem;
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+@media (min-width: 900px) {
+    .panel {
+        padding: 0 2rem;
+    }
+}

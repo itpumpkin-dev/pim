@@ -2,47 +2,38 @@ import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
-import FolderOutlinedIcon from '@mui/icons-material/FolderOutlined';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/folder-blank.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-add.js';
+import '@ui5/webcomponents-icons/dist/sys-minus.js';
+import '@ui5/webcomponents-icons/dist/vertical-grip.js';
 import {
-    Alert,
-    Box,
+    Bar,
+    BusyIndicator,
     Button,
-    Checkbox,
-    CircularProgress,
-    Collapse,
     Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    Grid,
-    IconButton,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
+    Icon,
+    Input,
+    Label,
     Menu,
     MenuItem,
-    Paper,
-    Select,
-    Snackbar,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+    MessageStrip,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
 import { FormEvent, useEffect, useState } from 'react';
-import { relabelAttributes, relabelGroups } from './relabel-assignments';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
+import styles from './create.module.css';
+import { relabelAttributes, relabelGroups } from './relabel-assignments';
 
 interface AttributeGroup {
     id: number;
@@ -154,9 +145,7 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
     });
 
     const toggleGroupExpand = (groupId: number) => {
-        setAssignedGroups((prev) =>
-            prev.map((g) => (g.id === groupId ? { ...g, expanded: !g.expanded } : g))
-        );
+        setAssignedGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, expanded: !g.expanded } : g)));
     };
 
     const handleAssignGroup = () => {
@@ -298,10 +287,8 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
         setUnassignedAttrs((prev) => prev.filter((a) => a.id !== attr.id));
         setAssignedGroups((prev) =>
             prev.map((g) =>
-                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id)
-                    ? { ...g, attributes: [...g.attributes, attr] }
-                    : g
-            )
+                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id) ? { ...g, attributes: [...g.attributes, attr] } : g,
+            ),
         );
     };
 
@@ -320,7 +307,7 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
                     return { ...g, attributes: [...g.attributes, attr] };
                 }
                 return g;
-            })
+            }),
         );
     };
 
@@ -330,10 +317,8 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
     const handleAddAttributeToGroup = (attr: AttributeItem, targetGroupId: number) => {
         setAssignedGroups((prev) =>
             prev.map((g) =>
-                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id)
-                    ? { ...g, attributes: [...g.attributes, attr] }
-                    : g
-            )
+                g.id === targetGroupId && !g.attributes.some((a) => a.id === attr.id) ? { ...g, attributes: [...g.attributes, attr] } : g,
+            ),
         );
     };
 
@@ -341,13 +326,9 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
     // ก็ต่อเมื่อนี่คือตำแหน่งสุดท้ายที่เหลืออยู่เท่านั้น (ถ้ายังถูกวางไว้ที่ group
     // อื่นอยู่ ให้ยังคงอยู่ที่นั่นต่อไปตามปกติ ไม่ต้องกลับไป Unassigned)
     const handleRemoveAttributeFromGroup = (attr: AttributeItem, groupId: number) => {
-        const stillPlacedElsewhere = assignedGroups.some(
-            (g) => g.id !== groupId && g.attributes.some((a) => a.id === attr.id)
-        );
+        const stillPlacedElsewhere = assignedGroups.some((g) => g.id !== groupId && g.attributes.some((a) => a.id === attr.id));
 
-        setAssignedGroups((prev) =>
-            prev.map((g) => (g.id === groupId ? { ...g, attributes: g.attributes.filter((a) => a.id !== attr.id) } : g))
-        );
+        setAssignedGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, attributes: g.attributes.filter((a) => a.id !== attr.id) } : g)));
 
         if (!stillPlacedElsewhere) {
             setUnassignedAttrs((prev) => (prev.some((a) => a.id === attr.id) ? prev : [...prev, attr]));
@@ -360,9 +341,7 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
             const remainingGroups = assignedGroups.filter((g) => g.id !== groupId);
             // แอตทริบิวต์ที่ยังมีตำแหน่งเหลืออยู่ใน group อื่น ไม่ต้องกลับไป
             // Unassigned — กลับเฉพาะตัวที่ group นี้เป็นที่อยู่แห่งสุดท้ายจริงๆ
-            const orphaned = groupToRemove.attributes.filter(
-                (attr) => !remainingGroups.some((g) => g.attributes.some((a) => a.id === attr.id))
-            );
+            const orphaned = groupToRemove.attributes.filter((attr) => !remainingGroups.some((g) => g.attributes.some((a) => a.id === attr.id)));
             if (orphaned.length > 0) {
                 setUnassignedAttrs((prev) => [...prev, ...orphaned]);
             }
@@ -387,8 +366,8 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
         setAssignedGroups([]);
     };
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         // กันกด Save ซ้ำๆ ตอน request แรกยังไม่จบ (บั๊กจริงที่เจอ: หน้านี้เคยยิง
         // ผ่าน router.post() ตรงๆ แทนที่จะเป็น post() ของ useForm() เอง ทำให้
         // processing ด้านล่างไม่เคยเปลี่ยนเป็น true จริงๆ เลย — ปุ่ม Save เลย
@@ -416,403 +395,294 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
         });
     };
 
+    // แจ้งเตือน "ยังไม่มีกลุ่ม" ปิดตัวเองอัตโนมัติหลัง 7 วินาที (เหมือน Snackbar autoHideDuration เดิม)
+    useEffect(() => {
+        if (!noGroupWarningOpen) return undefined;
+        const timer = window.setTimeout(() => setNoGroupWarningOpen(false), 7000);
+        return () => window.clearTimeout(timer);
+    }, [noGroupWarningOpen]);
+
+    const dialogStyle = { width: 'min(444px, calc(100vw - 2rem))' };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createAttributeFamily')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <form onSubmit={submit} className={styles.page}>
                 {/* หัวข้อและปุ่มต่างๆ */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {t('createAttributeFamily')}
-                    </Typography>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            component={Link}
-                            href="/catalog/attributeFamilies"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
+                <div className={styles.header}>
+                    <Title level="H3">{t('createAttributeFamily')}</Title>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <Button icon="nav-back" onClick={() => router.visit('/catalog/attributeFamilies')}>
                             {t('back')}
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                        >
+                        <Button design="Emphasized" icon={processing ? undefined : 'save'} disabled={processing} onClick={() => submit()}>
                             {processing ? t('saving') : t('saveAttributeFamily')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Grid container spacing={3}>
+                <div className={styles.mainGrid}>
                     {/* คอลัมน์ซ้าย: กลุ่มและแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
-                    <Grid item xs={12} md={8}>
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                                <Box>
-                                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                        {tNav('attributeGroups')}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                        {t('attributeGroupsPanelSubtitle')}
-                                    </Typography>
-                                </Box>
-                                <Stack direction="row" spacing={1.5}>
-                                    <Button
-                                        onClick={handleDeleteAllGroups}
-                                        sx={{ ...fioriGhostSx, color: FIORI.error }}
-                                    >
-                                        {t('deleteGroup')}
-                                    </Button>
-                                    {otherFamilies.length > 0 && (
-                                        <Button
-                                            variant="outlined"
-                                            onClick={openTemplateDialog}
-                                            sx={fioriDefaultSx}
-                                        >
-                                            {t('useTemplateFrom')}
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="outlined"
-                                        onClick={() => setAssignDialogOpen(true)}
-                                        sx={fioriDefaultSx}
-                                    >
-                                        {t('assignAttributeGroup')}
-                                    </Button>
-                                </Stack>
-                            </Stack>
+                    <div className={styles.card}>
+                        <div className={styles.cardHeader}>
+                            <div>
+                                <Title level="H5">{tNav('attributeGroups')}</Title>
+                                <div className={styles.subtitle}>{t('attributeGroupsPanelSubtitle')}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                <Button design="Transparent" onClick={handleDeleteAllGroups} style={{ color: 'var(--sapNegativeColor)' }}>
+                                    {t('deleteGroup')}
+                                </Button>
+                                {otherFamilies.length > 0 && <Button onClick={openTemplateDialog}>{t('useTemplateFrom')}</Button>}
+                                <Button onClick={() => setAssignDialogOpen(true)}>{t('assignAttributeGroup')}</Button>
+                            </div>
+                        </div>
 
-                            <Grid container spacing={3} sx={{ mt: 1 }}>
-                                {/* ส่วนคอลัมน์หลัก */}
-                                <Grid item xs={12} sm={6}>
-                                    <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1.5 }}>
-                                        {t('mainColumn')}
-                                    </Typography>
+                        <div className={styles.columns}>
+                            {/* ส่วนคอลัมน์หลัก */}
+                            <div>
+                                <div className={styles.columnTitle} style={{ marginBottom: '0.75rem' }}>
+                                    {t('mainColumn')}
+                                </div>
 
-                                    <Box
-                                        sx={{
-                                            minHeight: 400,
-                                            maxHeight: 550,
-                                            overflowY: 'auto',
-                                            pr: 1,
-                                        }}
-                                    >
-                                        {assignedGroups.length === 0 ? (
-                                            <Box sx={{ border: `1px dashed ${FIORI.border}`, borderRadius: '8px', p: 4, textAlign: 'center' }}>
-                                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                    {t('noGroupsAssignedYet')}
-                                                </Typography>
-                                            </Box>
-                                        ) : (
-                                            <Stack spacing={1}>
-                                                {assignedGroups.map((group) => (
-                                                    <Box
-                                                        key={group.id}
-                                                        onDragOver={(e) => e.preventDefault()}
-                                                        onDrop={(e) => {
-                                                            e.preventDefault();
-                                                            if (draggedAttr) {
-                                                                if (draggedAttr.sourceGroupId === null) {
-                                                                    handlePlaceFromUnassigned(draggedAttr.attr, group.id);
-                                                                } else {
-                                                                    handleMoveAttributeBetweenGroups(draggedAttr.attr, draggedAttr.sourceGroupId, group.id);
-                                                                }
-                                                                setDraggedAttr(null);
+                                <div className={styles.groupScroll}>
+                                    {assignedGroups.length === 0 ? (
+                                        <div className={styles.emptyGroups}>{t('noGroupsAssignedYet')}</div>
+                                    ) : (
+                                        <div className={styles.groupStack}>
+                                            {assignedGroups.map((group) => (
+                                                <div
+                                                    key={group.id}
+                                                    className={styles.dropZone}
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={(e) => {
+                                                        e.preventDefault();
+                                                        if (draggedAttr) {
+                                                            if (draggedAttr.sourceGroupId === null) {
+                                                                handlePlaceFromUnassigned(draggedAttr.attr, group.id);
+                                                            } else {
+                                                                handleMoveAttributeBetweenGroups(
+                                                                    draggedAttr.attr,
+                                                                    draggedAttr.sourceGroupId,
+                                                                    group.id,
+                                                                );
                                                             }
-                                                        }}
-                                                        sx={{
-                                                            p: 1,
-                                                            borderRadius: 1.5,
-                                                            border: '1px dashed transparent',
-                                                            '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
-                                                        }}
-                                                    >
-                                                        {/* หัวข้อกลุ่ม */}
-                                                        <Stack
-                                                            direction="row"
-                                                            alignItems="center"
-                                                            justifyContent="space-between"
-                                                            sx={{
-                                                                py: 0.5,
-                                                                cursor: 'pointer',
-                                                                userSelect: 'none',
-                                                                '&:hover': { color: FIORI.brand },
-                                                            }}
-                                                        >
-                                                            <Stack direction="row" alignItems="center" spacing={0.5} onClick={() => toggleGroupExpand(group.id)}>
-                                                                <IconButton size="small" sx={{ p: 0.2 }}>
-                                                                    {group.expanded ? (
-                                                                        <KeyboardArrowDownIcon fontSize="small" />
-                                                                    ) : (
-                                                                        <KeyboardArrowRightIcon fontSize="small" />
-                                                                    )}
-                                                                </IconButton>
-                                                                <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.textSecondary, fontSize: 16 }} />
-                                                                <FolderOutlinedIcon fontSize="small" sx={{ color: FIORI.textSecondary, ml: 0.5 }} />
-                                                                <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                                                    {group.name}
-                                                                </Typography>
-                                                            </Stack>
-                                                            <IconButton size="small" color="error" onClick={() => handleRemoveGroup(group.id)}>
-                                                                <DeleteIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Stack>
-
-                                                        {/* รายการแอตทริบิวต์ในกลุ่ม */}
-                                                        <Collapse in={group.expanded} timeout="auto" unmountOnExit>
-                                                            <Stack spacing={0.5} sx={{ pl: 4, pt: 0.5, pb: 1 }}>
-                                                                {group.attributes.map((attr) => {
-                                                                    const placedGroupCount = assignedGroups.filter((g) =>
-                                                                        g.attributes.some((a) => a.id === attr.id)
-                                                                    ).length;
-
-                                                                    return (
-                                                                        <Stack
-                                                                            key={attr.id}
-                                                                            draggable
-                                                                            onDragStart={() => setDraggedAttr({ attr, sourceGroupId: group.id })}
-                                                                            direction="row"
-                                                                            alignItems="center"
-                                                                            justifyContent="space-between"
-                                                                            sx={{
-                                                                                py: 0.5,
-                                                                                px: 1,
-                                                                                borderRadius: 1,
-                                                                                cursor: 'grab',
-                                                                                bgcolor: FIORI.surface,
-                                                                                border: `1px solid ${FIORI.border}`,
-                                                                                '&:hover': { bgcolor: FIORI.hover },
-                                                                            }}
-                                                                        >
-                                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                                <DragIndicatorIcon fontSize="small" sx={{ color: FIORI.border, fontSize: 16 }} />
-                                                                                <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.85rem' }}>
-                                                                                    {attr.name || attr.code}
-                                                                                </Typography>
-                                                                                {placedGroupCount > 1 && (
-                                                                                    <Typography
-                                                                                        variant="caption"
-                                                                                        title={t('attributeInMultipleGroups', { count: placedGroupCount })}
-                                                                                        sx={{ color: FIORI.brand, fontWeight: 600, fontSize: '0.7rem' }}
-                                                                                    >
-                                                                                        ×{placedGroupCount}
-                                                                                    </Typography>
-                                                                                )}
-                                                                            </Stack>
-                                                                            <Stack direction="row" alignItems="center" spacing={0.25}>
-                                                                                <IconButton
-                                                                                    size="small"
-                                                                                    title={t('addToAnotherGroup')}
-                                                                                    onClick={(e) => setAddToGroupMenu({ element: e.currentTarget, attr, currentGroupId: group.id })}
-                                                                                    sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.brand } }}
-                                                                                >
-                                                                                    <AddCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
-                                                                                </IconButton>
-                                                                                <IconButton
-                                                                                    size="small"
-                                                                                    title={t('removeFromThisGroup')}
-                                                                                    onClick={() => handleRemoveAttributeFromGroup(attr, group.id)}
-                                                                                    sx={{ color: FIORI.textSecondary, '&:hover': { color: FIORI.error } }}
-                                                                                >
-                                                                                    <RemoveCircleOutlineIcon fontSize="small" sx={{ fontSize: 16 }} />
-                                                                                </IconButton>
-                                                                            </Stack>
-                                                                        </Stack>
-                                                                    );
-                                                                })}
-                                                                {group.attributes.length === 0 && (
-                                                                    <Typography variant="caption" color="text.secondary" sx={{ pl: 1, fontStyle: 'italic' }}>
-                                                                        {t('dropAttributeHere')}
-                                                                    </Typography>
-                                                                )}
-                                                            </Stack>
-                                                        </Collapse>
-                                                    </Box>
-                                                ))}
-                                            </Stack>
-                                        )}
-                                    </Box>
-                                </Grid>
-
-                                {/* พื้นที่วางสำหรับแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
-                                <Grid item xs={12} sm={6}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                                        <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                            {t('unassignedAttributes')}
-                                        </Typography>
-                                        <TextField
-                                            value={attrSearch}
-                                            onChange={(e) => setAttrSearch(e.target.value)}
-                                            size="small"
-                                            variant="standard"
-                                            placeholder={t('search')}
-                                            InputProps={{
-                                                disableUnderline: true,
-                                                endAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />,
-                                            }}
-                                            sx={{ width: 100 }}
-                                        />
-                                    </Stack>
-                                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 1.5 }}>
-                                        {t('dragAttributeToUnassign')}
-                                    </Typography>
-
-                                    <Box
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            if (draggedAttr && draggedAttr.sourceGroupId !== null) {
-                                                handleRemoveAttributeFromGroup(draggedAttr.attr, draggedAttr.sourceGroupId);
-                                            }
-                                            setDraggedAttr(null);
-                                        }}
-                                        sx={{
-                                            minHeight: 400,
-                                            maxHeight: 500,
-                                            overflowY: 'auto',
-                                            bgcolor: FIORI.surface,
-                                            p: 1,
-                                            borderRadius: '8px',
-                                            border: '1px dashed transparent',
-                                            '&:hover': { border: `1px dashed ${FIORI.brand}`, bgcolor: FIORI.selected },
-                                        }}
-                                    >
-                                        <List dense disablePadding>
-                                            {filteredUnassigned.map((attr) => (
-                                                <ListItem
-                                                    key={attr.id}
-                                                    draggable
-                                                    onDragStart={(e) => {
-                                                        if (requireGroupBeforeAssigning()) {
-                                                            e.preventDefault();
-                                                            return;
+                                                            setDraggedAttr(null);
                                                         }
-                                                        setDraggedAttr({ attr, sourceGroupId: null });
-                                                    }}
-                                                    sx={{
-                                                        py: 0.8,
-                                                        px: 1,
-                                                        mb: 0.5,
-                                                        border: `1px solid ${FIORI.border}`,
-                                                        borderRadius: '6px',
-                                                        bgcolor: FIORI.surface,
-                                                        '&:hover': { bgcolor: FIORI.hover, borderColor: FIORI.brand },
-                                                        cursor: 'grab',
-                                                    }}
-                                                    onClick={() => {
-                                                        if (requireGroupBeforeAssigning()) return;
-                                                        handlePlaceFromUnassigned(attr, assignedGroups[0].id);
                                                     }}
                                                 >
-                                                    <ListItemIcon sx={{ minWidth: 28, color: FIORI.border }}>
-                                                        <DragIndicatorIcon fontSize="small" sx={{ fontSize: 16 }} />
-                                                    </ListItemIcon>
-                                                    <ListItemText
-                                                        primary={attr.name || attr.code}
-                                                        primaryTypographyProps={{ variant: 'body2', sx: { color: FIORI.textPrimary }, fontSize: '0.85rem' }}
-                                                    />
-                                                </ListItem>
+                                                    {/* หัวข้อกลุ่ม */}
+                                                    <div className={styles.groupHeader}>
+                                                        <div className={styles.groupToggle} onClick={() => toggleGroupExpand(group.id)}>
+                                                            <Icon
+                                                                name={group.expanded ? 'slim-arrow-down' : 'slim-arrow-right'}
+                                                                className={styles.mutedIcon}
+                                                            />
+                                                            <Icon name="vertical-grip" className={styles.gripIcon} />
+                                                            <Icon
+                                                                name="folder-blank"
+                                                                className={styles.mutedIcon}
+                                                                style={{ marginLeft: '0.25rem' }}
+                                                            />
+                                                            <span className={styles.groupName}>{group.name}</span>
+                                                        </div>
+                                                        <Button
+                                                            design="Transparent"
+                                                            icon="delete"
+                                                            tooltip={t('deleteGroup')}
+                                                            accessibleName={t('deleteGroup')}
+                                                            onClick={() => handleRemoveGroup(group.id)}
+                                                            style={{ color: 'var(--sapNegativeColor)' }}
+                                                        />
+                                                    </div>
+
+                                                    {/* รายการแอตทริบิวต์ในกลุ่ม */}
+                                                    {group.expanded && (
+                                                        <div className={styles.groupAttrs}>
+                                                            {group.attributes.map((attr) => {
+                                                                const placedGroupCount = assignedGroups.filter((g) =>
+                                                                    g.attributes.some((a) => a.id === attr.id),
+                                                                ).length;
+
+                                                                return (
+                                                                    <div
+                                                                        key={attr.id}
+                                                                        draggable
+                                                                        onDragStart={() => setDraggedAttr({ attr, sourceGroupId: group.id })}
+                                                                        className={styles.attrRow}
+                                                                    >
+                                                                        <div className={styles.attrLabel}>
+                                                                            <Icon name="vertical-grip" className={styles.gripIcon} />
+                                                                            <span className={styles.attrName}>{attr.name || attr.code}</span>
+                                                                            {placedGroupCount > 1 && (
+                                                                                <span
+                                                                                    className={styles.multiBadge}
+                                                                                    title={t('attributeInMultipleGroups', {
+                                                                                        count: placedGroupCount,
+                                                                                    })}
+                                                                                >
+                                                                                    ×{placedGroupCount}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className={styles.attrActions}>
+                                                                            <Button
+                                                                                design="Transparent"
+                                                                                icon="sys-add"
+                                                                                tooltip={t('addToAnotherGroup')}
+                                                                                accessibleName={t('addToAnotherGroup')}
+                                                                                onClick={(e) =>
+                                                                                    setAddToGroupMenu({
+                                                                                        element: e.currentTarget as HTMLElement,
+                                                                                        attr,
+                                                                                        currentGroupId: group.id,
+                                                                                    })
+                                                                                }
+                                                                            />
+                                                                            <Button
+                                                                                design="Transparent"
+                                                                                icon="sys-minus"
+                                                                                tooltip={t('removeFromThisGroup')}
+                                                                                accessibleName={t('removeFromThisGroup')}
+                                                                                onClick={() => handleRemoveAttributeFromGroup(attr, group.id)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                            {group.attributes.length === 0 && (
+                                                                <span className={styles.dropHint}>{t('dropAttributeHere')}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
-                                            {filteredUnassigned.length === 0 && (
-                                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, p: 2, display: 'block', textAlign: 'center' }}>
-                                                    {t('dropHereToUnassign')}
-                                                </Typography>
-                                            )}
-                                        </List>
-                                    </Box>
-                                </Grid>
-                            </Grid>
-                        </Paper>
-                    </Grid>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* พื้นที่วางสำหรับแอตทริบิวต์ที่ยังไม่ได้จัดกลุ่ม */}
+                            <div>
+                                <div className={styles.unassignedHeader}>
+                                    <span className={styles.columnTitle}>{t('unassignedAttributes')}</span>
+                                    <Input
+                                        value={attrSearch}
+                                        onInput={(e) => setAttrSearch(e.target.value)}
+                                        placeholder={t('search')}
+                                        icon={<Icon name="search" />}
+                                        style={{ width: '10rem' }}
+                                    />
+                                </div>
+                                <span className={styles.caption} style={{ marginBottom: '0.75rem' }}>
+                                    {t('dragAttributeToUnassign')}
+                                </span>
+
+                                <div
+                                    className={styles.unassignedZone}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (draggedAttr && draggedAttr.sourceGroupId !== null) {
+                                            handleRemoveAttributeFromGroup(draggedAttr.attr, draggedAttr.sourceGroupId);
+                                        }
+                                        setDraggedAttr(null);
+                                    }}
+                                >
+                                    {filteredUnassigned.map((attr) => (
+                                        <div
+                                            key={attr.id}
+                                            draggable
+                                            className={styles.unassignedItem}
+                                            onDragStart={(e) => {
+                                                if (requireGroupBeforeAssigning()) {
+                                                    e.preventDefault();
+                                                    return;
+                                                }
+                                                setDraggedAttr({ attr, sourceGroupId: null });
+                                            }}
+                                            onClick={() => {
+                                                if (requireGroupBeforeAssigning()) return;
+                                                handlePlaceFromUnassigned(attr, assignedGroups[0].id);
+                                            }}
+                                        >
+                                            <Icon name="vertical-grip" className={styles.gripIcon} />
+                                            <span className={styles.attrName}>{attr.name || attr.code}</span>
+                                        </div>
+                                    ))}
+                                    {filteredUnassigned.length === 0 && <span className={styles.unassignedEmpty}>{t('dropHereToUnassign')}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* คอลัมน์ขวา: ส่วนข้อมูลทั่วไปและป้ายชื่อ */}
-                    <Grid item xs={12} md={4}>
-                        <Stack spacing={3}>
-                            <LocaleLabelFields
-                                title={t('labelTitle')}
-                                values={data.translations}
-                                onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                            />
-                        </Stack>
-                    </Grid>
-                </Grid>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        <LocaleLabelFields
+                            title={t('labelTitle')}
+                            values={data.translations}
+                            onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                        />
+                    </div>
+                </div>
 
                 {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3 }}>
+                    <MessageStrip design="Negative" hideCloseButton style={{ marginTop: '1.5rem' }}>
                         {t('correctHighlightedFields')}
-                    </Alert>
+                    </MessageStrip>
                 )}
-            </Box>
+            </form>
 
             {/* ไดอะล็อกสำหรับกำหนดกลุ่มแอตทริบิวต์ */}
             <Dialog
                 open={assignDialogOpen}
                 onClose={closeAssignDialog}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 2 } }}
+                style={dialogStyle}
+                header={
+                    <Bar
+                        startContent={<Title level="H5">{t('assignAttributeGroup')}</Title>}
+                        endContent={
+                            <Button
+                                design="Transparent"
+                                icon="decline"
+                                tooltip={t('close')}
+                                accessibleName={t('close')}
+                                onClick={closeAssignDialog}
+                            />
+                        }
+                    />
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <Button design="Emphasized" onClick={handleAssignGroup} disabled={selectedGroupIds.length === 0}>
+                                {t('assignAttributeGroup')}
+                            </Button>
+                        }
+                    />
+                }
             >
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {t('assignAttributeGroup')}
-                    </Typography>
-                    <IconButton onClick={closeAssignDialog} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+                <div className={styles.dialogBody}>
+                    <Label required showColon={false}>
                         {t('groupsRequired')}
-                    </Typography>
-                    <FormControl fullWidth size="small">
-                        <Select
-                            multiple
-                            displayEmpty
-                            value={selectedGroupIds}
-                            onChange={(e) =>
-                                setSelectedGroupIds(
-                                    (typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value).map(Number),
-                                )
-                            }
-                            renderValue={(selected) => {
-                                if (selected.length === 0) {
-                                    return <Typography color="text.secondary">{t('selectOption')}</Typography>;
-                                }
-                                return selected
-                                    .map((id) => {
-                                        const g = groups.find((item) => item.id === id);
-                                        return g ? g.name || g.code : String(id);
-                                    })
-                                    .join(', ');
-                            }}
-                        >
-                            {assignableGroups.map((grp) => (
-                                <MenuItem key={grp.id} value={grp.id}>
-                                    <Checkbox size="small" checked={selectedGroupIds.includes(grp.id)} sx={{ py: 0, mr: 1 }} />
-                                    {grp.name || grp.code}
-                                </MenuItem>
-                            ))}
-                            {assignableGroups.length === 0 && (
-                                <MenuItem value="" disabled>
-                                    {t('noAttributeGroupsAvailable')}
-                                </MenuItem>
-                            )}
-                        </Select>
-                    </FormControl>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2 }}>
-                    <Button
-                        variant="contained"
-                        onClick={handleAssignGroup}
-                        disabled={selectedGroupIds.length === 0}
-                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                    </Label>
+                    <MultiComboBox
+                        style={{ width: '100%' }}
+                        placeholder={assignableGroups.length === 0 ? t('noAttributeGroupsAvailable') : t('selectOption')}
+                        disabled={assignableGroups.length === 0}
+                        selectedValues={selectedGroupIds.map(String)}
+                        onSelectionChange={(e) =>
+                            setSelectedGroupIds(
+                                e.detail.items.map((item) => Number((item as unknown as { value?: string }).value)).filter((id) => !Number.isNaN(id)),
+                            )
+                        }
                     >
-                        {t('assignAttributeGroup')}
-                    </Button>
-                </DialogActions>
+                        {assignableGroups.map((grp) => (
+                            <MultiComboBoxItem key={grp.id} value={String(grp.id)} text={grp.name || grp.code} />
+                        ))}
+                    </MultiComboBox>
+                </div>
             </Dialog>
 
             {/* ไดอะล็อก "ใช้เทมเพลตจาก..." — 2 ขั้นตอน: เลือกตระกูลต้นแบบ แล้วพรีวิว
@@ -820,124 +690,98 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
             <Dialog
                 open={templateDialogOpen}
                 onClose={closeTemplateDialog}
-                fullWidth
-                maxWidth="xs"
-                PaperProps={{ sx: { borderRadius: 2 } }}
+                style={dialogStyle}
+                header={
+                    <Bar
+                        startContent={<Title level="H5">{t('useTemplateFrom')}</Title>}
+                        endContent={
+                            <Button
+                                design="Transparent"
+                                icon="decline"
+                                tooltip={t('close')}
+                                accessibleName={t('close')}
+                                onClick={closeTemplateDialog}
+                            />
+                        }
+                    />
+                }
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                {templateStep === 'preview' && (
+                                    <Button design="Transparent" onClick={() => setTemplateStep('pick')}>
+                                        {t('back')}
+                                    </Button>
+                                )}
+                                <Button
+                                    design="Emphasized"
+                                    onClick={() => applyTemplateStructure(templatePreviewGroups ?? [])}
+                                    disabled={templateStep !== 'preview' || (templatePreviewGroups?.length ?? 0) === 0}
+                                >
+                                    {t('useTemplateFromApply')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
             >
-                <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {t('useTemplateFrom')}
-                    </Typography>
-                    <IconButton onClick={closeTemplateDialog} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    {templateStep === 'pick' && (
-                        <Stack spacing={1.5}>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('useTemplateFromHelp')}
-                            </Typography>
-                            <List sx={{ maxHeight: 360, overflowY: 'auto' }}>
-                                {otherFamilies.map((fam) => (
-                                    <ListItem
-                                        key={fam.id}
-                                        onClick={() => loadTemplatePreview(fam.id)}
-                                        sx={{
-                                            cursor: 'pointer',
-                                            borderRadius: '8px',
-                                            border: `1px solid ${FIORI.border}`,
-                                            mb: 1,
-                                            '&:hover': { bgcolor: FIORI.brandBg },
-                                        }}
-                                    >
-                                        <ListItemText
-                                            primary={fam.name || fam.code}
-                                            secondary={fam.code}
-                                        />
-                                        {templatePreviewLoading && selectedTemplateId === fam.id && (
-                                            <CircularProgress size={18} />
-                                        )}
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Stack>
-                    )}
+                {templateStep === 'pick' && (
+                    <div className={styles.dialogBody}>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('useTemplateFromHelp')}</Text>
+                        <div className={styles.templateList}>
+                            {otherFamilies.map((fam) => (
+                                <button key={fam.id} type="button" className={styles.templateItem} onClick={() => loadTemplatePreview(fam.id)}>
+                                    <span>
+                                        <span className={styles.templateItemName}>{fam.name || fam.code}</span>
+                                        <span className={styles.caption}>{fam.code}</span>
+                                    </span>
+                                    {templatePreviewLoading && selectedTemplateId === fam.id && <BusyIndicator active size="S" />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
-                    {templateStep === 'preview' && (
-                        <Stack spacing={2}>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('useTemplateFromPreviewHelp', {
-                                    name: otherFamilies.find((f) => f.id === selectedTemplateId)?.name
-                                        || otherFamilies.find((f) => f.id === selectedTemplateId)?.code
-                                        || '',
-                                })}
-                            </Typography>
-                            {(templatePreviewGroups?.length ?? 0) === 0 ? (
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary, fontStyle: 'italic' }}>
-                                    {t('useTemplateFromEmpty')}
-                                </Typography>
-                            ) : (
-                                <Stack spacing={1.5} sx={{ maxHeight: 360, overflowY: 'auto' }}>
-                                    {templatePreviewGroups!.map((g) => (
-                                        <Paper key={g.id} variant="outlined" sx={{ p: 1.5, borderRadius: '8px' }}>
-                                            <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 0.5 }}>
-                                                {g.name}
-                                            </Typography>
-                                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                                {g.attributes.map((attr) => (
-                                                    <Box
-                                                        key={attr.id}
-                                                        sx={{
-                                                            px: 1,
-                                                            py: 0.25,
-                                                            borderRadius: '6px',
-                                                            bgcolor: FIORI.brandBg,
-                                                            fontSize: '0.75rem',
-                                                            color: FIORI.textPrimary,
-                                                        }}
-                                                    >
-                                                        {attr.name || attr.code}
-                                                    </Box>
-                                                ))}
-                                            </Stack>
-                                        </Paper>
-                                    ))}
-                                </Stack>
-                            )}
-                        </Stack>
-                    )}
-                </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2 }}>
-                    {templateStep === 'preview' && (
-                        <Button onClick={() => setTemplateStep('pick')} sx={fioriGhostSx}>
-                            {t('back')}
-                        </Button>
-                    )}
-                    <Button
-                        variant="contained"
-                        onClick={() => applyTemplateStructure(templatePreviewGroups ?? [])}
-                        disabled={templateStep !== 'preview' || (templatePreviewGroups?.length ?? 0) === 0}
-                        sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                    >
-                        {t('useTemplateFromApply')}
-                    </Button>
-                </DialogActions>
+                {templateStep === 'preview' && (
+                    <div className={styles.dialogBody}>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>
+                            {t('useTemplateFromPreviewHelp', {
+                                name:
+                                    otherFamilies.find((f) => f.id === selectedTemplateId)?.name ||
+                                    otherFamilies.find((f) => f.id === selectedTemplateId)?.code ||
+                                    '',
+                            })}
+                        </Text>
+                        {(templatePreviewGroups?.length ?? 0) === 0 ? (
+                            <Text style={{ color: 'var(--sapContent_LabelColor)', fontStyle: 'italic' }}>{t('useTemplateFromEmpty')}</Text>
+                        ) : (
+                            <div className={styles.templateList} style={{ gap: '0.75rem' }}>
+                                {templatePreviewGroups!.map((g) => (
+                                    <div key={g.id} className={styles.previewGroup}>
+                                        <div className={styles.previewGroupName}>{g.name}</div>
+                                        <div className={styles.chipRow}>
+                                            {g.attributes.map((attr) => (
+                                                <span key={attr.id} className={styles.chip}>
+                                                    {attr.name || attr.code}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </Dialog>
 
-            <Snackbar
-                open={noGroupWarningOpen}
-                autoHideDuration={7000}
-                onClose={() => setNoGroupWarningOpen(false)}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-                <Alert
-                    severity="warning"
-                    onClose={() => setNoGroupWarningOpen(false)}
-                    action={
+            {noGroupWarningOpen && (
+                <MessageStrip design="Critical" className={styles.warningToast} onClose={() => setNoGroupWarningOpen(false)}>
+                    <div className={styles.warningToastBody}>
+                        <span>{t('noAttributeGroupsWarning')}</span>
                         <Button
-                            color="inherit"
-                            size="small"
+                            design="Transparent"
                             onClick={() => {
                                 setNoGroupWarningOpen(false);
                                 setAssignDialogOpen(true);
@@ -945,36 +789,35 @@ export default function AttributeFamilyCreate({ groups, attributes, otherFamilie
                         >
                             {t('assignAttributeGroup')}
                         </Button>
-                    }
-                >
-                    {t('noAttributeGroupsWarning')}
-                </Alert>
-            </Snackbar>
+                    </div>
+                </MessageStrip>
+            )}
 
             {/* เมนู "เพิ่มเข้าอีกกลุ่ม" — เปิดจากปุ่ม + บนแถวแอตทริบิวต์ที่ถูกจัดกลุ่ม
                 แล้ว โชว์เฉพาะกลุ่มที่ attribute ตัวนี้ "ยังไม่ได้" อยู่ (กันเพิ่มซ้ำ) */}
-            <Menu anchorEl={addToGroupMenu?.element ?? null} open={Boolean(addToGroupMenu)} onClose={() => setAddToGroupMenu(null)}>
+            <Menu
+                opener={addToGroupMenu?.element ?? null}
+                open={Boolean(addToGroupMenu)}
+                onClose={() => setAddToGroupMenu(null)}
+                onItemClick={(e) => {
+                    const groupId = Number((e.detail.item as unknown as HTMLElement).dataset.groupId);
+                    if (addToGroupMenu && !Number.isNaN(groupId)) {
+                        handleAddAttributeToGroup(addToGroupMenu.attr, groupId);
+                    }
+                    setAddToGroupMenu(null);
+                }}
+            >
                 {addToGroupMenu &&
                     (() => {
                         const otherGroups = assignedGroups.filter(
-                            (g) => g.id !== addToGroupMenu.currentGroupId && !g.attributes.some((a) => a.id === addToGroupMenu.attr.id)
+                            (g) => g.id !== addToGroupMenu.currentGroupId && !g.attributes.some((a) => a.id === addToGroupMenu.attr.id),
                         );
 
                         if (otherGroups.length === 0) {
-                            return <MenuItem disabled>{t('noOtherGroupsAvailable')}</MenuItem>;
+                            return <MenuItem disabled text={t('noOtherGroupsAvailable')} />;
                         }
 
-                        return otherGroups.map((g) => (
-                            <MenuItem
-                                key={g.id}
-                                onClick={() => {
-                                    handleAddAttributeToGroup(addToGroupMenu.attr, g.id);
-                                    setAddToGroupMenu(null);
-                                }}
-                            >
-                                {g.name}
-                            </MenuItem>
-                        ));
+                        return otherGroups.map((g) => <MenuItem key={g.id} data-group-id={g.id} text={g.name} />);
                     })()}
             </Menu>
         </AppLayout>

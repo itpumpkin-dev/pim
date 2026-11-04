@@ -1,42 +1,29 @@
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import TuneIcon from '@mui/icons-material/Tune';
-// Pilot batch (see resources/js/components/icon.tsx's docblock) — edit/
-// chevronRight/expandMore now render via SAP-icons. CalendarToday/OpenInNew
-// aren't in the pilot's curated name list yet, so left as MUI icons.
-import { Icon } from '@/components/icon';
-import {
-    Box,
-    Button,
-    Chip,
-    Grid,
-    IconButton,
-    Menu,
-    MenuItem,
-    Paper,
-    Stack,
-    Tab,
-    Tabs,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import AppLayout from '@/layouts/app-layout';
+import { FioriFormGroup } from '@/components/fiori-form';
 import { FioriPdfViewer } from '@/components/fiori-pdf-viewer';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { HistoryPanel } from '@/components/history-panel';
 import { TimelinePanel } from '@/components/timeline-panel';
-import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { useLocale } from '@/hooks/use-locale';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriFormGroup } from '@/components/fiori-form';
-import { FIORI, FioriStatus, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriTabsFilledSx } from '@/lib/fiori-style';
+import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
+import { localizedLabel, type Translation } from '@/lib/localized-label';
 import { isProductStatus, PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUS_TONES } from '@/lib/product-status';
-import { UI_BORDER } from '@/lib/ui-style';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/action-settings.js';
+import '@ui5/webcomponents-icons/dist/calendar.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/popup-window.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Button, Icon, Menu, MenuItem, MenuItemGroup, Tab, TabContainer, Tag, Title } from '@ui5/webcomponents-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import styles from './show.module.css';
+
+const LOCALE_BUTTON_ID = 'product-show-locale-button';
 
 interface AttributeOption {
     id: number;
@@ -183,11 +170,7 @@ function parseVideoPaths(raw: string): string[] {
 
 /** Empty-value placeholder — same wording used everywhere else this file shows "nothing entered". */
 function EmptyValue() {
-    return (
-        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-            (ไม่ได้กรอก)
-        </Typography>
-    );
+    return <span className={styles.empty}>(ไม่ได้กรอก)</span>;
 }
 
 /**
@@ -205,29 +188,27 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
 
     if (attr.type === 'select' || attr.type === 'multiselect') {
         const match = attr.options?.find((opt) => optionValue(opt) === value);
-        return <Typography variant="body2">{match ? optionLabel(match) : value}</Typography>;
+        return <span className={styles.bodyText}>{match ? optionLabel(match) : value}</span>;
     }
 
     if (attr.type === 'textarea') {
         // Rich text is stored as HTML (see edit.tsx's RichTextControl) — render
         // it as-is so formatting (bold/lists/etc.) survives, same as what the
         // editor showed while it was being entered.
-        return <Box sx={{ typography: 'body2', '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: value }} />;
+        return <div className={styles.richText} dangerouslySetInnerHTML={{ __html: value }} />;
     }
 
     if (attr.type === 'boolean' || attr.type === 'checkbox') {
         const checked = value === '1' || value === 'true';
         return (
-            <Chip
-                label={checked ? 'ใช่' : 'ไม่ใช่'}
-                size="small"
-                sx={{ bgcolor: checked ? FIORI.successBg : FIORI.neutralBg, color: checked ? FIORI.success : FIORI.textSecondary, fontWeight: 600 }}
-            />
+            <Tag design={checked ? 'Positive' : 'Neutral'} hideStateIcon>
+                {checked ? 'ใช่' : 'ไม่ใช่'}
+            </Tag>
         );
     }
 
     if (attr.type === 'date' || attr.type === 'datetime') {
-        return <Typography variant="body2">{formatLocalDateTime(value) === value ? value : formatLocalDateTime(value)}</Typography>;
+        return <span className={styles.bodyText}>{formatLocalDateTime(value) === value ? value : formatLocalDateTime(value)}</span>;
     }
 
     if (attr.type === 'gallery') {
@@ -235,17 +216,17 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
         if (paths.length === 0) return <EmptyValue />;
 
         return (
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+            <div className={styles.wrapRow} style={{ gap: '0.5rem' }}>
                 {paths.map((path, i) => (
-                    <Box
+                    <img
                         key={i}
-                        component="img"
                         src={resolveStorageUrl(path)}
                         alt={`${attr.name} ${i + 1}`}
-                        sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, border: `1px solid ${UI_BORDER}` }}
+                        className={styles.thumb}
+                        style={{ width: 56, height: 56 }}
                     />
                 ))}
-            </Stack>
+            </div>
         );
     }
 
@@ -254,24 +235,16 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
         if (paths.length === 0) return <EmptyValue />;
 
         return (
-            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+            <div className={styles.wrapRow} style={{ gap: '0.75rem' }}>
                 {paths.map((path, i) => (
-                    // eslint-disable-next-line jsx-a11y/media-has-caption
                     <video key={i} controls src={resolveStorageUrl(path)} style={{ maxWidth: 320, maxHeight: 200, borderRadius: 4 }} />
                 ))}
-            </Stack>
+            </div>
         );
     }
 
     if (attr.type === 'image') {
-        return (
-            <Box
-                component="img"
-                src={resolveStorageUrl(value)}
-                alt={attr.name}
-                sx={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 1, border: `1px solid ${UI_BORDER}` }}
-            />
-        );
+        return <img src={resolveStorageUrl(value)} alt={attr.name} className={styles.thumb} style={{ width: 72, height: 72 }} />;
     }
 
     if (attr.type === 'file') {
@@ -282,9 +255,9 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
         // ยังคงเป็นลิงก์เปิดแท็บใหม่ธรรมดาเหมือนเดิม
         if (filename.toLowerCase().endsWith('.pdf')) {
             return (
-                <Box sx={{ maxWidth: 480 }}>
+                <div style={{ maxWidth: 480 }}>
                     <FioriPdfViewer src={resolveStorageUrl(value)} title={filename} height={320} />
-                </Box>
+                </div>
             );
         }
 
@@ -306,7 +279,7 @@ function RenderAttributeValue({ attr, value }: { attr: AttributeItem; value: str
         );
     }
 
-    return <Typography variant="body2">{value}</Typography>;
+    return <span className={styles.bodyText}>{value}</span>;
 }
 
 // ระยะเว้นด้านบนของแต่ละ section ตอนเลื่อนไปหา — เท่ากับหน้าแก้ไข (edit.tsx)
@@ -315,12 +288,20 @@ const GROUP_SECTION_SCROLL_MARGIN = 80;
 /** แถว "ป้าย + ค่า" ของแผงข้อมูลสินค้าด้านขวา */
 function InfoRow({ label, children }: { label: ReactNode; children: ReactNode }) {
     return (
-        <Box>
-            <Typography variant="caption" fontWeight={600} color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-                {label}
-            </Typography>
+        <div>
+            <span className={styles.infoLabel}>{label}</span>
             {children}
-        </Box>
+        </div>
+    );
+}
+
+/** วันที่/เวลา + ไอคอนปฏิทิน (แถว "อัปเดตล่าสุด" / "สร้างเมื่อ") */
+function DateValue({ value }: { value: string }) {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <Icon name="calendar" style={{ width: '1rem', height: '1rem', color: 'var(--sapContent_LabelColor)' }} />
+            <span className={styles.bodyText}>{formatLocalDateTime(value)}</span>
+        </div>
     );
 }
 
@@ -346,7 +327,7 @@ export default function ProductShow({
     const [tabIndex, setTabIndex] = useState(0);
     const [collapsedGroupIds, setCollapsedGroupIds] = useState<Record<number, boolean>>({});
     const toggleGroupCollapse = (groupId: number) => setCollapsedGroupIds((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
-    const [localeMenuAnchor, setLocaleMenuAnchor] = useState<HTMLElement | null>(null);
+    const [localeMenuOpen, setLocaleMenuOpen] = useState(false);
 
     const defaultLocale = locales.find((l) => l.code === currentLocaleCode) || locales[0];
     const [activeLocaleId, setActiveLocaleId] = useState<number>(defaultLocale ? defaultLocale.id : 1);
@@ -372,7 +353,7 @@ export default function ProductShow({
 
     // ---------------------------------------------------------------- scroll-spy ของแถบแท็บกลุ่ม (เหมือนหน้าแก้ไข)
     const [groupTabIndex, setGroupTabIndex] = useState(0);
-    const groupSectionRefs = useRef<(HTMLDivElement | null)[]>([]);
+    const groupSectionRefs = useRef<(HTMLElement | null)[]>([]);
     const groupTabBarRef = useRef<HTMLDivElement | null>(null);
     const scrollBodyRef = useRef<HTMLDivElement | null>(null);
     const suppressScrollSpy = useRef(false);
@@ -426,308 +407,278 @@ export default function ProductShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('viewProductHeading', { sku: product.sku })} />
-            <Box sx={{ bgcolor: 'background.default', height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            <div className={styles.page}>
                 {/* แถบแท็บบนสุด */}
-                <Box sx={{ bgcolor: FIORI.surface, px: { xs: 2, md: 4 } }}>
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={fioriTabsFilledSx}>
-                        <Tab label={t('generalTitle')} />
-                        {canViewHistory && <Tab label={t('historyTab')} />}
-                    </Tabs>
-                </Box>
+                <div className={`${styles.topTabs} ${styles.gutter}`}>
+                    <TabContainer collapsed onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}>
+                        <Tab text={t('generalTitle')} selected={tabIndex === 0} />
+                        {canViewHistory && <Tab text={t('historyTab')} selected={tabIndex === 1} />}
+                    </TabContainer>
+                </div>
 
                 {/* หัวเรื่อง + ปุ่ม — โครงเดียวกับหน้าแก้ไข */}
-                <Box sx={{ px: { xs: 2, md: 4 }, py: 1.5, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}`, mb: 0.5 }}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Tooltip title={t('back')}>
-                                <IconButton component={Link} href="/catalog/products" size="small">
-                                    <ArrowBackIcon fontSize="small" sx={{ stroke: 'currentColor', strokeWidth: 1 }} />
-                                </IconButton>
-                            </Tooltip>
-                            <Typography variant="h5" fontWeight={700} color="text.primary">
-                                {t('viewProductHeading', { sku: product.sku })}
-                            </Typography>
-                        </Stack>
+                <div className={`${styles.header} ${styles.gutter}`}>
+                    <div className={styles.headerTitle}>
+                        <Button
+                            design="Transparent"
+                            icon="nav-back"
+                            tooltip={t('back')}
+                            accessibleName={t('back')}
+                            onClick={() => router.visit('/catalog/products')}
+                        />
+                        <Title level="H3" wrappingType="Normal">
+                            {t('viewProductHeading', { sku: product.sku })}
+                        </Title>
+                    </div>
 
-                        <Stack direction="row" spacing={1.5} alignItems="center">
-                            {/* ภาษาที่แสดง — ปุ่มขนาดเดียวกับปุ่มอื่นในแถว (เหมือนปุ่ม "ภาษา · ช่องทาง" ของหน้าแก้ไข) */}
-                            <Tooltip title={t('editingLocaleHelp')}>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<TuneIcon fontSize="small" />}
-                                    endIcon={<KeyboardArrowDownIcon fontSize="small" />}
-                                    onClick={(e) => setLocaleMenuAnchor(e.currentTarget)}
-                                    sx={fioriDefaultSx}
-                                >
-                                    {activeLocale ? activeLocale.display_name || activeLocale.code : ''}
-                                </Button>
-                            </Tooltip>
-                            <Menu anchorEl={localeMenuAnchor} open={Boolean(localeMenuAnchor)} onClose={() => setLocaleMenuAnchor(null)}>
+                    <div className={styles.headerActions}>
+                        {/* ภาษาที่แสดง — ปุ่มขนาดเดียวกับปุ่มอื่นในแถว (เหมือนปุ่ม "ภาษา · ช่องทาง" ของหน้าแก้ไข) */}
+                        <Button
+                            id={LOCALE_BUTTON_ID}
+                            icon="action-settings"
+                            endIcon="slim-arrow-down"
+                            tooltip={t('editingLocaleHelp')}
+                            onClick={() => setLocaleMenuOpen((prev) => !prev)}
+                        >
+                            {activeLocale ? activeLocale.display_name || activeLocale.code : ''}
+                        </Button>
+                        <Menu
+                            opener={LOCALE_BUTTON_ID}
+                            open={localeMenuOpen}
+                            onClose={() => setLocaleMenuOpen(false)}
+                            onItemClick={(e) => {
+                                const code = e.detail.item.dataset.code;
+                                setLocaleMenuOpen(false);
+                                if (code) setLocale(code);
+                            }}
+                        >
+                            <MenuItemGroup checkMode="Single">
                                 {locales.map((loc) => (
                                     <MenuItem
                                         key={loc.id}
-                                        selected={loc.id === activeLocaleId}
-                                        onClick={() => {
-                                            setLocaleMenuAnchor(null);
-                                            setLocale(loc.code);
-                                        }}
-                                    >
-                                        {loc.display_name || loc.code}
-                                    </MenuItem>
+                                        data-code={loc.code}
+                                        text={loc.display_name || loc.code}
+                                        checked={loc.id === activeLocaleId}
+                                    />
                                 ))}
-                            </Menu>
+                            </MenuItemGroup>
+                        </Menu>
 
-                            <Tooltip title={t('previewOnStorefront')}>
-                                <Button
-                                    variant="outlined"
-                                    component="a"
-                                    href={`/products/${product.id}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    sx={{ ...fioriDefaultSx, minWidth: 0, px: 1.25 }}
-                                    aria-label={t('previewOnStorefront')}
-                                >
-                                    <OpenInNewIcon fontSize="small" />
-                                </Button>
-                            </Tooltip>
+                        <Button
+                            icon="popup-window"
+                            tooltip={t('previewOnStorefront')}
+                            accessibleName={t('previewOnStorefront')}
+                            onClick={() => window.open(`/products/${product.id}`, '_blank', 'noreferrer')}
+                        />
 
-                            <Button
-                                component={Link}
-                                href={`/catalog/products/${product.id}/edit`}
-                                variant="contained"
-                                startIcon={<Icon name="edit" fontSize="small" />}
-                                sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                            >
-                                {t('editAction')}
-                            </Button>
-                        </Stack>
-                    </Stack>
-                </Box>
+                        <Button design="Emphasized" icon="edit" onClick={() => router.visit(`/catalog/products/${product.id}/edit`)}>
+                            {t('editAction')}
+                        </Button>
+                    </div>
+                </div>
 
-                <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
+                <div ref={scrollBodyRef} className={styles.scrollBody}>
                     {tabIndex === 0 && (
-                        <Box sx={{ px: { xs: 2, md: 4 } }}>
+                        <div className={styles.gutter}>
                             {/* แถบแท็บกลุ่มแอตทริบิวต์ — ติดด้านบนตอนเลื่อน กดแล้วเลื่อนไปที่กลุ่มนั้น */}
                             {assignedGroups.length > 0 && (
-                                <Paper
-                                    ref={groupTabBarRef}
-                                    variant="outlined"
-                                    sx={{ mb: 1, borderRadius: 0, bgcolor: FIORI.surface, position: 'sticky', top: 0, zIndex: 1 }}
-                                >
-                                    <Tabs
-                                        value={groupTabIndex}
-                                        onChange={(_, v) => scrollToGroup(v)}
-                                        variant="scrollable"
-                                        scrollButtons="auto"
-                                        sx={{ ...fioriTabsFilledSx, px: 2 }}
-                                    >
-                                        {assignedGroups.map((group) => (
-                                            <Tab key={group.id} label={localizedLabel(group, activeLocaleId)} />
+                                <div ref={groupTabBarRef} className={styles.groupTabBar}>
+                                    <TabContainer collapsed onTabSelect={(e) => scrollToGroup(e.detail.tabIndex)}>
+                                        {assignedGroups.map((group, idx) => (
+                                            <Tab key={group.id} text={localizedLabel(group, activeLocaleId)} selected={idx === groupTabIndex} />
                                         ))}
-                                    </Tabs>
-                                </Paper>
+                                    </TabContainer>
+                                </div>
                             )}
 
-                            <Grid container spacing={3} sx={{ mt: 0 }}>
-                                <Grid item xs={12} md={8.5}>
-                                    <Stack spacing={3}>
-                                        {assignedGroups.map((group, idx) => {
-                                            const isGeneral = group.code.toLowerCase() === 'general';
-                                            const isSales = group.code.toLowerCase() === 'pricing_packaging';
-                                            const groupKey = group.id === 0 ? 'ungrouped' : String(group.id);
-                                            const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
+                            <div className={styles.columns}>
+                                <div className={styles.stack}>
+                                    {assignedGroups.map((group, idx) => {
+                                        const isGeneral = group.code.toLowerCase() === 'general';
+                                        const isSales = group.code.toLowerCase() === 'pricing_packaging';
+                                        const groupKey = group.id === 0 ? 'ungrouped' : String(group.id);
+                                        const isGroupCollapsed = Boolean(collapsedGroupIds[group.id]);
+                                        const groupLabel = localizedLabel(group, activeLocaleId);
 
-                                            return (
-                                                <Paper
-                                                    key={group.id}
-                                                    ref={(el: HTMLDivElement | null) => {
-                                                        groupSectionRefs.current[idx] = el;
-                                                    }}
-                                                    sx={{ ...fioriCardSx, p: 3, scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
+                                        return (
+                                            <section
+                                                key={group.id}
+                                                ref={(el) => {
+                                                    groupSectionRefs.current[idx] = el;
+                                                }}
+                                                className={styles.card}
+                                                style={{ scrollMarginTop: `${GROUP_SECTION_SCROLL_MARGIN}px` }}
+                                            >
+                                                <div
+                                                    className={
+                                                        isGroupCollapsed ? styles.groupHeader : `${styles.groupHeader} ${styles.groupHeaderOpen}`
+                                                    }
+                                                    onClick={() => toggleGroupCollapse(group.id)}
                                                 >
-                                                    <Stack
-                                                        direction="row"
-                                                        alignItems="center"
-                                                        spacing={0.5}
-                                                        onClick={() => toggleGroupCollapse(group.id)}
-                                                        sx={{ mb: isGroupCollapsed ? 0 : 2.5, cursor: 'pointer', userSelect: 'none' }}
-                                                    >
-                                                        <IconButton size="small" sx={{ p: 0.5 }}>
-                                                            {isGroupCollapsed ? <Icon name="chevronRight" fontSize="small" /> : <Icon name="expandMore" fontSize="small" />}
-                                                        </IconButton>
-                                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, flex: 1 }}>
-                                                            {localizedLabel(group, activeLocaleId)}
-                                                        </Typography>
-                                                        {/* ตระกูลที่ฟิลด์ในกลุ่มนี้มาจาก — แบบเดียวกับหน้าแก้ไข */}
-                                                        {(group.families ?? []).map((family) => (
-                                                            <Chip
-                                                                key={family.id}
-                                                                size="small"
-                                                                variant="outlined"
-                                                                label={family.name ?? family.code}
-                                                                sx={{ bgcolor: FIORI.brandBg, color: FIORI.brand, fontWeight: 600 }}
-                                                            />
+                                                    <Button
+                                                        design="Transparent"
+                                                        icon={isGroupCollapsed ? 'slim-arrow-right' : 'slim-arrow-down'}
+                                                        accessibleName={groupLabel}
+                                                    />
+                                                    <Title level="H5" wrappingType="Normal" style={{ flex: 1 }}>
+                                                        {groupLabel}
+                                                    </Title>
+                                                    {/* ตระกูลที่ฟิลด์ในกลุ่มนี้มาจาก — แบบเดียวกับหน้าแก้ไข */}
+                                                    {(group.families ?? []).map((family) => (
+                                                        <Tag key={family.id} design="Information" hideStateIcon>
+                                                            {family.name ?? family.code}
+                                                        </Tag>
+                                                    ))}
+                                                </div>
+                                                {!isGroupCollapsed && (
+                                                    <div className={styles.stack} style={{ gap: '1.25rem' }}>
+                                                        {isGeneral && (
+                                                            <InfoRow label={t('sku')}>
+                                                                <span className={styles.bodyText}>{product.sku}</span>
+                                                            </InfoRow>
+                                                        )}
+
+                                                        {group.attributes.length === 0 && !isGeneral && !(isSales && variants.length > 0) && (
+                                                            <span className={styles.muted}>{t('noAttributesInGroup')}</span>
+                                                        )}
+
+                                                        {group.attributes.map((attr) => (
+                                                            <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
+                                                                <RenderAttributeValue attr={attr} value={getValue(attr, groupKey)} />
+                                                            </InfoRow>
                                                         ))}
-                                                    </Stack>
-                                                    {!isGroupCollapsed && (
-                                                        <Stack spacing={2.5}>
-                                                            {isGeneral && (
-                                                                <InfoRow label={t('sku')}>
-                                                                    <Typography variant="body2">{product.sku}</Typography>
-                                                                </InfoRow>
-                                                            )}
 
-                                                            {group.attributes.length === 0 && !isGeneral && !(isSales && variants.length > 0) && (
-                                                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                                    {t('noAttributesInGroup')}
-                                                                </Typography>
-                                                            )}
+                                                        {isSales && variants.length > 0 && (
+                                                            <div>
+                                                                <Title level="H6" style={{ marginBottom: '0.5rem' }}>
+                                                                    {t('variantsTitle')}
+                                                                </Title>
+                                                                <FioriResponsiveTable
+                                                                    variant="plain"
+                                                                    size="small"
+                                                                    columns={variantColumns}
+                                                                    rows={variants.map((v, index) => ({ v, index }))}
+                                                                    getRowKey={(row) => row.v.id ?? `new-${row.index}`}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </section>
+                                        );
+                                    })}
+                                </div>
 
-                                                            {group.attributes.map((attr) => (
-                                                                <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
-                                                                    <RenderAttributeValue attr={attr} value={getValue(attr, groupKey)} />
-                                                                </InfoRow>
-                                                            ))}
-
-                                                            {isSales && variants.length > 0 && (
-                                                                <Box>
-                                                                    <Typography variant="subtitle1" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                                                                        {t('variantsTitle')}
-                                                                    </Typography>
-                                                                    <FioriResponsiveTable
-                                                                        variant="plain"
-                                                                        size="small"
-                                                                        columns={variantColumns}
-                                                                        rows={variants.map((v, index) => ({ v, index }))}
-                                                                        getRowKey={(row) => row.v.id ?? `new-${row.index}`}
-                                                                    />
-                                                                </Box>
-                                                            )}
-                                                        </Stack>
-                                                    )}
-                                                </Paper>
-                                            );
-                                        })}
-                                    </Stack>
-                                </Grid>
-
-                                <Grid item xs={12} md={3.5}>
-                                    <Stack spacing={3}>
-                                        {/* ข้อมูลสินค้า — ชุดเดียวกับแผงของหน้าแก้ไข แบบอ่านอย่างเดียว */}
-                                        <FioriFormGroup title={t('productInfo')}>
-                                            <InfoRow label={t('publishing')}>
-                                                <FioriStatus label={product.enabled ? t('published') : t('unpublished')} tone={product.enabled ? 'success' : 'neutral'} />
-                                            </InfoRow>
-                                            <InfoRow label={t('showOnHome')}>
+                                <div className={styles.stack}>
+                                    {/* ข้อมูลสินค้า — ชุดเดียวกับแผงของหน้าแก้ไข แบบอ่านอย่างเดียว */}
+                                    <FioriFormGroup title={t('productInfo')}>
+                                        <InfoRow label={t('publishing')}>
+                                            <FioriStatus
+                                                label={product.enabled ? t('published') : t('unpublished')}
+                                                tone={product.enabled ? 'success' : 'neutral'}
+                                            />
+                                        </InfoRow>
+                                        <InfoRow label={t('showOnHome')}>
+                                            <FioriStatus
+                                                label={product.show_on_home ? t('showOnHomeYes') : t('showOnHomeNo')}
+                                                tone={product.show_on_home ? 'success' : 'neutral'}
+                                            />
+                                        </InfoRow>
+                                        <InfoRow label={t('productStatus')}>
+                                            {isProductStatus(product.status) ? (
                                                 <FioriStatus
-                                                    label={product.show_on_home ? t('showOnHomeYes') : t('showOnHomeNo')}
-                                                    tone={product.show_on_home ? 'success' : 'neutral'}
+                                                    label={t(PRODUCT_STATUS_LABEL_KEYS[product.status])}
+                                                    tone={PRODUCT_STATUS_TONES[product.status]}
                                                 />
-                                            </InfoRow>
-                                            <InfoRow label={t('productStatus')}>
-                                                {isProductStatus(product.status) ? (
-                                                    <FioriStatus label={t(PRODUCT_STATUS_LABEL_KEYS[product.status])} tone={PRODUCT_STATUS_TONES[product.status]} />
+                                            ) : (
+                                                <EmptyValue />
+                                            )}
+                                        </InfoRow>
+                                        {productTypeAttribute && (
+                                            <InfoRow label={t('masterProductTypeFieldLabel')}>
+                                                {productTypeCode ? (
+                                                    <span className={styles.bodyText}>
+                                                        {productTypeOption ? optionLabel(productTypeOption) : productTypeCode}
+                                                    </span>
                                                 ) : (
                                                     <EmptyValue />
                                                 )}
                                             </InfoRow>
-                                            {productTypeAttribute && (
-                                                <InfoRow label={t('masterProductTypeFieldLabel')}>
-                                                    {productTypeCode ? (
-                                                        <Typography variant="body2">{productTypeOption ? optionLabel(productTypeOption) : productTypeCode}</Typography>
-                                                    ) : (
-                                                        <EmptyValue />
-                                                    )}
-                                                </InfoRow>
-                                            )}
-                                            <InfoRow label={t('updatedAt')}>
-                                                <Stack direction="row" spacing={0.75} alignItems="center">
-                                                    <CalendarTodayIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                                    <Typography variant="body2">{formatLocalDateTime(product.updated_at)}</Typography>
-                                                </Stack>
-                                            </InfoRow>
-                                            <InfoRow label={t('createdAt')}>
-                                                <Stack direction="row" spacing={0.75} alignItems="center">
-                                                    <CalendarTodayIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                                    <Typography variant="body2">{formatLocalDateTime(product.created_at)}</Typography>
-                                                </Stack>
-                                            </InfoRow>
-                                        </FioriFormGroup>
-
-                                        {/* ช่องทางขาย — มีสิทธิ์แยกของตัวเอง (sales_channels) ดู routes/catalog.php */}
-                                        {canViewSalesChannels && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                    {t('salesChannels')}
-                                                </Typography>
-                                                {publishedChannels.length > 0 ? (
-                                                    <Stack spacing={1.5}>
-                                                        {publishedChannels.map((group) => (
-                                                            <InfoRow key={group.platform} label={group.platform}>
-                                                                <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                                                                    {group.channels.map((ch) => (
-                                                                        <Chip
-                                                                            key={ch.id}
-                                                                            label={ch.is_live ? `${ch.name || ch.code} · ${t('liveLabel')}` : ch.name || ch.code}
-                                                                            size="small"
-                                                                            sx={{
-                                                                                bgcolor: ch.is_live ? FIORI.successBg : FIORI.headerBg,
-                                                                                color: ch.is_live ? FIORI.success : FIORI.textSecondary,
-                                                                                fontWeight: 600,
-                                                                            }}
-                                                                        />
-                                                                    ))}
-                                                                </Stack>
-                                                            </InfoRow>
-                                                        ))}
-                                                    </Stack>
-                                                ) : (
-                                                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                                        {t('noPublishedChannels')}
-                                                    </Typography>
-                                                )}
-                                            </Paper>
                                         )}
+                                        <InfoRow label={t('updatedAt')}>
+                                            <DateValue value={product.updated_at} />
+                                        </InfoRow>
+                                        <InfoRow label={t('createdAt')}>
+                                            <DateValue value={product.created_at} />
+                                        </InfoRow>
+                                    </FioriFormGroup>
 
-                                        {/* หมวดหมู่ / หมวดหมู่ย่อย / กลุ่มสินค้า — ค่าเก็บที่ 'ungrouped'/'default' เสมอ */}
-                                        {masterCategoryAttributes.length > 0 && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                    {t('masterCategoriesBlockTitle')}
-                                                </Typography>
-                                                <Stack spacing={2}>
-                                                    {masterCategoryAttributes.map((attr) => (
-                                                        <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
-                                                            <RenderAttributeValue attr={attr} value={getValue(attr)} />
+                                    {/* ช่องทางขาย — มีสิทธิ์แยกของตัวเอง (sales_channels) ดู routes/catalog.php */}
+                                    {canViewSalesChannels && (
+                                        <section className={styles.card}>
+                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
+                                                {t('salesChannels')}
+                                            </Title>
+                                            {publishedChannels.length > 0 ? (
+                                                <div className={styles.stack} style={{ gap: '0.75rem' }}>
+                                                    {publishedChannels.map((group) => (
+                                                        <InfoRow key={group.platform} label={group.platform}>
+                                                            <div className={styles.wrapRow}>
+                                                                {group.channels.map((ch) => (
+                                                                    <Tag key={ch.id} design={ch.is_live ? 'Positive' : 'Neutral'} hideStateIcon>
+                                                                        {ch.is_live
+                                                                            ? `${ch.name || ch.code} · ${t('liveLabel')}`
+                                                                            : ch.name || ch.code}
+                                                                    </Tag>
+                                                                ))}
+                                                            </div>
                                                         </InfoRow>
                                                     ))}
-                                                </Stack>
-                                            </Paper>
-                                        )}
+                                                </div>
+                                            ) : (
+                                                <span className={styles.muted}>{t('noPublishedChannels')}</span>
+                                            )}
+                                        </section>
+                                    )}
 
-                                        {canViewHistory && (
-                                            <Paper sx={{ ...fioriCardSx, p: 3 }}>
-                                                <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                                    {t('timelineTitle')}
-                                                </Typography>
-                                                <Box sx={{ maxHeight: 480, overflowY: 'auto', pr: 0.5 }}>
-                                                    <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
-                                                </Box>
-                                            </Paper>
-                                        )}
-                                    </Stack>
-                                </Grid>
-                            </Grid>
-                        </Box>
+                                    {/* หมวดหมู่ / หมวดหมู่ย่อย / กลุ่มสินค้า — ค่าเก็บที่ 'ungrouped'/'default' เสมอ */}
+                                    {masterCategoryAttributes.length > 0 && (
+                                        <section className={styles.card}>
+                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
+                                                {t('masterCategoriesBlockTitle')}
+                                            </Title>
+                                            <div className={styles.stack} style={{ gap: '1rem' }}>
+                                                {masterCategoryAttributes.map((attr) => (
+                                                    <InfoRow key={attr.id} label={localizedLabel(attr, activeLocaleId)}>
+                                                        <RenderAttributeValue attr={attr} value={getValue(attr)} />
+                                                    </InfoRow>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
+                                    {canViewHistory && (
+                                        <section className={styles.card}>
+                                            <Title level="H5" wrappingType="Normal" className={styles.cardTitle}>
+                                                {t('timelineTitle')}
+                                            </Title>
+                                            <div style={{ maxHeight: 480, overflowY: 'auto', paddingRight: '0.25rem' }}>
+                                                <TimelinePanel timelineUrl={`/catalog/products/${product.id}/timeline`} />
+                                            </div>
+                                        </section>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {tabIndex === 1 && canViewHistory && (
-                        <Box sx={{ px: { xs: 2, md: 4 }, pt: 2 }}>
+                        <div className={styles.gutter} style={{ paddingTop: '1rem' }}>
                             <HistoryPanel historyUrl={`/catalog/products/${product.id}/history`} />
-                        </Box>
+                        </div>
                     )}
-                </Box>
-            </Box>
+                </div>
+            </div>
         </AppLayout>
     );
 }

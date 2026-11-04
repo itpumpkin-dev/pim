@@ -1,0 +1,350 @@
+/* Shared layout styles for the catalog/marketplace/* pages (UI5 migration). */
+
+.page {
+    padding: 1rem;
+    background: var(--sapBackgroundColor);
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+    .page {
+        padding: 2rem;
+    }
+}
+
+.card {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    box-sizing: border-box;
+}
+
+.tileGrid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 600px) {
+    .tileGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .tileGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.tile:hover,
+.tile:focus-visible {
+    border-color: var(--sapBrandColor);
+    outline: none;
+}
+
+.pageTitle {
+    display: block;
+}
+
+.subtitle {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}
+
+.caption {
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.muted {
+    color: var(--sapContent_LabelColor);
+}
+
+.searchField {
+    width: 100%;
+    min-width: 0;
+}
+
+@media (min-width: 600px) {
+    .searchField {
+        width: 260px;
+    }
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    width: 100%;
+    justify-content: space-between;
+}
+
+@media (min-width: 900px) {
+    .pager {
+        width: auto;
+        justify-content: flex-end;
+    }
+}
+
+.pageBox {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: 8px;
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSize);
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.toolbarStart {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    width: 100%;
+}
+
+@media (min-width: 900px) {
+    .toolbar {
+        flex-direction: row;
+    }
+
+    .toolbarStart {
+        width: auto;
+    }
+}
+
+.kpiStrip {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    overflow: hidden;
+    background: var(--sapGroup_ContentBorderColor);
+}
+
+@media (min-width: 600px) {
+    .kpiStrip {
+        flex-direction: row;
+    }
+}
+
+.kpiTile {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    cursor: pointer;
+    background: var(--sapGroup_ContentBackground);
+    transition: background-color 0.1s ease;
+}
+
+.kpiTile:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.kpiTileActive,
+.kpiTileActive:hover {
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.kpiLabel {
+    color: var(--sapContent_LabelColor);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+}
+
+.kpiValue {
+    margin-top: 0.25rem;
+    font-size: var(--sapFontHeader4Size);
+    font-weight: 700;
+}
+
+.selectionBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    background: var(--sapList_SelectionBackgroundColor);
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    color: var(--sapBrandColor);
+    font-weight: 600;
+    font-size: var(--sapFontSize);
+}
+
+.divider {
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.selectedRow {
+    background: var(--sapList_SelectionBackgroundColor);
+}
+
+.mapTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+}
+
+.mapTable thead {
+    background: var(--sapList_HeaderBackground);
+}
+
+.mapTable th {
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--sapTextColor);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.mapTable td {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+.mapTable tbody tr {
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+    transition: background-color 0.1s ease;
+}
+
+.mapTable tbody tr:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.thumb {
+    border-radius: var(--sapElement_BorderCornerRadius);
+    object-fit: cover;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapList_HeaderBackground);
+}
+
+/* Object Page (full-height column: fixed header + one scroll body) */
+.objectPage {
+    background: var(--sapBackgroundColor);
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.objectHeader {
+    padding: 1.25rem 1rem;
+    background: var(--sapObjectHeader_Background, var(--sapGroup_ContentBackground));
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.objectBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 3rem;
+}
+
+.anchorBar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--sapObjectHeader_Background, var(--sapGroup_ContentBackground));
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    padding: 0 1rem;
+}
+
+.objectSections {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.5rem 1rem 0;
+}
+
+@media (min-width: 900px) {
+    .objectHeader,
+    .anchorBar {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    .objectSections {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+/* Quick-view side panel (was a MUI right Drawer) */
+.sidePanel::part(content) {
+    padding: 0;
+}
+
+.sidePanelInner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--sapBackgroundColor);
+}
+
+.sidePanelHeader {
+    padding: 1rem;
+    background: var(--sapGroup_ContentBackground);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.sidePanelBody {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.listCard {
+    padding: 0.75rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    background: var(--sapGroup_ContentBackground);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    padding: 0 0.125rem 0 0.5rem;
+    border-radius: 1rem;
+    background: var(--sapButton_TokenBackground, var(--sapList_HeaderBackground));
+    border: 1px solid var(--sapButton_TokenBorderColor, var(--sapGroup_ContentBorderColor));
+    color: var(--sapTextColor);
+    font-size: var(--sapFontSmallSize);
+}

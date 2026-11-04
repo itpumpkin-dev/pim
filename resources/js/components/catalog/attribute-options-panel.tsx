@@ -1,30 +1,17 @@
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import { router, usePage } from '@inertiajs/react';
-import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
-import { useLocale } from '@/hooks/use-locale';
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { useLocale } from '@/hooks/use-locale';
+import { router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/reset.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import { Button, CheckBox, FileUploader, FlexBox, Icon, Input, Option, Select, Text, Title } from '@ui5/webcomponents-react';
+import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import styles from './attribute-options-panel.module.css';
 
 export interface AttributeOptionItem {
     id: number;
@@ -66,11 +53,22 @@ function SwatchPreview({ swatchType, value }: { swatchType: string; value: strin
     if (!value) return null;
 
     if (swatchType === 'color') {
-        return <Box sx={{ width: 22, height: 22, borderRadius: 0.5, bgcolor: value, border: 1, borderColor: 'divider', flexShrink: 0 }} />;
+        return (
+            <div
+                style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    background: value,
+                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                    flexShrink: 0,
+                }}
+            />
+        );
     }
 
     if (swatchType === 'image') {
-        return <Box component="img" src={value} sx={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }} />;
+        return <img src={value} alt="" style={{ width: 24, height: 24, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />;
     }
 
     return null;
@@ -110,7 +108,7 @@ export function AttributeOptionsPanel({
     isApiBound?: boolean;
 }) {
     const { locale, locales } = useLocale();
-    const { errors } = usePage<any>().props;
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [rows, setRows] = useState<EditableOption[]>(() => options.map((o) => toEditableOption(o, swatchType)));
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
@@ -257,9 +255,12 @@ export function AttributeOptionsPanel({
     // เป็น <form> ซ้อนตัวเองไม่ได้ (form ซ้อน form เป็น HTML ที่ผิด แล้ว React
     // ก็จะ warn หรือ hydration พังด้วย) เลยต้องต่อปุ่ม Enter เองแบบ manual
     // แทนที่จะพึ่งพฤติกรรม submit-on-Enter ของ form ปกติ
-    const submitOnEnter = (event: KeyboardEvent<HTMLDivElement>) => {
+    // UI5 <Input> เรียก form.requestSubmit() เองจาก keydown listener ใน shadow DOM
+    // เลยต้องดักใน capture phase (onKeyDownCapture) แล้ว stopPropagation ก่อนถึงตัว input
+    const submitOnEnter = (event: KeyboardEvent<HTMLElement>) => {
         if (event.key === 'Enter') {
             event.preventDefault();
+            event.stopPropagation();
             addOption();
         }
     };
@@ -311,11 +312,9 @@ export function AttributeOptionsPanel({
             width: 160,
             render: (row) =>
                 row.kind === 'new' ? (
-                    <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                        Auto
-                    </Typography>
+                    <Text style={{ fontStyle: 'italic', color: 'var(--sapContent_LabelColor)', fontSize: 'var(--sapFontSmallSize)' }}>Auto</Text>
                 ) : (
-                    <TextField size="small" fullWidth value={row.option.code} disabled />
+                    <Input value={row.option.code} disabled style={{ width: '100%' }} />
                 ),
         },
         {
@@ -324,31 +323,25 @@ export function AttributeOptionsPanel({
             priority: 'high',
             render: (row) =>
                 row.kind === 'new' ? (
-                    <TextField
-                        size="small"
-                        fullWidth
+                    <Input
+                        style={{ width: '100%' }}
                         value={activeLocaleId !== undefined ? (newTranslations[String(activeLocaleId)] ?? '') : ''}
-                        onChange={(e) =>
-                            activeLocaleId !== undefined &&
-                            setNewTranslations((prev) => ({ ...prev, [String(activeLocaleId)]: e.target.value }))
-                        }
-                        onKeyDown={submitOnEnter}
+                        onInput={(e) => {
+                            const value = e.target.value;
+                            if (activeLocaleId !== undefined) setNewTranslations((prev) => ({ ...prev, [String(activeLocaleId)]: value }));
+                        }}
+                        onKeyDownCapture={submitOnEnter}
                     />
                 ) : (
-                    <TextField
-                        size="small"
-                        fullWidth
+                    <Input
+                        style={{ width: '100%' }}
                         // ไม่มีแถว translation สำหรับ locale นี้ ก็ fall back ไปที่ admin_label
                         // แบบเดียวกับ accessor AttributeOption::adminLabel() ที่ที่อื่นทั้งหมดใช้
                         // (เช่น option ของ pbaseunit ถูก seed ใส่ไว้แค่ที่คอลัมน์ admin_label
                         // ไม่มี translation row) fallback อยู่แค่ในค่าที่แสดง ไม่ได้เข้าไปใน state
                         // เพราะงั้นการสลับภาษาแล้วกด Save all จะไม่เขียนค่า fallback ทับภาษาอื่น
-                        value={
-                            activeLocaleId !== undefined
-                                ? (row.option.translations[String(activeLocaleId)] ?? row.option.adminLabel ?? '')
-                                : ''
-                        }
-                        onChange={(e) =>
+                        value={activeLocaleId !== undefined ? (row.option.translations[String(activeLocaleId)] ?? row.option.adminLabel ?? '') : ''}
+                        onInput={(e) =>
                             activeLocaleId !== undefined &&
                             updateRow(row.option.id, {
                                 ...row.option,
@@ -370,11 +363,7 @@ export function AttributeOptionsPanel({
         priority: 'medium',
         render: (row) =>
             row.kind === 'new' ? null : (
-                <Checkbox
-                    size="small"
-                    checked={row.option.isActive}
-                    onChange={(e) => updateRow(row.option.id, { ...row.option, isActive: e.target.checked })}
-                />
+                <CheckBox checked={row.option.isActive} onChange={(e) => updateRow(row.option.id, { ...row.option, isActive: e.target.checked })} />
             ),
     });
 
@@ -385,24 +374,19 @@ export function AttributeOptionsPanel({
             priority: 'low',
             render: (row) =>
                 row.kind === 'new' || !row.option.isCustomized ? (
-                    <Typography variant="caption" color="text.disabled">
+                    <Text style={{ color: 'var(--sapContent_DisabledTextColor)', fontSize: 'var(--sapFontSmallSize)' }}>
                         {row.kind === 'new' ? '' : 'From master'}
-                    </Typography>
+                    </Text>
                 ) : (
-                    <Tooltip title="Reset this option back to its master value">
-                        <span>
-                            <Button
-                                size="small"
-                                startIcon={
-                                    resettingId === row.option.id ? <CircularProgress size={12} color="inherit" /> : <RestartAltIcon fontSize="small" />
-                                }
-                                onClick={() => resetToMaster(row.option.id)}
-                                disabled={resettingId === row.option.id}
-                            >
-                                Reset to master
-                            </Button>
-                        </span>
-                    </Tooltip>
+                    <Button
+                        icon="reset"
+                        tooltip="Reset this option back to its master value"
+                        loading={resettingId === row.option.id}
+                        onClick={() => resetToMaster(row.option.id)}
+                        disabled={resettingId === row.option.id}
+                    >
+                        Reset to master
+                    </Button>
                 ),
         });
     }
@@ -415,45 +399,36 @@ export function AttributeOptionsPanel({
             render: (row) => {
                 if (row.kind === 'new') {
                     return swatchType === 'color' ? (
-                        <TextField
-                            size="small"
+                        <Input
                             placeholder="#hex"
                             value={newSwatchText}
-                            onChange={(e) => setNewSwatchText(e.target.value)}
-                            onKeyDown={submitOnEnter}
+                            onInput={(e) => setNewSwatchText(e.target.value)}
+                            onKeyDownCapture={submitOnEnter}
                         />
                     ) : (
-                        <TextField
-                            type="file"
-                            size="small"
-                            onChange={(e) => setNewSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
-                            slotProps={{ htmlInput: { accept: 'image/*' } }}
-                        />
+                        <FileUploader accept="image/*" onChange={(e) => setNewSwatchImage(e.detail.files?.[0] ?? null)} />
                     );
                 }
 
                 const option = row.option;
                 return swatchType === 'color' ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                            size="small"
+                    <FlexBox alignItems="Center" style={{ gap: '0.5rem' }}>
+                        <Input
                             value={option.swatchText}
-                            onChange={(e) => updateRow(option.id, { ...option, swatchText: e.target.value })}
-                            sx={{ width: 100 }}
+                            onInput={(e) => updateRow(option.id, { ...option, swatchText: e.target.value })}
+                            style={{ width: 100 }}
                         />
                         <SwatchPreview swatchType={swatchType} value={option.existingSwatchValue} />
-                    </Stack>
+                    </FlexBox>
                 ) : (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        <TextField
-                            type="file"
-                            size="small"
-                            onChange={(e) => updateRow(option.id, { ...option, swatchImage: (e.target as HTMLInputElement).files?.[0] ?? null })}
-                            slotProps={{ htmlInput: { accept: 'image/*' } }}
-                            sx={{ width: 160 }}
+                    <FlexBox alignItems="Center" style={{ gap: '0.5rem' }}>
+                        <FileUploader
+                            accept="image/*"
+                            onChange={(e) => updateRow(option.id, { ...option, swatchImage: e.detail.files?.[0] ?? null })}
+                            style={{ width: 160 }}
                         />
                         <SwatchPreview swatchType={swatchType} value={option.existingSwatchValue} />
-                    </Stack>
+                    </FlexBox>
                 );
             },
         });
@@ -466,13 +441,7 @@ export function AttributeOptionsPanel({
         align: 'right',
         render: (row) =>
             row.kind === 'new' ? (
-                <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={addOption}
-                    disabled={!hasNewLabel || adding}
-                    startIcon={adding ? <CircularProgress size={14} color="inherit" /> : undefined}
-                >
+                <Button onClick={addOption} disabled={!hasNewLabel || adding} loading={adding}>
                     {adding ? 'Adding…' : 'Add Row'}
                 </Button>
             ) : isMasterBound || isApiBound ? (
@@ -481,114 +450,105 @@ export function AttributeOptionsPanel({
                 // MasterAttributeOptionSync::rebuildAttribute() /
                 // ApiAttributeOptionSync::rebuildAttribute()) ปิดที่ Active
                 // แทนถ้าไม่อยากให้โผล่ในหน้าสินค้า
-                <Tooltip title="Can't delete an option mirrored from a Master/API source — turn off Active instead.">
-                    <span>
-                        <IconButton size="small" disabled>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
-                    </span>
-                </Tooltip>
+                <span title="Can't delete an option mirrored from a Master/API source — turn off Active instead.">
+                    <Button design="Transparent" icon="delete" disabled accessibleName="Delete" />
+                </span>
             ) : (
-                <IconButton size="small" onClick={() => destroy(row.option.id)} disabled={deletingId === row.option.id} title="Delete">
-                    {deletingId === row.option.id ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon fontSize="small" />}
-                </IconButton>
+                <Button
+                    design="Transparent"
+                    icon="delete"
+                    onClick={() => destroy(row.option.id)}
+                    disabled={deletingId === row.option.id}
+                    loading={deletingId === row.option.id}
+                    tooltip="Delete"
+                    accessibleName="Delete"
+                />
             ),
     });
 
     return (
-        <Paper variant="outlined" sx={{ p: 3 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="h6" fontWeight={700}>
-                    Options
-                </Typography>
-                <Button
-                    type="button"
-                    variant="contained"
-                    size="small"
-                    disabled={saving || rows.length === 0}
-                    onClick={saveAll}
-                    startIcon={saving ? <CircularProgress size={14} color="inherit" /> : undefined}
-                >
+        <div
+            style={{
+                padding: '1.5rem',
+                background: 'var(--sapGroup_ContentBackground)',
+                border: '1px solid var(--sapGroup_ContentBorderColor)',
+                borderRadius: 'var(--sapElement_BorderCornerRadius)',
+            }}
+        >
+            <FlexBox justifyContent="SpaceBetween" alignItems="Center" style={{ marginBottom: '1rem' }}>
+                <Title level="H5">Options</Title>
+                <Button design="Emphasized" disabled={saving || rows.length === 0} onClick={saveAll} loading={saving}>
                     {saving ? 'Saving…' : 'Save all'}
                 </Button>
-            </Stack>
+            </FlexBox>
 
             {/* กล่องแจ้ง Error ของ Options — 'option' (เอกพจน์) เป็นคีย์ที่
                 AttributeOptionController::resetToMaster() ใช้ตอน reset ไม่สำเร็จ
                 (master row ถูกลบไปแล้ว) ต่างจาก 'options'/'options.*' ที่มาจาก
                 store()/batchUpdate() ต้องเช็คแยกไว้ ไม่งั้น error นี้จะไม่โผล่ให้
                 เห็นเลยเงียบๆ ผู้ใช้กด "Reset to master" แล้วเหมือนไม่มีอะไรเกิดขึ้น */}
-            {(errors.options || errors.option || Object.keys(errors).some(k => k.startsWith('options.'))) && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+            {(errors.options || errors.option || Object.keys(errors).some((k) => k.startsWith('options.'))) && (
+                <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
                     {errors.options}
                     {errors.option}
                     {Object.entries(errors)
                         .filter(([key]) => key.startsWith('options.'))
                         .map(([key, val]) => (
                             <div key={key}>{String(val)}</div>
-                        ))
-                    }
-                </Alert>
+                        ))}
+                </FioriMessageStrip>
             )}
 
-            <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
-                <TextField
-                    size="small"
+            <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <Input
                     placeholder="Search"
                     value={search}
-                    onChange={(e) => {
+                    onInput={(e) => {
                         setSearch(e.target.value);
                         setPage(1);
                     }}
-                    slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> } }}
-                    sx={{ width: 240 }}
+                    icon={<Icon name="search" />}
+                    style={{ width: 240 }}
                 />
-                <Stack direction="row" spacing={1} alignItems="center">
-                    <Typography variant="body2" color="text.secondary">
-                        {filteredRows.length} Results
-                    </Typography>
-                    <Select size="small" value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>
+                <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.5rem' }}>
+                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{filteredRows.length} Results</Text>
+                    <Select
+                        value={String(perPage)}
+                        onChange={(e) => {
+                            setPerPage(Number(e.detail.selectedOption.value));
+                            setPage(1);
+                        }}
+                        style={{ width: '5.5rem' }}
+                    >
                         {PER_PAGE_OPTIONS.map((n) => (
-                            <MenuItem key={n} value={n}>{n}</MenuItem>
+                            <Option key={n} value={String(n)}>
+                                {n}
+                            </Option>
                         ))}
                     </Select>
-                    <Typography variant="body2" color="text.secondary">Per Page</Typography>
-                    <IconButton size="small" disabled={currentPage <= 1} onClick={() => setPage(1)}>
-                        <FirstPageIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)}>
-                        <ChevronLeftIcon fontSize="small" />
-                    </IconButton>
-                    <Typography variant="body2">{currentPage} of {pageCount}</Typography>
-                    <IconButton size="small" disabled={currentPage >= pageCount} onClick={() => setPage((p) => p + 1)}>
-                        <ChevronRightIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton size="small" disabled={currentPage >= pageCount} onClick={() => setPage(pageCount)}>
-                        <LastPageIcon fontSize="small" />
-                    </IconButton>
-                </Stack>
-            </Stack>
+                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>Per Page</Text>
+                    <Button design="Transparent" icon="sys-first-page" disabled={currentPage <= 1} onClick={() => setPage(1)} />
+                    <Button design="Transparent" icon="slim-arrow-left" disabled={currentPage <= 1} onClick={() => setPage((p) => p - 1)} />
+                    <Text>
+                        {currentPage} of {pageCount}
+                    </Text>
+                    <Button design="Transparent" icon="slim-arrow-right" disabled={currentPage >= pageCount} onClick={() => setPage((p) => p + 1)} />
+                    <Button design="Transparent" icon="sys-last-page" disabled={currentPage >= pageCount} onClick={() => setPage(pageCount)} />
+                </FlexBox>
+            </FlexBox>
 
-            <Box sx={{ mb: 1 }}>
+            <div style={{ marginBottom: '0.5rem' }}>
                 <FioriResponsiveTable
                     columns={columns}
                     rows={tableRows}
                     getRowKey={(row) => (row.kind === 'new' ? 'new' : row.option.id)}
-                    rowSx={(row) => (row.kind === 'new' ? { bgcolor: 'action.hover' } : {})}
+                    rowClassName={(row) => (row.kind === 'new' ? styles.newRow : undefined)}
                 />
-            </Box>
+            </div>
 
-            {rows.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                    No options yet
-                </Typography>
-            )}
+            {rows.length === 0 && <Text className={styles.emptyNote}>No options yet</Text>}
 
-            {rows.length > 0 && filteredRows.length === 0 && (
-                <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
-                    No options match your search.
-                </Typography>
-            )}
-        </Paper>
+            {rows.length > 0 && filteredRows.length === 0 && <Text className={styles.emptyNote}>No options match your search.</Text>}
+        </div>
     );
 }

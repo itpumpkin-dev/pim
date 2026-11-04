@@ -1,30 +1,17 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
+import { formatDateTime } from '@/lib/format';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import {
-    Box,
-    Button,
-    InputAdornment,
-    TextField,
-    Typography,
-    IconButton,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useState, useEffect, useRef } from 'react';
+import '@ui5/webcomponents-icons/dist/copy.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, FlexBox, Icon, Input, Title } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    FioriStatus,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
-import { formatDateTime } from '@/lib/format';
 
 interface PaginationData<T> {
     data: T[];
@@ -35,19 +22,27 @@ interface PaginationData<T> {
 }
 
 interface GridConfig {
-    columns: Record<string, {
-        label: string;
-        type: string;
-        sortable?: boolean;
-    }>;
-    actions?: Record<string, {
-        icon: string;
-        label: string;
-    }>;
+    columns: Record<
+        string,
+        {
+            label: string;
+            type: string;
+            sortable?: boolean;
+        }
+    >;
+    actions?: Record<
+        string,
+        {
+            icon: string;
+            label: string;
+        }
+    >;
 }
 
 interface RoleIndexProps {
     gridConfig: GridConfig;
+    // server-driven gridConfig columns → row shape is dynamic
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     gridData: PaginationData<any>;
     filters: {
         search?: string;
@@ -127,24 +122,26 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
             width: 80,
             render: (row) => rowOffset + gridData.data.indexOf(row) + 1,
         },
-        ...Object.entries(gridConfig.columns).map(([key, column]): FioriResponsiveColumn<RoleRow> => ({
-            key,
-            header: t(column.label),
-            priority: columnPriority[key] ?? 'low',
-            render: (row) =>
-                key === 'is_guest' ? (
-                    // A flag, not a status — yes/no rather than active/inactive.
-                    <FioriStatus label={row[key] ? t('yes') : t('no')} tone={row[key] ? 'information' : 'neutral'} />
-                ) : column.type === 'boolean' ? (
-                    <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
-                ) : column.type === 'datetime' ? (
-                    formatDateTime(row[key])
-                ) : key === 'label' ? (
-                    <Typography component="span" fontWeight={600}>{row[key] || '-'}</Typography>
-                ) : (
-                    row[key] || '-'
-                ),
-        })),
+        ...Object.entries(gridConfig.columns).map(
+            ([key, column]): FioriResponsiveColumn<RoleRow> => ({
+                key,
+                header: t(column.label),
+                priority: columnPriority[key] ?? 'low',
+                render: (row) =>
+                    key === 'is_guest' ? (
+                        // A flag, not a status — yes/no rather than active/inactive.
+                        <FioriStatus label={row[key] ? t('yes') : t('no')} tone={row[key] ? 'information' : 'neutral'} />
+                    ) : column.type === 'boolean' ? (
+                        <FioriStatus label={row[key] ? t('active') : t('inactive')} tone={row[key] ? 'success' : 'neutral'} />
+                    ) : column.type === 'datetime' ? (
+                        formatDateTime(row[key])
+                    ) : key === 'label' ? (
+                        <span style={{ fontWeight: 600 }}>{row[key] || '-'}</span>
+                    ) : (
+                        row[key] || '-'
+                    ),
+            }),
+        ),
     ];
 
     if (visibleActions.length > 0) {
@@ -154,15 +151,15 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {visibleActions.map(([actionKey, action]) => {
                         if (actionKey === 'delete' && row.label === 'Administrator') {
                             return null;
                         }
 
-                        let Icon = EditIcon;
-                        if (action.icon === 'copy') Icon = ContentCopyIcon;
-                        if (action.icon === 'delete') Icon = DeleteIcon;
+                        let icon = 'edit';
+                        if (action.icon === 'copy') icon = 'copy';
+                        if (action.icon === 'delete') icon = 'delete';
 
                         const handleClick = () => {
                             if (actionKey === 'update') {
@@ -174,13 +171,17 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
                         };
 
                         return (
-                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                <Icon fontSize="small" />
-                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                            </IconButton>
+                            <Button
+                                key={actionKey}
+                                design="Transparent"
+                                icon={icon}
+                                tooltip={t(action.label)}
+                                accessibleName={t(action.label)}
+                                onClick={handleClick}
+                            />
                         );
                     })}
-                </Box>
+                </FlexBox>
             ),
         });
     }
@@ -188,51 +189,31 @@ export default function RoleIndex({ gridConfig, gridData, filters }: RoleIndexPr
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('rolesCount', { count: gridData.total })} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {tSystem('rolesCount', { count: gridData.total })}
-                        </Typography>
-                        <Box sx={{ mt: 2 }}>
-                            <TextField
+            <div style={{ padding: '2rem', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Start" wrap="Wrap" style={{ gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H3">{tSystem('rolesCount', { count: gridData.total })}</Title>
+                        <div style={{ marginTop: '1rem' }}>
+                            <Input
                                 placeholder={tSystem('searchByName')}
-                                size="small"
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                                InputProps={{
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
+                                onInput={(e) => setSearch(e.target.value)}
+                                icon={<Icon name="search" />}
+                                style={{ minWidth: 280 }}
                             />
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                     {canCreate && (
-                        <Box>
-                            <Button
-                                variant="contained"
-                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                                onClick={() => router.visit('/system/roles/create')}
-                            >
-                                {tSystem('createRole')}
-                            </Button>
-                        </Box>
+                        <Button design="Emphasized" onClick={() => router.visit('/system/roles/create')}>
+                            {tSystem('createRole')}
+                        </Button>
                     )}
-                </Box>
+                </FlexBox>
 
-                <Box sx={{ mt: 4 }}>
-                    <FioriResponsiveTable
-                        columns={columns}
-                        rows={gridData.data}
-                        getRowKey={(row) => row.id}
-                        emptyMessage={t('noDataFound')}
-                    />
-                </Box>
-            </Box>
+                <div style={{ marginTop: '2rem' }}>
+                    <FioriResponsiveTable columns={columns} rows={gridData.data} getRowKey={(row) => row.id} emptyMessage={t('noDataFound')} />
+                </div>
+            </div>
 
             <FioriMessageBox
                 open={Boolean(deleteTarget)}

@@ -1,9 +1,9 @@
+import '@ui5/webcomponents-icons/dist/accept.js';
+import { Button, MessageStrip, Text } from '@ui5/webcomponents-react';
+import { useState } from 'react';
+
 import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriEmphasizedSx } from '@/lib/fiori-style';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
-import { useState } from 'react';
 
 export interface AssignPimCategoryPanelProps {
     productId: number;
@@ -56,41 +56,43 @@ export function AssignPimCategoryPanel({ productId, onAssigned }: AssignPimCateg
     };
 
     return (
-        <Stack
-            spacing={1.5}
-            sx={{
-                p: 2,
-                borderRadius: 1,
-                bgcolor: FIORI.warningBg,
-                border: `1px dashed ${FIORI.warning}`,
+        <div
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                padding: '1rem',
+                borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                background: 'var(--sapWarningBackground, var(--fiori-warning-bg))',
+                border: '1px dashed var(--sapCriticalColor)',
             }}
         >
-            <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <Text style={{ fontWeight: 600, color: 'var(--sapTextColor)' }}>
                 สินค้านี้ยังไม่มีหมวดหมู่ PIM — กำหนดก่อน ถึงจะบันทึก Category Mapping ด้านบนได้
-            </Typography>
+            </Text>
 
-            <Box sx={{ maxWidth: 420 }}>
+            <div style={{ maxWidth: 420 }}>
                 <CategoryPicker value={selected} onChange={setSelected} placeholder="ค้นหาหมวดหมู่ PIM..." />
-            </Box>
+            </div>
 
             {error && (
-                <Alert severity="error" onClose={() => setError(null)}>
+                <MessageStrip design="Negative" onClose={() => setError(null)}>
                     {error}
-                </Alert>
+                </MessageStrip>
             )}
 
-            <Box>
+            <div>
                 <Button
-                    variant="contained"
-                    size="small"
+                    design="Emphasized"
+                    icon={saving ? undefined : 'accept'}
+                    loading={saving}
+                    loadingDelay={0}
                     disabled={!selected || saving}
                     onClick={save}
-                    startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <CheckCircleIcon fontSize="small" />}
-                    sx={{ ...fioriEmphasizedSx, px: 2 }}
                 >
                     กำหนดหมวดหมู่ PIM
                 </Button>
-            </Box>
-        </Stack>
+            </div>
+        </div>
     );
 }

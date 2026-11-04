@@ -1,48 +1,24 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import EditNoteIcon from '@mui/icons-material/EditNote';
-import DeleteIcon from '@mui/icons-material/Delete';
-import TranslateIcon from '@mui/icons-material/Translate';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    InputAdornment,
-    LinearProgress,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Tab,
-    Tabs,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/close-command-field.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/navigation-left-arrow.js';
+import '@ui5/webcomponents-icons/dist/navigation-right-arrow.js';
+import '@ui5/webcomponents-icons/dist/notes.js';
+import '@ui5/webcomponents-icons/dist/open-command-field.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import { Button, Icon, Input, Option, ProgressIndicator, Select, Tab, TabContainer, Tag, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    FioriStatus,
-    type FioriTone,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-    fioriTabsSx,
-} from '@/lib/fiori-style';
+
+import styles from './locale-pages.module.css';
 
 interface GridColumn {
     label: string;
@@ -95,6 +71,16 @@ const TRANSLATION_STATUS_LABEL_KEY: Record<TranslationStatus, string> = {
     partial: 'translationPartial',
     failed: 'translationFailed',
 };
+
+// FioriTone → UI5 ProgressIndicator valueState (progress bar colour).
+const TONE_VALUE_STATE: Record<FioriTone, 'None' | 'Positive' | 'Critical' | 'Negative' | 'Information'> = {
+    success: 'Positive',
+    warning: 'Critical',
+    error: 'Negative',
+    neutral: 'None',
+    information: 'Information',
+};
+
 interface GridData {
     data: LocaleRow[];
     total: number;
@@ -181,9 +167,7 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
     // Auto-refresh while any locale is mid-translation so progress/status
     // updates without the admin having to reload the page manually.
     useEffect(() => {
-        const hasActiveTranslation = gridData.data.some((row) =>
-            ACTIVE_TRANSLATION_STATUSES.includes(row.translation_status),
-        );
+        const hasActiveTranslation = gridData.data.some((row) => ACTIVE_TRANSLATION_STATUSES.includes(row.translation_status));
 
         if (!hasActiveTranslation) {
             return;
@@ -217,11 +201,7 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
     }, [view, translationJobs]);
 
     const startTranslation = (localeId: number) => {
-        router.post(
-            `/system/locales/${localeId}/translate`,
-            {},
-            { preserveScroll: true, preserveState: true },
-        );
+        router.post(`/system/locales/${localeId}/translate`, {}, { preserveScroll: true, preserveState: true });
     };
 
     const currentPage = gridData.current_page ?? 1;
@@ -243,7 +223,7 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
             key: 'code',
             header: t('fields.code'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 500 }}>{row.code}</Typography>,
+            render: (row) => <span style={{ fontWeight: 500 }}>{row.code}</span>,
         },
         {
             key: 'display_name',
@@ -264,45 +244,34 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
             minWidth: 220,
             render: (row) =>
                 row.code === 'en' ? (
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                        —
-                    </Typography>
+                    <span className={styles.mutedText}>—</span>
                 ) : (
-                    <Stack spacing={0.5}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <FioriStatus
                                 label={`${translationPercent(row)}% · ${tSystem(TRANSLATION_STATUS_LABEL_KEY[row.translation_status])}`}
                                 tone={TRANSLATION_STATUS_TONE[row.translation_status]}
                             />
-                            <Tooltip title={`${row.translation_translated} / ${row.translation_total}`}>
-                                <Box sx={{ flex: 1, minWidth: 60 }}>
-                                    <LinearProgress
-                                        variant="determinate"
-                                        value={translationPercent(row)}
-                                        sx={{
-                                            height: 6,
-                                            borderRadius: 3,
-                                            bgcolor: FIORI.border,
-                                            '& .MuiLinearProgress-bar': {
-                                                bgcolor: FIORI[TRANSLATION_STATUS_TONE[row.translation_status]],
-                                            },
-                                        }}
-                                    />
-                                </Box>
-                            </Tooltip>
-                        </Stack>
+                            <ProgressIndicator
+                                value={translationPercent(row)}
+                                hideValue
+                                valueState={TONE_VALUE_STATE[TRANSLATION_STATUS_TONE[row.translation_status]]}
+                                title={`${row.translation_translated} / ${row.translation_total}`}
+                                style={{ flex: 1, minWidth: 60 }}
+                            />
+                        </div>
                         {canEdit && (
                             <Button
-                                size="small"
-                                startIcon={<TranslateIcon fontSize="small" />}
+                                design="Transparent"
+                                icon="translate"
                                 disabled={ACTIVE_TRANSLATION_STATUSES.includes(row.translation_status)}
                                 onClick={() => startTranslation(row.id)}
-                                sx={{ ...fioriGhostSx, alignSelf: 'flex-start', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
+                                style={{ alignSelf: 'flex-start' }}
                             >
                                 {row.translation_status === 'not_started' ? tSystem('startTranslation') : tSystem('retryTranslation')}
                             </Button>
                         )}
-                    </Stack>
+                    </div>
                 ),
         },
         {
@@ -311,25 +280,33 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.25rem' }}>
                     {canEdit && (
-                        <Tooltip title={tSystem('editTranslations')}>
-                            <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/system/locales/${row.id}/translations`)}>
-                                <EditNoteIcon fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                        <Button
+                            design="Transparent"
+                            icon="notes"
+                            tooltip={tSystem('editTranslations')}
+                            accessibleName={tSystem('editTranslations')}
+                            onClick={() => router.visit(`/system/locales/${row.id}/translations`)}
+                        />
                     )}
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/system/locales/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            accessibleName={t('rowActions.edit')}
+                            onClick={() => router.visit(`/system/locales/${row.id}/edit`)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteLocaleId(row.id)}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            accessibleName={t('rowActions.delete')}
+                            onClick={() => setDeleteLocaleId(row.id)}
+                        />
                     )}
-                </Stack>
+                </div>
             ),
         },
     ];
@@ -337,117 +314,83 @@ export default function LocaleIndex({ gridData, filters, translationJobs }: Prop
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tSystem('localesTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <div className={styles.page}>
                 {/* Header Title & Create Button */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                <div className={styles.header} style={{ marginBottom: '1rem' }}>
+                    <Title level="H2" size="H4">
                         {tSystem('localesTitle')}
-                    </Typography>
+                    </Title>
                     {canCreate && view === 'locales' && (
-                        <Button
-                            variant="contained"
-                            onClick={() => router.visit('/system/locales/create')}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button design="Emphasized" onClick={() => router.visit('/system/locales/create')}>
                             {tSystem('createLocale')}
                         </Button>
                     )}
-                </Stack>
+                </div>
 
-                <Tabs
-                    value={view}
-                    onChange={(_, v: 'locales' | 'jobs') => setView(v)}
-                    sx={{ ...fioriTabsSx, mb: 3 }}
+                <TabContainer
+                    collapsed
+                    onTabSelect={(e) => setView(e.detail.tab.dataset.key === 'jobs' ? 'jobs' : 'locales')}
+                    style={{ marginBottom: '1.5rem' }}
                 >
-                    <Tab value="locales" label={tSystem('localesTitle')} />
-                    <Tab value="jobs" label={tSystem('translationJobsTab')} />
-                </Tabs>
+                    <Tab data-key="locales" text={tSystem('localesTitle')} selected={view === 'locales'} />
+                    <Tab data-key="jobs" text={tSystem('translationJobsTab')} selected={view === 'jobs'} />
+                </TabContainer>
 
                 {view === 'jobs' ? (
                     <TranslationJobsPanel jobs={translationJobs} tSystem={tSystem} tGrid={t} />
                 ) : (
-                <>
-                {/* Search & Controls Row */}
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={tSystem('searchByCode')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                    <>
+                        {/* Search & Controls Row */}
+                        <div className={styles.toolbar}>
+                            <div className={styles.toolbarGroup}>
+                                <Input
+                                    value={search}
+                                    onInput={(e) => setSearch(e.target.value ?? '')}
+                                    placeholder={tSystem('searchByCode')}
+                                    icon={<Icon name="search" />}
+                                    style={{ minWidth: 240 }}
+                                />
+                                <span className={styles.mutedText}>{t('results', { count: gridData.total })}</span>
+                            </div>
+
+                            <div className={`${styles.toolbarGroup} ${styles.toolbarGroupEnd}`}>
+                                <Button icon="filter">{t('filter')}</Button>
+
+                                <Select
+                                    value={String(perPage)}
+                                    onChange={(e) => setPerPage(Number(e.detail.selectedOption.value))}
+                                    style={{ width: '5rem', minWidth: 0 }}
+                                >
+                                    <Option value="10">10</Option>
+                                    <Option value="25">25</Option>
+                                    <Option value="50">50</Option>
+                                </Select>
+
+                                <span className={styles.mutedText}>{t('perPage')}</span>
+
+                                <div className={styles.pageBox}>{currentPage}</div>
+
+                                <span className={styles.mutedText}>{t('pageOf', { lastPage })}</span>
+
+                                <div style={{ display: 'flex', gap: '0.125rem' }}>
+                                    <Button design="Transparent" icon="close-command-field" disabled={currentPage <= 1} />
+                                    <Button design="Transparent" icon="navigation-left-arrow" disabled={currentPage <= 1} />
+                                    <Button design="Transparent" icon="navigation-right-arrow" disabled={currentPage >= lastPage} />
+                                    <Button design="Transparent" icon="open-command-field" disabled={currentPage >= lastPage} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <FioriResponsiveTable
+                            columns={columns}
+                            rows={gridData.data}
+                            getRowKey={(row) => row.id}
+                            emptyMessage={tSystem('noLocalesFound')}
                         />
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, whiteSpace: 'nowrap' }}>
-                            {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Stack>
-
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: 'flex-end' }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FilterListIcon />}
-                            sx={fioriDefaultSx}
-                        >
-                            {t('filter')}
-                        </Button>
-
-                        <Select
-                            value={perPage}
-                            onChange={(e) => setPerPage(Number(e.target.value))}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 60, height: 36 }}
-                        >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
-                        </Select>
-
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {t('perPage')}
-                        </Typography>
-
-                        <Paper elevation={0} sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', border: `1px solid ${FIORI.border}`, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                            {t('pageOf', { lastPage })}
-                        </Typography>
-
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} sx={fioriIconButtonSx}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} sx={fioriIconButtonSx}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} sx={fioriIconButtonSx}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} sx={fioriIconButtonSx}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    </Stack>
-                </Stack>
-
-                {/* Table */}
-                <FioriResponsiveTable
-                    columns={columns}
-                    rows={gridData.data}
-                    getRowKey={(row) => row.id}
-                    emptyMessage={tSystem('noLocalesFound')}
-                />
-                </>
+                    </>
                 )}
-            </Box>
+            </div>
 
             {/* Delete Dialog */}
             <FioriMessageBox
@@ -504,27 +447,19 @@ function TranslationJobsPanel({
             key: 'entity_type',
             header: tSystem('tjType'),
             priority: 'always',
-            render: (row) => (
-                <Typography sx={{ fontWeight: 500 }}>{ENTITY_TYPE_LABELS[row.entity_type] ?? row.entity_type}</Typography>
-            ),
+            render: (row) => <span style={{ fontWeight: 500 }}>{ENTITY_TYPE_LABELS[row.entity_type] ?? row.entity_type}</span>,
         },
         {
             key: 'reference',
             header: tSystem('tjReference'),
             priority: 'medium',
-            render: (row) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {row.reference}
-                </Typography>
-            ),
+            render: (row) => <span className={styles.monoText}>{row.reference}</span>,
         },
         {
             key: 'status',
             header: tGrid('fields.status'),
             priority: 'high',
-            render: (row) => (
-                <FioriStatus label={tSystem(JOB_STATUS_LABEL_KEY[row.status])} tone={JOB_STATUS_TONE[row.status]} />
-            ),
+            render: (row) => <FioriStatus label={tSystem(JOB_STATUS_LABEL_KEY[row.status])} tone={JOB_STATUS_TONE[row.status]} />,
         },
         {
             key: 'progress',
@@ -534,32 +469,15 @@ function TranslationJobsPanel({
             render: (row) => {
                 const percent = row.queued > 0 ? Math.round((row.completed / row.queued) * 100) : 100;
                 return (
-                    <Stack spacing={0.5} sx={{ minWidth: 120 }}>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 120 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span className={styles.mutedText} style={{ fontSize: 'var(--sapFontSmallSize)' }}>
                                 {row.completed} / {row.queued}
-                            </Typography>
-                            {row.errors > 0 && (
-                                <Chip
-                                    label={`${row.errors} ${tSystem('tjErrors')}`}
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{ height: 18, fontSize: '0.65rem' }}
-                                />
-                            )}
-                        </Stack>
-                        <LinearProgress
-                            variant="determinate"
-                            value={percent}
-                            sx={{
-                                height: 6,
-                                borderRadius: 3,
-                                bgcolor: FIORI.border,
-                                '& .MuiLinearProgress-bar': { bgcolor: FIORI[JOB_STATUS_TONE[row.status]] },
-                            }}
-                        />
-                    </Stack>
+                            </span>
+                            {row.errors > 0 && <Tag design="Negative">{`${row.errors} ${tSystem('tjErrors')}`}</Tag>}
+                        </div>
+                        <ProgressIndicator value={percent} hideValue valueState={TONE_VALUE_STATE[JOB_STATUS_TONE[row.status]]} />
+                    </div>
                 );
             },
         },
@@ -567,36 +485,21 @@ function TranslationJobsPanel({
             key: 'user',
             header: tSystem('tjBy'),
             priority: 'low',
-            render: (row) => <Typography variant="body2">{row.user ?? '—'}</Typography>,
+            render: (row) => <span>{row.user ?? '—'}</span>,
         },
         {
             key: 'started_at',
             header: tSystem('tjStarted'),
             priority: 'low',
-            render: (row) => (
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary, whiteSpace: 'nowrap' }}>
-                    {jobDateTime(row.started_at)}
-                </Typography>
-            ),
+            render: (row) => <span className={styles.mutedText}>{jobDateTime(row.started_at)}</span>,
         },
         {
             key: 'completed_at',
             header: tSystem('tjFinished'),
             priority: 'low',
-            render: (row) => (
-                <Typography variant="body2" sx={{ color: FIORI.textSecondary, whiteSpace: 'nowrap' }}>
-                    {jobDateTime(row.completed_at)}
-                </Typography>
-            ),
+            render: (row) => <span className={styles.mutedText}>{jobDateTime(row.completed_at)}</span>,
         },
     ];
 
-    return (
-        <FioriResponsiveTable
-            columns={columns}
-            rows={jobs}
-            getRowKey={(row) => row.id}
-            emptyMessage={tSystem('translationJobsEmpty')}
-        />
-    );
+    return <FioriResponsiveTable columns={columns} rows={jobs} getRowKey={(row) => row.id} emptyMessage={tSystem('translationJobsEmpty')} />;
 }

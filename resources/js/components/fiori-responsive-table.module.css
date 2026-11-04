@@ -1,0 +1,30 @@
+.card {
+    background: var(--sapList_Background);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    overflow: hidden;
+}
+
+.plain {
+    min-width: 0;
+}
+
+/* The bounded box that actually scrolls — required for a sticky header row. */
+.scroll {
+    overflow-y: auto;
+}
+
+.table {
+    width: 100%;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSize);
+}

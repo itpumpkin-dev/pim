@@ -1,58 +1,23 @@
-import AppLayout from '@/layouts/app-layout';
-import { PALETTE } from '@/theme';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Avatar,
-    Box,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Divider,
-    FormControlLabel,
-    IconButton,
-    Menu,
-    MenuItem,
-    Paper,
-    Stack,
-    Switch,
-    Tab,
-    Tabs,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { FormEvent, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { SalesChannelSectionTabs } from '@/components/catalog/sales-channel-section-tabs';
+import { FioriField, ui5ValueState } from '@/components/fiori-form';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSwitchSx,
-    fioriTabsSx,
-} from '@/lib/fiori-style';
+import AppLayout from '@/layouts/app-layout';
 import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import { FioriStatus } from '@/lib/fiori-style';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/overflow.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import { Bar, Button, Dialog, Input, Label, Menu, MenuItem, MenuSeparator, Switch, Tab, TabContainer } from '@ui5/webcomponents-react';
+import { FormEvent, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-// วนสีตาม index ของ platform (ไม่ใช้สีตามแบรนด์) — เพราะ platform ในหน้านี้
-// admin สร้างเองได้อิสระ (ดูที่ storePlatform()) ไม่ได้มีแค่ Lazada/Shopee/
-// TikTok เท่านั้น ถ้าทำ map สีตามแบรนด์ตายตัวจะมี platform ที่สร้างเองเหลือไม่มีสี
-// เลยใช้ชุดสีวนซ้ำ 4 สีแบบเดียวกับที่กล่องข้อมูลใน dashboard ใช้
-const PLATFORM_ACCENT_COLORS = [PALETTE.accent, PALETTE.highlight, PALETTE.primary, PALETTE.secondary];
+import { MasterListPage, masterStyles } from '../master-crud';
 
 // จำนวนร้านค้าที่โชว์ก่อนจะสลับเป็นปุ่ม "ดูทั้งหมด" — ตั้งไว้พอให้เห็นภาพรวมของลิสต์
 // โดยไม่ทำให้ตารางยาวเกินจอสำหรับ platform ที่มีร้านค้าเยอะๆ
@@ -158,16 +123,24 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         e.preventDefault();
         setSavingPlatform(true);
         if (editingPlatform) {
-            router.put(`/catalog/sales-platforms/${editingPlatform.id}`, { code: platformCode, name: platformName }, {
-                onSuccess: () => setPlatformDialogOpen(false),
-                onError: (errors) => setPlatformCodeError(errors.code),
-                onFinish: () => setSavingPlatform(false),
-            });
+            router.put(
+                `/catalog/sales-platforms/${editingPlatform.id}`,
+                { code: platformCode, name: platformName },
+                {
+                    onSuccess: () => setPlatformDialogOpen(false),
+                    onError: (errors) => setPlatformCodeError(errors.code),
+                    onFinish: () => setSavingPlatform(false),
+                },
+            );
         } else {
-            router.post('/catalog/sales-platforms', { name: platformName }, {
-                onSuccess: () => setPlatformDialogOpen(false),
-                onFinish: () => setSavingPlatform(false),
-            });
+            router.post(
+                '/catalog/sales-platforms',
+                { name: platformName },
+                {
+                    onSuccess: () => setPlatformDialogOpen(false),
+                    onFinish: () => setSavingPlatform(false),
+                },
+            );
         }
     };
 
@@ -192,16 +165,24 @@ export default function SalesPlatformIndex({ platforms }: Props) {
         e.preventDefault();
         setSavingShop(true);
         if (editingShop) {
-            router.put(`/catalog/sales-platforms/shops/${editingShop.id}`, { code: shopCode, name: shopName, is_active: shopActive }, {
-                onSuccess: () => setShopDialogPlatformId(null),
-                onError: (errors) => setShopCodeError(errors.code),
-                onFinish: () => setSavingShop(false),
-            });
+            router.put(
+                `/catalog/sales-platforms/shops/${editingShop.id}`,
+                { code: shopCode, name: shopName, is_active: shopActive },
+                {
+                    onSuccess: () => setShopDialogPlatformId(null),
+                    onError: (errors) => setShopCodeError(errors.code),
+                    onFinish: () => setSavingShop(false),
+                },
+            );
         } else if (shopDialogPlatformId) {
-            router.post(`/catalog/sales-platforms/${shopDialogPlatformId}/shops`, { name: shopName, is_active: shopActive }, {
-                onSuccess: () => setShopDialogPlatformId(null),
-                onFinish: () => setSavingShop(false),
-            });
+            router.post(
+                `/catalog/sales-platforms/${shopDialogPlatformId}/shops`,
+                { name: shopName, is_active: shopActive },
+                {
+                    onSuccess: () => setShopDialogPlatformId(null),
+                    onFinish: () => setSavingShop(false),
+                },
+            );
         }
     };
 
@@ -256,10 +237,12 @@ export default function SalesPlatformIndex({ platforms }: Props) {
             header: t('shopsLabel'),
             priority: 'always',
             render: (shop) => (
-                <>
-                    <Typography variant="body2" fontWeight={600}>{shop.name}</Typography>
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>{shop.code}</Typography>
-                </>
+                <div>
+                    <div className={masterStyles.strong}>{shop.name}</div>
+                    <div className={masterStyles.secondary} style={{ fontSize: 'var(--sapFontSmallSize)' }}>
+                        {shop.code}
+                    </div>
+                </div>
             ),
         },
         {
@@ -268,17 +251,14 @@ export default function SalesPlatformIndex({ platforms }: Props) {
             priority: 'high',
             render: (shop) =>
                 linkedAccountLabel(shop) ?? (
-                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                        {t('noLinkedAccount')}
-                    </Typography>
+                    <span style={{ color: 'var(--sapContent_LabelColor)', fontStyle: 'italic' }}>{t('noLinkedAccount')}</span>
                 ),
         },
         {
             key: 'active',
             header: t('shopActive'),
             priority: 'medium',
-            render: (shop) =>
-                shop.is_active ? <FioriStatus label={t('shopActive')} tone="success" /> : <FioriStatus label="-" tone="neutral" />,
+            render: (shop) => (shop.is_active ? <FioriStatus label={t('shopActive')} tone="success" /> : <FioriStatus label="-" tone="neutral" />),
         },
         {
             key: 'actions',
@@ -288,135 +268,102 @@ export default function SalesPlatformIndex({ platforms }: Props) {
             width: 48,
             render: (shop) =>
                 (canEdit || canDelete) && (
-                    <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}>
-                        <MoreVertIcon fontSize="small" />
-                    </IconButton>
+                    <Button
+                        design="Transparent"
+                        icon="overflow"
+                        tooltip={t('editShop')}
+                        accessibleName={t('editShop')}
+                        onClick={(e) => e.currentTarget && setShopMenuAnchor({ shopId: shop.id, el: e.currentTarget })}
+                    />
                 ),
         },
     ];
 
+    const closeSyncMenu = () => setSyncMenuAnchor(null);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('salesPlatformsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <SalesChannelSectionTabs active="platforms" />
-
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'flex-start' }, gap: 2, mb: 3, flexWrap: 'wrap' }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {t('salesPlatformsTitle')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{t('salesPlatformsSubtitle')}</Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={anySyncing ? <CircularProgress size={16} /> : <SyncIcon />}
-                            endIcon={<ArrowDropDownIcon />}
-                            disabled={anySyncing}
-                            onClick={(e) => setSyncMenuAnchor(e.currentTarget)}
-                            sx={fioriDefaultSx}
-                        >
-                            {t('syncData')}
-                        </Button>
-                        <Menu anchorEl={syncMenuAnchor} open={Boolean(syncMenuAnchor)} onClose={() => setSyncMenuAnchor(null)}>
-                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncLazada(); }} disabled={syncing}>
-                                {syncing ? t('syncingLazada') : t('syncFromLazada')}
-                            </MenuItem>
-                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncShopee(); }} disabled={syncingShopee}>
-                                {syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
-                            </MenuItem>
-                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncTiktok(); }} disabled={syncingTiktok}>
-                                {syncingTiktok ? t('syncingTiktok') : t('syncFromTiktok')}
-                            </MenuItem>
-                            <Divider />
-                            <MenuItem onClick={() => { setSyncMenuAnchor(null); syncLiveStatus(); }} disabled={syncingLiveStatus}>
-                                {syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
-                            </MenuItem>
-                        </Menu>
-                        {canCreate && (
-                            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreatePlatform} sx={fioriEmphasizedSx}>
-                                {t('createPlatform')}
-                            </Button>
-                        )}
-                    </Stack>
-                </Box>
-
+            <MasterListPage
+                before={<SalesChannelSectionTabs active="platforms" />}
+                title={t('salesPlatformsTitle')}
+                intro={t('salesPlatformsSubtitle')}
+                addLabel={t('createPlatform')}
+                onAdd={canCreate ? openCreatePlatform : undefined}
+                actions={
+                    <Button
+                        icon="synchronize"
+                        endIcon="slim-arrow-down"
+                        disabled={anySyncing}
+                        loading={anySyncing}
+                        loadingDelay={0}
+                        onClick={(e) => setSyncMenuAnchor(e.currentTarget)}
+                    >
+                        {t('syncData')}
+                    </Button>
+                }
+            >
                 {platforms.length === 0 ? (
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 4, textAlign: 'center' }}>
-                        <Typography sx={{ color: FIORI.textSecondary }}>{t('noPlatformsFound')}</Typography>
-                    </Paper>
+                    <div className={masterStyles.emptyPanel} style={{ maxWidth: 'none' }}>
+                        <span className={masterStyles.muted}>{t('noPlatformsFound')}</span>
+                    </div>
                 ) : (
-                    <Paper elevation={0} sx={fioriCardSx}>
-                        <Tabs
-                            value={activePlatform?.id ?? false}
-                            onChange={(_, val) => {
-                                setActivePlatformId(val);
-                                setShowAllShops(false);
+                    <div
+                        style={{
+                            background: 'var(--sapGroup_ContentBackground)',
+                            border: '1px solid var(--sapGroup_ContentBorderColor)',
+                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <TabContainer
+                            collapsed
+                            onTabSelect={(e) => {
+                                const id = Number(e.detail.tab.dataset.platformId);
+                                if (!Number.isNaN(id)) {
+                                    setActivePlatformId(id);
+                                    setShowAllShops(false);
+                                }
                             }}
-                            sx={{ ...fioriTabsSx, px: 2 }}
                         >
-                            {platforms.map((platform, index) => (
+                            {platforms.map((platform) => (
                                 <Tab
                                     key={platform.id}
-                                    value={platform.id}
-                                    iconPosition="start"
-                                    icon={
-                                        <Avatar
-                                            sx={{
-                                                width: 22,
-                                                height: 22,
-                                                fontSize: '0.7rem',
-                                                fontWeight: 700,
-                                                bgcolor: PLATFORM_ACCENT_COLORS[index % PLATFORM_ACCENT_COLORS.length],
-                                            }}
-                                        >
-                                            {platform.name.charAt(0).toUpperCase()}
-                                        </Avatar>
-                                    }
-                                    label={`${platform.name} ${platform.shops.length}`}
+                                    data-platform-id={platform.id}
+                                    text={platform.name}
+                                    additionalText={String(platform.shops.length)}
+                                    selected={platform.id === activePlatform?.id}
                                 />
                             ))}
-                        </Tabs>
+                        </TabContainer>
 
                         {activePlatform && (
                             <>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', px: 2, py: 1 }}>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        justifyContent: 'flex-end',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        padding: '0.5rem 1rem',
+                                        borderBottom: '1px solid var(--sapGroup_ContentBorderColor)',
+                                    }}
+                                >
                                     {canEdit && (
-                                        <Button size="small" startIcon={<AddIcon fontSize="small" />} onClick={() => openCreateShop(activePlatform.id)} sx={fioriGhostSx}>
+                                        <Button design="Transparent" icon="add" onClick={() => openCreateShop(activePlatform.id)}>
                                             {t('addShop')}
                                         </Button>
                                     )}
                                     {(canEdit || canDelete) && (
-                                        <IconButton size="small" sx={fioriIconButtonSx} onClick={(e) => setPlatformMenuAnchor(e.currentTarget)}>
-                                            <MoreVertIcon fontSize="small" />
-                                        </IconButton>
+                                        <Button
+                                            design="Transparent"
+                                            icon="overflow"
+                                            tooltip={t('editPlatform')}
+                                            accessibleName={t('editPlatform')}
+                                            onClick={(e) => setPlatformMenuAnchor(e.currentTarget)}
+                                        />
                                     )}
-                                    <Menu anchorEl={platformMenuAnchor} open={Boolean(platformMenuAnchor)} onClose={() => setPlatformMenuAnchor(null)}>
-                                        {canEdit && (
-                                            <MenuItem
-                                                onClick={() => {
-                                                    setPlatformMenuAnchor(null);
-                                                    openEditPlatform(activePlatform);
-                                                }}
-                                            >
-                                                <EditIcon fontSize="small" sx={{ mr: 1 }} /> {t('editPlatform')}
-                                            </MenuItem>
-                                        )}
-                                        {canDelete && (
-                                            <MenuItem
-                                                sx={{ color: 'error.main' }}
-                                                onClick={() => {
-                                                    setPlatformMenuAnchor(null);
-                                                    setDeletePlatformId(activePlatform.id);
-                                                }}
-                                            >
-                                                <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> {tGrid('delete')}
-                                            </MenuItem>
-                                        )}
-                                    </Menu>
-                                </Box>
-                                <Divider />
+                                </div>
 
                                 <FioriResponsiveTable
                                     variant="plain"
@@ -427,151 +374,229 @@ export default function SalesPlatformIndex({ platforms }: Props) {
                                 />
 
                                 {activePlatform.shops.length > SHOPS_PREVIEW_COUNT && (
-                                    <Box sx={{ px: 2.5, py: 1.5 }}>
-                                        <Button size="small" onClick={() => setShowAllShops((v) => !v)} sx={fioriGhostSx}>
+                                    <div style={{ padding: '0.75rem 1.25rem' }}>
+                                        <Button design="Transparent" onClick={() => setShowAllShops((v) => !v)}>
                                             {showAllShops ? t('showFewerShops') : t('viewAllShops', { count: activePlatform.shops.length })}
                                         </Button>
-                                    </Box>
+                                    </div>
                                 )}
                             </>
                         )}
-                    </Paper>
+                    </div>
                 )}
-            </Box>
+            </MasterListPage>
 
-            <Menu anchorEl={shopMenuAnchor?.el ?? null} open={Boolean(shopMenuAnchor)} onClose={() => setShopMenuAnchor(null)}>
+            <Menu opener={syncMenuAnchor} open={Boolean(syncMenuAnchor)} onClose={closeSyncMenu}>
+                <MenuItem
+                    text={syncing ? t('syncingLazada') : t('syncFromLazada')}
+                    disabled={syncing}
+                    onClick={() => {
+                        closeSyncMenu();
+                        syncLazada();
+                    }}
+                />
+                <MenuItem
+                    text={syncingShopee ? t('syncingLazada') : t('syncFromShopee')}
+                    disabled={syncingShopee}
+                    onClick={() => {
+                        closeSyncMenu();
+                        syncShopee();
+                    }}
+                />
+                <MenuItem
+                    text={syncingTiktok ? t('syncingTiktok') : t('syncFromTiktok')}
+                    disabled={syncingTiktok}
+                    onClick={() => {
+                        closeSyncMenu();
+                        syncTiktok();
+                    }}
+                />
+                <MenuSeparator />
+                <MenuItem
+                    text={syncingLiveStatus ? t('syncingLiveStatus') : t('syncLiveStatus')}
+                    disabled={syncingLiveStatus}
+                    onClick={() => {
+                        closeSyncMenu();
+                        syncLiveStatus();
+                    }}
+                />
+            </Menu>
+
+            <Menu
+                opener={platformMenuAnchor}
+                open={Boolean(platformMenuAnchor) && Boolean(activePlatform)}
+                onClose={() => setPlatformMenuAnchor(null)}
+            >
+                {canEdit && activePlatform && (
+                    <MenuItem
+                        icon="edit"
+                        text={t('editPlatform')}
+                        onClick={() => {
+                            setPlatformMenuAnchor(null);
+                            openEditPlatform(activePlatform);
+                        }}
+                    />
+                )}
+                {canDelete && activePlatform && (
+                    <MenuItem
+                        icon="delete"
+                        text={tGrid('delete')}
+                        onClick={() => {
+                            setPlatformMenuAnchor(null);
+                            setDeletePlatformId(activePlatform.id);
+                        }}
+                    />
+                )}
+            </Menu>
+
+            <Menu opener={shopMenuAnchor?.el ?? null} open={Boolean(shopMenuAnchor)} onClose={() => setShopMenuAnchor(null)}>
                 {menuShop && canEdit && menuShop.lazada_seller_account_id && (
                     <MenuItem
+                        icon="synchronize"
+                        text={t('syncLiveStatus')}
                         disabled={syncingShopIds.has(menuShop.id)}
+                        loading={syncingShopIds.has(menuShop.id)}
                         onClick={() => {
                             const shopId = menuShop.id;
                             setShopMenuAnchor(null);
                             syncShopLiveStatus(shopId);
                         }}
-                    >
-                        {syncingShopIds.has(menuShop.id) ? (
-                            <CircularProgress size={14} sx={{ mr: 1 }} />
-                        ) : (
-                            <SyncIcon fontSize="small" sx={{ mr: 1 }} />
-                        )}
-                        {t('syncLiveStatus')}
-                    </MenuItem>
+                    />
                 )}
                 {menuShop && canEdit && activePlatform && (
                     <MenuItem
+                        icon="edit"
+                        text={t('editShop')}
                         onClick={() => {
                             openEditShop(activePlatform.id, menuShop);
                             setShopMenuAnchor(null);
                         }}
-                    >
-                        <EditIcon fontSize="small" sx={{ mr: 1 }} /> {t('editShop')}
-                    </MenuItem>
+                    />
                 )}
                 {menuShop && canDelete && (
                     <MenuItem
-                        sx={{ color: 'error.main' }}
+                        icon="delete"
+                        text={tGrid('delete')}
                         onClick={() => {
                             setDeleteShopId(menuShop.id);
                             setShopMenuAnchor(null);
                         }}
-                    >
-                        <DeleteIcon fontSize="small" sx={{ mr: 1 }} /> {tGrid('delete')}
-                    </MenuItem>
+                    />
                 )}
             </Menu>
 
-            <Dialog open={platformDialogOpen} onClose={() => setPlatformDialogOpen(false)} maxWidth="xs" fullWidth>
-                <Box component="form" onSubmit={submitPlatform}>
-                    <DialogTitle>{editingPlatform ? t('editPlatform') : t('createPlatform')}</DialogTitle>
-                    <DialogContent>
-                        <Stack spacing={2.5} sx={{ mt: 1 }}>
-                            {editingPlatform && (
-                                <TextField
-                                    label={t('platformCode')}
-                                    fullWidth
-                                    size="small"
-                                    value={platformCode}
-                                    disabled={!canEditCodePermission || !!editingPlatform.code_locked}
-                                    onChange={(e) => setPlatformCode(normalizeCodeInput(e.target.value))}
-                                    error={!!platformCodeError}
-                                    helperText={platformCodeError || t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingPlatform.code_locked }))}
-                                    inputProps={{ maxLength: 50 }}
-                                />
-                            )}
-                            <TextField
-                                label={t('platformName')}
-                                required
-                                fullWidth
-                                size="small"
-                                value={platformName}
-                                onChange={(e) => setPlatformName(e.target.value)}
-                            />
-                        </Stack>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setPlatformDialogOpen(false)} sx={fioriGhostSx} disabled={savingPlatform}>
-                            {tGrid('cancel')}
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={savingPlatform}
-                            startIcon={savingPlatform ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={fioriEmphasizedSx}
+            <Dialog
+                open={platformDialogOpen}
+                headerText={editingPlatform ? t('editPlatform') : t('createPlatform')}
+                style={{ width: 'min(26rem, calc(100vw - 2rem))' }}
+                onClose={() => setPlatformDialogOpen(false)}
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    onClick={() => (document.getElementById('sales-platform-form') as HTMLFormElement | null)?.requestSubmit()}
+                                    design="Emphasized"
+                                    disabled={savingPlatform}
+                                    loading={savingPlatform}
+                                    loadingDelay={0}
+                                >
+                                    {t('save')}
+                                </Button>
+                                <Button design="Transparent" disabled={savingPlatform} onClick={() => setPlatformDialogOpen(false)}>
+                                    {tGrid('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <form id="sales-platform-form" onSubmit={submitPlatform} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {editingPlatform && (
+                        <FioriField
+                            label={t('platformCode')}
+                            htmlFor="platform-code"
+                            valueState={platformCodeError ? 'error' : 'none'}
+                            message={platformCodeError}
+                            hint={t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingPlatform.code_locked }))}
+                            fullWidth
+                            labelWidth={120}
                         >
-                            {t('save')}
-                        </Button>
-                    </DialogActions>
-                </Box>
+                            <Input
+                                id="platform-code"
+                                value={platformCode}
+                                maxlength={50}
+                                disabled={!canEditCodePermission || !!editingPlatform.code_locked}
+                                valueState={ui5ValueState(platformCodeError ? 'error' : 'none')}
+                                onInput={(e) => setPlatformCode(normalizeCodeInput(e.target.value))}
+                            />
+                        </FioriField>
+                    )}
+                    <FioriField label={t('platformName')} htmlFor="platform-name" required fullWidth labelWidth={120}>
+                        <Input id="platform-name" required value={platformName} onInput={(e) => setPlatformName(e.target.value)} />
+                    </FioriField>
+                </form>
             </Dialog>
 
-            <Dialog open={shopDialogPlatformId !== null} onClose={() => setShopDialogPlatformId(null)} maxWidth="xs" fullWidth>
-                <Box component="form" onSubmit={submitShop}>
-                    <DialogTitle>{editingShop ? t('editShop') : t('addShop')}</DialogTitle>
-                    <DialogContent>
-                        <Stack spacing={2.5} sx={{ mt: 1 }}>
-                            {editingShop && (
-                                <TextField
-                                    label={t('shopCode')}
-                                    fullWidth
-                                    size="small"
-                                    value={shopCode}
-                                    disabled={!canEditCodePermission || !!editingShop.code_locked}
-                                    onChange={(e) => setShopCode(normalizeCodeInput(e.target.value))}
-                                    error={!!shopCodeError}
-                                    helperText={shopCodeError || t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingShop.code_locked }))}
-                                    inputProps={{ maxLength: 100 }}
-                                />
-                            )}
-                            <TextField
-                                label={t('shopName')}
-                                required
-                                fullWidth
-                                size="small"
-                                value={shopName}
-                                onChange={(e) => setShopName(e.target.value)}
-                            />
-                            <FormControlLabel
-                                control={<Switch sx={fioriSwitchSx} checked={shopActive} onChange={(e) => setShopActive(e.target.checked)} />}
-                                label={t('shopActive')}
-                            />
-                        </Stack>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setShopDialogPlatformId(null)} sx={fioriGhostSx} disabled={savingShop}>
-                            {tGrid('cancel')}
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={savingShop}
-                            startIcon={savingShop ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={fioriEmphasizedSx}
+            <Dialog
+                open={shopDialogPlatformId !== null}
+                headerText={editingShop ? t('editShop') : t('addShop')}
+                style={{ width: 'min(26rem, calc(100vw - 2rem))' }}
+                onClose={() => setShopDialogPlatformId(null)}
+                footer={
+                    <Bar
+                        design="Footer"
+                        endContent={
+                            <>
+                                <Button
+                                    onClick={() => (document.getElementById('sales-shop-form') as HTMLFormElement | null)?.requestSubmit()}
+                                    design="Emphasized"
+                                    disabled={savingShop}
+                                    loading={savingShop}
+                                    loadingDelay={0}
+                                >
+                                    {t('save')}
+                                </Button>
+                                <Button design="Transparent" disabled={savingShop} onClick={() => setShopDialogPlatformId(null)}>
+                                    {tGrid('cancel')}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
+                <form id="sales-shop-form" onSubmit={submitShop} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {editingShop && (
+                        <FioriField
+                            label={t('shopCode')}
+                            htmlFor="shop-code"
+                            valueState={shopCodeError ? 'error' : 'none'}
+                            message={shopCodeError}
+                            hint={t(codeHintKey({ canEditCode: canEditCodePermission, codeLocked: editingShop.code_locked }))}
+                            fullWidth
+                            labelWidth={120}
                         >
-                            {t('save')}
-                        </Button>
-                    </DialogActions>
-                </Box>
+                            <Input
+                                id="shop-code"
+                                value={shopCode}
+                                maxlength={100}
+                                disabled={!canEditCodePermission || !!editingShop.code_locked}
+                                valueState={ui5ValueState(shopCodeError ? 'error' : 'none')}
+                                onInput={(e) => setShopCode(normalizeCodeInput(e.target.value))}
+                            />
+                        </FioriField>
+                    )}
+                    <FioriField label={t('shopName')} htmlFor="shop-name" required fullWidth labelWidth={120}>
+                        <Input id="shop-name" required value={shopName} onInput={(e) => setShopName(e.target.value)} />
+                    </FioriField>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Switch id="shop-active" checked={shopActive} onChange={(e) => setShopActive(e.target.checked)} />
+                        <Label for="shop-active" showColon={false}>
+                            {t('shopActive')}
+                        </Label>
+                    </div>
+                </form>
             </Dialog>
 
             <FioriMessageBox

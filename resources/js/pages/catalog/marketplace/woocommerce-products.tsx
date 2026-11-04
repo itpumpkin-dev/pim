@@ -1,61 +1,43 @@
 import { AssignPimCategoryPanel } from '@/components/catalog/assign-pim-category-panel';
+import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { useFioriConfirm } from '@/components/fiori-message-box';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import { MarketplaceCategoryPicker } from '@/components/marketplace-category-picker';
-import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import { TimelinePanel } from '@/components/timeline-panel';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import {
-    FIORI,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriGhostSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-    fioriTabsSx,
-    fioriTableRowSx,
-} from '@/lib/fiori-style';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    Divider,
-    IconButton,
-    InputAdornment,
-    Link,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Tab,
-    Tabs,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/accept.js';
+import '@ui5/webcomponents-icons/dist/collections-management.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import { Button, CheckBox, Link, SegmentedButton, SegmentedButtonItem, Tab, TabContainer, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import {
+    Body,
+    Caption,
+    CenteredSpinner,
+    HStack,
+    KpiTiles,
+    LockedNotice,
+    MappingTable,
+    PageHeader,
+    Pager,
+    SearchField,
+    SectionCard,
+    SectionHeading,
+    Spinner,
+    TONE_TEXT,
+    VStack,
+} from './marketplace-ui';
+import styles from './marketplace.module.css';
 
 type ProductFilter = 'all' | 'mapped' | 'unmapped';
 
@@ -200,7 +182,9 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
     // ฟิลด์โผล่ในหน้า Edit Product ทันที (ดู WooCommerceAttributeFamilyGenerator
     // ฝั่ง backend) — mirror ของ lazada-products.tsx เป๊ะ
     const [syncingFamily, setSyncingFamily] = useState(false);
-    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(null);
+    const [familySyncResult, setFamilySyncResult] = useState<{ name: string; count: number; newlyCreatedCount: number; editUrl: string } | null>(
+        null,
+    );
     const [familySyncError, setFamilySyncError] = useState<string | null>(null);
 
     // Payload WooCommerce section state (section 3) — ฟิลด์ payload ตายตัวของ
@@ -522,7 +506,9 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             .then((res) => {
                 if (!res.ok) return;
                 setPayloadFields((prev) =>
-                    prev ? prev.map((f) => (f.target_field === field ? { ...f, mapped: [{ id: pimAttribute.id, name: pimAttribute.name }] } : f)) : prev,
+                    prev
+                        ? prev.map((f) => (f.target_field === field ? { ...f, mapped: [{ id: pimAttribute.id, name: pimAttribute.name }] } : f))
+                        : prev,
                 );
             })
             .finally(() => setSavingPayloadField(null));
@@ -604,22 +590,18 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         {
             key: 'selection',
             header: (
-                <Checkbox
-                    size="small"
-                    checked={products.data.length > 0 && selectedRows.length === products.data.length}
+                <CheckBox
+                    accessibleName="Select all"
+                    checked={products.data.length > 0 && selectedRows.length > 0}
                     indeterminate={selectedRows.length > 0 && selectedRows.length < products.data.length}
                     onChange={toggleSelectAll}
                 />
             ),
+            popinText: 'Select',
             priority: 'always',
             width: 48,
-            render: (row) => (
-                <Checkbox
-                    size="small"
-                    checked={selectedRows.includes(row.id)}
-                    onChange={() => toggleSelectRow(row.id)}
-                />
-            ),
+            minWidth: 48,
+            render: (row) => <CheckBox accessibleName={row.sku} checked={selectedRows.includes(row.id)} onChange={() => toggleSelectRow(row.id)} />,
         },
         {
             key: 'product',
@@ -627,40 +609,26 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             priority: 'always',
             minWidth: 260,
             render: (row) => (
-                <Box>
-                    <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            sx={{ color: FIORI.brand, cursor: 'pointer' }}
-                            onClick={() => openProduct(row)}
-                        >
+                <div>
+                    <HStack gap="0.25rem">
+                        <Link onClick={() => openProduct(row)} style={{ fontWeight: 600 }}>
                             {row.name}
-                        </Typography>
+                        </Link>
                         {canEditProducts && (
-                            <Tooltip title="แก้ไขสินค้า">
-                                <IconButton
-                                    size="small"
-                                    sx={fioriIconButtonSx}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.visit(`/catalog/products/${row.id}/edit?platform=woocommerce`);
-                                    }}
-                                >
-                                    <EditIcon fontSize="inherit" />
-                                </IconButton>
-                            </Tooltip>
+                            <Button
+                                design="Transparent"
+                                icon="edit"
+                                tooltip="แก้ไขสินค้า"
+                                accessibleName="แก้ไขสินค้า"
+                                onClick={() => router.visit(`/catalog/products/${row.id}/edit?platform=woocommerce`)}
+                            />
                         )}
-                    </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                            {row.sku}
-                        </Typography>
-                        {row.variants_count > 0 && (
-                            <FioriStatus label={`${row.variants_count} variants`} tone="neutral" />
-                        )}
-                    </Stack>
-                </Box>
+                    </HStack>
+                    <HStack gap="0.5rem" style={{ marginTop: '0.125rem' }}>
+                        <Caption mono>{row.sku}</Caption>
+                        {row.variants_count > 0 && <FioriStatus label={`${row.variants_count} variants`} tone="neutral" />}
+                    </HStack>
+                </div>
             ),
         },
         {
@@ -670,9 +638,7 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             minWidth: 220,
             render: (row) =>
                 row.master_category ? (
-                    <Typography variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                        {row.master_category.path || row.master_category.name}
-                    </Typography>
+                    <Body style={{ fontSize: '0.8125rem' }}>{row.master_category.path || row.master_category.name}</Body>
                 ) : (
                     <FioriStatus label="ไม่มีหมวดหมู่ PIM" tone="neutral" />
                 ),
@@ -684,14 +650,12 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             minWidth: 240,
             render: (row) =>
                 row.woocommerce_category ? (
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
+                    <div>
+                        <Body style={{ fontSize: '0.8125rem', fontWeight: 600 }}>
                             {row.woocommerce_category.path || row.woocommerce_category.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                            wc:{row.woocommerce_category.id}
-                        </Typography>
-                    </Box>
+                        </Body>
+                        <Caption mono>wc:{row.woocommerce_category.id}</Caption>
+                    </div>
                 ) : (
                     <FioriStatus label="ยังไม่ได้ map" tone="warning" />
                 ),
@@ -703,21 +667,11 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
             align: 'right',
             minWidth: 140,
             render: (row) => (
-                <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-                    <Button
-                        size="small"
-                        variant={row.category_mapped ? 'outlined' : 'contained'}
-                        onClick={() => openProduct(row)}
-                        sx={{
-                            ...(row.category_mapped ? fioriDefaultSx : fioriEmphasizedSx),
-                            fontSize: '0.8125rem',
-                            px: 1.5,
-                            py: 0.5,
-                        }}
-                    >
+                <HStack gap="0.5rem" justify="flex-end">
+                    <Button design={row.category_mapped ? 'Default' : 'Emphasized'} onClick={() => openProduct(row)}>
                         {row.category_mapped ? 'แก้ไขการแมพ' : 'เริ่มแมพ'}
                     </Button>
-                </Stack>
+                </HStack>
             ),
         },
     ];
@@ -732,116 +686,91 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title={`WooCommerce Mapping | ${activeProduct.sku}`} />
-                <Box sx={{ bgcolor: FIORI.pageBg, height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div className={styles.objectPage}>
                     {/* Object Page header — ไม่ scroll ไปกับเนื้อหา */}
-                    <Box sx={{ px: { xs: 2, md: 4 }, py: 2.5, bgcolor: FIORI.surface, borderBottom: `1px solid ${FIORI.border}` }}>
-                        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', md: 'center' }} spacing={2}>
-                            <Box>
-                                <Button
-                                    size="small"
-                                    startIcon={<ArrowBackIcon fontSize="small" />}
-                                    onClick={() => setActiveProduct(null)}
-                                    sx={{ ...fioriGhostSx, mb: 1, px: 0.5 }}
-                                >
-                                    กลับไปหน้ารายการ
-                                </Button>
-                                <Stack direction="row" spacing={0.5} alignItems="center">
-                                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                        {activeProduct.name}
-                                    </Typography>
-                                    {canEditProducts && (
-                                        <Tooltip title="แก้ไขสินค้า">
-                                            <IconButton
-                                                size="small"
-                                                sx={fioriIconButtonSx}
-                                                onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=woocommerce`)}
-                                            >
-                                                <EditIcon fontSize="inherit" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                </Stack>
-                                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                                    SKU: {activeProduct.sku}
-                                </Typography>
-                                {/* Object Status facets — สถานะ mapping ของสินค้านี้ ณ ตอนนี้ */}
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.25 }}>
-                                    <FioriStatus
-                                        label={`PIM: ${activeProduct.master_category?.path || activeProduct.master_category?.name || 'ไม่มีหมวดหมู่'}`}
-                                        tone={activeProduct.master_category ? 'neutral' : 'warning'}
+                    <div className={styles.objectHeader}>
+                        <div>
+                            <Button design="Transparent" icon="nav-back" onClick={() => setActiveProduct(null)} style={{ marginBottom: '0.5rem' }}>
+                                กลับไปหน้ารายการ
+                            </Button>
+                            <HStack gap="0.25rem">
+                                <Title level="H5" size="H5" wrappingType="Normal">
+                                    {activeProduct.name}
+                                </Title>
+                                {canEditProducts && (
+                                    <Button
+                                        design="Transparent"
+                                        icon="edit"
+                                        tooltip="แก้ไขสินค้า"
+                                        accessibleName="แก้ไขสินค้า"
+                                        onClick={() => router.visit(`/catalog/products/${activeProduct.id}/edit?platform=woocommerce`)}
                                     />
-                                    <FioriStatus
-                                        label={
-                                            activeProduct.woocommerce_category
-                                                ? `WooCommerce: ${activeProduct.woocommerce_category.path || activeProduct.woocommerce_category.name}`
-                                                : 'ยังไม่ได้แมป Category'
-                                        }
-                                        tone={activeProduct.category_mapped ? 'success' : 'warning'}
-                                    />
-                                </Stack>
-                            </Box>
-                        </Stack>
-                    </Box>
+                                )}
+                            </HStack>
+                            <Caption mono>SKU: {activeProduct.sku}</Caption>
+                            {/* Object Status facets — สถานะ mapping ของสินค้านี้ ณ ตอนนี้ */}
+                            <HStack gap="0.5rem" wrap style={{ marginTop: '0.625rem' }}>
+                                <FioriStatus
+                                    label={`PIM: ${activeProduct.master_category?.path || activeProduct.master_category?.name || 'ไม่มีหมวดหมู่'}`}
+                                    tone={activeProduct.master_category ? 'neutral' : 'warning'}
+                                />
+                                <FioriStatus
+                                    label={
+                                        activeProduct.woocommerce_category
+                                            ? `WooCommerce: ${activeProduct.woocommerce_category.path || activeProduct.woocommerce_category.name}`
+                                            : 'ยังไม่ได้แมป Category'
+                                    }
+                                    tone={activeProduct.category_mapped ? 'success' : 'warning'}
+                                />
+                            </HStack>
+                        </div>
+                    </div>
 
                     {/* Scrollable Body — พื้นที่เดียวในหน้านี้ที่ scroll ได้ */}
-                    <Box ref={scrollBodyRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 6 }}>
+                    <div ref={scrollBodyRef} className={styles.objectBody}>
                         {/* Anchor bar — sticky, ทำหน้าที่เป็น scroll-spy nav ไม่ใช่สลับ panel */}
-                        <Paper
-                            ref={anchorBarRef}
-                            variant="outlined"
-                            sx={{
-                                borderRadius: 0,
-                                bgcolor: FIORI.surface,
-                                borderColor: FIORI.border,
-                                position: 'sticky',
-                                top: 0,
-                                zIndex: 1,
-                                px: { xs: 2, md: 4 },
-                            }}
-                        >
-                            <Tabs value={sectionIndex} onChange={(_, v) => scrollToSection(v)} sx={fioriTabsSx}>
-                                <Tab label="1. Category Mapping" />
-                                <Tab label="2. Attribute Mapping" />
-                                <Tab label="3. Payload WooCommerce" />
-                                <Tab label="4. History" disabled={!activeProduct.master_category} />
-                            </Tabs>
-                        </Paper>
+                        <div ref={anchorBarRef} className={styles.anchorBar}>
+                            <TabContainer collapsed onTabSelect={(e) => scrollToSection(e.detail.tabIndex)}>
+                                <Tab text="1. Category Mapping" selected={sectionIndex === 0} />
+                                <Tab text="2. Attribute Mapping" selected={sectionIndex === 1} />
+                                <Tab text="3. Payload WooCommerce" selected={sectionIndex === 2} />
+                                <Tab text="4. History" disabled={!activeProduct.master_category} selected={sectionIndex === 3} />
+                            </TabContainer>
+                        </div>
 
-                        <Stack spacing={3} sx={{ px: { xs: 2, md: 4 }, pt: 3 }}>
+                        <div className={styles.objectSections}>
                             {/* Section 1 — Category Mapping */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[0] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={2.5}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                                        <Box>
-                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                เลือก WooCommerce Category ปลายทางสำหรับ Master Category นี้
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                                การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ
-                                            </Typography>
-                                        </Box>
+                                <VStack gap="1.25rem">
+                                    <HStack justify="space-between" align="flex-start" gap="1rem">
+                                        <SectionHeading
+                                            title="เลือก WooCommerce Category ปลายทางสำหรับ Master Category นี้"
+                                            description="การเปลี่ยน Category Mapping ตรงนี้ จะมีผลกับสินค้าทุกตัวที่อยู่ใน Master Category เดียวกันอัตโนมัติ"
+                                        />
                                         <Button
-                                            size="small"
-                                            variant="outlined"
+                                            icon="synchronize"
                                             disabled={syncingCategoryTree}
-                                            startIcon={syncingCategoryTree ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                            loading={syncingCategoryTree}
+                                            loadingDelay={0}
                                             onClick={syncCategoryTree}
-                                            sx={{ ...fioriDefaultSx, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                                         >
                                             Sync Categories จาก WooCommerce
                                         </Button>
-                                    </Stack>
+                                    </HStack>
 
                                     {categorySyncMessage && (
-                                        <Alert severity={categorySyncMessage.isError ? 'error' : 'success'} onClose={() => setCategorySyncMessage(null)}>
+                                        <FioriMessageStrip
+                                            severity={categorySyncMessage.isError ? 'error' : 'success'}
+                                            onClose={() => setCategorySyncMessage(null)}
+                                        >
                                             {categorySyncMessage.text}
-                                        </Alert>
+                                        </FioriMessageStrip>
                                     )}
 
                                     {/* สินค้ายังไม่มีหมวดหมู่ PIM เลย — ปุ่ม "บันทึก Category
@@ -855,315 +784,260 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                                             onAssigned={(category) =>
                                                 setActiveProduct((prev) =>
                                                     prev
-                                                        ? { ...prev, master_category: { id: category.id, name: category.name, path: category.path, woocommerce_category_id: null } }
+                                                        ? {
+                                                              ...prev,
+                                                              master_category: {
+                                                                  id: category.id,
+                                                                  name: category.name,
+                                                                  path: category.path,
+                                                                  woocommerce_category_id: null,
+                                                              },
+                                                          }
                                                         : prev,
                                                 )
                                             }
                                         />
                                     )}
 
-                                    <Box sx={{ maxWidth: 420 }}>
+                                    <div style={{ maxWidth: 420 }}>
                                         <MarketplaceCategoryPicker
                                             platform="woocommerce"
                                             label="WooCommerce Category"
                                             value={selectedWooCatId}
                                             onChange={setSelectedWooCatId}
                                         />
-                                    </Box>
+                                    </div>
 
-                                    <Box>
+                                    <div>
                                         <Button
-                                            variant="contained"
+                                            design="Emphasized"
+                                            icon="accept"
                                             disabled={!selectedWooCatId || savingCatMap}
+                                            loading={savingCatMap}
+                                            loadingDelay={0}
                                             onClick={saveCategoryMapping}
-                                            startIcon={savingCatMap ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon fontSize="small" />}
-                                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
                                         >
                                             บันทึก Category Mapping & ดำเนินการต่อ
                                         </Button>
-                                    </Box>
-                                </Stack>
-                            </Paper>
+                                    </div>
+                                </VStack>
+                            </SectionCard>
 
                             {/* Section 2 — Attribute Mapping: WooCommerce attribute เป็น global
                                 ทั้งหมด ไม่ผูก category — ไม่ lock รอ Category Mapping (section 1)
                                 เหมือน 3 platform อื่น */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[1] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={3}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                        <Box>
-                                            <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                                WooCommerce Product Attributes (global)
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                                Attribute ของ WooCommerce ไม่ผูกกับหมวดหมู่ — แมปที่นี่มีผลกับสินค้าทุกตัวในระบบ ไม่ใช่แค่ตัวนี้
-                                            </Typography>
-                                        </Box>
-                                        <Stack direction="row" spacing={1}>
+                                <VStack gap="1.5rem">
+                                    <HStack justify="space-between" wrap gap="1rem">
+                                        <SectionHeading
+                                            title="WooCommerce Product Attributes (global)"
+                                            description="Attribute ของ WooCommerce ไม่ผูกกับหมวดหมู่ — แมปที่นี่มีผลกับสินค้าทุกตัวในระบบ ไม่ใช่แค่ตัวนี้"
+                                        />
+                                        <HStack gap="0.5rem" wrap>
                                             <Button
-                                                size="small"
-                                                variant="outlined"
+                                                icon="collections-management"
                                                 disabled={syncingFamily || !activeProduct.master_category || (wooAttributes ?? []).length === 0}
-                                                startIcon={syncingFamily ? <CircularProgress size={14} /> : <CollectionsBookmarkIcon fontSize="small" />}
+                                                loading={syncingFamily}
+                                                loadingDelay={0}
                                                 onClick={syncAttributeFamily}
-                                                sx={fioriDefaultSx}
                                             >
                                                 สร้าง/อัปเดต Attribute Family
                                             </Button>
                                             <Button
-                                                size="small"
-                                                variant="outlined"
+                                                icon="synchronize"
                                                 disabled={syncingAttributes}
-                                                startIcon={syncingAttributes ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
+                                                loading={syncingAttributes}
+                                                loadingDelay={0}
                                                 onClick={syncAttributes}
-                                                sx={fioriDefaultSx}
                                             >
                                                 Sync Attributes
                                             </Button>
-                                        </Stack>
-                                    </Stack>
+                                        </HStack>
+                                    </HStack>
 
                                     {familySyncResult && (
-                                        <Alert severity="success" onClose={() => setFamilySyncResult(null)}>
-                                            สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count} attributes
-                                            {familySyncResult.newlyCreatedCount > 0 && `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`}) —{' '}
-                                            <Link href={familySyncResult.editUrl} target="_blank" rel="noopener noreferrer">
+                                        <FioriMessageStrip severity="success" onClose={() => setFamilySyncResult(null)}>
+                                            สร้าง/อัปเดต Attribute Family &quot;{familySyncResult.name}&quot; แล้ว ({familySyncResult.count}{' '}
+                                            attributes
+                                            {familySyncResult.newlyCreatedCount > 0 && `, สร้างใหม่ ${familySyncResult.newlyCreatedCount} attribute`})
+                                            —{' '}
+                                            <Link href={familySyncResult.editUrl} target="_blank">
                                                 เปิดหน้าตรวจสอบ
                                             </Link>
-                                        </Alert>
+                                        </FioriMessageStrip>
                                     )}
                                     {familySyncError && (
-                                        <Alert severity="error" onClose={() => setFamilySyncError(null)}>
+                                        <FioriMessageStrip severity="error" onClose={() => setFamilySyncError(null)}>
                                             {familySyncError}
-                                        </Alert>
+                                        </FioriMessageStrip>
                                     )}
 
                                     {loadingAttributes ? (
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                            <CircularProgress size={24} sx={{ color: FIORI.brand }} />
-                                        </Box>
+                                        <CenteredSpinner />
                                     ) : wooAttributes && wooAttributes.length > 0 ? (
-                                        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                                            <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                                <Box component="tr">
-                                                    <Box
-                                                        component="th"
-                                                        sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}
-                                                    >
-                                                        WooCommerce Attribute
-                                                    </Box>
-                                                    <Box
-                                                        component="th"
-                                                        sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}
-                                                    >
-                                                        PIM Attribute (ต้นทาง)
-                                                    </Box>
-                                                </Box>
-                                            </Box>
-                                            <Box component="tbody">
-                                                {wooAttributes.map((attr) => (
-                                                    <Box
-                                                        component="tr"
-                                                        key={attr.id}
-                                                        sx={{
-                                                            borderTop: `1px solid ${FIORI.border}`,
-                                                            '&:hover': { bgcolor: FIORI.hover },
-                                                            transition: 'background-color 0.1s ease',
-                                                        }}
-                                                    >
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            <Typography fontWeight={600} variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                                                                {attr.name}
-                                                            </Typography>
-                                                        </Box>
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                                <Box sx={{ flex: 1, minWidth: 200 }}>
+                                        <MappingTable headers={['WooCommerce Attribute', 'PIM Attribute (ต้นทาง)']}>
+                                            {wooAttributes.map((attr) => (
+                                                <tr key={attr.id}>
+                                                    <td>
+                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{attr.name}</Body>
+                                                    </td>
+                                                    <td>
+                                                        <HStack gap="0.5rem">
+                                                            <div style={{ flex: 1, minWidth: 200 }}>
+                                                                <PimAttributePicker
+                                                                    value={attr.mapped}
+                                                                    disabled={savingAttributeId === attr.id}
+                                                                    onChange={(val) => {
+                                                                        if (val) {
+                                                                            assignAttribute(attr.id, val);
+                                                                        } else if (attr.mapped) {
+                                                                            clearAttribute(attr.id, attr.mapped.id);
+                                                                        }
+                                                                    }}
+                                                                    placeholder="เลือก PIM attribute..."
+                                                                />
+                                                            </div>
+                                                            {savingAttributeId === attr.id && <Spinner />}
+                                                        </HStack>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </MappingTable>
+                                    ) : (
+                                        <Body style={{ color: TONE_TEXT.neutral, textAlign: 'center', padding: '1.5rem 0' }}>
+                                            ยังไม่มีข้อมูล Attributes ในระบบ กรุณากด "Sync Attributes"
+                                        </Body>
+                                    )}
+                                </VStack>
+                            </SectionCard>
+
+                            {/* Section 3 — Payload WooCommerce: ฟิลด์ payload ตายตัวของ
+                                WooCommerce เอง ไม่ผูกกับหมวดหมู่ไหนเลย */}
+                            <SectionCard
+                                ref={(el: HTMLDivElement | null) => {
+                                    sectionRefs.current[2] = el;
+                                }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
+                            >
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="แมป PIM Attribute เข้ากับฟิลด์ payload ของ WooCommerce"
+                                        description="ฟิลด์ตายตัวของ WooCommerce เอง — ใช้ร่วมกันทุกสินค้า เปลี่ยนตรงนี้มีผลกับสินค้าทุกตัวในระบบ"
+                                    />
+
+                                    {loadingPayloadFields ? (
+                                        <CenteredSpinner />
+                                    ) : (
+                                        <MappingTable headers={['WooCommerce Payload Field', 'PIM Attribute (ต้นทาง)']}>
+                                            {(payloadFields ?? []).map((f) => (
+                                                <tr key={f.target_field}>
+                                                    <td>
+                                                        <Body style={{ fontWeight: 600, fontSize: '0.8125rem' }}>
+                                                            {PAYLOAD_FIELD_LABELS[f.target_field]}
+                                                        </Body>
+                                                        <Caption>{f.target_field}</Caption>
+                                                    </td>
+                                                    <td>
+                                                        {f.multi ? (
+                                                            // description/short_description — รับได้หลาย attribute พร้อมกัน
+                                                            // (แต่ละตัวถูกประกอบเป็นหนึ่ง section ต่อกันฝั่ง WooCommerce จริง)
+                                                            // แสดงเป็นรายการที่ลบทีละตัวได้ + ช่องเพิ่มตัวใหม่
+                                                            <VStack gap="0.5rem">
+                                                                {f.mapped.length > 0 && (
+                                                                    <HStack wrap gap="0.5rem">
+                                                                        {f.mapped.map((m) => (
+                                                                            <span key={m.id} className={styles.chip}>
+                                                                                {m.name}
+                                                                                <Button
+                                                                                    design="Transparent"
+                                                                                    icon="decline"
+                                                                                    accessibleName={`ลบ ${m.name}`}
+                                                                                    tooltip={`ลบ ${m.name}`}
+                                                                                    disabled={savingPayloadField === f.target_field}
+                                                                                    onClick={() => removePayloadFieldAttribute(f.target_field, m.id)}
+                                                                                    style={{ minWidth: 0, height: '1.5rem', width: '1.5rem' }}
+                                                                                />
+                                                                            </span>
+                                                                        ))}
+                                                                    </HStack>
+                                                                )}
+                                                                <HStack gap="0.5rem">
+                                                                    <div style={{ flex: 1, minWidth: 200 }}>
+                                                                        <PimAttributePicker
+                                                                            value={null}
+                                                                            disabled={savingPayloadField === f.target_field}
+                                                                            onChange={(val) => {
+                                                                                if (val && !f.mapped.some((m) => m.id === val.id)) {
+                                                                                    addPayloadFieldAttribute(f.target_field, val);
+                                                                                }
+                                                                            }}
+                                                                            placeholder="เพิ่ม PIM attribute..."
+                                                                        />
+                                                                    </div>
+                                                                    {savingPayloadField === f.target_field && <Spinner />}
+                                                                </HStack>
+                                                            </VStack>
+                                                        ) : (
+                                                            <HStack gap="0.5rem">
+                                                                <div style={{ flex: 1, minWidth: 200 }}>
                                                                     <PimAttributePicker
-                                                                        value={attr.mapped}
-                                                                        disabled={savingAttributeId === attr.id}
+                                                                        value={f.mapped[0] ?? null}
+                                                                        disabled={savingPayloadField === f.target_field}
+                                                                        typeFilter={f.target_field === 'video' ? ['video'] : undefined}
                                                                         onChange={(val) => {
                                                                             if (val) {
-                                                                                assignAttribute(attr.id, val);
-                                                                            } else if (attr.mapped) {
-                                                                                clearAttribute(attr.id, attr.mapped.id);
+                                                                                assignPayloadField(f.target_field, val, f.mapped[0]?.id ?? null);
+                                                                            } else if (f.mapped[0]) {
+                                                                                clearPayloadField(f.target_field, f.mapped[0].id);
                                                                             }
                                                                         }}
                                                                         placeholder="เลือก PIM attribute..."
                                                                     />
-                                                                </Box>
-                                                                {savingAttributeId === attr.id && <CircularProgress size={14} sx={{ color: FIORI.brand }} />}
-                                                            </Stack>
-                                                        </Box>
-                                                    </Box>
-                                                ))}
-                                            </Box>
-                                        </Box>
-                                    ) : (
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }} align="center" py={3}>
-                                            ยังไม่มีข้อมูล Attributes ในระบบ กรุณากด "Sync Attributes"
-                                        </Typography>
+                                                                </div>
+                                                                {savingPayloadField === f.target_field && <Spinner />}
+                                                            </HStack>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </MappingTable>
                                     )}
-                                </Stack>
-                            </Paper>
-
-                            {/* Section 3 — Payload WooCommerce: ฟิลด์ payload ตายตัวของ
-                                WooCommerce เอง ไม่ผูกกับหมวดหมู่ไหนเลย */}
-                            <Paper
-                                ref={(el: HTMLDivElement | null) => {
-                                    sectionRefs.current[2] = el;
-                                }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
-                            >
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            แมป PIM Attribute เข้ากับฟิลด์ payload ของ WooCommerce
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            ฟิลด์ตายตัวของ WooCommerce เอง — ใช้ร่วมกันทุกสินค้า เปลี่ยนตรงนี้มีผลกับสินค้าทุกตัวในระบบ
-                                        </Typography>
-                                    </Box>
-
-                                    {loadingPayloadFields ? (
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                                            <CircularProgress size={24} sx={{ color: FIORI.brand }} />
-                                        </Box>
-                                    ) : (
-                                        <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
-                                            <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                                <Box component="tr">
-                                                    <Box component="th" sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}>
-                                                        WooCommerce Payload Field
-                                                    </Box>
-                                                    <Box component="th" sx={{ p: 1.5, textAlign: 'left', fontWeight: 600, color: FIORI.textPrimary, borderBottom: `1px solid ${FIORI.border}` }}>
-                                                        PIM Attribute (ต้นทาง)
-                                                    </Box>
-                                                </Box>
-                                            </Box>
-                                            <Box component="tbody">
-                                                {(payloadFields ?? []).map((f) => (
-                                                    <Box
-                                                        component="tr"
-                                                        key={f.target_field}
-                                                        sx={{ borderTop: `1px solid ${FIORI.border}`, '&:hover': { bgcolor: FIORI.hover }, transition: 'background-color 0.1s ease' }}
-                                                    >
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            <Typography fontWeight={600} variant="body2" sx={{ color: FIORI.textPrimary, fontSize: '0.8125rem' }}>
-                                                                {PAYLOAD_FIELD_LABELS[f.target_field]}
-                                                            </Typography>
-                                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                                                {f.target_field}
-                                                            </Typography>
-                                                        </Box>
-                                                        <Box component="td" sx={{ p: 1.5, verticalAlign: 'middle' }}>
-                                                            {f.multi ? (
-                                                                // description/short_description — รับได้หลาย attribute พร้อมกัน
-                                                                // (แต่ละตัวถูกประกอบเป็นหนึ่ง section ต่อกันฝั่ง WooCommerce จริง)
-                                                                // แสดงเป็นรายการที่ลบทีละตัวได้ + ช่องเพิ่มตัวใหม่
-                                                                <Stack spacing={1}>
-                                                                    {f.mapped.length > 0 && (
-                                                                        <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1}>
-                                                                            {f.mapped.map((m) => (
-                                                                                <Chip
-                                                                                    key={m.id}
-                                                                                    label={m.name}
-                                                                                    size="small"
-                                                                                    onDelete={() => removePayloadFieldAttribute(f.target_field, m.id)}
-                                                                                    disabled={savingPayloadField === f.target_field}
-                                                                                />
-                                                                            ))}
-                                                                        </Stack>
-                                                                    )}
-                                                                    <Stack direction="row" alignItems="center" spacing={1}>
-                                                                        <Box sx={{ flex: 1, minWidth: 200 }}>
-                                                                            <PimAttributePicker
-                                                                                value={null}
-                                                                                disabled={savingPayloadField === f.target_field}
-                                                                                onChange={(val) => {
-                                                                                    if (val && !f.mapped.some((m) => m.id === val.id)) {
-                                                                                        addPayloadFieldAttribute(f.target_field, val);
-                                                                                    }
-                                                                                }}
-                                                                                placeholder="เพิ่ม PIM attribute..."
-                                                                            />
-                                                                        </Box>
-                                                                        {savingPayloadField === f.target_field && <CircularProgress size={14} sx={{ color: FIORI.brand }} />}
-                                                                    </Stack>
-                                                                </Stack>
-                                                            ) : (
-                                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                                    <Box sx={{ flex: 1, minWidth: 200 }}>
-                                                                        <PimAttributePicker
-                                                                            value={f.mapped[0] ?? null}
-                                                                            disabled={savingPayloadField === f.target_field}
-                                                                            typeFilter={f.target_field === 'video' ? ['video'] : undefined}
-                                                                            onChange={(val) => {
-                                                                                if (val) {
-                                                                                    assignPayloadField(f.target_field, val, f.mapped[0]?.id ?? null);
-                                                                                } else if (f.mapped[0]) {
-                                                                                    clearPayloadField(f.target_field, f.mapped[0].id);
-                                                                                }
-                                                                            }}
-                                                                            placeholder="เลือก PIM attribute..."
-                                                                        />
-                                                                    </Box>
-                                                                    {savingPayloadField === f.target_field && <CircularProgress size={14} sx={{ color: FIORI.brand }} />}
-                                                                </Stack>
-                                                            )}
-                                                        </Box>
-                                                    </Box>
-                                                ))}
-                                            </Box>
-                                        </Box>
-                                    )}
-                                </Stack>
-                            </Paper>
+                                </VStack>
+                            </SectionCard>
 
                             {/* Section 4 — History: WooCommerceMappingTimelineBuilder ขอบเขต
                                 แคบกว่า 3 platform อื่น — แค่ audit trail ของ Category Mapping
                                 (section 1) เท่านั้น เพราะ attribute mapping เป็น global ไม่ผูก
                                 กับ category นี้เจาะจง */}
-                            <Paper
+                            <SectionCard
                                 ref={(el: HTMLDivElement | null) => {
                                     sectionRefs.current[3] = el;
                                 }}
-                                elevation={0}
-                                sx={{ ...(fioriCardSx as Record<string, unknown>), p: 3, scrollMarginTop: `${SECTION_SCROLL_MARGIN}px` }}
+                                scrollMarginTop={SECTION_SCROLL_MARGIN}
                             >
-                                <Stack spacing={2.5}>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
-                                            เส้นทางการแมพ WooCommerce ของ Master Category นี้
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            รวมการเปลี่ยนแปลงของ Category Mapping (Section 1) — attribute mapping (Section 2/3) เป็น global ไม่ผูกกับ
-                                            category นี้เจาะจง เลยไม่รวมอยู่ในนี้
-                                        </Typography>
-                                    </Box>
+                                <VStack gap="1.25rem">
+                                    <SectionHeading
+                                        title="เส้นทางการแมพ WooCommerce ของ Master Category นี้"
+                                        description="รวมการเปลี่ยนแปลงของ Category Mapping (Section 1) — attribute mapping (Section 2/3) เป็น global ไม่ผูกกับ category นี้เจาะจง เลยไม่รวมอยู่ในนี้"
+                                    />
 
                                     {!activeProduct.master_category ? (
-                                        <Stack alignItems="center" spacing={1} sx={{ py: 4, color: FIORI.textSecondary }}>
-                                            <LockOutlinedIcon fontSize="small" />
-                                            <Typography variant="body2">สินค้านี้ยังไม่มี Master Category — ไม่มีประวัติให้แสดง</Typography>
-                                        </Stack>
+                                        <LockedNotice>สินค้านี้ยังไม่มี Master Category — ไม่มีประวัติให้แสดง</LockedNotice>
                                     ) : (
                                         <TimelinePanel
                                             timelineUrl={`/catalog/attributes/woocommerce-mapping/timeline?category_id=${activeProduct.master_category.id}`}
                                         />
                                     )}
-                                </Stack>
-                            </Paper>
-                        </Stack>
-                    </Box>
-                </Box>
+                                </VStack>
+                            </SectionCard>
+                        </div>
+                    </div>
+                </div>
                 {confirmElement}
             </AppLayout>
         );
@@ -1172,193 +1046,66 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="แมปสินค้า WooCommerce" />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <div className={styles.page}>
                 {/* ──── Page Header ──── */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            สินค้า ({products.total})
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                            จัดการการแมปหมวดหมู่และ Attributes ของ WooCommerce ตั้งแต่ระดับสินค้า
-                        </Typography>
-                    </Box>
-                    <Button
-                        size="small"
-                        startIcon={<ArrowBackIcon fontSize="small" />}
-                        onClick={() => router.visit('/catalog/marketplace/woocommerce')}
-                        sx={fioriGhostSx}
-                    >
-                        WooCommerce Hub
-                    </Button>
-                </Stack>
+                <PageHeader
+                    title={`สินค้า (${products.total})`}
+                    subtitle="จัดการการแมปหมวดหมู่และ Attributes ของ WooCommerce ตั้งแต่ระดับสินค้า"
+                    actions={
+                        <Button design="Transparent" icon="nav-back" onClick={() => router.visit('/catalog/marketplace/woocommerce')}>
+                            WooCommerce Hub
+                        </Button>
+                    }
+                />
 
                 {/* ──── Stat KPI Tiles ──── */}
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    spacing={0}
-                    sx={{
-                        mb: 3,
-                        borderRadius: '8px',
-                        border: `1px solid ${FIORI.border}`,
-                        overflow: 'hidden',
-                        bgcolor: FIORI.border,
-                        gap: '1px',
-                    }}
-                >
-                    {[
-                        { label: 'สินค้าทั้งหมด', value: stats.total, tone: undefined, filterValue: 'all' as ProductFilter },
-                        { label: 'แมป Category แล้ว', value: stats.mapped, tone: 'success' as const, filterValue: 'mapped' as ProductFilter },
-                        { label: 'ยังไม่ได้แมป Category', value: stats.unmapped, tone: 'warning' as const, filterValue: 'unmapped' as ProductFilter },
-                    ].map((kpi) => (
-                        <Box
-                            key={kpi.label}
-                            onClick={() => applyFilter(kpi.filterValue)}
-                            sx={{
-                                flex: 1,
-                                p: 2,
-                                cursor: 'pointer',
-                                transition: 'background-color 0.1s ease',
-                                ...(filter === kpi.filterValue ? { bgcolor: FIORI.brandBg } : { bgcolor: FIORI.surface, '&:hover': { bgcolor: FIORI.hover } }),
-                            }}
-                        >
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: FIORI.textSecondary,
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    fontSize: '0.6875rem',
-                                    letterSpacing: '0.04em',
-                                }}
-                            >
-                                {kpi.label}
-                            </Typography>
-                            <Typography
-                                variant="h5"
-                                fontWeight={700}
-                                sx={{
-                                    color: kpi.tone ? FIORI[kpi.tone] : FIORI.textPrimary,
-                                    mt: 0.5,
-                                }}
-                            >
-                                {kpi.value}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Stack>
+                <KpiTiles<ProductFilter>
+                    tiles={[
+                        { label: 'สินค้าทั้งหมด', value: stats.total, filterValue: 'all' },
+                        { label: 'แมป Category แล้ว', value: stats.mapped, tone: 'success', filterValue: 'mapped' },
+                        { label: 'ยังไม่ได้แมป Category', value: stats.unmapped, tone: 'warning', filterValue: 'unmapped' },
+                    ]}
+                    active={filter}
+                    onSelect={applyFilter}
+                />
 
                 {/* ──── Table Card (Toolbar + Data + Pagination) ──── */}
-                <Paper elevation={0} sx={fioriCardSx}>
+                <div className={styles.card}>
                     {/* Toolbar */}
-                    <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        justifyContent="space-between"
-                        alignItems="center"
-                        spacing={2}
-                        sx={{ p: 2 }}
-                    >
-                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                            <TextField
-                                size="small"
-                                placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
-                            />
-                            <ToggleButtonGroup
-                                size="small"
-                                exclusive
-                                value={filter}
-                                onChange={(_, val) => val && applyFilter(val)}
-                                sx={{
-                                    '& .MuiToggleButton-root': {
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        fontSize: '0.8125rem',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        color: FIORI.textSecondary,
-                                        borderColor: FIORI.borderStrong,
-                                        transition: 'background-color 0.1s ease, color 0.1s ease',
-                                        '&:hover': { backgroundColor: FIORI.hover, color: FIORI.textPrimary },
-                                        '&.Mui-selected': {
-                                            backgroundColor: FIORI.brandBg,
-                                            color: FIORI.brand,
-                                            borderColor: FIORI.brand,
-                                            fontWeight: 700,
-                                            zIndex: 1,
-                                            '&:hover': { backgroundColor: FIORI.brandBg, color: FIORI.brand },
-                                        },
-                                    },
+                    <div className={styles.toolbar}>
+                        <div className={styles.toolbarStart}>
+                            <SearchField value={search} onChange={setSearch} placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..." />
+                            <SegmentedButton
+                                accessibleName="Filter"
+                                onSelectionChange={(e) => {
+                                    const val = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.filter as ProductFilter | undefined;
+                                    if (val) applyFilter(val);
                                 }}
                             >
-                                <ToggleButton value="all">ทั้งหมด ({stats.total})</ToggleButton>
-                                <ToggleButton value="mapped">แมปแล้ว ({stats.mapped})</ToggleButton>
-                                <ToggleButton value="unmapped">ยังไม่ได้แมป ({stats.unmapped})</ToggleButton>
-                            </ToggleButtonGroup>
-                        </Stack>
+                                <SegmentedButtonItem data-filter="all" selected={filter === 'all'}>
+                                    ทั้งหมด ({stats.total})
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-filter="mapped" selected={filter === 'mapped'}>
+                                    แมปแล้ว ({stats.mapped})
+                                </SegmentedButtonItem>
+                                <SegmentedButtonItem data-filter="unmapped" selected={filter === 'unmapped'}>
+                                    ยังไม่ได้แมป ({stats.unmapped})
+                                </SegmentedButtonItem>
+                            </SegmentedButton>
+                        </div>
 
                         {/* Pagination controls — same pattern as products/index.tsx */}
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                                }}
-                            >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                                <MenuItem value={100}>100</MenuItem>
-                            </Select>
+                        <Pager
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            perPage={perPage}
+                            perPageLabel={tGrid('perPage') || 'ต่อหน้า'}
+                            onPerPageChange={handlePerPageChange}
+                            onGoToPage={goToPage}
+                        />
+                    </div>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tGrid('perPage') || 'ต่อหน้า'}
-                            </Typography>
-
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                            >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
-
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                / {lastPage}
-                            </Typography>
-
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div className={styles.divider} />
 
                     {/* Data Table */}
                     <FioriResponsiveTable
@@ -1366,27 +1113,16 @@ export default function WooCommerceProductsMapping({ products, stats, filters }:
                         columns={columns}
                         rows={products.data}
                         getRowKey={(row: ProductRow) => row.id}
-                        rowSx={(row) => fioriTableRowSx(selectedRows.includes(row.id))}
+                        rowClassName={(row: ProductRow) => (selectedRows.includes(row.id) ? styles.selectedRow : undefined)}
                         emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
                     />
 
                     {/* Footer info */}
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            alignItems: 'center',
-                            px: 2,
-                            py: 1,
-                            borderTop: `1px solid ${FIORI.border}`,
-                        }}
-                    >
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                            {tGrid('totalCount', { count: products.total })}
-                        </Typography>
-                    </Box>
-                </Paper>
-            </Box>
+                    <div className={styles.footer}>
+                        <Caption>{tGrid('totalCount', { count: products.total })}</Caption>
+                    </div>
+                </div>
+            </div>
         </AppLayout>
     );
 }

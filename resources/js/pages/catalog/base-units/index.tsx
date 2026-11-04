@@ -1,39 +1,14 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Alert,
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TableSortLabel,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FIORI,
-    FioriStatus,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+
+import { CountTag, MasterListPage, MasterListToolbar, MasterPagination, RowActions, SecondaryText, SortableHeader, StrongText } from '../master-crud';
 
 interface BaseUnitItem {
     id: number;
@@ -114,81 +89,44 @@ export default function BaseUnitIndex({ baseUnits, attributeId, filters }: Props
         router.visit(url);
     };
 
+    const sortHeader = (field: string, label: string) => (
+        <SortableHeader label={label} active={sortField === field} direction={sortDir} onSort={() => handleSort(field)} />
+    );
+
     const columns: FioriResponsiveColumn<BaseUnitItem>[] = [
         {
             key: 'name',
-            header: (
-                <TableSortLabel active={sortField === 'admin_label'} direction={sortField === 'admin_label' ? sortDir : 'asc'} onClick={() => handleSort('admin_label')}>
-                    {t('name')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('admin_label', t('name')),
+            popinText: t('name'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.admin_label || row.code}</Typography>,
+            render: (row) => <StrongText>{row.admin_label || row.code}</StrongText>,
         },
         {
             key: 'slug',
-            header: (
-                <TableSortLabel active={sortField === 'slug'} direction={sortField === 'slug' ? sortDir : 'asc'} onClick={() => handleSort('slug')}>
-                    {t('baseUnitAbbrev')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('slug', t('baseUnitAbbrev')),
+            popinText: t('baseUnitAbbrev'),
             priority: 'high',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary }}>
-                    {row.slug || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.slug} />,
         },
         {
             key: 'description',
-            header: (
-                <TableSortLabel active={sortField === 'description'} direction={sortField === 'description' ? sortDir : 'asc'} onClick={() => handleSort('description')}>
-                    {t('description')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('description', t('description')),
+            popinText: t('description'),
             priority: 'medium',
-            render: (row) => (
-                <Typography sx={{ color: FIORI.textSecondary, maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {row.description || <Typography component="span" color="text.disabled">—</Typography>}
-                </Typography>
-            ),
+            render: (row) => <SecondaryText value={row.description} maxWidth={320} />,
         },
         {
             key: 'products_count',
-            header: (
-                <TableSortLabel active={sortField === 'products_count'} direction={sortField === 'products_count' ? sortDir : 'asc'} onClick={() => handleSort('products_count')}>
-                    {t('productsCount')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('products_count', t('productsCount')),
+            popinText: t('productsCount'),
             priority: 'high',
             align: 'right',
-            render: (row) =>
-                row.products_count ? (
-                    <Tooltip title={t('viewBaseUnitProducts')}>
-                        <Chip
-                            label={row.products_count}
-                            size="small"
-                            onClick={() => goToProducts(row)}
-                            sx={{
-                                bgcolor: 'rgba(0,112,242,0.08)',
-                                color: FIORI.brand,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                '&:hover': { bgcolor: 'rgba(0,112,242,0.16)' },
-                            }}
-                        />
-                    </Tooltip>
-                ) : (
-                    <Typography color="text.disabled">0</Typography>
-                ),
+            render: (row) => <CountTag count={row.products_count} tooltip={t('viewBaseUnitProducts')} onClick={() => goToProducts(row)} />,
         },
         {
             key: 'is_active',
-            header: (
-                <TableSortLabel active={sortField === 'is_active'} direction={sortField === 'is_active' ? sortDir : 'asc'} onClick={() => handleSort('is_active')}>
-                    {t('status')}
-                </TableSortLabel>
-            ),
+            header: sortHeader('is_active', t('status')),
+            popinText: t('status'),
             priority: 'high',
             render: (row) => <FioriStatus label={row.is_active ? t('active') : t('nonActive')} tone={row.is_active ? 'success' : 'neutral'} />,
         },
@@ -200,14 +138,7 @@ export default function BaseUnitIndex({ baseUnits, attributeId, filters }: Props
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: BaseUnitItem) => (
-                          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/base-units/${row.id}/edit`)}>
-                                  <EditIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                  <DeleteIcon fontSize="small" />
-                              </IconButton>
-                          </Stack>
+                          <RowActions onEdit={() => router.visit(`/catalog/base-units/${row.id}/edit`)} onDelete={() => setDeleteId(row.id)} />
                       ),
                   },
               ]
@@ -217,81 +148,23 @@ export default function BaseUnitIndex({ baseUnits, attributeId, filters }: Props
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('baseUnitsTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
-                        justifyContent: 'space-between',
-                        alignItems: { xs: 'stretch', sm: 'flex-start' },
-                        gap: 2,
-                        mb: 3,
-                    }}
-                >
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('baseUnitsTitle')}</Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25, maxWidth: 720 }}>{t('baseUnitsIntro')}</Typography>
-                    </Box>
-                    {canEdit && (
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => router.visit('/catalog/base-units/create')}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {t('addNewBaseUnit')}
-                        </Button>
-                    )}
-                </Box>
-
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={2} sx={{ mb: 2 }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                        {tGrid('results', { count: baseUnits.total })}
-                    </Typography>
-                    <TextField
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t('searchBaseUnits')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 280 } }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
-                </Stack>
-
-                <FioriResponsiveTable
-                    columns={columns}
-                    rows={baseUnits.data}
-                    getRowKey={(row) => row.id}
-                    emptyMessage={t('noBaseUnitsFound')}
+            <MasterListPage
+                title={t('baseUnitsTitle')}
+                intro={t('baseUnitsIntro')}
+                addLabel={t('addNewBaseUnit')}
+                onAdd={canEdit ? () => router.visit('/catalog/base-units/create') : undefined}
+            >
+                <MasterListToolbar
+                    resultsLabel={tGrid('results', { count: baseUnits.total })}
+                    search={search}
+                    onSearchChange={setSearch}
+                    searchPlaceholder={t('searchBaseUnits')}
                 />
 
-                <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ mt: 2 }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{tGrid('pageOf', { lastPage })}</Typography>
-                    <Stack direction="row" spacing={0.2}>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                            <FirstPageIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                            <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                        </Paper>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                            <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                            <LastPageIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Stack>
-            </Box>
+                <FioriResponsiveTable columns={columns} rows={baseUnits.data} getRowKey={(row) => row.id} emptyMessage={t('noBaseUnitsFound')} />
+
+                <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage} />
+            </MasterListPage>
 
             <FioriMessageBox
                 open={deleteId !== null}
@@ -319,9 +192,9 @@ export default function BaseUnitIndex({ baseUnits, attributeId, filters }: Props
                     const count = target?.products_count ?? 0;
                     if (count === 0) return null;
                     return (
-                        <Alert severity="warning" sx={{ mt: 1.5 }}>
+                        <FioriMessageStrip severity="warning" style={{ marginTop: '0.75rem' }}>
                             {t('deleteBaseUnitProductWarning', { count })}
-                        </Alert>
+                        </FioriMessageStrip>
                     );
                 })()}
             </FioriMessageBox>

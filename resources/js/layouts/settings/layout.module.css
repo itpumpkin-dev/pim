@@ -1,0 +1,36 @@
+.columns {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.aside {
+    width: 100%;
+}
+
+.divider {
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.content {
+    flex: 1;
+}
+
+@media (min-width: 1200px) {
+    .columns {
+        flex-direction: row;
+        gap: 3rem;
+    }
+
+    .aside {
+        max-width: 192px;
+    }
+
+    .divider {
+        display: none;
+    }
+
+    .content {
+        max-width: 672px;
+    }
+}

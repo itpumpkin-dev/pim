@@ -1,28 +1,19 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
+import { followLink } from '@/components/import-export/follow-link';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DownloadIcon from '@mui/icons-material/Download';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import AddIcon from '@mui/icons-material/Add';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import {
-    Alert,
-    Box,
-    Button,
-    Divider,
-    Grid,
-    Menu,
-    MenuItem,
-    Paper,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/message-warning.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/navigation-right-arrow.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import '@ui5/webcomponents-icons/dist/status-positive.js';
+import { Button, Icon, Menu, MenuItem, Title } from '@ui5/webcomponents-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface UserSummary {
     id: number;
@@ -70,7 +61,7 @@ export default function WooConvertShow({ conversion }: Props) {
         { title: `#${conversion.id}`, href: '#' },
     ];
 
-    const [downloadAnchor, setDownloadAnchor] = useState<HTMLElement | null>(null);
+    const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
 
     const creatorLabel = (() => {
         if (!conversion.creator) return '-';
@@ -79,189 +70,182 @@ export default function WooConvertShow({ conversion }: Props) {
     })();
 
     const stat = (label: string, value: number, tone: 'neutral' | 'good' | 'warn' = 'neutral', icon?: ReactNode) => {
-        const toneColor = tone === 'warn' ? FIORI.warning : tone === 'good' ? FIORI.success : FIORI.textPrimary;
+        const toneColor = tone === 'warn' ? 'var(--sapCriticalTextColor)' : tone === 'good' ? 'var(--sapPositiveTextColor)' : 'var(--sapTextColor)';
+        const borderColor = tone === 'warn' ? 'var(--sapCriticalColor)' : tone === 'good' ? 'var(--sapPositiveColor)' : undefined;
         return (
-            <Grid item xs={6} sm={3}>
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: 2, textAlign: 'center', borderColor: tone === 'neutral' ? FIORI.border : toneColor }}>
-                    <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
-                        {icon}
-                        <Typography variant="h4" fontWeight={700} sx={{ color: toneColor }}>{value}</Typography>
-                    </Stack>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{label}</Typography>
-                </Paper>
-            </Grid>
+            <div className={styles.cardPadded} style={{ padding: '1rem', textAlign: 'center', borderColor }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.25rem' }}>
+                    {icon}
+                    <span className={styles.statValue} style={{ color: toneColor }}>
+                        {value}
+                    </span>
+                </div>
+                <span className={styles.secondaryText}>{label}</span>
+            </div>
         );
     };
+
+    const goodIcon = <Icon name="status-positive" style={{ width: '1.25rem', height: '1.25rem', color: 'var(--sapPositiveColor)' }} />;
+    const warnIcon = <Icon name="message-warning" style={{ width: '1.25rem', height: '1.25rem', color: 'var(--sapCriticalColor)' }} />;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('wooConvertResultTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('wooConvertResultTitle')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/woo-convert" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('wooConvertResultTitle')}
+                    </Title>
+                    <div className={styles.actions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/import-export/woo-convert')}>
                             {tCatalog('back')}
                         </Button>
-                        <Button component={Link} href="/import-export/woo-convert/create" variant="outlined" startIcon={<AddIcon />} sx={fioriDefaultSx}>
+                        <Button icon="add" onClick={() => router.visit('/import-export/woo-convert/create')}>
                             {t('wooConvertAnother')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Alert severity="success" sx={{ mb: 1 }}>
+                <FioriMessageStrip severity="success" style={{ marginBottom: '0.5rem' }}>
                     {t('wooConvertResultSummary', {
                         file: conversion.original_filename,
                         count: conversion.row_count,
                         skipped: conversion.sku_missing_count,
                     })}
-                </Alert>
-                <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 3 }}>
+                </FioriMessageStrip>
+                <span className={styles.smallText} style={{ display: 'block', marginBottom: '1.5rem' }}>
                     {formatLocalDateTime(conversion.created_at)} · {creatorLabel}
-                </Typography>
+                </span>
 
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                    {stat(t('wooConvertRowsConverted'), conversion.row_count, 'good', <CheckCircleIcon color="success" fontSize="small" />)}
+                <div className={styles.statGrid4}>
+                    {stat(t('wooConvertRowsConverted'), conversion.row_count, 'good', goodIcon)}
                     {stat(
                         t('wooConvertRowsSkipped'),
                         conversion.sku_missing_count,
                         conversion.sku_missing_count > 0 ? 'warn' : 'neutral',
-                        conversion.sku_missing_count > 0 ? <WarningAmberIcon color="warning" fontSize="small" /> : undefined
+                        conversion.sku_missing_count > 0 ? warnIcon : undefined,
                     )}
-                    {stat(t('wooConvertCategoriesMatched'), conversion.category_matched_count, 'good', <CheckCircleIcon color="success" fontSize="small" />)}
+                    {stat(t('wooConvertCategoriesMatched'), conversion.category_matched_count, 'good', goodIcon)}
                     {stat(
                         t('wooConvertCategoriesUnmatched'),
                         conversion.category_unmatched_count,
                         conversion.category_unmatched_count > 0 ? 'warn' : 'neutral',
-                        conversion.category_unmatched_count > 0 ? <WarningAmberIcon color="warning" fontSize="small" /> : undefined
+                        conversion.category_unmatched_count > 0 ? warnIcon : undefined,
                     )}
                     {stat(
                         t('wooConvertBrandsCreated'),
                         conversion.brand_new_count,
                         conversion.brand_new_count > 0 ? 'warn' : 'neutral',
-                        conversion.brand_new_count > 0 ? <WarningAmberIcon color="warning" fontSize="small" /> : undefined
+                        conversion.brand_new_count > 0 ? warnIcon : undefined,
                     )}
-                </Grid>
+                </div>
 
-                <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('wooConvertDownloadsTitle')}</Typography>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <div className={styles.stack}>
+                    <div className={styles.cardPadded}>
+                        <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '1rem' }}>
+                            {t('wooConvertDownloadsTitle')}
+                        </Title>
+                        <div className={styles.actions} style={{ gap: '1rem' }}>
                             <Button
-                                variant="contained"
-                                startIcon={<DownloadIcon />}
-                                endIcon={<ArrowDropDownIcon />}
-                                onClick={(e) => setDownloadAnchor(e.currentTarget)}
-                                sx={fioriEmphasizedSx}
+                                id="woo-convert-download-opener"
+                                design="Emphasized"
+                                icon="download"
+                                endIcon="slim-arrow-down"
+                                onClick={() => setDownloadMenuOpen((open) => !open)}
                             >
                                 {t('wooConvertDownloadButton')}
                             </Button>
-                            <Menu anchorEl={downloadAnchor} open={Boolean(downloadAnchor)} onClose={() => setDownloadAnchor(null)}>
-                                <MenuItem
-                                    component="a"
-                                    href={`/import-export/woo-convert/${conversion.id}/download`}
-                                    onClick={() => setDownloadAnchor(null)}
-                                >
-                                    {t('wooConvertDownloadCsv')}
-                                </MenuItem>
-                                <MenuItem
-                                    component="a"
-                                    href={`/import-export/woo-convert/${conversion.id}/download-xlsx`}
-                                    onClick={() => setDownloadAnchor(null)}
-                                >
-                                    {t('wooConvertDownloadXlsx')}
-                                </MenuItem>
+                            <Menu
+                                opener="woo-convert-download-opener"
+                                open={downloadMenuOpen}
+                                onClose={() => setDownloadMenuOpen(false)}
+                                onItemClick={(e) => {
+                                    const suffix = e.detail.item.dataset.suffix ?? 'download';
+                                    setDownloadMenuOpen(false);
+                                    followLink(`/import-export/woo-convert/${conversion.id}/${suffix}`);
+                                }}
+                            >
+                                <MenuItem text={t('wooConvertDownloadCsv')} data-suffix="download" />
+                                <MenuItem text={t('wooConvertDownloadXlsx')} data-suffix="download-xlsx" />
                             </Menu>
                             {conversion.has_unmatched && (
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<DownloadIcon />}
-                                    href={`/import-export/woo-convert/${conversion.id}/download-unmatched`}
-                                    sx={fioriDefaultSx}
-                                >
+                                <Button icon="download" onClick={() => followLink(`/import-export/woo-convert/${conversion.id}/download-unmatched`)}>
                                     {t('wooConvertDownloadUnmatched')}
                                 </Button>
                             )}
-                        </Stack>
+                        </div>
                         {conversion.has_unmatched && (
-                            <Alert severity="warning" sx={{ mt: 2 }}>
+                            <FioriMessageStrip severity="warning" style={{ marginTop: '1rem' }}>
                                 {t('wooConvertUnmatchedHelp')}
-                            </Alert>
+                            </FioriMessageStrip>
                         )}
-                        <Divider sx={{ my: 2, borderColor: FIORI.border }} />
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 1.5 }}>
+                        <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)', margin: '1rem 0' }} />
+                        <span className={styles.secondaryText} style={{ display: 'block', marginBottom: '0.75rem' }}>
                             {t('wooConvertNextStep')}
-                        </Typography>
-                        <Button
-                            component={Link}
-                            href="/import-export/imports/create"
-                            variant="text"
-                            endIcon={<ArrowForwardIcon />}
-                            sx={{ color: FIORI.brand, fontWeight: 600, textTransform: 'none' }}
-                        >
+                        </span>
+                        <Button design="Transparent" endIcon="navigation-right-arrow" onClick={() => router.visit('/import-export/imports/create')}>
                             {t('wooConvertGoToImport')}
                         </Button>
-                    </Paper>
+                    </div>
 
                     {(conversion.emitted_name || conversion.emitted_description) && (
-                        <Alert severity="info" sx={{ whiteSpace: 'pre-line' }}>
+                        <FioriMessageStrip severity="information" style={{ whiteSpace: 'pre-line' }}>
                             {t('wooConvertLocaleCaveat')}
-                        </Alert>
+                        </FioriMessageStrip>
                     )}
 
                     {conversion.brand_new_names.length > 0 && (
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                            <Typography variant="h6" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
+                        <div className={styles.cardPadded}>
+                            <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '0.5rem' }}>
                                 {t('wooConvertNewBrandsTitle', { count: conversion.brand_new_names_total })}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
+                            </Title>
+                            <span className={styles.secondaryText} style={{ display: 'block', marginBottom: '1rem' }}>
                                 {t('wooConvertNewBrandsHelp')}
-                            </Typography>
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                            </span>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: 320, overflowY: 'auto' }}>
                                 {conversion.brand_new_names.map((name, i) => (
-                                    <Typography
-                                        key={i}
-                                        variant="body2"
-                                        sx={{ px: 1, py: 0.5, bgcolor: FIORI.hover, color: FIORI.textPrimary, borderRadius: '6px' }}
-                                    >
+                                    <span key={i} className={styles.chip}>
                                         {name}
-                                    </Typography>
+                                    </span>
                                 ))}
-                            </Stack>
+                            </div>
                             {conversion.brand_new_names_total > conversion.brand_new_names.length && (
-                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, mt: 1, display: 'block' }}>
+                                <span className={styles.smallText} style={{ display: 'block', marginTop: '0.5rem' }}>
                                     {t('wooConvertTypeWarningsTruncated', {
                                         remaining: conversion.brand_new_names_total - conversion.brand_new_names.length,
                                     })}
-                                </Typography>
+                                </span>
                             )}
-                        </Paper>
+                        </div>
                     )}
 
                     {conversion.type_warnings.length > 0 && (
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                            <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>
+                        <div className={styles.cardPadded}>
+                            <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '1rem' }}>
                                 {t('wooConvertTypeWarningsTitle', { count: conversion.type_warnings_total })}
-                            </Typography>
-                            <Stack spacing={1} sx={{ maxHeight: 320, overflowY: 'auto' }}>
+                            </Title>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: 320, overflowY: 'auto' }}>
                                 {conversion.type_warnings.map((warning, i) => (
-                                    <Stack key={i} direction="row" spacing={1} alignItems="flex-start">
-                                        <WarningAmberIcon sx={{ color: FIORI.warning, fontSize: 16, mt: 0.3, flexShrink: 0 }} />
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{warning}</Typography>
-                                    </Stack>
+                                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                                        <Icon
+                                            name="message-warning"
+                                            style={{ width: 16, height: 16, color: 'var(--sapCriticalColor)', marginTop: 2, flexShrink: 0 }}
+                                        />
+                                        <span className={styles.secondaryText}>{warning}</span>
+                                    </div>
                                 ))}
-                            </Stack>
+                            </div>
                             {conversion.type_warnings_total > conversion.type_warnings.length && (
-                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, mt: 1, display: 'block' }}>
+                                <span className={styles.smallText} style={{ display: 'block', marginTop: '0.5rem' }}>
                                     {t('wooConvertTypeWarningsTruncated', {
                                         remaining: conversion.type_warnings_total - conversion.type_warnings.length,
                                     })}
-                                </Typography>
+                                </span>
                             )}
-                        </Paper>
+                        </div>
                     )}
-                </Stack>
-            </Box>
+                </div>
+            </div>
         </AppLayout>
     );
 }

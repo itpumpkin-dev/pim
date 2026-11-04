@@ -1,10 +1,12 @@
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Box, Typography } from '@mui/material';
+import { Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, FioriStatus, fioriCardSx } from '@/lib/fiori-style';
+
+import styles from './marketplace.module.css';
 
 type MarketplacePlatform = 'shopee' | 'lazada' | 'tiktok' | 'woocommerce';
 
@@ -76,14 +78,10 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
             header: t('shopsLabel'),
             priority: 'always',
             render: (shop) => (
-                <>
-                    <Typography variant="body2" fontWeight={600}>
-                        {shop.name}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                        {shop.code}
-                    </Typography>
-                </>
+                <div>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--sapFontSize)', color: 'var(--sapTextColor)' }}>{shop.name}</div>
+                    <span className={styles.caption}>{shop.code}</span>
+                </div>
             ),
         },
         {
@@ -92,9 +90,9 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
             priority: 'high',
             render: (shop) =>
                 linkedAccountLabel(shop) ?? (
-                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
+                    <span style={{ fontStyle: 'italic', color: 'var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor))' }}>
                         {t('noLinkedAccount')}
-                    </Typography>
+                    </span>
                 ),
         },
         {
@@ -108,17 +106,15 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tNav('marketplaceConnect')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <div className={styles.page}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H4" size="H4" wrappingType="Normal" className={styles.pageTitle}>
                         {tNav('marketplaceConnect')}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                        {platformLabel}
-                    </Typography>
-                </Box>
+                    </Title>
+                    <Text className={styles.subtitle}>{platformLabel}</Text>
+                </div>
 
-                <Box sx={{ ...fioriCardSx, p: 2 }}>
+                <div className={styles.card} style={{ padding: '1rem' }}>
                     <FioriResponsiveTable
                         variant="plain"
                         columns={shopColumns}
@@ -126,8 +122,8 @@ export default function MarketplaceConnectionSettings({ platform, shops }: Props
                         getRowKey={(shop) => shop.id}
                         emptyMessage={t('noShopsYet')}
                     />
-                </Box>
-            </Box>
+                </div>
+            </div>
         </AppLayout>
     );
 }

@@ -1,0 +1,195 @@
+.wrapper {
+    margin-bottom: 1rem;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    width: 100%;
+}
+
+.card {
+    position: relative;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    border-radius: 12px;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapGroup_ContentBackground);
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--sapTextColor);
+    font-family: var(--sapFontFamily);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--sapContent_Shadow2);
+}
+
+/* Instant press feedback the moment you click — bridges the gap before the
+   page navigation/fade-in even starts, so the click itself feels
+   acknowledged right away instead of sitting dead. */
+.card:active {
+    transform: translateY(-1px) scale(0.98);
+    transition: transform 0.08s ease;
+}
+
+.tag {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+    font-weight: 600;
+}
+
+.popular {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: #ea580c;
+    color: #fff;
+    font-size: var(--sapFontSmallSize);
+    font-weight: 600;
+}
+
+.popularIcon {
+    width: 1rem;
+    height: 1rem;
+    color: #fff;
+}
+
+.media {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sapList_Hover_Background, rgba(0, 0, 0, 0.04));
+}
+
+.image {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    padding: 0.75rem;
+    box-sizing: border-box;
+}
+
+.fallbackIcon {
+    width: 56px;
+    height: 56px;
+    margin: 2rem 0;
+    color: var(--sapContent_NonInteractiveIconColor);
+}
+
+.video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.body {
+    padding: 1rem;
+}
+
+.metaRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.caption {
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+    min-width: 0;
+}
+
+.status {
+    flex-shrink: 0;
+}
+
+.name {
+    font-size: var(--sapFontSize);
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    min-height: 40px;
+}
+
+.variant {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.footerRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.price {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sapBrandColor);
+}
+
+.pack {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: var(--sapContent_LabelColor);
+    font-size: var(--sapFontSmallSize);
+}
+
+.packIcon {
+    width: 16px;
+    height: 16px;
+    color: inherit;
+}
+
+.exportButton {
+    position: absolute;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapContent_IconColor);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.card:hover .exportButton,
+.exportButton:hover,
+.exportButton:focus-visible {
+    opacity: 1;
+}
+
+.exportButton:hover,
+.exportButton:focus-visible {
+    background: var(--sapButton_Lite_Hover_Background, var(--sapList_Hover_Background));
+}
+
+.exportIcon {
+    width: 1.125rem;
+    height: 1.125rem;
+    color: inherit;
+}

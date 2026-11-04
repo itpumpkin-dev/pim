@@ -1,54 +1,48 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import {
-    Box,
-    Button,
-    Divider,
-    IconButton,
-    InputAdornment,
-    Menu,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useLocale } from '@/hooks/use-locale';
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { GridFilterDrawer, type FilterValue, type GridColumn as FilterableGridColumn } from '@/components/grid-filter-drawer';
+import { useLocale } from '@/hooks/use-locale';
+import AppLayout from '@/layouts/app-layout';
+import { FioriBusyOverlay, FioriStatus } from '@/lib/fiori-style';
 import { encodeQueryParams } from '@/lib/query-string';
-import {
-    FIORI,
-    FioriBusyOverlay,
-    FioriStatus,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-    fioriIconButtonSx,
-    fioriSearchFieldSx,
-} from '@/lib/fiori-style';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/filter.js';
+import '@ui5/webcomponents-icons/dist/navigation-down-arrow.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/sys-first-page.js';
+import '@ui5/webcomponents-icons/dist/sys-last-page.js';
+import { Button, FlexBox, Icon, Input, Menu, MenuItem, Option, Select, Text, Title } from '@ui5/webcomponents-react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-interface GridColumn extends FilterableGridColumn {}
-interface GridAction { icon: string; label: string; }
-interface GridConfig { columns: Record<string, GridColumn>; actions?: Record<string, GridAction>; }
-interface GridData { data: Array<Record<string, unknown> & { id: number }>; total: number; current_page: number; last_page: number; per_page: number; }
-interface Props { gridConfig: GridConfig; gridData: GridData; filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> }; }
+type GridColumn = FilterableGridColumn;
+interface GridAction {
+    icon: string;
+    label: string;
+}
+interface GridConfig {
+    columns: Record<string, GridColumn>;
+    actions?: Record<string, GridAction>;
+}
+interface GridData {
+    data: Array<Record<string, unknown> & { id: number }>;
+    total: number;
+    current_page: number;
+    last_page: number;
+    per_page: number;
+}
+interface Props {
+    gridConfig: GridConfig;
+    gridData: GridData;
+    filters: { search?: string; sort?: string; dir?: string; filters?: Record<string, FilterValue> };
+}
 
 function cellValue(value: unknown, type: string, t: (key: string) => string) {
     if (type === 'boolean') return <FioriStatus label={value ? t('yes') : t('no')} tone={value ? 'success' : 'neutral'} />;
@@ -61,7 +55,10 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const { t: tCatalog } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
     const { locale } = useLocale();
-    const breadcrumbs: BreadcrumbItem[] = [{ title: tNav('catalog'), href: '#' }, { title: tNav('attributes'), href: '/catalog/attributes' }];
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: tNav('catalog'), href: '#' },
+        { title: tNav('attributes'), href: '/catalog/attributes' },
+    ];
 
     const { auth } = usePage<SharedData>().props;
     const permissions = auth.permissions || [];
@@ -75,7 +72,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     const [deleting, setDeleting] = useState(false);
     const [activeFilters, setActiveFilters] = useState<Record<string, FilterValue>>(filters.filters ?? {});
     const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-    const [exportAnchor, setExportAnchor] = useState<HTMLElement | null>(null);
+    const [exportOpen, setExportOpen] = useState(false);
     // ตัวนี้ควบคุม Busy State ของตาราง (FioriBusyOverlay) ระหว่างที่มี request
     // ค้นหา/เรียงลำดับ/กรอง/เปลี่ยนหน้า กำลังทำงานอยู่ — เพราะ request พวกนี้เป็น visit
     // แบบ `preserveState` ซึ่ง RouteLoadingSkeleton (loading placeholder เต็มหน้าจอของแอป)
@@ -92,7 +89,7 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
         // locale เริ่มต้นของแอปแทน ซึ่งไม่ตรงกับที่ผู้ใช้เห็นอยู่บนจอ
         const params = encodeQueryParams({ format, search, filters: activeFilters, locale });
         window.location.href = `/catalog/attributes/export?${params.join('&')}`;
-        setExportAnchor(null);
+        setExportOpen(false);
     };
 
     const visibleActions = Object.entries(gridConfig.actions ?? {}).filter(([actionKey]) => {
@@ -122,10 +119,9 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                <FlexBox justifyContent="End" style={{ gap: '0.25rem' }}>
                     {visibleActions.map(([actionKey, action]) => {
-                        let Icon = EditIcon;
-                        if (action.icon === 'delete') Icon = DeleteIcon;
+                        const icon = action.icon === 'delete' ? 'delete' : 'edit';
 
                         const handleClick = () => {
                             if (actionKey === 'update') {
@@ -136,13 +132,17 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                         };
 
                         return (
-                            <IconButton key={actionKey} size="small" sx={{ ...fioriIconButtonSx, display: 'flex', flexDirection: 'column' }} onClick={handleClick}>
-                                <Icon fontSize="small" />
-                                <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>{t(action.label)}</Typography>
-                            </IconButton>
+                            <Button
+                                key={actionKey}
+                                design="Transparent"
+                                icon={icon}
+                                tooltip={t(action.label)}
+                                accessibleName={t(action.label)}
+                                onClick={handleClick}
+                            />
                         );
                     })}
-                </Stack>
+                </FlexBox>
             ),
         });
     }
@@ -154,7 +154,12 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
         }
 
         const timeout = setTimeout(
-            () => router.get('/catalog/attributes', { search, per_page: perPage, filters: activeFilters }, { preserveState: true, replace: true, ...visitOptions }),
+            () =>
+                router.get(
+                    '/catalog/attributes',
+                    { search, per_page: perPage, filters: activeFilters },
+                    { preserveState: true, replace: true, ...visitOptions },
+                ),
             300,
         );
         return () => clearTimeout(timeout);
@@ -180,126 +185,97 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributesTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {tCatalog('attributesTitle')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+            <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H3">{tCatalog('attributesTitle')}</Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)', marginTop: '0.125rem', display: 'block' }}>
                             {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
+                        </Text>
+                    </div>
+                    <FlexBox wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
                         {/* {canEdit && (
-                            <Button variant="outlined" onClick={() => router.visit('/catalog/attributes/woocommerce-mapping')} sx={fioriDefaultSx}>
+                            <Button onClick={() => router.visit('/catalog/attributes/woocommerce-mapping')}>
                                 {tCatalog('woocommerceContentMapping')}
                             </Button>
                         )} */}
-                        <Button
-                            variant="outlined"
-                            startIcon={<DownloadIcon />}
-                            endIcon={<ArrowDropDownIcon />}
-                            onClick={(e) => setExportAnchor(e.currentTarget)}
-                            sx={fioriDefaultSx}
-                        >
+                        <Button id="attributes-export-btn" icon="download" endIcon="navigation-down-arrow" onClick={() => setExportOpen(true)}>
                             {tCatalog('quickExport')}
                         </Button>
-                        <Menu anchorEl={exportAnchor} open={Boolean(exportAnchor)} onClose={() => setExportAnchor(null)}>
-                            <MenuItem onClick={() => handleExport('csv')}>CSV</MenuItem>
-                            <MenuItem onClick={() => handleExport('xlsx')}>XLSX</MenuItem>
+                        <Menu opener="attributes-export-btn" open={exportOpen} onClose={() => setExportOpen(false)}>
+                            <MenuItem text="CSV" onClick={() => handleExport('csv')} />
+                            <MenuItem text="XLSX" onClick={() => handleExport('xlsx')} />
                         </Menu>
                         {canCreate && (
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit('/catalog/attributes/create')}
-                                sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                            >
+                            <Button design="Emphasized" icon="add" onClick={() => router.visit('/catalog/attributes/create')}>
                                 {tCatalog('createAttribute')}
                             </Button>
                         )}
-                    </Stack>
-                </Stack>
+                    </FlexBox>
+                </FlexBox>
 
                 {/* การ์ดตาราง: รวม toolbar + หัวตาราง + แถวข้อมูล ไว้บนพื้นผิว "Table" แบบ Fiori เดียวกัน */}
-                <Paper elevation={0} sx={fioriCardSx}>
+                <div
+                    style={{
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        overflow: 'hidden',
+                    }}
+                >
                     {/* แถบเครื่องมือ */}
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                        <TextField
+                    <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', padding: '1rem' }}>
+                        <Input
                             value={search}
-                            onChange={(event) => setSearch(event.target.value)}
+                            onInput={(event) => setSearch(event.target.value)}
                             placeholder={tCatalog('searchAttributes')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                    </InputAdornment>
-                                ),
-                            }}
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 280 }}
                         />
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, rowGap: 1, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Button
-                                variant="outlined"
-                                startIcon={<FilterListIcon />}
-                                onClick={() => setFilterDrawerOpen(true)}
-                                sx={fioriDefaultSx}
-                            >
+                        <FlexBox alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', rowGap: '0.5rem' }}>
+                            <Button icon="filter" onClick={() => setFilterDrawerOpen(true)}>
                                 {t('filter')}
                                 {Object.keys(activeFilters).length > 0 && ` (${Object.keys(activeFilters).length})`}
                             </Button>
                             <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{
-                                    bgcolor: FIORI.surface,
-                                    borderRadius: '8px',
-                                    minWidth: 60,
-                                    height: 34,
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: FIORI.border },
-                                }}
+                                value={String(perPage)}
+                                onChange={(e) => handlePerPageChange(Number(e.detail.selectedOption.value))}
+                                style={{ width: '5rem' }}
                             >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
+                                <Option value="10">10</Option>
+                                <Option value="25">25</Option>
+                                <Option value="50">50</Option>
                             </Select>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('perPage')}
-                            </Typography>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('perPage')}</Text>
+                            <Text>{currentPage}</Text>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('pageOf', { lastPage })}</Text>
 
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}
-                            >
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
+                            <FlexBox style={{ gap: '0.125rem' }}>
+                                <Button design="Transparent" icon="sys-first-page" disabled={currentPage <= 1} onClick={() => goToPage(1)} />
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-left"
+                                    disabled={currentPage <= 1}
+                                    onClick={() => goToPage(currentPage - 1)}
+                                />
+                                <Button
+                                    design="Transparent"
+                                    icon="slim-arrow-right"
+                                    disabled={currentPage >= lastPage}
+                                    onClick={() => goToPage(currentPage + 1)}
+                                />
+                                <Button
+                                    design="Transparent"
+                                    icon="sys-last-page"
+                                    disabled={currentPage >= lastPage}
+                                    onClick={() => goToPage(lastPage)}
+                                />
+                            </FlexBox>
+                        </FlexBox>
+                    </FlexBox>
 
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('pageOf', { lastPage })}
-                            </Typography>
-
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
 
                     <FioriBusyOverlay busy={isFetching}>
                         <FioriResponsiveTable
@@ -310,8 +286,8 @@ export default function AttributeIndex({ gridConfig, gridData, filters }: Props)
                             emptyMessage={tCatalog('noAttributesFound')}
                         />
                     </FioriBusyOverlay>
-                </Paper>
-            </Box>
+                </div>
+            </div>
             <FioriMessageBox
                 open={deleteAttributeId !== null}
                 onCancel={() => setDeleteAttributeId(null)}

@@ -1,16 +1,16 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import { CheckBox, Input, TextArea } from '@ui5/webcomponents-react';
 import { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import { FioriField, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
+
+import { MasterFormPage } from '../master-crud';
+
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 
 interface BaseUnitDetail {
     id: number;
@@ -58,76 +58,52 @@ export default function BaseUnitEdit({ baseUnit, translations }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editBaseUnit')}: ${baseUnit.admin_label || baseUnit.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editBaseUnit')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/base-units" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
-                            {t('back')}
-                        </Button>
-                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
-                            {processing ? t('saving') : t('save')}
-                        </Button>
-                    </Stack>
-                </Stack>
+            <MasterFormPage title={t('editBaseUnit')} backHref="/catalog/base-units" processing={processing} onSubmit={submit} errors={errors}>
+                <LocaleLabelFields
+                    title={t('name')}
+                    description={t('nameHelperText')}
+                    values={data.translations}
+                    onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
+                />
 
-                <Stack spacing={2}>
-                    <LocaleLabelFields
-                        title={t('name')}
-                        description={t('nameHelperText')}
-                        values={data.translations}
-                        onChange={(localeId, value) => setData('translations', { ...data.translations, [localeId]: value })}
-                    />
+                <FioriFormGroup title={t('generalTitle')}>
+                    <FioriField
+                        label={t('baseUnitAbbrev')}
+                        htmlFor="base-unit-slug"
+                        valueState={valueStateOf(errors.slug)}
+                        message={errors.slug}
+                        hint={t('baseUnitAbbrevHelperText')}
+                    >
+                        <Input
+                            id="base-unit-slug"
+                            value={data.slug}
+                            valueState={ui5ValueState(valueStateOf(errors.slug))}
+                            onInput={(e) => setData('slug', e.target.value)}
+                        />
+                    </FioriField>
 
-                    <FioriFormGroup title={t('generalTitle')}>
-                        <FioriField
-                            label={t('baseUnitAbbrev')}
-                            htmlFor="base-unit-slug"
-                            valueState={valueStateOf(errors.slug)}
-                            message={errors.slug}
-                            hint={t('baseUnitAbbrevHelperText')}
-                        >
-                            <TextField
-                                id="base-unit-slug"
-                                fullWidth
-                                size="small"
-                                value={data.slug}
-                                onChange={(e) => setData('slug', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.slug))}
-                            />
-                        </FioriField>
+                    <FioriField
+                        label={t('description')}
+                        htmlFor="base-unit-description"
+                        valueState={valueStateOf(errors.description)}
+                        message={errors.description}
+                        hint={t('descriptionHelperText')}
+                        fullWidth
+                    >
+                        <TextArea
+                            id="base-unit-description"
+                            rows={4}
+                            value={data.description}
+                            valueState={ui5ValueState(valueStateOf(errors.description))}
+                            onInput={(e) => setData('description', e.target.value)}
+                        />
+                    </FioriField>
 
-                        <FioriField
-                            label={t('description')}
-                            htmlFor="base-unit-description"
-                            valueState={valueStateOf(errors.description)}
-                            message={errors.description}
-                            hint={t('descriptionHelperText')}
-                            fullWidth
-                        >
-                            <TextField
-                                id="base-unit-description"
-                                fullWidth
-                                size="small"
-                                multiline
-                                rows={4}
-                                value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.description))}
-                            />
-                        </FioriField>
-
-                        <FioriField label="">
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                label={t('active')}
-                            />
-                        </FioriField>
-                    </FioriFormGroup>
-                </Stack>
-
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-            </Box>
+                    <FioriField label="">
+                        <CheckBox text={t('active')} checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />
+                    </FioriField>
+                </FioriFormGroup>
+            </MasterFormPage>
         </AppLayout>
     );
 }

@@ -1,7 +1,6 @@
 import { FioriMessageStrip } from '@/components/fiori-form';
-import { FIORI } from '@/lib/fiori-style';
-import { Box, CircularProgress, Divider, Stack, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { BusyIndicator, Title } from '@ui5/webcomponents-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -120,7 +119,7 @@ export function MarketplacePushReview({
 
     if (error) {
         return (
-            <FioriMessageStrip severity="error" sx={{ py: 0.5 }}>
+            <FioriMessageStrip severity="error" style={{ padding: '0.25rem 0' }}>
                 {error}
             </FioriMessageStrip>
         );
@@ -128,82 +127,82 @@ export function MarketplacePushReview({
 
     if (!detail) {
         return (
-            <Stack direction="row" spacing={1} alignItems="center">
-                <CircularProgress size={14} />
-                <Typography variant="body2" color="text.secondary">
-                    {t('pushReviewLoading')}
-                </Typography>
-            </Stack>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BusyIndicator active delay={0} size="S" />
+                <span style={{ fontSize: 'var(--sapFontSize)', color: 'var(--sapContent_LabelColor)' }}>{t('pushReviewLoading')}</span>
+            </div>
         );
     }
 
     return (
-        <Box>
+        <div>
             {issues.length > 0 ? (
-                <FioriMessageStrip severity="error" sx={{ mb: 2 }}>
-                    <Typography variant="body2" fontWeight={600}>
-                        {t('pushReviewBlockedTitle')}
-                    </Typography>
-                    <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+                <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontWeight: 600 }}>{t('pushReviewBlockedTitle')}</div>
+                    <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
                         {issues.map((issue) => (
-                            <Typography key={issue} component="li" variant="body2">
-                                {issue}
-                            </Typography>
+                            <li key={issue}>{issue}</li>
                         ))}
-                    </Box>
+                    </ul>
                 </FioriMessageStrip>
             ) : (
-                <FioriMessageStrip severity="success" sx={{ mb: 2 }}>
+                <FioriMessageStrip severity="success" style={{ marginBottom: '1rem' }}>
                     {t('pushReviewAllPassed')}
                 </FioriMessageStrip>
             )}
 
             {showSavedDataNote && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                <span style={{ display: 'block', marginBottom: '1rem', fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>
                     {t('pushReviewSavedDataNote')}
-                </Typography>
+                </span>
             )}
 
             <SectionTitle>{t('pushReviewCategory')}</SectionTitle>
-            <Typography variant="body2" sx={{ mb: 2, color: categoryPath ? FIORI.textPrimary : FIORI.error, fontWeight: categoryPath ? 400 : 600 }}>
+            <div
+                style={{
+                    marginBottom: '1rem',
+                    fontSize: 'var(--sapFontSize)',
+                    color: categoryPath ? 'var(--sapTextColor)' : 'var(--sapNegativeTextColor)',
+                    fontWeight: categoryPath ? 400 : 600,
+                }}
+            >
                 {categoryPath ?? t('pushReviewNotMapped')}
-            </Typography>
+            </div>
 
             <SectionTitle>{t('pushReviewPlatformFields')}</SectionTitle>
             <FieldList rows={detail.platform_fields} isRequired={isRequiredPlatformField} />
 
             <SectionTitle>{t('pushReviewImages', { count: detail.platform_images.length })}</SectionTitle>
             {noImages ? (
-                <Typography variant="body2" sx={{ color: FIORI.error, fontWeight: 600, mb: 2 }}>
+                <div style={{ marginBottom: '1rem', fontSize: 'var(--sapFontSize)', color: 'var(--sapNegativeTextColor)', fontWeight: 600 }}>
                     {t('pushReviewNoImagesShort')}
-                </Typography>
+                </div>
             ) : (
-                <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
                     {detail.platform_images.map((url, idx) => (
-                        <Box
+                        <img
                             key={idx}
-                            component="img"
                             src={url}
                             alt={`${idx + 1}`}
                             onError={(e) => {
                                 (e.target as HTMLImageElement).style.visibility = 'hidden';
                             }}
-                            sx={{
+                            style={{
                                 width: 64,
                                 height: 64,
-                                borderRadius: 1,
+                                borderRadius: 'var(--sapElement_BorderCornerRadius)',
                                 objectFit: 'cover',
-                                border: `1px solid ${FIORI.border}`,
-                                bgcolor: FIORI.headerBg,
+                                border: '1px solid var(--sapGroup_ContentBorderColor)',
+                                background: 'var(--sapList_HeaderBackground)',
                             }}
                         />
                     ))}
-                </Stack>
+                </div>
             )}
 
             <SectionTitle>{t('pushReviewAttributes')}</SectionTitle>
             <FieldList rows={detail.attributes} isRequired={(row) => Boolean(row.mandatory)} showRequiredTag />
-        </Box>
+        </div>
     );
 }
 
@@ -211,11 +210,11 @@ function platformLabel(platform: ReviewablePlatform): string {
     return { lazada: 'Lazada', shopee: 'Shopee', tiktok: 'TikTok' }[platform];
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { children: ReactNode }) {
     return (
-        <Typography variant="subtitle2" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 1 }}>
+        <Title level="H6" size="H6" wrappingType="Normal" style={{ display: 'block', marginBottom: '0.5rem' }}>
             {children}
-        </Typography>
+        </Title>
     );
 }
 
@@ -231,32 +230,42 @@ function FieldList({
     const { t } = useTranslation('catalog');
 
     return (
-        <Stack divider={<Divider sx={{ borderColor: FIORI.border }} />} spacing={0} sx={{ mb: 2 }}>
+        <div style={{ marginBottom: '1rem' }}>
             {rows.map((row, idx) => {
                 const empty = isEmpty(row.value);
                 const blocking = empty && isRequired(row);
 
                 return (
-                    <Stack key={idx} direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2} sx={{ py: 0.75 }}>
-                        <Box sx={{ flexShrink: 0 }}>
-                            <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
+                    <div
+                        key={idx}
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            gap: '1rem',
+                            padding: '0.375rem 0',
+                            borderTop: idx > 0 ? '1px solid var(--sapGroup_ContentBorderColor)' : undefined,
+                        }}
+                    >
+                        <div style={{ flexShrink: 0 }}>
+                            <div style={{ fontSize: 'var(--sapFontSize)', color: 'var(--sapTextColor)' }}>
                                 {row.label}{' '}
                                 {showRequiredTag && row.mandatory && (
-                                    <Typography component="span" variant="caption" sx={{ color: FIORI.warning, fontWeight: 700 }}>
+                                    <span style={{ fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapCriticalTextColor)', fontWeight: 700 }}>
                                         {t('pushReviewRequired')}
-                                    </Typography>
+                                    </span>
                                 )}
-                            </Typography>
+                            </div>
                             {row.type && (
-                                <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>
+                                <span style={{ display: 'block', fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapContent_LabelColor)' }}>
                                     {row.type}
-                                </Typography>
+                                </span>
                             )}
-                        </Box>
-                        <Typography
-                            variant="body2"
-                            sx={{
-                                color: blocking ? FIORI.error : empty ? FIORI.textSecondary : FIORI.textPrimary,
+                        </div>
+                        <div
+                            style={{
+                                fontSize: 'var(--sapFontSize)',
+                                color: blocking ? 'var(--sapNegativeTextColor)' : empty ? 'var(--sapContent_LabelColor)' : 'var(--sapTextColor)',
                                 fontWeight: blocking ? 600 : 400,
                                 textAlign: 'right',
                                 wordBreak: 'break-word',
@@ -265,10 +274,10 @@ function FieldList({
                             }}
                         >
                             {empty ? t('pushReviewEmpty') : plainText(row.value)}
-                        </Typography>
-                    </Stack>
+                        </div>
+                    </div>
                 );
             })}
-        </Stack>
+        </div>
     );
 }

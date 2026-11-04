@@ -1,6 +1,3 @@
-import { SvgIconComponent } from '@mui/icons-material';
-import { type IconName } from '@/components/icon';
-
 export interface Auth {
     user: User;
     permissions: string[];
@@ -19,16 +16,16 @@ export interface NavGroup {
 export interface NavItem {
     title: string;
     url?: string;
-    icon?: SvgIconComponent | null;
     /**
-     * SAP-icons glyph (see resources/js/components/icon.tsx) shown at the
-     * root level of the secondary "double sidebar" panel (NavSecondary) —
-     * distinct from `icon` above, which is only ever read by the primary
-     * icon rail (NavPrimary, the 4 top-level groups). Deeper-nested items
-     * inside NavSecondary intentionally stay icon-less (matches Fiori's own
-     * spec: only navigation *list items*, not child items, carry an icon).
+     * SAP-icons glyph name (a `@ui5/webcomponents-icons` name such as
+     * `"product"` / `"database"`), rendered by the UI5 SideNavigation in
+     * app-sidebar.tsx. Every item that renders as a first-level
+     * SideNavigationItem should carry one (the collapsed rail shows icons
+     * only); sub-items and SideNavigationGroup headers ignore it. The glyph
+     * must also be side-effect imported once — see the icon imports at the
+     * top of app-sidebar.tsx.
      */
-    iconName?: IconName;
+    icon?: string | null;
     isActive?: boolean;
     items?: NavItem[];
     permission?: string;

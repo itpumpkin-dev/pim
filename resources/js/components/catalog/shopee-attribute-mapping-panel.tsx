@@ -1,8 +1,8 @@
-import { ListSubheader, MenuItem, Select } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingTargetSelect } from '@/components/catalog/marketplace-mapping-ui';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
+import { useTranslation } from 'react-i18next';
 
 // v1 รองรับแค่ Shopee attribute แบบพิมพ์ข้อความเอง (input_type 3) เท่านั้น — ดูที่
 // ShopeeAttributeMappingController::update() ซึ่งจะปฏิเสธการ mapping ไปยัง
@@ -11,18 +11,7 @@ import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-
 // value_id เฉพาะเจาะจงสำหรับแบบนั้น ไม่ใช่ข้อความอิสระ
 const MAPPABLE_INPUT_TYPE = 3;
 
-type TargetField =
-    | 'name'
-    | 'price'
-    | 'qty'
-    | 'weight'
-    | 'length'
-    | 'width'
-    | 'height'
-    | 'description'
-    | 'video'
-    | 'shopee_attribute'
-    | '';
+type TargetField = 'name' | 'price' | 'qty' | 'weight' | 'length' | 'width' | 'height' | 'description' | 'video' | 'shopee_attribute' | '';
 
 // ทั้ง 9 ฟิลด์นี้เป็นแบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่า
 // จะชนะ" ส่งค่าตรงเข้า payload ของ Shopee เอง (add_item/update_item)
@@ -37,7 +26,7 @@ const STRUCTURED_FIELDS: TargetField[] = ['name', 'price', 'qty', 'weight', 'len
 // ค่าของ target Select จะเป็น string ของ TargetField ธรรมดาสำหรับฟิลด์
 // payload ที่ตายตัวทุกตัว แต่ถ้าเป็นการ mapping ไป Shopee attribute_list
 // ต้องแนบด้วยว่า *attribute ไหน* ของ Shopee — เลยเข้ารหัสเป็น prefix นี้ + id
-// (เช่น "shopee_attribute:7") เพื่อให้ MUI Select ตัวเดียวแทนทั้งสองแบบได้
+// (เช่น "shopee_attribute:7") เพื่อให้ Select ตัวเดียวแทนทั้งสองแบบได้
 // โดยไม่ต้องมี control ตัวที่สอง
 const SHOPEE_ATTRIBUTE_PREFIX = 'shopee_attribute:';
 
@@ -145,29 +134,32 @@ export function ShopeeAttributeMappingPanel({ attributes, shopeeAttributes, cove
             syncing={mapping.syncing}
             onSync={mapping.syncFromPlatform}
             renderMapToCell={(row) => (
-                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
-                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                    <ListSubheader>{t('shopeePayloadFieldsGroup')}</ListSubheader>
-                    {STRUCTURED_FIELDS.map((field) => (
-                        <MenuItem
-                            key={field}
-                            value={field}
-                            // ฟิลด์วิดีโอของ Shopee ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
-                            // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
-                            // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
-                            disabled={field === 'video' && row.type !== 'video'}
-                        >
-                            {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'shopee_attribute'>])}
-                        </MenuItem>
-                    ))}
-                    <ListSubheader>{t('shopeeAttributesGroup')}</ListSubheader>
-                    {shopeeAttributes.map((sa) => (
-                        <MenuItem key={sa.id} value={`${SHOPEE_ATTRIBUTE_PREFIX}${sa.id}`} disabled={sa.input_type !== MAPPABLE_INPUT_TYPE}>
-                            {sa.name}
-                            {sa.input_type !== MAPPABLE_INPUT_TYPE ? ` ${t('shopeeDropdownUnsupported')}` : ''}
-                        </MenuItem>
-                    ))}
-                </Select>
+                <MappingTargetSelect
+                    value={buildTargetValue(row)}
+                    onChange={(value) => applySelectValue(row, value)}
+                    emptyLabel={t('notUsed')}
+                    groups={[
+                        {
+                            header: t('shopeePayloadFieldsGroup'),
+                            options: STRUCTURED_FIELDS.map((field) => ({
+                                value: field,
+                                label: t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'shopee_attribute'>]),
+                                // ฟิลด์วิดีโอของ Shopee ต้องการไฟล์ที่อัปโหลดจริงๆ ไม่ใช่
+                                // URL จากภายนอก (ดู backend guard ของฟิลด์นี้) — จะมีแค่
+                                // PIM attribute ประเภท `video` เท่านั้นที่ map มาที่นี่ได้
+                                disabled: field === 'video' && row.type !== 'video',
+                            })),
+                        },
+                        {
+                            header: t('shopeeAttributesGroup'),
+                            options: shopeeAttributes.map((sa) => ({
+                                value: `${SHOPEE_ATTRIBUTE_PREFIX}${sa.id}`,
+                                label: sa.input_type !== MAPPABLE_INPUT_TYPE ? `${sa.name} ${t('shopeeDropdownUnsupported')}` : sa.name,
+                                disabled: sa.input_type !== MAPPABLE_INPUT_TYPE,
+                            })),
+                        },
+                    ]}
+                />
             )}
         />
     );

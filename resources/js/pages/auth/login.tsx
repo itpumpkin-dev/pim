@@ -1,13 +1,18 @@
 import AppLogoIcon from '@/components/app-logo-icon';
+import InputError from '@/components/input-error';
 import LocaleDropdown from '@/components/locale-dropdown';
 import TextLink from '@/components/text-link';
-import { Head, Link, useForm } from '@inertiajs/react';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/show.js';
+import { Button, CheckBox, FlexBox, Label, Text, Title } from '@ui5/webcomponents-react';
 import { FormEventHandler, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
+
+import field from './credential-field.module.css';
+import styles from './login.module.css';
+
+const cx = (...names: Array<string | false | undefined>) => names.filter(Boolean).join(' ');
 
 interface LoginForm {
     email: string;
@@ -37,186 +42,148 @@ export default function Login({ status, canResetPassword }: LoginProps) {
         });
     };
 
+    const togglePasswordLabel = showPassword ? t('hidePassword') : t('showPassword');
+
     return (
         <>
             <Head title="Log in" />
-            <Box
-                sx={{
-                    minHeight: '100vh',
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    bgcolor: FIORI.pageBg,
-                }}
-            >
-                <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 3, sm: 6 }, py: { xs: 4, sm: 6 } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box
-                            component={Link}
-                            href={route('home')}
-                            sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'text.primary' }}
-                        >
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 1,
-                                    color: 'primary.contrastText',
-                                }}
-                            >
+            <div className={styles.page}>
+                <div className={styles.formColumn}>
+                    <FlexBox alignItems="Center" justifyContent="SpaceBetween">
+                        <Link href={route('home')} className={styles.brandLink}>
+                            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32 }}>
                                 <AppLogoIcon style={{ width: 36, height: 36, fill: 'currentColor' }} />
-                            </Box>
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                PIM <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>Pumpkin</Box>
-                            </Typography>
-                        </Box>
+                            </span>
+                            <span className={styles.brandName}>
+                                PIM <span className={styles.brandAccent}>Pumpkin</span>
+                            </span>
+                        </Link>
                         <LocaleDropdown />
-                    </Box>
+                    </FlexBox>
 
-                    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-                        <Box sx={{ width: '100%', maxWidth: 360, mx: 'auto' }}>
-                            <Stack spacing={3}>
-                                <Stack spacing={1}>
-                                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
+                    <FlexBox alignItems="Center" style={{ flex: 1 }}>
+                        <div style={{ width: '100%', maxWidth: 360, margin: '0 auto' }}>
+                            <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                                <FlexBox direction="Column" style={{ gap: '0.5rem' }}>
+                                    <Title level="H1" size="H2" wrappingType="Normal">
                                         {t('signIn')}
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary">
-                                        {t('signInSubtitle')}
-                                    </Typography>
-                                </Stack>
+                                    </Title>
+                                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('signInSubtitle')}</Text>
+                                </FlexBox>
 
-                                {status && (
-                                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 500 }}>
-                                        {status}
-                                    </Typography>
-                                )}
+                                {status && <Text style={{ fontWeight: 500, color: 'var(--sapPositiveTextColor)' }}>{status}</Text>}
 
-                                <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                                    <Stack spacing={3}>
-                                        <TextField
-                                            id="email"
-                                            type="email"
-                                            label={t('emailAddress')}
-                                            required
-                                            autoFocus
-                                            tabIndex={1}
-                                            autoComplete="email"
-                                            value={data.email}
-                                            onChange={(e) => setData('email', e.target.value)}
-                                            placeholder="email@example.com"
-                                            fullWidth
-                                            error={Boolean(errors.email)}
-                                            helperText={errors.email}
-                                        />
-
-                                        <Box>
-                                            <TextField
-                                                id="password"
-                                                type={showPassword ? 'text' : 'password'}
-                                                label={t('password')}
+                                <form onSubmit={submit}>
+                                    <FlexBox direction="Column" style={{ gap: '1.5rem' }}>
+                                        <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+                                            <Label for="email" required showColon={false}>
+                                                {t('emailAddress')}
+                                            </Label>
+                                            <input
+                                                id="email"
+                                                name="email"
+                                                type="email"
                                                 required
-                                                tabIndex={2}
-                                                autoComplete="current-password"
-                                                value={data.password}
-                                                onChange={(e) => setData('password', e.target.value)}
-                                                placeholder="Password"
-                                                fullWidth
-                                                error={Boolean(errors.password)}
-                                                helperText={errors.password}
-                                                slotProps={{
-                                                    input: {
-                                                        endAdornment: (
-                                                            <InputAdornment position="end">
-                                                                <IconButton
-                                                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-                                                                    onClick={() => setShowPassword((prev) => !prev)}
-                                                                    edge="end"
-                                                                    tabIndex={-1}
-                                                                >
-                                                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                                                </IconButton>
-                                                            </InputAdornment>
-                                                        ),
-                                                    },
-                                                }}
+                                                autoFocus
+                                                tabIndex={1}
+                                                autoComplete="email"
+                                                value={data.email}
+                                                onChange={(e) => setData('email', e.target.value)}
+                                                placeholder="email@example.com"
+                                                aria-invalid={Boolean(errors.email)}
+                                                className={cx(field.input, errors.email && field.invalid)}
                                             />
+                                            <InputError message={errors.email} />
+                                        </FlexBox>
+
+                                        <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+                                            <Label for="password" required showColon={false}>
+                                                {t('password')}
+                                            </Label>
+                                            <div className={field.withAction}>
+                                                <input
+                                                    id="password"
+                                                    name="password"
+                                                    type={showPassword ? 'text' : 'password'}
+                                                    required
+                                                    tabIndex={2}
+                                                    autoComplete="current-password"
+                                                    value={data.password}
+                                                    onChange={(e) => setData('password', e.target.value)}
+                                                    placeholder="Password"
+                                                    aria-invalid={Boolean(errors.password)}
+                                                    className={cx(field.input, errors.password && field.invalid)}
+                                                />
+                                                <Button
+                                                    className={field.action}
+                                                    design="Transparent"
+                                                    icon={showPassword ? 'hide' : 'show'}
+                                                    tooltip={togglePasswordLabel}
+                                                    accessibleName={togglePasswordLabel}
+                                                    tabIndex={-1}
+                                                    onClick={() => setShowPassword((prev) => !prev)}
+                                                />
+                                            </div>
+                                            <InputError message={errors.password} />
                                             {canResetPassword && (
-                                                <Box sx={{ textAlign: 'right', mt: 1 }}>
+                                                <div style={{ textAlign: 'right', marginTop: '0.5rem' }}>
                                                     <TextLink href={route('password.request')} tabIndex={5} style={{ fontSize: '0.875rem' }}>
                                                         {t('forgotPassword')}
                                                     </TextLink>
-                                                </Box>
+                                                </div>
                                             )}
-                                        </Box>
+                                        </FlexBox>
 
-                                        <FormControlLabel
-                                            control={
-                                                <Checkbox
-                                                    id="remember"
-                                                    name="remember"
-                                                    tabIndex={3}
-                                                    checked={data.remember}
-                                                    onChange={(e) => setData('remember', e.target.checked)}
-                                                />
-                                            }
-                                            label={t('rememberMe')}
+                                        <CheckBox
+                                            id="remember"
+                                            name="remember"
+                                            tabIndex={3}
+                                            text={t('rememberMe')}
+                                            checked={data.remember}
+                                            onChange={(e) => setData('remember', e.target.checked)}
                                         />
 
                                         <Button
-                                            type="submit"
-                                            variant="contained"
-                                            size="large"
-                                            fullWidth
+                                            type="Submit"
+                                            design="Emphasized"
                                             tabIndex={4}
                                             disabled={processing}
-                                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                            sx={{ ...fioriEmphasizedSx, py: 1.25 }}
+                                            loading={processing}
+                                            loadingDelay={0}
+                                            style={{ width: '100%' }}
                                         >
                                             {t('signIn')}
                                         </Button>
 
                                         <Button
-                                            component={Link}
-                                            href={route('home')}
-                                            variant="text"
-                                            fullWidth
+                                            design="Transparent"
                                             tabIndex={5}
-                                            sx={{ ...fioriGhostSx, mt: 0 }}
+                                            style={{ width: '100%' }}
+                                            onClick={() => router.visit(route('home'))}
                                         >
                                             {t('backToHome')}
                                         </Button>
-                                    </Stack>
-                                </Box>
-                            </Stack>
-                        </Box>
-                    </Box>
-                </Box>
+                                    </FlexBox>
+                                </form>
+                            </FlexBox>
+                        </div>
+                    </FlexBox>
+                </div>
 
-                <Box
-                    sx={{
-                        display: { xs: 'none', md: 'flex' },
-                        position: 'relative',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        bgcolor: FIORI.surface,
-                        color: FIORI.textPrimary,
-                        borderLeft: `1px solid ${FIORI.border}`,
-                    }}
-                >
-                    <Stack spacing={1} alignItems="center" sx={{ position: 'relative', textAlign: 'center', px: 6, maxWidth: 420 }}>
+                <div className={styles.heroPanel}>
+                    <FlexBox
+                        direction="Column"
+                        alignItems="Center"
+                        style={{ gap: '0.5rem', position: 'relative', textAlign: 'center', padding: '0 3rem', maxWidth: 420 }}
+                    >
                         <AppLogoIcon style={{ width: 96, height: 96 }} />
-                        <Typography variant="h4" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
+                        <Title level="H2" size="H2" wrappingType="Normal">
                             PIM Pumpkin
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: FIORI.textSecondary }}>
-                            {t('appTagline')}
-                        </Typography>
-                    </Stack>
-                </Box>
-            </Box>
+                        </Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('appTagline')}</Text>
+                    </FlexBox>
+                </div>
+            </div>
         </>
     );
 }

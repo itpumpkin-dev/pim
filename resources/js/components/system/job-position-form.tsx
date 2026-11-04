@@ -1,9 +1,9 @@
+import { FioriField, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Box, Button, Checkbox, CircularProgress, FormControlLabel, Paper, TextField, Typography } from '@mui/material';
-import { FormEventHandler } from 'react';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+import { Button, CheckBox, Input, Title } from '@ui5/webcomponents-react';
+import { FormEvent } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -40,8 +40,8 @@ export default function JobPositionFormPage({ jobPosition }: JobPositionFormProp
 
     const cancel = () => router.visit('/system/jobPosition');
 
-    const submit: FormEventHandler = (e) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         if (isEdit && jobPosition) {
             put(`/system/jobPosition/${jobPosition.id}`);
         } else {
@@ -54,55 +54,41 @@ export default function JobPositionFormPage({ jobPosition }: JobPositionFormProp
             breadcrumbs={breadcrumbs}
             actions={
                 <>
-                    <Button variant="outlined" onClick={cancel} sx={fioriDefaultSx}>
-                        CANCEL
-                    </Button>
-                    <Button
-                        type="submit"
-                        form="job-position-form"
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={fioriEmphasizedSx}
-                    >
+                    <Button onClick={cancel}>CANCEL</Button>
+                    <Button design="Emphasized" disabled={processing} loading={processing} loadingDelay={0} onClick={() => submit()}>
                         {processing ? 'Saving…' : 'Save'}
                     </Button>
                 </>
             }
         >
             <Head title={isEdit ? `Edit ${jobPosition?.name}` : 'Create Job Position'} />
-            <Box component="form" id="job-position-form" onSubmit={submit} sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, color: FIORI.textPrimary }}>
+            <form
+                id="job-position-form"
+                onSubmit={submit}
+                style={{ padding: '2rem', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}
+            >
+                <Title level="H3" wrappingType="Normal" style={{ marginBottom: '1.5rem' }}>
                     {isEdit ? jobPosition?.name : 'New Job Position'}
-                </Typography>
+                </Title>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3, maxWidth: 420 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                        <Box>
-                            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: FIORI.textPrimary }}>
-                                Name *
-                            </Typography>
-                            <TextField
-                                fullWidth
-                                size="small"
-                                value={data.name}
-                                onChange={(e) => {
-                                    setData('name', e.target.value);
-                                    clearErrors('name');
-                                }}
-                                error={Boolean(errors.name)}
-                                helperText={errors.name}
-                            />
-                        </Box>
-                        <Box>
-                            <FormControlLabel
-                                control={<Checkbox checked={data.enabled} onChange={(e) => setData('enabled', e.target.checked)} />}
-                                label="Active"
-                            />
-                        </Box>
-                    </Box>
-                </Paper>
-            </Box>
+                <FioriFormGroup style={{ maxWidth: 560 }}>
+                    <FioriField label="Name" htmlFor="job-position-name" required valueState={valueStateOf(errors.name)} message={errors.name}>
+                        <Input
+                            id="job-position-name"
+                            style={{ width: '100%' }}
+                            value={data.name}
+                            valueState={ui5ValueState(valueStateOf(errors.name))}
+                            onInput={(e) => {
+                                setData('name', e.target.value);
+                                clearErrors('name');
+                            }}
+                        />
+                    </FioriField>
+                    <FioriField label="">
+                        <CheckBox text="Active" checked={data.enabled} onChange={(e) => setData('enabled', e.target.checked)} />
+                    </FioriField>
+                </FioriFormGroup>
+            </form>
         </AppLayout>
     );
 }

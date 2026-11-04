@@ -1,10 +1,12 @@
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, FioriStatus, type FioriTone } from '@/lib/fiori-style';
+import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import { Box, Stack, Typography } from '@mui/material';
+import { Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './category-pages.module.css';
 
 // ทำเป็นตารางแถวละแพลตฟอร์ม แทนที่จะเป็น picker-tile + panel รายละเอียดอันเดียว
 // (ดีไซน์เดิมโชว์ action ได้ทีละแพลตฟอร์มเท่านั้น) — ตอนนี้เห็นสถานะ sync ของทุก
@@ -66,15 +68,13 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
             priority: 'always',
             minWidth: 200,
             render: (platform) => (
-                <Stack spacing={0.5}>
-                    <Typography fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                        {platform.label}
-                    </Typography>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                    <span className={styles.strong}>{platform.label}</span>
                     <FioriStatus
                         label={t('lastSyncedAt', { datetime: formatLocalDateTime(lastSyncedAt[platform.value] ?? null) })}
                         tone={syncFreshnessTone(lastSyncedAt[platform.value] ?? null)}
                     />
-                </Stack>
+                </div>
             ),
         },
     ];
@@ -82,16 +82,16 @@ export default function CategoryMarketplaceSync({ lastSyncedAt }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('marketplaceSyncTitle')} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h4" fontWeight={700} sx={{ color: FIORI.textPrimary }}>
+            <div className={styles.page}>
+                <div className={styles.headerText} style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H2" wrappingType="Normal">
                         {t('marketplaceSyncTitle')}
-                    </Typography>
-                    <Typography sx={{ color: FIORI.textSecondary, mt: 0.5 }}>{t('marketplaceSyncSubtitle')}</Typography>
-                </Box>
+                    </Title>
+                    <Text className={styles.subtitle}>{t('marketplaceSyncSubtitle')}</Text>
+                </div>
 
                 <FioriResponsiveTable columns={columns} rows={[...PLATFORMS]} getRowKey={(platform) => platform.value} />
-            </Box>
+            </div>
         </AppLayout>
     );
 }

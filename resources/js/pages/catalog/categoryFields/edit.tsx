@@ -1,18 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
-import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import LocaleLabelFields from '@/components/catalog/locale-label-fields';
 import { OptionListEditor } from '@/components/catalog/option-list-editor';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { HistoryPanel } from '@/components/history-panel';
+import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import { Box, Button, Checkbox, CircularProgress, FormControl, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, Input, Option, Select, Tab, TabContainer, Title } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriField, FioriFormErrorSummary, FioriFormGroup, fioriFieldStateSx, valueStateOf } from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
-import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+
+import styles from '../categories/category-pages.module.css';
+
+const FIELD_TYPES = ['Text', 'Textarea', 'Boolean', 'Select', 'Multiselect', 'Datetime', 'Date', 'Image', 'File', 'Checkbox'];
 
 interface CategoryFieldItem {
     id: number;
@@ -56,8 +59,8 @@ export default function CategoryFieldEdit({ field, canViewHistory = false, canEd
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
-    const submit = (event: FormEvent) => {
-        event.preventDefault();
+    const submit = (event?: FormEvent) => {
+        event?.preventDefault();
         skipNavigationGuardRef.current = true;
         put(`/catalog/categoryFields/${field.id}`, {
             onSuccess: () => router.visit('/catalog/categoryFields', { replace: true }),
@@ -70,130 +73,138 @@ export default function CategoryFieldEdit({ field, canViewHistory = false, canEd
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Category Field: ${field.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', maxWidth: 760, bgcolor: FIORI.pageBg }}>
+            <form onSubmit={submit} className={styles.formPage}>
                 {canViewHistory && (
-                    <Tabs
-                        value={tabIndex}
-                        onChange={(_, v) => setTabIndex(v)}
-                        sx={{ ...fioriTabsSx, mb: 3 }}
+                    <TabContainer
+                        collapsed
+                        className={styles.tabs}
+                        contentBackgroundDesign="Transparent"
+                        onTabSelect={(e) => setTabIndex(e.detail.tabIndex)}
                     >
-                        <Tab label="General" />
-                        <Tab label="History" />
-                    </Tabs>
+                        <Tab text="General" selected={tabIndex === 0} />
+                        <Tab text="History" selected={tabIndex === 1} />
+                    </TabContainer>
                 )}
 
                 {tabIndex === 1 && canViewHistory && <HistoryPanel historyUrl={`/catalog/categoryFields/${field.id}/history`} />}
 
                 {tabIndex === 0 && (
-                <>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>Edit Category Field</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/catalog/categoryFields" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
-                            {t('back')}
-                        </Button>
-                        <Button type="submit" variant="contained" disabled={processing} startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />} sx={fioriEmphasizedSx}>
-                            {processing ? t('saving') : t('save')}
-                        </Button>
-                    </Stack>
-                </Stack>
+                    <>
+                        <div className={styles.formHeader}>
+                            <Title level="H3" wrappingType="Normal">
+                                Edit Category Field
+                            </Title>
+                            <div className={styles.actions}>
+                                <Button icon="nav-back" onClick={() => router.visit('/catalog/categoryFields')}>
+                                    {t('back')}
+                                </Button>
+                                <Button design="Emphasized" icon="save" disabled={processing} loading={processing} onClick={() => submit()}>
+                                    {processing ? t('saving') : t('save')}
+                                </Button>
+                            </div>
+                        </div>
 
-                <Stack spacing={2}>
-                    <FioriFormGroup title="General Config">
-                        <FioriField label="Code" htmlFor="field-code" hint={t(codeHintKey({ canEditCode, codeLocked }))} valueState={valueStateOf(errors.code)} message={errors.code}>
-                            <TextField
-                                id="field-code"
-                                fullWidth
-                                size="small"
-                                value={data.code}
-                                disabled={!canEditCode}
-                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
-                                inputProps={{ maxLength: 100 }}
-                                sx={fioriFieldStateSx(valueStateOf(errors.code))}
+                        <div className={styles.formStack}>
+                            <FioriFormGroup title="General Config">
+                                <FioriField
+                                    label="Code"
+                                    htmlFor="field-code"
+                                    hint={t(codeHintKey({ canEditCode, codeLocked }))}
+                                    valueState={valueStateOf(errors.code)}
+                                    message={errors.code}
+                                >
+                                    <Input
+                                        id="field-code"
+                                        className={styles.fullWidth}
+                                        value={data.code}
+                                        disabled={!canEditCode}
+                                        maxlength={100}
+                                        valueState={ui5ValueState(valueStateOf(errors.code))}
+                                        onInput={(e) => setData('code', normalizeCodeInput(e.target.value))}
+                                    />
+                                </FioriField>
+
+                                <FioriField label="Field Type" htmlFor="field-type" required>
+                                    <Select
+                                        id="field-type"
+                                        className={styles.fullWidth}
+                                        value={data.type}
+                                        onChange={(e) => setData('type', e.detail.selectedOption.value ?? 'Text')}
+                                    >
+                                        {FIELD_TYPES.map((type) => (
+                                            <Option key={type} value={type}>
+                                                {type}
+                                            </Option>
+                                        ))}
+                                    </Select>
+                                </FioriField>
+
+                                {(data.type === 'Select' || data.type === 'Multiselect') && (
+                                    <FioriField label="Options" fullWidth>
+                                        <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
+                                    </FioriField>
+                                )}
+
+                                <FioriField
+                                    label="Position"
+                                    htmlFor="field-position"
+                                    valueState={valueStateOf(errors.position)}
+                                    message={errors.position}
+                                >
+                                    <Input
+                                        id="field-position"
+                                        type="Number"
+                                        className={styles.fullWidth}
+                                        value={String(data.position)}
+                                        valueState={ui5ValueState(valueStateOf(errors.position))}
+                                        onInput={(e) => setData('position', Number(e.target.value))}
+                                    />
+                                </FioriField>
+
+                                <FioriField
+                                    label="Display Section"
+                                    htmlFor="field-display-section"
+                                    valueState={valueStateOf(errors.display_section)}
+                                    message={errors.display_section}
+                                    hint="Optional UI grouping name"
+                                >
+                                    <Input
+                                        id="field-display-section"
+                                        className={styles.fullWidth}
+                                        value={data.display_section}
+                                        valueState={ui5ValueState(valueStateOf(errors.display_section))}
+                                        onInput={(e) => setData('display_section', e.target.value)}
+                                    />
+                                </FioriField>
+
+                                <FioriField label="">
+                                    <div className={styles.checkRow}>
+                                        <CheckBox
+                                            text="Required field"
+                                            checked={data.is_required}
+                                            onChange={(e) => setData('is_required', e.target.checked)}
+                                        />
+                                        <CheckBox
+                                            text={t('aiTranslate')}
+                                            checked={data.is_ai_translate}
+                                            onChange={(e) => setData('is_ai_translate', e.target.checked)}
+                                        />
+                                        <CheckBox text="Status Active" checked={data.status} onChange={(e) => setData('status', e.target.checked)} />
+                                    </div>
+                                </FioriField>
+                            </FioriFormGroup>
+
+                            <LocaleLabelFields
+                                title="Field Labels"
+                                values={data.labels}
+                                onChange={(localeId, value) => setData('labels', { ...data.labels, [localeId]: value })}
                             />
-                        </FioriField>
+                        </div>
 
-                        <FioriField label="Field Type" htmlFor="field-type" required>
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx('none')}>
-                                <Select id="field-type" value={data.type} onChange={(e) => setData('type', e.target.value)}>
-                                    <MenuItem value="Text">Text</MenuItem>
-                                    <MenuItem value="Textarea">Textarea</MenuItem>
-                                    <MenuItem value="Boolean">Boolean</MenuItem>
-                                    <MenuItem value="Select">Select</MenuItem>
-                                    <MenuItem value="Multiselect">Multiselect</MenuItem>
-                                    <MenuItem value="Datetime">Datetime</MenuItem>
-                                    <MenuItem value="Date">Date</MenuItem>
-                                    <MenuItem value="Image">Image</MenuItem>
-                                    <MenuItem value="File">File</MenuItem>
-                                    <MenuItem value="Checkbox">Checkbox</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </FioriField>
-
-                        {(data.type === 'Select' || data.type === 'Multiselect') && (
-                            <FioriField label="Options" fullWidth>
-                                <OptionListEditor value={data.options} onChange={(options) => setData('options', options)} />
-                            </FioriField>
-                        )}
-
-                        <FioriField label="Position" htmlFor="field-position" valueState={valueStateOf(errors.position)} message={errors.position}>
-                            <TextField
-                                id="field-position"
-                                type="number"
-                                fullWidth
-                                size="small"
-                                value={data.position}
-                                onChange={(e) => setData('position', Number(e.target.value))}
-                                sx={fioriFieldStateSx(valueStateOf(errors.position))}
-                            />
-                        </FioriField>
-
-                        <FioriField
-                            label="Display Section"
-                            htmlFor="field-display-section"
-                            valueState={valueStateOf(errors.display_section)}
-                            message={errors.display_section}
-                            hint="Optional UI grouping name"
-                        >
-                            <TextField
-                                id="field-display-section"
-                                fullWidth
-                                size="small"
-                                value={data.display_section}
-                                onChange={(e) => setData('display_section', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.display_section))}
-                            />
-                        </FioriField>
-
-                        <FioriField label="">
-                            <Stack direction="row" spacing={3} flexWrap="wrap">
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.is_required} onChange={(e) => setData('is_required', e.target.checked)} />}
-                                    label="Required field"
-                                />
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.is_ai_translate} onChange={(e) => setData('is_ai_translate', e.target.checked)} />}
-                                    label={t('aiTranslate')}
-                                />
-                                <FormControlLabel
-                                    control={<Checkbox checked={data.status} onChange={(e) => setData('status', e.target.checked)} />}
-                                    label="Status Active"
-                                />
-                            </Stack>
-                        </FioriField>
-                    </FioriFormGroup>
-
-                    <LocaleLabelFields
-                        title="Field Labels"
-                        values={data.labels}
-                        onChange={(localeId, value) => setData('labels', { ...data.labels, [localeId]: value })}
-                    />
-                </Stack>
-
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-                </>
+                        <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} className={styles.errorSummary} />
+                    </>
                 )}
-            </Box>
+            </form>
         </AppLayout>
     );
 }

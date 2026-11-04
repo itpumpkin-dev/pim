@@ -1,46 +1,34 @@
-import { TimelinePanel } from '@/components/timeline-panel';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useFioriConfirm } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { TimelinePanel } from '@/components/timeline-panel';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import CloseIcon from '@mui/icons-material/Close';
-import ImageIcon from '@mui/icons-material/Image';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/hide.js';
+import '@ui5/webcomponents-icons/dist/picture.js';
+import '@ui5/webcomponents-icons/dist/show.js';
 import {
-    Alert,
-    Autocomplete,
-    Box,
+    Bar,
     Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
     Dialog,
-    DialogContent,
-    FormControl,
-    FormControlLabel,
-    IconButton,
-    InputAdornment,
-    MenuItem,
+    Icon,
+    Input,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
+    RadioButton,
     Select,
     Tab,
-    Tabs,
-    TextField,
-    Typography,
-} from '@mui/material';
+    TabContainer,
+    Tag,
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
 import { ChangeEvent, FormEventHandler, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import {
-    FioriField,
-    FioriFormErrorSummary,
-    FioriFormGroup,
-    fioriFieldStateSx,
-    fioriMultiInputSx,
-    valueStateOf,
-} from '@/components/fiori-form';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTabsSx } from '@/lib/fiori-style';
 
 interface UserGroupOption {
     id: number;
@@ -175,6 +163,9 @@ function localeLabel(code: string) {
     }
 }
 
+/** Select value ('' = none) → form value (number | '') */
+const toIdOrEmpty = (value: string | undefined): number | '' => (value ? Number(value) : '');
+
 export default function UserEdit({
     user,
     groups,
@@ -191,6 +182,7 @@ export default function UserEdit({
 }: EditUserProps) {
     const { t } = useTranslation('system');
     const { t: tNav } = useTranslation('nav');
+    const { t: tCatalog } = useTranslation('catalog');
 
     // Anyone can open their own account here (it's the "Settings" page from the
     // user menu), but the user list at /system/user is gated by
@@ -253,9 +245,7 @@ export default function UserEdit({
             });
         });
 
-        return Array.from(rows.values()).sort(
-            (a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action),
-        );
+        return Array.from(rows.values()).sort((a, b) => a.resource.localeCompare(b.resource) || a.action.localeCompare(b.action));
     }, [permissions, t]);
 
     // Column pop-in priority (SAP Fiori responsive table): resource
@@ -268,30 +258,26 @@ export default function UserEdit({
             key: 'resource',
             header: t('resource'),
             priority: 'always',
-            render: (row) => humanize(row.resource),
+            render: (row: PermissionRow) => humanize(row.resource),
         },
         {
             key: 'action',
             header: t('action'),
             priority: 'high',
-            render: (row) => humanize(row.action),
+            render: (row: PermissionRow) => humanize(row.action),
         },
         {
             key: 'grantedVia',
             header: t('grantedVia'),
             priority: 'medium',
-            render: (row) => (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            render: (row: PermissionRow) => (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                     {row.sources.map((source) => (
-                        <Chip
-                            key={source}
-                            label={source}
-                            size="small"
-                            variant="outlined"
-                            sx={{ borderColor: FIORI.border, borderRadius: '6px', color: FIORI.textPrimary }}
-                        />
+                        <Tag key={source} design="Neutral" hideStateIcon>
+                            {source}
+                        </Tag>
                     ))}
-                </Box>
+                </div>
             ),
         },
     ];
@@ -408,511 +394,473 @@ export default function UserEdit({
         }
     };
 
+    const passwordToggle = (visible: boolean, toggle: () => void) => (
+        <Icon
+            name={visible ? 'hide' : 'show'}
+            mode="Interactive"
+            accessibleName={visible ? t('hidePassword') : t('showPassword')}
+            showTooltip
+            onClick={toggle}
+        />
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('editUserTitle', { name: user.name })} />
-            <Box
-                component="form"
+            <form
                 id="user-edit-form"
                 onSubmit={submit}
-                sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', bgcolor: FIORI.pageBg }}
+                style={{ display: 'flex', flexDirection: 'column', minHeight: '100%', background: 'var(--sapBackgroundColor)' }}
             >
-                <Box sx={{ flex: 1, p: 4 }}>
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <Box
-                        onClick={() => avatarPreview && setAvatarViewerOpen(true)}
-                        sx={{
-                            width: 72,
-                            height: 72,
-                            borderRadius: '8px',
-                            border: `2px solid ${FIORI.border}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                            cursor: avatarPreview ? 'pointer' : 'default',
-                        }}
-                    >
-                        {avatarPreview ? (
-                            <Box component="img" src={avatarPreview} alt={user.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <ImageIcon sx={{ fontSize: 36 }} />
-                        )}
-                    </Box>
-
-                    <Dialog open={avatarViewerOpen} onClose={() => setAvatarViewerOpen(false)} maxWidth="sm">
-                        <IconButton
-                            onClick={() => setAvatarViewerOpen(false)}
-                            sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'background.paper', '&:hover': { bgcolor: 'background.paper' } }}
+                <div style={{ flex: 1, padding: '2rem' }}>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div
+                            onClick={() => avatarPreview && setAvatarViewerOpen(true)}
+                            style={{
+                                width: 72,
+                                height: 72,
+                                borderRadius: '8px',
+                                border: '2px solid var(--sapGroup_ContentBorderColor)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                                cursor: avatarPreview ? 'pointer' : 'default',
+                            }}
                         >
-                            <CloseIcon fontSize="small" />
-                        </IconButton>
-                        <DialogContent sx={{ p: 0, display: 'flex' }}>
+                            {avatarPreview ? (
+                                <img src={avatarPreview} alt={user.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                <Icon name="picture" style={{ width: 36, height: 36, color: 'var(--sapContent_LabelColor)' }} />
+                            )}
+                        </div>
+
+                        <Dialog
+                            open={avatarViewerOpen}
+                            onClose={() => setAvatarViewerOpen(false)}
+                            header={
+                                <Bar
+                                    endContent={
+                                        <Button
+                                            design="Transparent"
+                                            icon="decline"
+                                            tooltip={tCatalog('close')}
+                                            accessibleName={tCatalog('close')}
+                                            onClick={() => setAvatarViewerOpen(false)}
+                                        />
+                                    }
+                                >
+                                    <Title level="H5">{user.name}</Title>
+                                </Bar>
+                            }
+                            style={{ maxWidth: 600 }}
+                        >
                             {avatarPreview && (
-                                <Box
-                                    component="img"
+                                <img
                                     src={avatarPreview}
                                     alt={user.name}
-                                    sx={{ width: '100%', maxHeight: '80vh', objectFit: 'contain' }}
+                                    style={{ display: 'block', width: '100%', maxHeight: '80vh', objectFit: 'contain' }}
                                 />
                             )}
-                        </DialogContent>
-                    </Dialog>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {user.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                            {t('createdLabel')}: {formatDateTime(user.created_at)} {t('updatedLabel')}: {formatDateTime(user.updated_at)} {t('lastLoggedInLabel')}:{' '}
-                            {formatDateTime(user.last_login_at)} {t('loginCountLabel')}: {user.login_count}
-                        </Typography>
-                    </Box>
-                </Box>
+                        </Dialog>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+                            <Title level="H2" size="H3" wrappingType="Normal">
+                                {user.name}
+                            </Title>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)', fontSize: 'var(--sapFontSmallSize)' }}>
+                                {t('createdLabel')}: {formatDateTime(user.created_at)} {t('updatedLabel')}: {formatDateTime(user.updated_at)}{' '}
+                                {t('lastLoggedInLabel')}: {formatDateTime(user.last_login_at)} {t('loginCountLabel')}: {user.login_count}
+                            </Text>
+                        </div>
+                    </div>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ ...fioriTabsSx, mb: 3 }}>
-                    {tabs.map((key) => (
-                        <Tab key={key} label={tabLabels[key]} value={key} />
-                    ))}
-                </Tabs>
+                    <TabContainer
+                        collapsed
+                        contentBackgroundDesign="Transparent"
+                        onTabSelect={(e) => {
+                            const key = tabs[e.detail.tabIndex];
+                            if (key) setTab(key);
+                        }}
+                        style={{ marginBottom: '1.5rem' }}
+                    >
+                        {tabs.map((key) => (
+                            <Tab key={key} text={tabLabels[key]} selected={tab === key} />
+                        ))}
+                    </TabContainer>
 
-                {tab === 'general' && (
-                    <FioriFormGroup title={t('tabGeneralProperties')} sx={{ maxWidth: 760 }}>
-                        {canManageAccess && (
-                            <FioriField label={t('fieldStatus')} required>
-                                <Box sx={{ display: 'flex', gap: 2 }}>
-                                    <FormControlLabel
-                                        control={<Checkbox checked={data.enabled} onChange={() => update('enabled', true)} />}
-                                        label={t('active')}
-                                    />
-                                    <FormControlLabel
-                                        control={<Checkbox checked={!data.enabled} onChange={() => update('enabled', false)} />}
-                                        label={t('nonActive')}
-                                    />
-                                </Box>
+                    {tab === 'general' && (
+                        <FioriFormGroup title={t('tabGeneralProperties')} style={{ maxWidth: 760 }}>
+                            {canManageAccess && (
+                                <FioriField label={t('fieldStatus')} required>
+                                    <div style={{ display: 'flex', gap: '1rem' }}>
+                                        <RadioButton
+                                            name="user-status"
+                                            text={t('active')}
+                                            checked={data.enabled}
+                                            onChange={() => update('enabled', true)}
+                                        />
+                                        <RadioButton
+                                            name="user-status"
+                                            text={t('nonActive')}
+                                            checked={!data.enabled}
+                                            onChange={() => update('enabled', false)}
+                                        />
+                                    </div>
+                                </FioriField>
+                            )}
+
+                            <FioriField
+                                label={t('fieldFirstName')}
+                                htmlFor="user-first-name"
+                                required
+                                valueState={valueStateOf(errors.first_name)}
+                                message={errors.first_name}
+                            >
+                                <Input
+                                    id="user-first-name"
+                                    value={data.first_name}
+                                    valueState={ui5ValueState(valueStateOf(errors.first_name))}
+                                    onInput={(e) => update('first_name', e.target.value)}
+                                />
                             </FioriField>
-                        )}
 
-                        <FioriField
-                            label={t('fieldFirstName')}
-                            htmlFor="user-first-name"
-                            required
-                            valueState={valueStateOf(errors.first_name)}
-                            message={errors.first_name}
-                        >
-                            <TextField
-                                id="user-first-name"
-                                fullWidth
-                                size="small"
-                                value={data.first_name}
-                                onChange={(e) => update('first_name', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.first_name))}
-                            />
-                        </FioriField>
+                            <FioriField
+                                label={t('fieldLastName')}
+                                htmlFor="user-last-name"
+                                required
+                                valueState={valueStateOf(errors.last_name)}
+                                message={errors.last_name}
+                            >
+                                <Input
+                                    id="user-last-name"
+                                    value={data.last_name}
+                                    valueState={ui5ValueState(valueStateOf(errors.last_name))}
+                                    onInput={(e) => update('last_name', e.target.value)}
+                                />
+                            </FioriField>
 
-                        <FioriField
-                            label={t('fieldLastName')}
-                            htmlFor="user-last-name"
-                            required
-                            valueState={valueStateOf(errors.last_name)}
-                            message={errors.last_name}
-                        >
-                            <TextField
-                                id="user-last-name"
-                                fullWidth
-                                size="small"
-                                value={data.last_name}
-                                onChange={(e) => update('last_name', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.last_name))}
-                            />
-                        </FioriField>
+                            <FioriField label={t('phone')} htmlFor="user-phone" valueState={valueStateOf(errors.phone)} message={errors.phone}>
+                                <Input
+                                    id="user-phone"
+                                    value={data.phone}
+                                    maxlength={10}
+                                    valueState={ui5ValueState(valueStateOf(errors.phone))}
+                                    onInput={(e) => update('phone', e.target.value.slice(0, 10))}
+                                />
+                            </FioriField>
 
-                        <FioriField
-                            label={t('phone')}
-                            htmlFor="user-phone"
-                            valueState={valueStateOf(errors.phone)}
-                            message={errors.phone}
-                        >
-                            <TextField
-                                id="user-phone"
-                                fullWidth
-                                size="small"
-                                value={data.phone}
-                                onChange={(e) => update('phone', e.target.value.slice(0, 10))}
-                                slotProps={{ htmlInput: { maxLength: 10 } }}
-                                sx={fioriFieldStateSx(valueStateOf(errors.phone))}
-                            />
-                        </FioriField>
-
-                        <FioriField
-                            label={t('department')}
-                            htmlFor="user-department"
-                            valueState={valueStateOf(errors.department_id)}
-                            message={errors.department_id}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.department_id))}>
+                            <FioriField
+                                label={t('department')}
+                                htmlFor="user-department"
+                                valueState={valueStateOf(errors.department_id)}
+                                message={errors.department_id}
+                            >
                                 <Select
                                     id="user-department"
-                                    displayEmpty
-                                    value={data.department_id}
-                                    onChange={(e) => update('department_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                    value={String(data.department_id)}
+                                    valueState={ui5ValueState(valueStateOf(errors.department_id))}
+                                    onChange={(e) => update('department_id', toIdOrEmpty(e.detail.selectedOption.value))}
                                 >
-                                    <MenuItem value="">—</MenuItem>
+                                    <Option value="">—</Option>
                                     {departments.map((department) => (
-                                        <MenuItem key={department.id} value={department.id}>
+                                        <Option key={department.id} value={String(department.id)}>
                                             {department.name}
-                                        </MenuItem>
+                                        </Option>
                                     ))}
                                 </Select>
-                            </FormControl>
-                        </FioriField>
+                            </FioriField>
 
-                        <FioriField
-                            label={t('jobPosition')}
-                            htmlFor="user-job-position"
-                            valueState={valueStateOf(errors.job_position_id)}
-                            message={errors.job_position_id}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.job_position_id))}>
+                            <FioriField
+                                label={t('jobPosition')}
+                                htmlFor="user-job-position"
+                                valueState={valueStateOf(errors.job_position_id)}
+                                message={errors.job_position_id}
+                            >
                                 <Select
                                     id="user-job-position"
-                                    displayEmpty
-                                    value={data.job_position_id}
-                                    onChange={(e) => update('job_position_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                    value={String(data.job_position_id)}
+                                    valueState={ui5ValueState(valueStateOf(errors.job_position_id))}
+                                    onChange={(e) => update('job_position_id', toIdOrEmpty(e.detail.selectedOption.value))}
                                 >
-                                    <MenuItem value="">—</MenuItem>
+                                    <Option value="">—</Option>
                                     {jobPositions.map((jobPosition) => (
-                                        <MenuItem key={jobPosition.id} value={jobPosition.id}>
+                                        <Option key={jobPosition.id} value={String(jobPosition.id)}>
                                             {jobPosition.name}
-                                        </MenuItem>
+                                        </Option>
                                     ))}
                                 </Select>
-                            </FormControl>
-                        </FioriField>
+                            </FioriField>
 
-                        {canManageAccess && (
-                            <FioriField
-                                label={t('reportsTo')}
-                                htmlFor="user-manager"
-                                valueState={valueStateOf(errors.manager_id)}
-                                message={errors.manager_id}
-                            >
-                                <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.manager_id))}>
+                            {canManageAccess && (
+                                <FioriField
+                                    label={t('reportsTo')}
+                                    htmlFor="user-manager"
+                                    valueState={valueStateOf(errors.manager_id)}
+                                    message={errors.manager_id}
+                                >
                                     <Select
                                         id="user-manager"
-                                        displayEmpty
-                                        value={data.manager_id}
-                                        onChange={(e) => update('manager_id', e.target.value === '' ? '' : Number(e.target.value))}
+                                        value={String(data.manager_id)}
+                                        valueState={ui5ValueState(valueStateOf(errors.manager_id))}
+                                        onChange={(e) => update('manager_id', toIdOrEmpty(e.detail.selectedOption.value))}
                                     >
-                                        <MenuItem value="">—</MenuItem>
+                                        <Option value="">—</Option>
                                         {managerOptions.map((option) => (
-                                            <MenuItem key={option.id} value={option.id}>
+                                            <Option key={option.id} value={String(option.id)}>
                                                 {option.name}
-                                            </MenuItem>
+                                            </Option>
                                         ))}
                                     </Select>
-                                </FormControl>
-                                {managerExcessPermissions.length > 0 && (
-                                    <Alert severity="warning" sx={{ mt: 1 }}>
-                                        {t('managerExcessPermissionsWarning', { count: managerExcessPermissions.length })}
-                                        <Box component="ul" sx={{ m: '4px 0 0', pl: 2.5 }}>
-                                            {managerExcessPermissions.slice(0, 8).map((p) => (
-                                                <li key={p}>{p}</li>
-                                            ))}
-                                            {managerExcessPermissions.length > 8 && (
-                                                <li>
-                                                    {t('andNMore', { count: managerExcessPermissions.length - 8 })}
-                                                </li>
-                                            )}
-                                        </Box>
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            color="warning"
-                                            disabled={copyingAccess}
-                                            startIcon={copyingAccess ? <CircularProgress size={14} color="inherit" /> : undefined}
-                                            onClick={copyAccessToManager}
-                                            sx={{ mt: 1 }}
-                                        >
-                                            {t('copyRolesToManager')}
-                                        </Button>
-                                    </Alert>
-                                )}
+                                    {managerExcessPermissions.length > 0 && (
+                                        <FioriMessageStrip severity="warning" style={{ marginTop: '0.5rem' }}>
+                                            {t('managerExcessPermissionsWarning', { count: managerExcessPermissions.length })}
+                                            <ul style={{ margin: '4px 0 0', paddingLeft: '1.25rem' }}>
+                                                {managerExcessPermissions.slice(0, 8).map((p) => (
+                                                    <li key={p}>{p}</li>
+                                                ))}
+                                                {managerExcessPermissions.length > 8 && (
+                                                    <li>{t('andNMore', { count: managerExcessPermissions.length - 8 })}</li>
+                                                )}
+                                            </ul>
+                                            <Button
+                                                design="Attention"
+                                                disabled={copyingAccess}
+                                                loading={copyingAccess}
+                                                onClick={copyAccessToManager}
+                                                style={{ marginTop: '0.5rem' }}
+                                            >
+                                                {t('copyRolesToManager')}
+                                            </Button>
+                                        </FioriMessageStrip>
+                                    )}
+                                </FioriField>
+                            )}
+
+                            <FioriField label={t('avatar')} fullWidth valueState={valueStateOf(errors.avatar)} message={errors.avatar}>
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    style={{
+                                        border: '2px dashed var(--sapGroup_ContentBorderColor)',
+                                        borderRadius: '8px',
+                                        padding: '1.5rem',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    <Icon name="picture" style={{ width: 32, height: 32, color: 'var(--sapContent_LabelColor)' }} />
+                                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('dragDropUpload')}</Text>
+                                    <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+                                </div>
                             </FioriField>
-                        )}
 
-                        <FioriField label={t('avatar')} fullWidth valueState={valueStateOf(errors.avatar)} message={errors.avatar}>
-                            <Box
-                                onClick={() => fileInputRef.current?.click()}
-                                sx={{
-                                    border: `2px dashed ${FIORI.border}`,
-                                    borderRadius: '8px',
-                                    p: 3,
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: 1,
-                                    cursor: 'pointer',
-                                }}
+                            <FioriField
+                                label={t('fieldEmail')}
+                                htmlFor="user-email"
+                                required
+                                valueState={valueStateOf(errors.email)}
+                                message={errors.email}
                             >
-                                <ImageIcon sx={{ fontSize: 32, color: FIORI.textSecondary }} />
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('dragDropUpload')}
-                                </Typography>
-                                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
-                            </Box>
-                        </FioriField>
+                                <Input
+                                    id="user-email"
+                                    type="Email"
+                                    value={data.email}
+                                    valueState={ui5ValueState(valueStateOf(errors.email))}
+                                    onInput={(e) => update('email', e.target.value)}
+                                />
+                            </FioriField>
+                        </FioriFormGroup>
+                    )}
 
-                        <FioriField
-                            label={t('fieldEmail')}
-                            htmlFor="user-email"
-                            required
-                            valueState={valueStateOf(errors.email)}
-                            message={errors.email}
-                        >
-                            <TextField
-                                id="user-email"
-                                fullWidth
-                                size="small"
-                                type="email"
-                                value={data.email}
-                                onChange={(e) => update('email', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.email))}
-                            />
-                        </FioriField>
-                    </FioriFormGroup>
-                )}
-
-                {tab === 'groupsAndRoles' && canManageAccess && (
-                    <FioriFormGroup title={t('tabGroupsAndRoles')} description={t('groupsOrRolesHint')} sx={{ maxWidth: 760 }}>
-                        <FioriField
-                            label={t('userGroups')}
-                            valueState={valueStateOf(accessForm.errors.groups)}
-                            message={accessForm.errors.groups}
-                        >
-                            <Autocomplete
-                                multiple
-                                size="small"
-                                options={groups}
-                                getOptionLabel={(option) => option.name}
-                                isOptionEqualToValue={(option, value) => option.id === value.id}
-                                value={groups.filter((g) => accessForm.data.groups.includes(g.id))}
-                                onChange={(_, value) => {
-                                    accessForm.setData('groups', value.map((v) => v.id));
-                                    accessForm.clearErrors('groups');
-                                }}
-                                sx={fioriMultiInputSx(valueStateOf(accessForm.errors.groups))}
-                                renderTags={(value, getTagProps) =>
-                                    value.map((option, index) => <Chip label={option.name} size="small" {...getTagProps({ index })} key={option.id} />)
-                                }
-                                renderInput={(params) => <TextField {...params} placeholder={t('userGroups')} />}
-                            />
-                        </FioriField>
-
-                        <FioriField
-                            label={t('roles')}
-                            valueState={valueStateOf(accessForm.errors.roles)}
-                            message={accessForm.errors.roles}
-                        >
-                            <Autocomplete
-                                multiple
-                                size="small"
-                                options={roles}
-                                getOptionLabel={(option) => option.label}
-                                isOptionEqualToValue={(option, value) => option.id === value.id}
-                                value={roles.filter((r) => accessForm.data.roles.includes(r.id))}
-                                onChange={(_, value) => {
-                                    accessForm.setData('roles', value.map((v) => v.id));
-                                    accessForm.clearErrors('roles');
-                                }}
-                                sx={fioriMultiInputSx(valueStateOf(accessForm.errors.roles))}
-                                renderTags={(value, getTagProps) =>
-                                    value.map((option, index) => <Chip label={option.label} size="small" {...getTagProps({ index })} key={option.id} />)
-                                }
-                                renderInput={(params) => <TextField {...params} placeholder={t('roles')} />}
-                            />
-                        </FioriField>
-
-                        <FioriField label="">
-                            <Button
-                                type="button"
-                                onClick={saveAccess}
-                                variant="contained"
-                                disabled={accessForm.processing || !accessForm.isDirty}
-                                startIcon={accessForm.processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                                sx={{ ...fioriEmphasizedSx, px: 4 }}
+                    {tab === 'groupsAndRoles' && canManageAccess && (
+                        <FioriFormGroup title={t('tabGroupsAndRoles')} description={t('groupsOrRolesHint')} style={{ maxWidth: 760 }}>
+                            <FioriField
+                                label={t('userGroups')}
+                                htmlFor="user-groups"
+                                valueState={valueStateOf(accessForm.errors.groups)}
+                                message={accessForm.errors.groups}
                             >
-                                {accessForm.processing ? t('saving').toUpperCase() : t('saveGroupsAndRoles').toUpperCase()}
-                            </Button>
-                        </FioriField>
-                    </FioriFormGroup>
-                )}
+                                <MultiComboBox
+                                    id="user-groups"
+                                    placeholder={t('userGroups')}
+                                    selectedValues={accessForm.data.groups.map(String)}
+                                    valueState={ui5ValueState(valueStateOf(accessForm.errors.groups))}
+                                    onSelectionChange={(e) => {
+                                        accessForm.setData(
+                                            'groups',
+                                            e.detail.items.map((item) => Number(item.value)).filter((id) => !Number.isNaN(id)),
+                                        );
+                                        accessForm.clearErrors('groups');
+                                    }}
+                                >
+                                    {groups.map((group) => (
+                                        <MultiComboBoxItem key={group.id} value={String(group.id)} text={group.name} />
+                                    ))}
+                                </MultiComboBox>
+                            </FioriField>
 
-                {tab === 'permissions' && (
-                    <Box sx={{ maxWidth: 800 }}>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 2 }}>
-                            {t('permissionsDescription')}
-                        </Typography>
-                        <FioriResponsiveTable
-                            size="small"
-                            columns={permissionColumns}
-                            rows={permissionRows}
-                            getRowKey={(row) => `${row.resource}.${row.action}`}
-                            emptyMessage={t('noPermissionsAssigned')}
-                        />
-                    </Box>
-                )}
+                            <FioriField
+                                label={t('roles')}
+                                htmlFor="user-roles"
+                                valueState={valueStateOf(accessForm.errors.roles)}
+                                message={accessForm.errors.roles}
+                            >
+                                <MultiComboBox
+                                    id="user-roles"
+                                    placeholder={t('roles')}
+                                    selectedValues={accessForm.data.roles.map(String)}
+                                    valueState={ui5ValueState(valueStateOf(accessForm.errors.roles))}
+                                    onSelectionChange={(e) => {
+                                        accessForm.setData(
+                                            'roles',
+                                            e.detail.items.map((item) => Number(item.value)).filter((id) => !Number.isNaN(id)),
+                                        );
+                                        accessForm.clearErrors('roles');
+                                    }}
+                                >
+                                    {roles.map((role) => (
+                                        <MultiComboBoxItem key={role.id} value={String(role.id)} text={role.label} />
+                                    ))}
+                                </MultiComboBox>
+                            </FioriField>
 
-                {tab === 'timeline' && (
-                    <Box sx={{ maxWidth: 700 }}>
-                        <TimelinePanel timelineUrl={route('system.user.history', user.id)} />
-                    </Box>
-                )}
+                            <FioriField label="">
+                                <Button
+                                    design="Emphasized"
+                                    onClick={saveAccess}
+                                    disabled={accessForm.processing || !accessForm.isDirty}
+                                    loading={accessForm.processing}
+                                    style={{ minWidth: '8rem' }}
+                                >
+                                    {accessForm.processing ? t('saving').toUpperCase() : t('saveGroupsAndRoles').toUpperCase()}
+                                </Button>
+                            </FioriField>
+                        </FioriFormGroup>
+                    )}
 
-                {tab === 'password' && (
-                    <FioriFormGroup title={t('tabPassword')} sx={{ maxWidth: 760 }}>
-                        <FioriField
-                            label={t('newPassword')}
-                            htmlFor="user-password"
-                            valueState={valueStateOf(errors.password)}
-                            message={errors.password}
-                        >
-                            <TextField
-                                id="user-password"
-                                fullWidth
+                    {tab === 'permissions' && (
+                        <div style={{ maxWidth: 800 }}>
+                            <Text style={{ display: 'block', color: 'var(--sapContent_LabelColor)', marginBottom: '1rem' }}>
+                                {t('permissionsDescription')}
+                            </Text>
+                            <FioriResponsiveTable
                                 size="small"
-                                type={showPassword ? 'text' : 'password'}
-                                autoComplete="new-password"
-                                value={data.password}
-                                onChange={(e) => update('password', e.target.value)}
-                                sx={fioriFieldStateSx(valueStateOf(errors.password))}
-                                slotProps={{
-                                    input: {
-                                        endAdornment: (
-                                            <InputAdornment position="end">
-                                                <IconButton
-                                                    aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-                                                    onClick={() => setShowPassword((prev) => !prev)}
-                                                    edge="end"
-                                                    tabIndex={-1}
-                                                >
-                                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                                </IconButton>
-                                            </InputAdornment>
-                                        ),
-                                    },
-                                }}
+                                columns={permissionColumns}
+                                rows={permissionRows}
+                                getRowKey={(row: PermissionRow) => `${row.resource}.${row.action}`}
+                                emptyMessage={t('noPermissionsAssigned')}
                             />
-                        </FioriField>
-                        <FioriField label={t('newPasswordRepeat')} htmlFor="user-password-confirm">
-                            <TextField
-                                id="user-password-confirm"
-                                fullWidth
-                                size="small"
-                                type={showPasswordConfirm ? 'text' : 'password'}
-                                autoComplete="new-password"
-                                value={data.password_confirmation}
-                                onChange={(e) => update('password_confirmation', e.target.value)}
-                                sx={fioriFieldStateSx('none')}
-                                slotProps={{
-                                    input: {
-                                        endAdornment: (
-                                            <InputAdornment position="end">
-                                                <IconButton
-                                                    aria-label={showPasswordConfirm ? t('hidePassword') : t('showPassword')}
-                                                    onClick={() => setShowPasswordConfirm((prev) => !prev)}
-                                                    edge="end"
-                                                    tabIndex={-1}
-                                                >
-                                                    {showPasswordConfirm ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                                                </IconButton>
-                                            </InputAdornment>
-                                        ),
-                                    },
-                                }}
-                            />
-                        </FioriField>
-                    </FioriFormGroup>
-                )}
+                        </div>
+                    )}
 
-                {tab === 'interfaces' && (
-                    <FioriFormGroup title={t('tabInterfaces')} sx={{ maxWidth: 760 }}>
-                        <FioriField
-                            label={t('uiLocale')}
-                            htmlFor="user-ui-locale"
-                            valueState={valueStateOf(errors.ui_locale_id)}
-                            message={errors.ui_locale_id}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.ui_locale_id))}>
+                    {tab === 'timeline' && (
+                        <div style={{ maxWidth: 700 }}>
+                            <TimelinePanel timelineUrl={route('system.user.history', user.id)} />
+                        </div>
+                    )}
+
+                    {tab === 'password' && (
+                        <FioriFormGroup title={t('tabPassword')} style={{ maxWidth: 760 }}>
+                            <FioriField
+                                label={t('newPassword')}
+                                htmlFor="user-password"
+                                valueState={valueStateOf(errors.password)}
+                                message={errors.password}
+                            >
+                                <Input
+                                    id="user-password"
+                                    type={showPassword ? 'Text' : 'Password'}
+                                    value={data.password}
+                                    valueState={ui5ValueState(valueStateOf(errors.password))}
+                                    onInput={(e) => update('password', e.target.value)}
+                                    icon={passwordToggle(showPassword, () => setShowPassword((prev) => !prev))}
+                                />
+                            </FioriField>
+                            <FioriField label={t('newPasswordRepeat')} htmlFor="user-password-confirm">
+                                <Input
+                                    id="user-password-confirm"
+                                    type={showPasswordConfirm ? 'Text' : 'Password'}
+                                    value={data.password_confirmation}
+                                    onInput={(e) => update('password_confirmation', e.target.value)}
+                                    icon={passwordToggle(showPasswordConfirm, () => setShowPasswordConfirm((prev) => !prev))}
+                                />
+                            </FioriField>
+                        </FioriFormGroup>
+                    )}
+
+                    {tab === 'interfaces' && (
+                        <FioriFormGroup title={t('tabInterfaces')} style={{ maxWidth: 760 }}>
+                            <FioriField
+                                label={t('uiLocale')}
+                                htmlFor="user-ui-locale"
+                                valueState={valueStateOf(errors.ui_locale_id)}
+                                message={errors.ui_locale_id}
+                            >
                                 <Select
                                     id="user-ui-locale"
-                                    value={data.ui_locale_id}
-                                    onChange={(e) => update('ui_locale_id', Number(e.target.value))}
+                                    value={String(data.ui_locale_id)}
+                                    valueState={ui5ValueState(valueStateOf(errors.ui_locale_id))}
+                                    onChange={(e) => update('ui_locale_id', Number(e.detail.selectedOption.value))}
                                 >
+                                    {/* MUI Select แสดงช่องว่างเมื่อยังไม่ได้ตั้งค่า — UI5 Select ต้องมี option ที่ตรง value */}
+                                    {data.ui_locale_id === '' && <Option value="">—</Option>}
                                     {localeOptions.map((locale) => (
-                                        <MenuItem key={locale.id} value={locale.id}>
+                                        <Option key={locale.id} value={String(locale.id)}>
                                             {localeLabel(locale.code)}
-                                        </MenuItem>
+                                        </Option>
                                     ))}
                                 </Select>
-                            </FormControl>
-                        </FioriField>
-                        <FioriField
-                            label={t('fieldTimezone')}
-                            htmlFor="user-timezone"
-                            required
-                            valueState={valueStateOf(errors.timezone)}
-                            message={errors.timezone}
-                        >
-                            <FormControl fullWidth size="small" sx={fioriFieldStateSx(valueStateOf(errors.timezone))}>
+                            </FioriField>
+                            <FioriField
+                                label={t('fieldTimezone')}
+                                htmlFor="user-timezone"
+                                required
+                                valueState={valueStateOf(errors.timezone)}
+                                message={errors.timezone}
+                            >
                                 <Select
                                     id="user-timezone"
                                     value={data.timezone}
-                                    onChange={(e) => update('timezone', e.target.value)}
+                                    valueState={ui5ValueState(valueStateOf(errors.timezone))}
+                                    onChange={(e) => update('timezone', e.detail.selectedOption.value ?? '')}
                                 >
                                     {timezones.map((tz) => (
-                                        <MenuItem key={tz} value={tz}>
+                                        <Option key={tz} value={tz}>
                                             {tz}
-                                        </MenuItem>
+                                        </Option>
                                     ))}
                                 </Select>
-                            </FormControl>
-                        </FioriField>
-                    </FioriFormGroup>
-                )}
+                            </FioriField>
+                        </FioriFormGroup>
+                    )}
 
-                <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} sx={{ mt: 2, maxWidth: 760 }} />
-                </Box>
+                    <FioriFormErrorSummary errors={errors} message={t('correctHighlightedFields')} style={{ marginTop: '1rem', maxWidth: 760 }} />
+                </div>
 
                 {/* Fiori footer action bar — ปุ่มอยู่ล่างสุด ติดขอบ ไม่ใช่บน header */}
-                <Box
-                    sx={{
+                <div
+                    style={{
                         position: 'sticky',
                         bottom: 0,
                         display: 'flex',
                         justifyContent: 'flex-end',
-                        gap: 1,
-                        px: 4,
-                        py: 2,
-                        bgcolor: FIORI.surface,
-                        borderTop: `1px solid ${FIORI.border}`,
+                        gap: '0.5rem',
+                        padding: '1rem 2rem',
+                        background: 'var(--sapGroup_ContentBackground)',
+                        borderTop: '1px solid var(--sapGroup_ContentBorderColor)',
                     }}
                 >
-                    <Button type="button" onClick={cancel} variant="contained" color="inherit" sx={{ ...fioriDefaultSx, px: 4 }}>
+                    <Button onClick={cancel} style={{ minWidth: '6rem' }}>
                         {t('cancel').toUpperCase()}
                     </Button>
-                    <Button
-                        type="button"
-                        onClick={performSubmit}
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 4 }}
-                    >
+                    <Button design="Emphasized" onClick={performSubmit} disabled={processing} loading={processing} style={{ minWidth: '6rem' }}>
                         {processing ? t('saving').toUpperCase() : t('save').toUpperCase()}
                     </Button>
-                </Box>
-            </Box>
+                </div>
+            </form>
             {confirmElement}
         </AppLayout>
     );

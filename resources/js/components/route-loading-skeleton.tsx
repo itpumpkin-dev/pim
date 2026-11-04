@@ -1,28 +1,6 @@
 import { router } from '@inertiajs/react';
-import { Box, keyframes } from '@mui/material';
 import { useEffect, useState } from 'react';
-
-// Originally from Uiverse.io by adamgiebl; recolored from its stock
-// orange to the Fiori brand blue tokens so it matches the rest of the
-// Fiori-themed UI (and picks up dark mode along with it, since these
-// resolve through var(--fiori-*) — see fiori-style.tsx).
-const pulse = keyframes`
-    0% {
-        transform: scale(0.8);
-        background-color: rgba(0, 112, 242, 0.35);
-        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
-    }
-    50% {
-        transform: scale(1.2);
-        background-color: var(--fiori-brand);
-        box-shadow: 0 0 0 10px rgba(0, 112, 242, 0);
-    }
-    100% {
-        transform: scale(0.8);
-        background-color: rgba(0, 112, 242, 0.35);
-        box-shadow: 0 0 0 0 rgba(0, 112, 242, 0.35);
-    }
-`;
+import styles from './shell-loading.module.css';
 
 // How long a navigation must stay in flight before the skeleton appears.
 // Most navigations (cached grids, warm permission checks) now resolve
@@ -72,40 +50,39 @@ export function RouteLoadingSkeleton() {
     }
 
     return (
-        <Box
-            sx={{
+        <div
+            style={{
                 position: 'absolute',
                 inset: 0,
-                zIndex: (theme) => theme.zIndex.appBar - 1,
-                bgcolor: 'background.default',
+                zIndex: 10,
+                background: 'var(--sapBackgroundColor)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
             }}
         >
             <PulseDots />
-        </Box>
+        </div>
     );
 }
 
 /** The three pulsing brand-blue dots — shared with LocaleSwitchOverlay. */
 export function PulseDots({ size = 12 }: { size?: number }) {
     return (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {[-0.3, -0.1, 0.1].map((delay) => (
-                <Box
+                <div
                     key={delay}
-                    sx={{
+                    className={styles.pulseDot}
+                    style={{
                         height: size,
                         width: size,
-                        mr: delay === 0.1 ? 0 : `${size / 2}px`,
-                        borderRadius: `${size / 2}px`,
-                        bgcolor: 'rgba(0, 112, 242, 0.35)',
-                        animation: `${pulse} 1.5s infinite ease-in-out`,
+                        marginRight: delay === 0.1 ? 0 : size / 2,
+                        borderRadius: size / 2,
                         animationDelay: `${delay}s`,
                     }}
                 />
             ))}
-        </Box>
+        </div>
     );
 }

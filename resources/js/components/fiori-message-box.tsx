@@ -1,10 +1,9 @@
-import { FIORI, fioriEmphasizedSx, fioriGhostSx, fioriNegativeSx } from '@/lib/fiori-style';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/message-error.js';
+import '@ui5/webcomponents-icons/dist/message-information.js';
+import '@ui5/webcomponents-icons/dist/message-success.js';
+import '@ui5/webcomponents-icons/dist/message-warning.js';
+import '@ui5/webcomponents-icons/dist/question-mark.js';
+import { Bar, Button, Dialog, Icon, Title } from '@ui5/webcomponents-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
 /**
@@ -12,32 +11,29 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
  * that needs the user's explicit acknowledgement (confirm/cancel an action,
  * or dismiss an information/success/error notice) — unlike
  * <FioriMessageStrip> (fiori-form.tsx), which is inline and non-blocking.
- * Reuses the same semantic colour set as every other Fiori primitive in this
- * app (FIORI.warning/error/success/information).
+ *
+ * Built on the UI5 `Dialog` (with its `state` value-state header highlight,
+ * the same look as UI5's own `MessageBox`) rather than the UI5 `MessageBox`
+ * component, because MessageBox's action buttons can't carry a loading /
+ * disabled state — needed for `confirmLoading` / `confirmDisabled`.
  *
  * Meant as a drop-in replacement for the browser's native `window.confirm()`/
- * `window.alert()`, which render as an unstyled, untrusted-looking
- * "<host> says" box the user can't theme, translate, or brand — use
- * `useFioriConfirm()` below instead of calling this component directly for
- * the common "await confirm before doing something risky" case.
+ * `window.alert()` — use `useFioriConfirm()` below instead of calling this
+ * component directly for the common "await confirm before doing something
+ * risky" case.
  * ref: sap.com/design-system/fiori-design-web → UI elements → Message Box
  */
 export type FioriMessageBoxSeverity = 'confirm' | 'information' | 'success' | 'warning' | 'error';
 
-const MESSAGE_BOX_ICON: Record<FioriMessageBoxSeverity, typeof ErrorOutlineIcon> = {
-    confirm: HelpOutlineIcon,
-    information: InfoOutlinedIcon,
-    success: CheckCircleOutlineIcon,
-    warning: WarningAmberOutlinedIcon,
-    error: ErrorOutlineIcon,
-};
-
-const MESSAGE_BOX_COLOR: Record<FioriMessageBoxSeverity, string> = {
-    confirm: FIORI.brand,
-    information: FIORI.information,
-    success: FIORI.success,
-    warning: FIORI.warning,
-    error: FIORI.error,
+const MESSAGE_BOX_META: Record<
+    FioriMessageBoxSeverity,
+    { icon: string; state: 'None' | 'Information' | 'Positive' | 'Critical' | 'Negative'; color: string }
+> = {
+    confirm: { icon: 'question-mark', state: 'None', color: 'var(--sapBrandColor)' },
+    information: { icon: 'message-information', state: 'Information', color: 'var(--sapInformativeColor)' },
+    success: { icon: 'message-success', state: 'Positive', color: 'var(--sapPositiveColor)' },
+    warning: { icon: 'message-warning', state: 'Critical', color: 'var(--sapCriticalColor)' },
+    error: { icon: 'message-error', state: 'Negative', color: 'var(--sapNegativeColor)' },
 };
 
 export interface FioriMessageBoxProps {
@@ -50,9 +46,9 @@ export interface FioriMessageBoxProps {
     cancelLabel?: string;
     /** hide the Cancel button entirely — for a plain acknowledgement (information/success/error) instead of a yes/no confirm */
     hideCancel?: boolean;
-    /** true = the confirm action is destructive (Fiori "Negative" red button) instead of the default "Emphasized" brand-blue one */
+    /** true = the confirm action is destructive (Fiori "Negative" button) instead of the default "Emphasized" one */
     destructive?: boolean;
-    /** disables both buttons and shows a spinner on Confirm — for a confirm that kicks off a request itself */
+    /** disables both buttons and shows a busy state on Confirm — for a confirm that kicks off a request itself */
     confirmLoading?: boolean;
     /** disables the Confirm button independent of `confirmLoading` — e.g. a required field in the message body hasn't been filled in yet */
     confirmDisabled?: boolean;
@@ -74,37 +70,56 @@ export function FioriMessageBox({
     onConfirm,
     onCancel,
 }: FioriMessageBoxProps) {
-    const Icon = MESSAGE_BOX_ICON[severity];
-    const color = MESSAGE_BOX_COLOR[severity];
+    const meta = MESSAGE_BOX_META[severity];
 
     return (
-        <Dialog open={open} onClose={confirmLoading ? undefined : onCancel} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2 } }}>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.25, fontWeight: 700, fontSize: '1rem', color: FIORI.textPrimary }}>
-                <Icon sx={{ fontSize: 24, color, flexShrink: 0 }} />
-                {title}
-            </DialogTitle>
-            {/* `typography: 'body2'` applies the text style without wrapping children in
-                an actual <p> (unlike <Typography>) — several call sites nest an extra
-                <Typography> below the main message (e.g. a conditional "N products use
-                this" warning line), which would be invalid HTML (<p> inside <p>) if this
-                wrapped them in a real Typography element too. */}
-            <DialogContent sx={{ pt: 0, typography: 'body2', color: FIORI.textPrimary, whiteSpace: 'pre-line' }}>{children}</DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2.5 }}>
-                {!hideCancel && (
-                    <Button onClick={onCancel} disabled={confirmLoading} sx={fioriGhostSx}>
-                        {cancelLabel}
-                    </Button>
-                )}
-                <Button
-                    onClick={onConfirm}
-                    variant={destructive ? 'outlined' : 'contained'}
-                    disabled={confirmLoading || confirmDisabled}
-                    startIcon={confirmLoading ? <CircularProgress size={16} color="inherit" /> : undefined}
-                    sx={destructive ? fioriNegativeSx : fioriEmphasizedSx}
-                >
-                    {confirmLabel}
-                </Button>
-            </DialogActions>
+        <Dialog
+            open={open}
+            state={meta.state}
+            accessibleRole="AlertDialog"
+            style={{ width: 'min(28rem, calc(100vw - 2rem))' }}
+            // Fully controlled: ESC never closes the dialog by itself — it is
+            // reported as Cancel (ignored while confirmLoading) and the parent
+            // decides by flipping `open`.
+            onBeforeClose={(event) => {
+                if (!event.detail.escPressed) return;
+                event.preventDefault();
+                if (!confirmLoading) onCancel();
+            }}
+            header={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', width: '100%', padding: '0.5rem 0' }}>
+                    <Icon name={meta.icon} style={{ width: '1.5rem', height: '1.5rem', color: meta.color, flexShrink: 0 }} />
+                    <Title level="H5" size="H5" wrappingType="Normal">
+                        {title}
+                    </Title>
+                </div>
+            }
+            footer={
+                <Bar
+                    design="Footer"
+                    endContent={
+                        <>
+                            <Button
+                                design={destructive ? 'Negative' : 'Emphasized'}
+                                disabled={confirmLoading || confirmDisabled}
+                                loading={confirmLoading}
+                                loadingDelay={0}
+                                onClick={onConfirm}
+                            >
+                                {confirmLabel}
+                            </Button>
+                            {!hideCancel && (
+                                <Button design="Transparent" disabled={confirmLoading} onClick={onCancel}>
+                                    {cancelLabel}
+                                </Button>
+                            )}
+                        </>
+                    }
+                />
+            }
+        >
+            {/* div (not <p>/Text) so call sites can nest their own blocks below the main message */}
+            <div style={{ whiteSpace: 'pre-line', color: 'var(--sapTextColor)', fontSize: 'var(--sapFontSize)', lineHeight: 1.5 }}>{children}</div>
         </Dialog>
     );
 }
@@ -125,7 +140,7 @@ interface FioriConfirmOptions {
  * anywhere in the component's JSX tree (it renders nothing until `confirm()`
  * is called) and call `confirm(options)` from an event handler — the
  * returned promise resolves `true`/`false` when the user picks Confirm/
- * Cancel (or dismisses the dialog, which counts as Cancel).
+ * Cancel (or dismisses the dialog with ESC, which counts as Cancel).
  */
 export function useFioriConfirm() {
     const [options, setOptions] = useState<FioriConfirmOptions | null>(null);

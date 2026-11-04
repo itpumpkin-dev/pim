@@ -1,0 +1,237 @@
+/* products/edit.tsx — responsive layout + bits that need :hover / media queries */
+
+.pagePad {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+@media (min-width: 900px) {
+    .pagePad {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+}
+
+.toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+@media (min-width: 900px) {
+    .toolbar {
+        flex-direction: row;
+    }
+}
+
+/* main 2-column layout: 8.5 / 3.5 on ≥900px, stacked below */
+.mainGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+    .mainGrid {
+        grid-template-columns: minmax(0, 8.5fr) minmax(0, 3.5fr);
+    }
+}
+
+.card {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+    padding: 1.5rem;
+}
+
+.divider {
+    border-top: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.caption {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.captionInline {
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapContent_LabelColor);
+}
+
+.emptyText {
+    font-size: var(--sapFontSize);
+    font-style: italic;
+    color: var(--sapContent_LabelColor);
+}
+
+.errorText {
+    margin-top: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    color: var(--sapNegativeTextColor, var(--sapNegativeColor));
+}
+
+.dialogText {
+    font-size: var(--sapFontSize);
+    color: var(--sapContent_LabelColor);
+    line-height: 1.5;
+}
+
+.fieldLabel {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.fieldHeader {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.fieldLabelText {
+    font-size: var(--sapFontSmallSize);
+    font-weight: 600;
+    color: var(--sapTextColor);
+}
+
+.chipInfoIcon {
+    width: 0.875rem;
+    height: 0.875rem;
+    color: var(--sapContent_LabelColor);
+    cursor: help;
+}
+
+.currencyAdornment {
+    padding: 0 0.5rem;
+    color: var(--sapContent_LabelColor);
+}
+
+/* "More" panel (UI5 has no Drawer → a Dialog, full-width on phones) */
+.sidePanel {
+    width: 100vw;
+    max-height: 100vh;
+}
+
+@media (min-width: 600px) {
+    .sidePanel {
+        width: 380px;
+    }
+}
+
+.panelAction {
+    width: 100%;
+}
+
+.panelAction::part(button) {
+    justify-content: flex-start;
+}
+
+.variantHeader {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 600px) {
+    .variantHeader {
+        flex-direction: row;
+        align-items: center;
+    }
+}
+
+.hoverRow {
+    border-radius: var(--sapElement_BorderCornerRadius);
+    cursor: pointer;
+}
+
+.hoverRow:hover {
+    background: var(--sapList_Hover_Background);
+}
+
+.negativeIcon {
+    color: var(--sapNegativeColor);
+}
+
+.shopList {
+    margin: 0.5rem 0 0;
+    padding-left: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* gallery / video / image thumbnails */
+.thumbMedia {
+    display: block;
+    border-radius: var(--sapElement_BorderCornerRadius);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+.thumbClickable {
+    cursor: pointer;
+}
+
+.thumbClickable:hover {
+    opacity: 0.85;
+}
+
+.thumbPlaceholder {
+    border-radius: var(--sapElement_BorderCornerRadius);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapNeutralBackgroundColor, var(--sapBackgroundColor));
+}
+
+.thumbRemove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    background: var(--sapGroup_ContentBackground);
+    color: var(--sapContent_IconColor);
+    cursor: pointer;
+}
+
+.thumbRemove:hover {
+    background: var(--sapErrorBackground);
+    color: var(--sapNegativeColor);
+}
+
+.fileChip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 200px;
+    max-width: 260px;
+    padding: 0.125rem 0.25rem 0.125rem 0.625rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius);
+}
+
+.fileChipLabel {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--sapTextColor);
+}
+
+.lightbox::part(content) {
+    padding: 0;
+    line-height: 0;
+}

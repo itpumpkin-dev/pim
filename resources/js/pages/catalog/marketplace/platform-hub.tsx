@@ -1,15 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import InventoryIcon from '@mui/icons-material/Inventory';
-import CategoryIcon from '@mui/icons-material/Category';
-import SettingsIcon from '@mui/icons-material/Settings';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import SyncAltIcon from '@mui/icons-material/SyncAlt';
-import { Box, Grid, Typography } from '@mui/material';
-import { type ComponentType } from 'react';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/retail-store.js';
+import '@ui5/webcomponents-icons/dist/settings.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import '@ui5/webcomponents-icons/dist/tree.js';
+import { Icon, Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+
+import styles from './marketplace.module.css';
 
 type MarketplacePlatform = 'shopee' | 'lazada' | 'tiktok' | 'woocommerce';
 
@@ -73,23 +73,31 @@ export default function MarketplacePlatformHub({ platform }: Props) {
     const PLATFORMS_WITH_MASTER_PRODUCT_LIST: MarketplacePlatform[] = ['lazada'];
     const hasMasterProductListPage = PLATFORMS_WITH_MASTER_PRODUCT_LIST.includes(platform);
 
-    const tiles: { key: string; icon: ComponentType<{ sx?: object }>; title: string; description: string; url: string; permission: string }[] = [
-        ...(hasProductMappingPage ? [{
-            key: 'products',
-            icon: InventoryIcon,
-            title: 'สินค้า (Product Mapping)',
-            description: 'ไล่การแมพข้อมูล Category & Attributes ตั้งแต่ตัวสินค้า',
-            url: `/catalog/marketplace/${platform}/products`,
-            permission: 'products.list_products',
-        }] : []),
-        ...(hasMasterProductListPage ? [{
-            key: 'masterProducts',
-            icon: StorefrontIcon,
-            title: 'Master Product List',
-            description: `สินค้าที่จริงๆ อยู่บน ${platformLabel} ทั้งหมด (sync ลงมาเก็บไว้ดู ไม่ผูกกับสินค้าใน PIM)`,
-            url: `/catalog/marketplace/${platform}/master-products`,
-            permission: `marketplace_${platform}.list_marketplace_${platform}`,
-        }] : []),
+    const tiles: { key: string; icon: string; title: string; description: string; url: string; permission: string }[] = [
+        ...(hasProductMappingPage
+            ? [
+                  {
+                      key: 'products',
+                      icon: 'product',
+                      title: 'สินค้า (Product Mapping)',
+                      description: 'ไล่การแมพข้อมูล Category & Attributes ตั้งแต่ตัวสินค้า',
+                      url: `/catalog/marketplace/${platform}/products`,
+                      permission: 'products.list_products',
+                  },
+              ]
+            : []),
+        ...(hasMasterProductListPage
+            ? [
+                  {
+                      key: 'masterProducts',
+                      icon: 'retail-store',
+                      title: 'Master Product List',
+                      description: `สินค้าที่จริงๆ อยู่บน ${platformLabel} ทั้งหมด (sync ลงมาเก็บไว้ดู ไม่ผูกกับสินค้าใน PIM)`,
+                      url: `/catalog/marketplace/${platform}/master-products`,
+                      permission: `marketplace_${platform}.list_marketplace_${platform}`,
+                  },
+              ]
+            : []),
 
         // ซ่อน 2 การ์ดนี้ไว้เฉพาะ platform ที่มีหน้า "สินค้า (Product Mapping)"
         // แล้ว (เคยถูก comment ออกไปแบบไม่มีเงื่อนไขมาก่อน ทำให้ทุก platform
@@ -97,25 +105,33 @@ export default function MarketplacePlatformHub({ platform }: Props) {
         // เลย — ดูบั๊กที่เคยแก้ไปแล้วตอน Lazada เป็น platform แรกที่มีหน้านี้
         // — ตอนนี้ครบทั้ง 4 platform แล้ว เลยไม่มี platform ไหนต้องพึ่ง 2
         // การ์ดนี้เป็นทางเข้าหลักอีกต่อไป)
-        ...(!hasProductMappingPage ? [{
-            key: 'category',
-            icon: CategoryIcon,
-            title: tNav('mapCategory'),
-            description: t('marketplaceHubCategoryDesc'),
-            url: `/catalog/categories/${platform}-mapping`,
-            permission: 'categories.edit_categories',
-        }] : []),
-        ...(!hasProductMappingPage ? [{
-            key: 'push',
-            icon: SyncAltIcon,
-            title: tNav('mapPushData'),
-            description: t('marketplaceHubPushDesc'),
-            url: `/catalog/marketplace/${platform}/attribute-mapping`,
-            permission: 'attributes.edit_attributes',
-        }] : []),
+        ...(!hasProductMappingPage
+            ? [
+                  {
+                      key: 'category',
+                      icon: 'tree',
+                      title: tNav('mapCategory'),
+                      description: t('marketplaceHubCategoryDesc'),
+                      url: `/catalog/categories/${platform}-mapping`,
+                      permission: 'categories.edit_categories',
+                  },
+              ]
+            : []),
+        ...(!hasProductMappingPage
+            ? [
+                  {
+                      key: 'push',
+                      icon: 'synchronize',
+                      title: tNav('mapPushData'),
+                      description: t('marketplaceHubPushDesc'),
+                      url: `/catalog/marketplace/${platform}/attribute-mapping`,
+                      permission: 'attributes.edit_attributes',
+                  },
+              ]
+            : []),
         {
             key: 'connect',
-            icon: SettingsIcon,
+            icon: 'settings',
             title: tNav('marketplaceConnect'),
             description: t('marketplaceHubConnectDesc'),
             url: `/catalog/marketplace/connect/${platform}`,
@@ -128,64 +144,54 @@ export default function MarketplacePlatformHub({ platform }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={platformLabel} />
-            <Box sx={{ p: 4, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{platformLabel}</Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                        {t('marketplaceHubSubtitle', { platform: platformLabel })}
-                    </Typography>
-                </Box>
+            <div className={styles.page} style={{ padding: '2rem' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H4" size="H4" wrappingType="Normal" className={styles.pageTitle}>
+                        {platformLabel}
+                    </Title>
+                    <Text className={styles.subtitle}>{t('marketplaceHubSubtitle', { platform: platformLabel })}</Text>
+                </div>
 
-                <Grid container spacing={3}>
-                    {visibleTiles.map((tile) => {
-                        const Icon = tile.icon;
-
-                        return (
-                            <Grid item xs={12} sm={6} md={4} key={tile.key}>
-                                <Box
-                                    onClick={() => router.visit(tile.url)}
-                                    sx={{
-                                        ...fioriCardSx,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        height: '100%',
-                                        cursor: 'pointer',
-                                        transition: 'border-color 0.15s ease',
-                                        '&:hover': { borderColor: FIORI.brand },
+                <div className={styles.tileGrid}>
+                    {visibleTiles.map((tile) => (
+                        <div
+                            key={tile.key}
+                            role="link"
+                            tabIndex={0}
+                            onClick={() => router.visit(tile.url)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') router.visit(tile.url);
+                            }}
+                            className={`${styles.card} ${styles.tile}`}
+                        >
+                            <div style={{ padding: '1.5rem' }}>
+                                <div
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: '8px',
+                                        background: 'var(--sapBrandColor)',
+                                        marginBottom: '1rem',
                                     }}
                                 >
-                                    <Box sx={{ p: 3 }}>
-                                        <Box
-                                            sx={{
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                width: 48,
-                                                height: 48,
-                                                borderRadius: '8px',
-                                                bgcolor: FIORI.brand,
-                                                mb: 2,
-                                            }}
-                                        >
-                                            <Icon sx={{ fontSize: 26, color: '#fff' }} />
-                                        </Box>
-                                        <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{tile.title}</Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.5 }}>
-                                            {tile.description}
-                                        </Typography>
-                                    </Box>
-                                </Box>
-                            </Grid>
-                        );
-                    })}
+                                    <Icon name={tile.icon} style={{ width: 26, height: 26, color: 'var(--sapContent_ContrastIconColor, #fff)' }} />
+                                </div>
+                                <Title level="H5" size="H5" wrappingType="Normal" style={{ display: 'block' }}>
+                                    {tile.title}
+                                </Title>
+                                <Text style={{ display: 'block', color: 'var(--sapContent_LabelColor)', marginTop: '0.25rem' }}>
+                                    {tile.description}
+                                </Text>
+                            </div>
+                        </div>
+                    ))}
 
-                    {visibleTiles.length === 0 && (
-                        <Grid item xs={12}>
-                            <Typography sx={{ color: FIORI.textSecondary }}>{t('managementNoAccess')}</Typography>
-                        </Grid>
-                    )}
-                </Grid>
-            </Box>
+                    {visibleTiles.length === 0 && <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('managementNoAccess')}</Text>}
+                </div>
+            </div>
         </AppLayout>
     );
 }

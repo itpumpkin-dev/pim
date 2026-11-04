@@ -1,8 +1,8 @@
-import { ListSubheader, MenuItem, Select } from '@mui/material';
-import { useTranslation } from 'react-i18next';
 import { AttributeMappingTable } from '@/components/catalog/attribute-mapping-table';
 import { CoverageStat } from '@/components/catalog/mapping-coverage-summary';
+import { MappingTargetSelect } from '@/components/catalog/marketplace-mapping-ui';
 import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-mapping';
+import { useTranslation } from 'react-i18next';
 
 // v1 รองรับ Lazada attribute แบบใส่ค่าอิสระ (input_type text/numeric) และ
 // ฟิลด์ richText (เช่น description/short_description ที่รับ HTML จริงๆ ได้)
@@ -13,17 +13,7 @@ import { MappingAttributeRow, useAttributeMapping } from '@/hooks/use-attribute-
 // ไม่ใช่ค่าอิสระ
 const MAPPABLE_INPUT_TYPES = ['text', 'numeric', 'richText'];
 
-type TargetField =
-    | 'name'
-    | 'price'
-    | 'qty'
-    | 'weight'
-    | 'length'
-    | 'width'
-    | 'height'
-    | 'video'
-    | 'lazada_attribute'
-    | '';
+type TargetField = 'name' | 'price' | 'qty' | 'weight' | 'length' | 'width' | 'height' | 'video' | 'lazada_attribute' | '';
 
 // ฟิลด์แบบ single-value คือ "attribute ตัวแรกที่ map ไว้แล้วมีค่าจะชนะ"
 // ส่งค่าตรงเข้า payload ของ Lazada เอง (SellerSku/quantity/price/package_*/
@@ -144,33 +134,36 @@ export function LazadaAttributeMappingPanel({ attributes, lazadaAttributes, cove
             syncing={mapping.syncing}
             onSync={mapping.syncFromPlatform}
             renderMapToCell={(row) => (
-                <Select value={buildTargetValue(row)} onChange={(e) => applySelectValue(row, e.target.value)} size="small" fullWidth>
-                    <MenuItem value="">{t('notUsed')}</MenuItem>
-                    <ListSubheader>{t('lazadaPayloadFieldsGroup')}</ListSubheader>
-                    {STRUCTURED_FIELDS.map((field) => (
-                        <MenuItem
-                            key={field}
-                            value={field}
-                            // Lazada ไม่รับ URL วิดีโอจากภายนอก (ดู backend guard ของ
-                            // ฟิลด์นี้) — จะมีแค่ PIM attribute ประเภท `video`
-                            // (ไฟล์ที่อัปโหลดจริง) เท่านั้นที่ map มาที่ฟิลด์ Video ได้
-                            disabled={field === 'video' && row.type !== 'video'}
-                        >
-                            {t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>])}
-                        </MenuItem>
-                    ))}
-                    <ListSubheader>{t('lazadaAttributesGroup')}</ListSubheader>
-                    {lazadaAttributes.map((la) => (
-                        <MenuItem
-                            key={la.name}
-                            value={`${LAZADA_ATTRIBUTE_PREFIX}${la.name}`}
-                            disabled={!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type)}
-                        >
-                            {la.label ?? la.name}
-                            {!la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type) ? ` ${t('lazadaSelectUnsupported')}` : ''}
-                        </MenuItem>
-                    ))}
-                </Select>
+                <MappingTargetSelect
+                    value={buildTargetValue(row)}
+                    onChange={(value) => applySelectValue(row, value)}
+                    emptyLabel={t('notUsed')}
+                    groups={[
+                        {
+                            header: t('lazadaPayloadFieldsGroup'),
+                            options: STRUCTURED_FIELDS.map((field) => ({
+                                value: field,
+                                label: t(FIELD_LABEL_KEYS[field as Exclude<TargetField, '' | 'lazada_attribute'>]),
+                                // Lazada ไม่รับ URL วิดีโอจากภายนอก (ดู backend guard ของ
+                                // ฟิลด์นี้) — จะมีแค่ PIM attribute ประเภท `video`
+                                // (ไฟล์ที่อัปโหลดจริง) เท่านั้นที่ map มาที่ฟิลด์ Video ได้
+                                disabled: field === 'video' && row.type !== 'video',
+                            })),
+                        },
+                        {
+                            header: t('lazadaAttributesGroup'),
+                            options: lazadaAttributes.map((la) => {
+                                const unsupported = !la.input_type || !MAPPABLE_INPUT_TYPES.includes(la.input_type);
+                                const name = la.label ?? la.name;
+                                return {
+                                    value: `${LAZADA_ATTRIBUTE_PREFIX}${la.name}`,
+                                    label: unsupported ? `${name} ${t('lazadaSelectUnsupported')}` : name,
+                                    disabled: unsupported,
+                                };
+                            }),
+                        },
+                    ]}
+                />
             )}
         />
     );

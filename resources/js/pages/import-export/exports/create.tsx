@@ -1,29 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import SaveIcon from '@mui/icons-material/Save';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import {
-    Alert,
-    Box,
-    Button,
-    CircularProgress,
-    FormControl,
-    FormControlLabel,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    Switch,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/play.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, Input, Option, Select, Switch, Title } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriSwitchSx } from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface Props {
     types: string[];
@@ -44,7 +30,7 @@ export default function ExportCreate({ types }: Props) {
         type: types[0] ?? 'products',
         file_format: 'csv',
         field_separator: ',',
-        with_media: false,
+        with_media: false as boolean,
     });
     const skipNavigationGuardRef = useUnsavedChangesGuard(isDirty);
 
@@ -56,8 +42,8 @@ export default function ExportCreate({ types }: Props) {
 
     const [activeAction, setActiveAction] = useState<'save' | 'run' | null>(null);
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         setActiveAction('save');
         skipNavigationGuardRef.current = true;
         post('/import-export/exports', {
@@ -69,8 +55,8 @@ export default function ExportCreate({ types }: Props) {
         });
     };
 
-    const submitAndRun = (e: FormEvent) => {
-        e.preventDefault();
+    const submitAndRun = (e?: FormEvent) => {
+        e?.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, run: true }));
         skipNavigationGuardRef.current = true;
@@ -91,78 +77,79 @@ export default function ExportCreate({ types }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createExport')} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('createExport')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/exports" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+            <form onSubmit={submit} className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('createExport')}
+                    </Title>
+                    <div className={styles.actions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/import-export/exports')}>
                             {tCatalog('back')}
                         </Button>
-                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />} sx={fioriDefaultSx}>
+                        <Button icon="save" disabled={processing} loading={activeAction === 'save'} loadingDelay={0} onClick={() => submit()}>
                             {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                         </Button>
                         <Button
-                            variant="contained"
+                            design="Emphasized"
+                            icon="play"
                             disabled={processing}
-                            startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
-                            onClick={submitAndRun}
-                            sx={fioriEmphasizedSx}
+                            loading={activeAction === 'run'}
+                            loadingDelay={0}
+                            onClick={() => submitAndRun()}
                         >
                             {t('exportNow')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{tCatalog('generalTitle')}</Typography>
-                    <Stack spacing={3}>
-                        <FormControl fullWidth>
-                            <InputLabel id="export-type-label">{t('typeLabel')}</InputLabel>
-                            <Select
-                                labelId="export-type-label"
-                                label={t('typeLabel')}
-                                value={data.type}
-                                onChange={(e) => setData('type', e.target.value)}
-                            >
-                                {types.map((type) => (
-                                    <MenuItem key={type} value={type}>{typeLabel(type)}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <TextField
-                            label={t('fieldSeparator')}
-                            fullWidth
+                <FioriFormGroup title={tCatalog('generalTitle')}>
+                    <FioriField label={t('typeLabel')} htmlFor="export-type">
+                        <Select
+                            id="export-type"
+                            className={styles.fullWidth}
+                            value={data.type}
+                            onChange={(e) => setData('type', e.detail.selectedOption.value ?? data.type)}
+                        >
+                            {types.map((type) => (
+                                <Option key={type} value={type}>
+                                    {typeLabel(type)}
+                                </Option>
+                            ))}
+                        </Select>
+                    </FioriField>
+                    <FioriField
+                        label={t('fieldSeparator')}
+                        htmlFor="export-field-separator"
+                        valueState={valueStateOf(errors.field_separator)}
+                        message={errors.field_separator}
+                    >
+                        <Input
+                            id="export-field-separator"
+                            className={styles.fullWidth}
                             value={data.field_separator}
-                            onChange={(e) => setData('field_separator', e.target.value)}
-                            error={Boolean(errors.field_separator)}
-                            helperText={errors.field_separator}
+                            valueState={ui5ValueState(valueStateOf(errors.field_separator))}
+                            onInput={(e) => setData('field_separator', e.target.value)}
                         />
-                        <FormControl fullWidth>
-                            <InputLabel id="export-format-label">{t('fileFormat')}</InputLabel>
-                            <Select
-                                labelId="export-format-label"
-                                label={t('fileFormat')}
-                                value={data.file_format}
-                                onChange={(e) => setData('file_format', e.target.value)}
-                            >
-                                <MenuItem value="csv">CSV</MenuItem>
-                                <MenuItem value="xls">XLS</MenuItem>
-                                <MenuItem value="xlsx">XLSX</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <FormControlLabel
-                            control={<Switch sx={fioriSwitchSx} checked={data.with_media} onChange={(e) => setData('with_media', e.target.checked)} />}
-                            label={t('withMedia')}
-                        />
-                    </Stack>
-                </Paper>
+                    </FioriField>
+                    <FioriField label={t('fileFormat')} htmlFor="export-format">
+                        <Select
+                            id="export-format"
+                            className={styles.fullWidth}
+                            value={data.file_format}
+                            onChange={(e) => setData('file_format', e.detail.selectedOption.value ?? data.file_format)}
+                        >
+                            <Option value="csv">CSV</Option>
+                            <Option value="xls">XLS</Option>
+                            <Option value="xlsx">XLSX</Option>
+                        </Select>
+                    </FioriField>
+                    <FioriField label={t('withMedia')} htmlFor="export-with-media">
+                        <Switch id="export-with-media" checked={data.with_media} onChange={(e) => setData('with_media', e.target.checked)} />
+                    </FioriField>
+                </FioriFormGroup>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {tCatalog('correctHighlightedFields')}
-                    </Alert>
-                )}
-            </Box>
+                <FioriFormErrorSummary errors={errors} message={tCatalog('correctHighlightedFields')} style={{ marginTop: '1rem' }} />
+            </form>
         </AppLayout>
     );
 }

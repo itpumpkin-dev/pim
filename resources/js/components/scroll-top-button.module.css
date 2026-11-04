@@ -1,0 +1,24 @@
+.button {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1050;
+    border-radius: 50%;
+    width: 3rem;
+    height: 3rem;
+    min-width: 3rem;
+    box-shadow: var(--sapContent_Shadow2);
+    transform: scale(0);
+    transition: transform 0.2s ease;
+}
+
+.visible {
+    transform: scale(1);
+}
+
+@media (min-width: 900px) {
+    .button {
+        right: 2rem;
+        bottom: 2rem;
+    }
+}

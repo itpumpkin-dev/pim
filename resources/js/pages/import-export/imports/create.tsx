@@ -1,44 +1,37 @@
 import { type CategoryNode } from '@/components/category-cascade-select';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
+import { FioriField, FioriFormErrorSummary, FioriMessageStrip, ui5ValueState, valueStateOf } from '@/components/fiori-form';
+import { followLink } from '@/components/import-export/follow-link';
 import ImportPreflight, { type PreflightSchema } from '@/components/import-export/import-preflight';
 import WizardSteps, { type WizardStep } from '@/components/import-export/wizard-steps';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import DownloadIcon from '@mui/icons-material/Download';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import SaveIcon from '@mui/icons-material/Save';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/navigation-right-arrow.js';
+import '@ui5/webcomponents-icons/dist/play.js';
+import '@ui5/webcomponents-icons/dist/save.js';
 import {
-    Accordion,
-    AccordionDetails,
-    AccordionSummary,
-    Alert,
-    Autocomplete,
-    Box,
+    BusyIndicator,
     Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    FormControl,
-    FormControlLabel,
-    FormHelperText,
-    InputLabel,
-    MenuItem,
-    Paper,
-    Radio,
-    RadioGroup,
+    CheckBox,
+    Input,
+    Label,
+    MultiComboBox,
+    MultiComboBoxItem,
+    Option,
+    Panel,
+    RadioButton,
     Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+    Tag,
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
+import { FormEvent, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from '../import-export.module.css';
 
 interface Props {
     types: string[];
@@ -55,6 +48,66 @@ type FamilyOption = ResolvedFamily & { groups_count: number };
 // families). None of these sets the imported products' family: that always
 // comes from each row's own category columns.
 type ScopeMode = 'group' | 'family' | 'all';
+
+const cx = (...names: Array<string | false | null | undefined>) => names.filter(Boolean).join(' ');
+
+/** Selectable card with a radio button — the wizard's single-choice tiles. */
+function ChoiceCard({
+    name,
+    selected,
+    title,
+    description,
+    onSelect,
+    style,
+}: {
+    name: string;
+    selected: boolean;
+    title: ReactNode;
+    description?: ReactNode;
+    onSelect: () => void;
+    style?: CSSProperties;
+}) {
+    return (
+        <div className={cx(styles.choiceCard, selected && styles.choiceCardSelected)} onClick={onSelect} style={style}>
+            <RadioButton
+                name={name}
+                checked={selected}
+                accessibleName={typeof title === 'string' ? title : undefined}
+                onChange={(e) => {
+                    if (e.target.checked) onSelect();
+                }}
+            />
+            <div style={{ minWidth: 0 }}>
+                <span className={styles.choiceTitle}>{title}</span>
+                {description && <span className={styles.choiceDescription}>{description}</span>}
+            </div>
+        </div>
+    );
+}
+
+/** Label stacked above its control at every width — for the side-by-side category cascade. */
+function StackedField({ label, htmlFor, children }: { label: ReactNode; htmlFor: string; children: ReactNode }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', minWidth: 0 }}>
+            <Label for={htmlFor} showColon={false} wrappingType="Normal">
+                {label}
+            </Label>
+            {children}
+        </div>
+    );
+}
+
+/** Step heading + subtitle. */
+function StepHeading({ title, subtitle }: { title: ReactNode; subtitle: ReactNode }) {
+    return (
+        <div>
+            <Title level="H4" size="H5" wrappingType="Normal" className={styles.sectionHeading}>
+                {title}
+            </Title>
+            <span className={styles.secondaryText}>{subtitle}</span>
+        </div>
+    );
+}
 
 export default function ImportCreate({ types, requiredColumnsByType, columnLabelsByType }: Props) {
     const { t } = useTranslation('import_export');
@@ -140,6 +193,7 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
     // Same one-time-fetch-via-ref pattern as categoryTreeFetchStarted below.
     const familyOptionsFetchStarted = useRef(false);
     const [selectedFamilies, setSelectedFamilies] = useState<FamilyOption[]>([]);
+    const [advancedOpen, setAdvancedOpen] = useState(false);
 
     const currentKey = stepKeys[Math.min(activeStep, stepKeys.length - 1)];
 
@@ -364,520 +418,325 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
         { value: 'all', title: t('wizardFamilyAll'), description: t('scopeModeAllDescription') },
     ];
 
+    const errorFor = (field: keyof typeof errors) => errors[field];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('createImport')} />
-            <Box component="form" onSubmit={onSubmit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack
-                    direction={{ xs: 'column', sm: 'row' }}
-                    justifyContent="space-between"
-                    alignItems={{ sm: 'center' }}
-                    spacing={2}
-                    sx={{ mb: 3 }}
-                >
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <form onSubmit={onSubmit} className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
                         {t('createImport')}
-                    </Typography>
-                    <Button component={Link} href="/import-export/imports" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+                    </Title>
+                    <Button icon="nav-back" onClick={() => router.visit('/import-export/imports')}>
                         {tCatalog('back')}
                     </Button>
-                </Stack>
+                </div>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: { xs: 2, md: 3 }, mb: 2 }}>
+                <div className={styles.cardPadded} style={{ marginBottom: '1rem' }}>
                     <WizardSteps steps={steps} active={activeStep} furthest={furthest} onStepClick={goToStep} />
-                </Paper>
+                </div>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: { xs: 2, md: 3 } }}>
+                <div className={styles.cardPadded}>
                     {currentKey === 'type' && (
-                        <Stack spacing={3}>
-                            <Stack spacing={2}>
-                                <Box>
-                                    <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                        {t('wizardTypeKindHeading')}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                        {t('wizardTypeKindSubtitle')}
-                                    </Typography>
-                                </Box>
-                                <RadioGroup value={importKind} onChange={(e) => changeKind(e.target.value as 'master' | 'product')}>
-                                    <Stack spacing={1.5}>
-                                        {masterTypes.length > 0 && (
-                                            <Paper
-                                                variant="outlined"
-                                                onClick={() => changeKind('master')}
-                                                sx={{
-                                                    p: 1.5,
-                                                    borderRadius: '8px',
-                                                    cursor: 'pointer',
-                                                    borderColor: importKind === 'master' ? FIORI.brand : FIORI.border,
-                                                    bgcolor: importKind === 'master' ? FIORI.brandBg : FIORI.surface,
-                                                }}
-                                            >
-                                                <FormControlLabel
-                                                    value="master"
-                                                    control={<Radio />}
-                                                    label={
-                                                        <Box>
-                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                                                                {t('importKindMaster')}
-                                                            </Typography>
-                                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                                {t('importKindMasterDescription')}
-                                                            </Typography>
-                                                        </Box>
-                                                    }
-                                                    sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
-                                                />
-                                            </Paper>
-                                        )}
-                                        {hasProductType && (
-                                            <Paper
-                                                variant="outlined"
-                                                onClick={() => changeKind('product')}
-                                                sx={{
-                                                    p: 1.5,
-                                                    borderRadius: '8px',
-                                                    cursor: 'pointer',
-                                                    borderColor: importKind === 'product' ? FIORI.brand : FIORI.border,
-                                                    bgcolor: importKind === 'product' ? FIORI.brandBg : FIORI.surface,
-                                                }}
-                                            >
-                                                <FormControlLabel
-                                                    value="product"
-                                                    control={<Radio />}
-                                                    label={
-                                                        <Box>
-                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                                                                {t('importKindProduct')}
-                                                            </Typography>
-                                                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                                {t('importKindProductDescription')}
-                                                            </Typography>
-                                                        </Box>
-                                                    }
-                                                    sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
-                                                />
-                                            </Paper>
-                                        )}
-                                    </Stack>
-                                </RadioGroup>
-                            </Stack>
+                        <div className={styles.stack} style={{ gap: '1.5rem' }}>
+                            <div className={styles.stack}>
+                                <StepHeading title={t('wizardTypeKindHeading')} subtitle={t('wizardTypeKindSubtitle')} />
+                                <div className={styles.stack} style={{ gap: '0.75rem' }} role="radiogroup">
+                                    {masterTypes.length > 0 && (
+                                        <ChoiceCard
+                                            name="import-kind"
+                                            selected={importKind === 'master'}
+                                            title={t('importKindMaster')}
+                                            description={t('importKindMasterDescription')}
+                                            onSelect={() => changeKind('master')}
+                                        />
+                                    )}
+                                    {hasProductType && (
+                                        <ChoiceCard
+                                            name="import-kind"
+                                            selected={importKind === 'product'}
+                                            title={t('importKindProduct')}
+                                            description={t('importKindProductDescription')}
+                                            onSelect={() => changeKind('product')}
+                                        />
+                                    )}
+                                </div>
+                            </div>
 
                             {importKind === 'master' && masterTypes.length > 0 && (
-                                <Stack spacing={2}>
-                                    <Box>
-                                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                            {t('wizardMasterTypeHeading')}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                            {t('wizardMasterTypeSubtitle')}
-                                        </Typography>
-                                    </Box>
-                                    <RadioGroup value={data.type} onChange={(e) => changeType(e.target.value)}>
-                                        <Stack spacing={1.5}>
-                                            {masterTypes.map((type) => (
-                                                <Paper
-                                                    key={type}
-                                                    variant="outlined"
-                                                    onClick={() => changeType(type)}
-                                                    sx={{
-                                                        p: 1.5,
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        borderColor: data.type === type ? FIORI.brand : FIORI.border,
-                                                        bgcolor: data.type === type ? FIORI.brandBg : FIORI.surface,
-                                                    }}
-                                                >
-                                                    <FormControlLabel
-                                                        value={type}
-                                                        control={<Radio />}
-                                                        label={
-                                                            <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                                                                {typeLabel(type)}
-                                                            </Typography>
-                                                        }
-                                                        sx={{ m: 0, width: '100%' }}
-                                                    />
-                                                </Paper>
-                                            ))}
-                                        </Stack>
-                                    </RadioGroup>
-                                </Stack>
+                                <div className={styles.stack}>
+                                    <StepHeading title={t('wizardMasterTypeHeading')} subtitle={t('wizardMasterTypeSubtitle')} />
+                                    <div className={styles.stack} style={{ gap: '0.75rem' }} role="radiogroup">
+                                        {masterTypes.map((type) => (
+                                            <ChoiceCard
+                                                key={type}
+                                                name="import-master-type"
+                                                selected={data.type === type}
+                                                title={typeLabel(type)}
+                                                onSelect={() => changeType(type)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                        </Stack>
+                        </div>
                     )}
 
                     {currentKey === 'language' && (
-                        <Stack spacing={2}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('wizardLanguageHeading')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('wizardLanguageSubtitle')}
-                                </Typography>
-                            </Box>
-                            <FormControl fullWidth>
-                                <InputLabel id="import-source-locale-label">{t('sourceLocaleLabel')}</InputLabel>
+                        <div className={styles.stack}>
+                            <StepHeading title={t('wizardLanguageHeading')} subtitle={t('wizardLanguageSubtitle')} />
+                            <FioriField label={t('sourceLocaleLabel')} htmlFor="import-source-locale" hint={t('sourceLocaleHelp')} fullWidth>
                                 <Select
-                                    labelId="import-source-locale-label"
-                                    label={t('sourceLocaleLabel')}
+                                    id="import-source-locale"
+                                    className={styles.fullWidth}
                                     value={data.source_locale}
-                                    onChange={(e) => setData('source_locale', e.target.value)}
+                                    onChange={(e) => setData('source_locale', e.detail.selectedOption.value ?? data.source_locale)}
                                 >
                                     {locales.map((l) => (
-                                        <MenuItem key={l.code} value={l.code}>
+                                        <Option key={l.code} value={l.code}>
                                             {l.display_name ?? l.code}
-                                        </MenuItem>
+                                        </Option>
                                     ))}
                                 </Select>
-                                <FormHelperText>{t('sourceLocaleHelp')}</FormHelperText>
-                            </FormControl>
-                        </Stack>
+                            </FioriField>
+                        </div>
                     )}
 
                     {currentKey === 'family' && (
-                        <Stack spacing={2}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('wizardFamilyHeading')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('wizardFamilySubtitle')}
-                                </Typography>
-                            </Box>
+                        <div className={styles.stack}>
+                            <StepHeading title={t('wizardFamilyHeading')} subtitle={t('wizardFamilySubtitle')} />
 
-                            <RadioGroup value={scopeMode} onChange={(e) => changeScopeMode(e.target.value as ScopeMode)}>
-                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-                                    {scopeModes.map((mode) => (
-                                        <Paper
-                                            key={mode.value}
-                                            variant="outlined"
-                                            onClick={() => changeScopeMode(mode.value)}
-                                            sx={{
-                                                p: 1.5,
-                                                flex: 1,
-                                                borderRadius: '8px',
-                                                cursor: 'pointer',
-                                                borderColor: scopeMode === mode.value ? FIORI.brand : FIORI.border,
-                                                bgcolor: scopeMode === mode.value ? FIORI.brandBg : FIORI.surface,
-                                            }}
-                                        >
-                                            <FormControlLabel
-                                                value={mode.value}
-                                                control={<Radio />}
-                                                label={
-                                                    <Box>
-                                                        <Typography sx={{ fontWeight: 600, color: FIORI.textPrimary }}>{mode.title}</Typography>
-                                                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                                            {mode.description}
-                                                        </Typography>
-                                                    </Box>
-                                                }
-                                                sx={{ m: 0, width: '100%', alignItems: 'flex-start' }}
-                                            />
-                                        </Paper>
-                                    ))}
-                                </Stack>
-                            </RadioGroup>
+                            <div className={cx(styles.responsiveRow, styles.responsiveRowMd)} style={{ gap: '0.75rem' }} role="radiogroup">
+                                {scopeModes.map((mode) => (
+                                    <ChoiceCard
+                                        key={mode.value}
+                                        name="import-scope-mode"
+                                        selected={scopeMode === mode.value}
+                                        title={mode.title}
+                                        description={mode.description}
+                                        onSelect={() => changeScopeMode(mode.value)}
+                                    />
+                                ))}
+                            </div>
 
                             {scopeMode === 'family' && (
-                                <Box>
+                                <div>
                                     {familyOptionsError && (
-                                        <Alert severity="error" sx={{ mb: 2 }}>
+                                        <FioriMessageStrip severity="error" style={{ marginBottom: '1rem' }}>
                                             {t('familyListLoadError')}
-                                        </Alert>
+                                        </FioriMessageStrip>
                                     )}
-                                    <Autocomplete
-                                        multiple
-                                        options={familyOptions}
-                                        value={selectedFamilies}
-                                        loading={familyOptionsLoading}
-                                        onChange={(_e, value) => selectFamilies(value)}
-                                        isOptionEqualToValue={(option, value) => option.code === value.code}
-                                        getOptionLabel={(option) => `${option.name} (${option.code})`}
-                                        filterSelectedOptions
-                                        renderOption={(props, option) => {
-                                            const { key, ...rest } = props as typeof props & { key: string };
-                                            return (
-                                                <Box component="li" key={key} {...rest}>
-                                                    <Box>
-                                                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                                                            {option.name} ({option.code})
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                                            {t('familyGroupsCount', { count: option.groups_count })}
-                                                        </Typography>
-                                                    </Box>
-                                                </Box>
-                                            );
-                                        }}
-                                        renderInput={(params) => (
-                                            <TextField
-                                                {...params}
-                                                label={t('familyPickerLabel')}
-                                                placeholder={selectedFamilies.length === 0 ? t('familyPickerPlaceholder') : undefined}
-                                            />
-                                        )}
-                                    />
+                                    <FioriField label={t('familyPickerLabel')} htmlFor="import-family-picker" fullWidth>
+                                        <MultiComboBox
+                                            id="import-family-picker"
+                                            className={styles.fullWidth}
+                                            loading={familyOptionsLoading}
+                                            placeholder={selectedFamilies.length === 0 ? t('familyPickerPlaceholder') : undefined}
+                                            selectedValues={selectedFamilies.map((f) => f.code)}
+                                            onSelectionChange={(e) => {
+                                                const codes = new Set(e.detail.items.map((item) => item.value));
+                                                selectFamilies(familyOptions.filter((option) => codes.has(option.code)));
+                                            }}
+                                        >
+                                            {familyOptions.map((option) => (
+                                                <MultiComboBoxItem
+                                                    key={option.code}
+                                                    value={option.code}
+                                                    text={`${option.name} (${option.code})`}
+                                                    additionalText={t('familyGroupsCount', { count: option.groups_count })}
+                                                />
+                                            ))}
+                                        </MultiComboBox>
+                                    </FioriField>
                                     {selectedFamilies.length === 0 ? (
-                                        <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 1, color: FIORI.warning }}>
+                                        <div className={styles.warningText} style={{ marginTop: '0.5rem' }}>
                                             {t('selectFamilyFirst')}
-                                        </Typography>
+                                        </div>
                                     ) : (
-                                        <FormHelperText>{t('scopeModeFamilyHelp')}</FormHelperText>
+                                        <span className={styles.hint}>{t('scopeModeFamilyHelp')}</span>
                                     )}
-                                </Box>
+                                </div>
                             )}
 
-                            {scopeMode === 'all' && <Alert severity="info">{t('scopeModeAllInfo')}</Alert>}
+                            {scopeMode === 'all' && <FioriMessageStrip severity="information">{t('scopeModeAllInfo')}</FioriMessageStrip>}
 
-                            {scopeMode === 'group' && categoryTreeError && <Alert severity="error">{t('categoryTreeLoadError')}</Alert>}
+                            {scopeMode === 'group' && categoryTreeError && (
+                                <FioriMessageStrip severity="error">{t('categoryTreeLoadError')}</FioriMessageStrip>
+                            )}
 
                             {scopeMode === 'group' && (
                                 <>
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                        <FormControl fullWidth disabled={categoryTreeLoading}>
-                                            <InputLabel id="import-category-label">{t('categoryStepCategoryLabel')}</InputLabel>
+                                    <div className={cx(styles.responsiveRow, styles.responsiveRowSm)}>
+                                        <StackedField label={t('categoryStepCategoryLabel')} htmlFor="import-category">
                                             <Select
-                                                labelId="import-category-label"
-                                                label={t('categoryStepCategoryLabel')}
-                                                value={catId ?? ''}
-                                                onChange={(e) => selectCategory(e.target.value === '' ? null : Number(e.target.value))}
+                                                id="import-category"
+                                                className={styles.fullWidth}
+                                                disabled={categoryTreeLoading}
+                                                value={catId === null ? '' : String(catId)}
+                                                onChange={(e) => {
+                                                    const v = e.detail.selectedOption.value ?? '';
+                                                    selectCategory(v === '' ? null : Number(v));
+                                                }}
                                             >
-                                                <MenuItem value="">
-                                                    <em>—</em>
-                                                </MenuItem>
+                                                <Option value="">—</Option>
                                                 {categoryTree.map((n) => (
-                                                    <MenuItem key={n.id} value={n.id}>
+                                                    <Option key={n.id} value={String(n.id)}>
                                                         {n.name}
-                                                    </MenuItem>
+                                                    </Option>
                                                 ))}
                                             </Select>
-                                        </FormControl>
+                                        </StackedField>
 
-                                        <FormControl fullWidth disabled={!catNode}>
-                                            <InputLabel id="import-subcategory-label">{t('categoryStepSubcategoryLabel')}</InputLabel>
+                                        <StackedField label={t('categoryStepSubcategoryLabel')} htmlFor="import-subcategory">
                                             <Select
-                                                labelId="import-subcategory-label"
-                                                label={t('categoryStepSubcategoryLabel')}
-                                                value={subcatId ?? ''}
-                                                onChange={(e) => selectSubcategory(e.target.value === '' ? null : Number(e.target.value))}
+                                                id="import-subcategory"
+                                                className={styles.fullWidth}
+                                                disabled={!catNode}
+                                                value={subcatId === null ? '' : String(subcatId)}
+                                                onChange={(e) => {
+                                                    const v = e.detail.selectedOption.value ?? '';
+                                                    selectSubcategory(v === '' ? null : Number(v));
+                                                }}
                                             >
-                                                <MenuItem value="">
-                                                    <em>—</em>
-                                                </MenuItem>
+                                                <Option value="">—</Option>
                                                 {(catNode?.children ?? []).map((n) => (
-                                                    <MenuItem key={n.id} value={n.id}>
+                                                    <Option key={n.id} value={String(n.id)}>
                                                         {n.name}
-                                                    </MenuItem>
+                                                    </Option>
                                                 ))}
                                             </Select>
-                                        </FormControl>
+                                        </StackedField>
 
-                                        <FormControl fullWidth disabled={!subcatNode}>
-                                            <InputLabel id="import-group-label">{t('categoryStepProductGroupLabel')}</InputLabel>
+                                        <StackedField label={t('categoryStepProductGroupLabel')} htmlFor="import-group">
                                             <Select
-                                                labelId="import-group-label"
-                                                label={t('categoryStepProductGroupLabel')}
-                                                value={groupId ?? ''}
-                                                onChange={(e) => selectGroup(e.target.value === '' ? null : Number(e.target.value))}
+                                                id="import-group"
+                                                className={styles.fullWidth}
+                                                disabled={!subcatNode}
+                                                value={groupId === null ? '' : String(groupId)}
+                                                onChange={(e) => {
+                                                    const v = e.detail.selectedOption.value ?? '';
+                                                    selectGroup(v === '' ? null : Number(v));
+                                                }}
                                             >
-                                                <MenuItem value="">
-                                                    <em>—</em>
-                                                </MenuItem>
+                                                <Option value="">—</Option>
                                                 {(subcatNode?.children ?? []).map((n) => (
-                                                    <MenuItem key={n.id} value={n.id}>
+                                                    <Option key={n.id} value={String(n.id)}>
                                                         {n.name}
-                                                    </MenuItem>
+                                                    </Option>
                                                 ))}
                                             </Select>
-                                        </FormControl>
-                                    </Stack>
+                                        </StackedField>
+                                    </div>
 
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                                    <div>
+                                        <span className={styles.subHeading} style={{ marginBottom: '0.25rem' }}>
                                             {t('resolvedFamiliesLabel')}
-                                        </Typography>
+                                        </span>
                                         {familiesLoading ? (
-                                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
-                                                <CircularProgress size={14} />
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {t('previewLoading')}
-                                                </Typography>
-                                            </Stack>
+                                            <div className={styles.row} style={{ gap: '0.5rem' }}>
+                                                <BusyIndicator active delay={0} size="S" />
+                                                <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('previewLoading')}</Text>
+                                            </div>
                                         ) : groupId === null ? (
-                                            <Typography variant="body2" sx={{ fontStyle: 'italic', mt: 0.5, color: FIORI.warning }}>
-                                                {t('selectProductGroupFirst')}
-                                            </Typography>
+                                            <div className={styles.warningText}>{t('selectProductGroupFirst')}</div>
                                         ) : resolvedFamilies.length === 0 ? (
-                                            <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic', mt: 0.5 }}>
-                                                {t('noFamilyBoundToProductGroup')}
-                                            </Typography>
+                                            <div className={styles.mutedItalic}>{t('noFamilyBoundToProductGroup')}</div>
                                         ) : (
-                                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                                            <div className={styles.row}>
                                                 {resolvedFamilies.map((f) => (
-                                                    <Chip
-                                                        key={f.code}
-                                                        label={`${f.name} (${f.code})`}
-                                                        size="small"
-                                                        sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600 }}
-                                                    />
+                                                    <Tag key={f.code} design="Information" hideStateIcon>
+                                                        {`${f.name} (${f.code})`}
+                                                    </Tag>
                                                 ))}
-                                            </Stack>
+                                            </div>
                                         )}
-                                        <FormHelperText>{t('wizardFamilyHelp')}</FormHelperText>
-                                    </Box>
+                                        <span className={styles.hint}>{t('wizardFamilyHelp')}</span>
+                                    </div>
                                 </>
                             )}
-                        </Stack>
+                        </div>
                     )}
 
                     {currentKey === 'review' && (
-                        <Stack spacing={2.5}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('wizardReviewHeading')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('wizardReviewSubtitle')}
-                                </Typography>
-                            </Box>
+                        <div className={styles.stack} style={{ gap: '1.25rem' }}>
+                            <StepHeading title={t('wizardReviewHeading')} subtitle={t('wizardReviewSubtitle')} />
 
                             {schemaLoading && !schema ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={16} />
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('previewLoading')}
-                                    </Typography>
-                                </Stack>
+                                <div className={styles.row} style={{ gap: '0.5rem' }}>
+                                    <BusyIndicator active delay={0} size="S" />
+                                    <Text style={{ color: 'var(--sapContent_LabelColor)' }}>{t('previewLoading')}</Text>
+                                </div>
                             ) : (
                                 <>
-                                    <Box>
-                                        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
-                                            {t('wizardRequiredAttributes')}
-                                        </Typography>
+                                    <div>
+                                        <span className={styles.subHeading}>{t('wizardRequiredAttributes')}</span>
                                         {requiredCodes.length === 0 ? (
-                                            <Typography variant="body2" color="text.secondary">
-                                                {t('wizardNoRequired')}
-                                            </Typography>
+                                            <span className={styles.secondaryText}>{t('wizardNoRequired')}</span>
                                         ) : (
-                                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                                            <div className={styles.row}>
                                                 {requiredCodes.map((code) => (
-                                                    <Chip
-                                                        key={code}
-                                                        label={labelFor(code)}
-                                                        size="small"
-                                                        sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600, borderRadius: '6px' }}
-                                                    />
+                                                    <Tag key={code} design="Information" hideStateIcon>
+                                                        {labelFor(code)}
+                                                    </Tag>
                                                 ))}
-                                            </Stack>
+                                            </div>
                                         )}
-                                    </Box>
+                                    </div>
 
                                     {schema && schema.columns.length > 0 && (
-                                        <Box>
-                                            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
-                                                {t('wizardAllColumns')}
-                                            </Typography>
-                                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                                        <div>
+                                            <span className={styles.subHeading}>{t('wizardAllColumns')}</span>
+                                            <div className={styles.row}>
                                                 {schema.columns.map((code) => (
-                                                    <Chip
-                                                        key={code}
-                                                        label={labelFor(code)}
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{
-                                                            borderColor: requiredCodes.includes(code) ? FIORI.brand : FIORI.borderStrong,
-                                                            color: FIORI.textPrimary,
-                                                            borderRadius: '6px',
-                                                        }}
-                                                    />
+                                                    <Tag key={code} design={requiredCodes.includes(code) ? 'Information' : 'Neutral'} hideStateIcon>
+                                                        {labelFor(code)}
+                                                    </Tag>
                                                 ))}
-                                            </Stack>
-                                        </Box>
+                                            </div>
+                                        </div>
                                     )}
 
                                     {schema && schema.sample.columns.length > 0 && (
-                                        <Box>
-                                            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, color: FIORI.textPrimary }}>
-                                                {t('filePreview')}
-                                            </Typography>
-                                            <Box sx={{ overflowX: 'auto', border: `1px solid ${FIORI.border}`, borderRadius: '8px' }}>
-                                                <Box component="table" sx={{ borderCollapse: 'collapse', width: '100%', fontSize: '0.8125rem' }}>
-                                                    <Box component="thead" sx={{ bgcolor: FIORI.headerBg }}>
-                                                        <Box component="tr">
+                                        <div>
+                                            <span className={styles.subHeading}>{t('filePreview')}</span>
+                                            <div className={styles.sampleTableWrap}>
+                                                <table className={styles.sampleTable}>
+                                                    <thead>
+                                                        <tr>
                                                             {schema.sample.columns.map((col) => (
-                                                                <Box
-                                                                    component="th"
-                                                                    key={col}
-                                                                    sx={{
-                                                                        textAlign: 'left',
-                                                                        whiteSpace: 'nowrap',
-                                                                        p: 1,
-                                                                        fontWeight: 600,
-                                                                        color: FIORI.textPrimary,
-                                                                        borderBottom: `1px solid ${FIORI.border}`,
-                                                                    }}
-                                                                >
-                                                                    {col}
-                                                                </Box>
+                                                                <th key={col}>{col}</th>
                                                             ))}
-                                                        </Box>
-                                                    </Box>
-                                                    <Box component="tbody">
-                                                        <Box component="tr">
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr>
                                                             {schema.sample.columns.map((col) => (
-                                                                <Box
-                                                                    component="td"
-                                                                    key={col}
-                                                                    sx={{ whiteSpace: 'nowrap', p: 1, color: FIORI.textPrimary }}
-                                                                >
-                                                                    {schema.sample.rows[0]?.[col] ?? ''}
-                                                                </Box>
+                                                                <td key={col}>{schema.sample.rows[0]?.[col] ?? ''}</td>
                                                             ))}
-                                                        </Box>
-                                                    </Box>
-                                                </Box>
-                                            </Box>
-                                        </Box>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
                                     )}
 
-                                    <Stack direction="row" spacing={1}>
-                                        <Button
-                                            component="a"
-                                            href={sampleHref('csv')}
-                                            variant="outlined"
-                                            startIcon={<DownloadIcon />}
-                                            sx={fioriDefaultSx}
-                                        >
+                                    <div className={styles.actions}>
+                                        <Button icon="download" onClick={() => followLink(sampleHref('csv'))}>
                                             {t('downloadSample')} · CSV
                                         </Button>
-                                        <Button
-                                            component="a"
-                                            href={sampleHref('xlsx')}
-                                            variant="outlined"
-                                            startIcon={<DownloadIcon />}
-                                            sx={fioriDefaultSx}
-                                        >
+                                        <Button icon="download" onClick={() => followLink(sampleHref('xlsx'))}>
                                             {t('downloadSample')} · XLSX
                                         </Button>
-                                    </Stack>
+                                    </div>
                                 </>
                             )}
-                        </Stack>
+                        </div>
                     )}
 
                     {currentKey === 'upload' && (
-                        <Stack spacing={2.5}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                    {t('wizardUploadHeading')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('wizardUploadSubtitle')}
-                                </Typography>
-                            </Box>
+                        <div className={styles.stack} style={{ gap: '1.25rem' }}>
+                            <StepHeading title={t('wizardUploadHeading')} subtitle={t('wizardUploadSubtitle')} />
 
                             <FioriFileUploader
                                 files={data.file ? [data.file] : []}
@@ -896,154 +755,156 @@ export default function ImportCreate({ types, requiredColumnsByType, columnLabel
 
                             <ImportPreflight file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} schema={schema} />
 
-                            <Accordion
-                                elevation={0}
-                                disableGutters
-                                sx={{ border: `1px solid ${FIORI.border}`, borderRadius: '8px', '&:before': { display: 'none' } }}
+                            <Panel
+                                headerText={t('wizardAdvancedOptions')}
+                                collapsed={!advancedOpen}
+                                onToggle={() => setAdvancedOpen((open) => !open)}
+                                style={{
+                                    border: '1px solid var(--sapGroup_ContentBorderColor)',
+                                    borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                                    overflow: 'hidden',
+                                }}
                             >
-                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                    <Typography fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                        {t('wizardAdvancedOptions')}
-                                    </Typography>
-                                </AccordionSummary>
-                                <AccordionDetails>
-                                    <Stack spacing={3}>
-                                        <FormControl fullWidth>
-                                            <InputLabel id="import-action-label">{t('action')}</InputLabel>
-                                            <Select
-                                                labelId="import-action-label"
-                                                label={t('action')}
-                                                value={data.action}
-                                                onChange={(e) => setData('action', e.target.value)}
-                                            >
-                                                <MenuItem value="create_update">{t('actionCreateUpdate')}</MenuItem>
-                                                <MenuItem value="delete">{t('actionDelete')}</MenuItem>
-                                            </Select>
-                                        </FormControl>
+                                <div className={styles.stack} style={{ gap: '0.875rem', padding: '0.5rem 0' }}>
+                                    <FioriField label={t('action')} htmlFor="import-action">
+                                        <Select
+                                            id="import-action"
+                                            className={styles.fullWidth}
+                                            value={data.action}
+                                            onChange={(e) => setData('action', e.detail.selectedOption.value ?? data.action)}
+                                        >
+                                            <Option value="create_update">{t('actionCreateUpdate')}</Option>
+                                            <Option value="delete">{t('actionDelete')}</Option>
+                                        </Select>
+                                    </FioriField>
 
-                                        <FormControl fullWidth>
-                                            <InputLabel id="import-validation-label">{t('validationStrategy')}</InputLabel>
-                                            <Select
-                                                labelId="import-validation-label"
-                                                label={t('validationStrategy')}
-                                                value={data.validation_strategy}
-                                                onChange={(e) => setData('validation_strategy', e.target.value)}
-                                            >
-                                                <MenuItem value="skip_errors">{t('validationStrategySkip')}</MenuItem>
-                                                <MenuItem value="stop_on_errors">{t('validationStrategyStop')}</MenuItem>
-                                            </Select>
-                                        </FormControl>
+                                    <FioriField label={t('validationStrategy')} htmlFor="import-validation">
+                                        <Select
+                                            id="import-validation"
+                                            className={styles.fullWidth}
+                                            value={data.validation_strategy}
+                                            onChange={(e) =>
+                                                setData('validation_strategy', e.detail.selectedOption.value ?? data.validation_strategy)
+                                            }
+                                        >
+                                            <Option value="skip_errors">{t('validationStrategySkip')}</Option>
+                                            <Option value="stop_on_errors">{t('validationStrategyStop')}</Option>
+                                        </Select>
+                                    </FioriField>
 
-                                        {isProducts && (
-                                            <Box>
-                                                <FormControlLabel
-                                                    control={
-                                                        <Checkbox
-                                                            checked={data.ai_translate}
-                                                            onChange={(e) => setData('ai_translate', e.target.checked)}
-                                                        />
-                                                    }
-                                                    label={t('aiTranslate')}
-                                                />
-                                                <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
-                                            </Box>
-                                        )}
-
-                                        <TextField
-                                            label={t('allowedErrors')}
-                                            type="number"
-                                            fullWidth
-                                            value={data.allowed_errors}
-                                            onChange={(e) => setData('allowed_errors', Number(e.target.value))}
-                                            error={Boolean(errors.allowed_errors)}
-                                            helperText={errors.allowed_errors}
-                                        />
-
-                                        <FormControl fullWidth>
-                                            <InputLabel id="import-format-label">{t('fileFormat')}</InputLabel>
-                                            <Select
-                                                labelId="import-format-label"
-                                                label={t('fileFormat')}
-                                                value={data.file_format}
-                                                onChange={(e) => setData('file_format', e.target.value)}
-                                            >
-                                                <MenuItem value="csv">CSV</MenuItem>
-                                                <MenuItem value="xls">XLS</MenuItem>
-                                                <MenuItem value="xlsx">XLSX</MenuItem>
-                                            </Select>
-                                        </FormControl>
-
-                                        <TextField
-                                            label={t('fieldSeparator')}
-                                            fullWidth
-                                            value={data.field_separator}
-                                            onChange={(e) => setData('field_separator', e.target.value)}
-                                            error={Boolean(errors.field_separator)}
-                                            helperText={errors.field_separator}
-                                        />
-
-                                        {isProducts && (
-                                            <TextField
-                                                label={t('imageDirectoryPath')}
-                                                fullWidth
-                                                value={data.image_directory_path}
-                                                onChange={(e) => setData('image_directory_path', e.target.value)}
-                                                error={Boolean(errors.image_directory_path)}
-                                                helperText={errors.image_directory_path}
+                                    {isProducts && (
+                                        <FioriField label={t('aiTranslate')} htmlFor="import-ai-translate" hint={t('aiTranslateHelp')}>
+                                            <CheckBox
+                                                id="import-ai-translate"
+                                                accessibleName={t('aiTranslate')}
+                                                checked={data.ai_translate}
+                                                onChange={(e) => setData('ai_translate', e.target.checked)}
                                             />
-                                        )}
-                                    </Stack>
-                                </AccordionDetails>
-                            </Accordion>
-                        </Stack>
+                                        </FioriField>
+                                    )}
+
+                                    <FioriField
+                                        label={t('allowedErrors')}
+                                        htmlFor="import-allowed-errors"
+                                        valueState={valueStateOf(errorFor('allowed_errors'))}
+                                        message={errorFor('allowed_errors')}
+                                    >
+                                        <Input
+                                            id="import-allowed-errors"
+                                            type="Number"
+                                            className={styles.fullWidth}
+                                            value={String(data.allowed_errors)}
+                                            valueState={ui5ValueState(valueStateOf(errorFor('allowed_errors')))}
+                                            onInput={(e) => setData('allowed_errors', Number(e.target.value))}
+                                        />
+                                    </FioriField>
+
+                                    <FioriField label={t('fileFormat')} htmlFor="import-format">
+                                        <Select
+                                            id="import-format"
+                                            className={styles.fullWidth}
+                                            value={data.file_format}
+                                            onChange={(e) => setData('file_format', e.detail.selectedOption.value ?? data.file_format)}
+                                        >
+                                            <Option value="csv">CSV</Option>
+                                            <Option value="xls">XLS</Option>
+                                            <Option value="xlsx">XLSX</Option>
+                                        </Select>
+                                    </FioriField>
+
+                                    <FioriField
+                                        label={t('fieldSeparator')}
+                                        htmlFor="import-field-separator"
+                                        valueState={valueStateOf(errorFor('field_separator'))}
+                                        message={errorFor('field_separator')}
+                                    >
+                                        <Input
+                                            id="import-field-separator"
+                                            className={styles.fullWidth}
+                                            value={data.field_separator}
+                                            valueState={ui5ValueState(valueStateOf(errorFor('field_separator')))}
+                                            onInput={(e) => setData('field_separator', e.target.value)}
+                                        />
+                                    </FioriField>
+
+                                    {isProducts && (
+                                        <FioriField
+                                            label={t('imageDirectoryPath')}
+                                            htmlFor="import-image-dir"
+                                            valueState={valueStateOf(errorFor('image_directory_path'))}
+                                            message={errorFor('image_directory_path')}
+                                        >
+                                            <Input
+                                                id="import-image-dir"
+                                                className={styles.fullWidth}
+                                                value={data.image_directory_path}
+                                                valueState={ui5ValueState(valueStateOf(errorFor('image_directory_path')))}
+                                                onInput={(e) => setData('image_directory_path', e.target.value)}
+                                            />
+                                        </FioriField>
+                                    )}
+                                </div>
+                            </Panel>
+                        </div>
                     )}
 
-                    {Object.keys(errors).length > 0 && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {tCatalog('correctHighlightedFields')}
-                        </Alert>
-                    )}
+                    <FioriFormErrorSummary errors={errors} message={tCatalog('correctHighlightedFields')} style={{ marginTop: '1rem' }} />
 
-                    <Stack direction="row" justifyContent="space-between" sx={{ mt: 3 }}>
-                        <Button onClick={goBack} disabled={activeStep === 0} startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+                    <div className={styles.footerNav}>
+                        <Button icon="nav-back" onClick={goBack} disabled={activeStep === 0}>
                             {tCatalog('back')}
                         </Button>
 
                         {isLastStep ? (
-                            <Stack direction="row" spacing={1}>
+                            <div className={styles.actions}>
                                 <Button
-                                    type="submit"
-                                    variant="outlined"
+                                    icon="save"
                                     disabled={processing || !data.file}
-                                    startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />}
-                                    sx={fioriDefaultSx}
+                                    loading={activeAction === 'save'}
+                                    loadingDelay={0}
+                                    onClick={() => submitForm(false)}
                                 >
                                     {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                                 </Button>
                                 <Button
-                                    variant="contained"
+                                    design="Emphasized"
+                                    icon="play"
                                     disabled={processing || !data.file}
-                                    startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
+                                    loading={activeAction === 'run'}
+                                    loadingDelay={0}
                                     onClick={() => submitForm(true)}
-                                    sx={fioriEmphasizedSx}
                                 >
                                     {t('importNow')}
                                 </Button>
-                            </Stack>
+                            </div>
                         ) : (
-                            <Button
-                                onClick={goNext}
-                                disabled={nextDisabled}
-                                variant="contained"
-                                endIcon={<ArrowForwardIcon />}
-                                sx={fioriEmphasizedSx}
-                            >
+                            <Button design="Emphasized" endIcon="navigation-right-arrow" onClick={goNext} disabled={nextDisabled}>
                                 {t('wizardNext')}
                             </Button>
                         )}
-                    </Stack>
-                </Paper>
-            </Box>
+                    </div>
+                </div>
+            </form>
         </AppLayout>
     );
 }

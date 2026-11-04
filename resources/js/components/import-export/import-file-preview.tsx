@@ -1,8 +1,8 @@
-import { Box, CircularProgress, Typography } from '@mui/material';
-import * as XLSX from 'xlsx';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { BusyIndicator, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import * as XLSX from 'xlsx';
 
 const PREVIEW_ROW_LIMIT = 10;
 
@@ -75,54 +75,40 @@ export default function ImportFilePreview({ file, fileFormat, fieldSeparator }: 
             ? rows[0].map((header, idx) => ({
                   key: String(idx),
                   header: <span style={{ whiteSpace: 'nowrap' }}>{header}</span>,
+                  popinText: header,
                   priority: idx === 0 ? 'always' : idx === 1 ? 'high' : idx === 2 ? 'medium' : 'low',
-                  render: (row: { key: number; cells: string[] }) => (
-                      <span style={{ whiteSpace: 'nowrap' }}>{row.cells[idx]}</span>
-                  ),
+                  render: (row: { key: number; cells: string[] }) => <span style={{ whiteSpace: 'nowrap' }}>{row.cells[idx]}</span>,
               }))
             : [];
     const previewRows = rows.slice(1).map((cells, idx) => ({ key: idx, cells }));
 
+    const secondary = { color: 'var(--sapContent_LabelColor)' };
+
     return (
-        <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+        <div style={{ marginTop: '1rem' }}>
+            <Title level="H6" size="H6" style={{ marginBottom: '0.5rem' }}>
                 {t('filePreview')}
-            </Typography>
+            </Title>
 
             {loading && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CircularProgress size={16} />
-                    <Typography variant="body2" color="text.secondary">
-                        {t('previewLoading')}
-                    </Typography>
-                </Box>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <BusyIndicator active delay={0} size="S" />
+                    <Text style={secondary}>{t('previewLoading')}</Text>
+                </div>
             )}
 
-            {!loading && error && (
-                <Typography variant="body2" color="error">
-                    {error}
-                </Typography>
-            )}
+            {!loading && error && <Text style={{ color: 'var(--sapNegativeTextColor, var(--sapNegativeColor))' }}>{error}</Text>}
 
-            {!loading && !error && rows.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                    {t('previewEmpty')}
-                </Typography>
-            )}
+            {!loading && !error && rows.length === 0 && <Text style={secondary}>{t('previewEmpty')}</Text>}
 
             {!loading && !error && rows.length > 0 && (
                 <>
-                    <FioriResponsiveTable
-                        size="small"
-                        columns={previewColumns}
-                        rows={previewRows}
-                        getRowKey={(row) => row.key}
-                    />
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                    <FioriResponsiveTable size="small" columns={previewColumns} rows={previewRows} getRowKey={(row) => row.key} />
+                    <Text style={{ ...secondary, display: 'block', marginTop: '0.25rem', fontSize: 'var(--sapFontSmallSize)' }}>
                         {t('previewRowsNote', { count: rows.length })}
-                    </Typography>
+                    </Text>
                 </>
             )}
-        </Box>
+        </div>
     );
 }

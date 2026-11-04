@@ -1,31 +1,17 @@
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { followLink } from '@/components/import-export/follow-link';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus, type FioriTone } from '@/lib/fiori-style';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CancelIcon from '@mui/icons-material/Cancel';
-import DownloadIcon from '@mui/icons-material/Download';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Grid,
-    LinearProgress,
-    Paper,
-    Stack,
-    Typography,
-} from '@mui/material';
+import { Head, router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/sys-cancel.js';
+import { BusyIndicator, Button, Label, ProgressIndicator, Title } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import {
-    FIORI,
-    FioriStatus,
-    type FioriTone,
-    fioriCardSx,
-    fioriDefaultSx,
-    fioriEmphasizedSx,
-} from '@/lib/fiori-style';
+import styles from '../import-export.module.css';
 
 interface UserSummary {
     id: number;
@@ -195,139 +181,137 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('jobTrackerTitle')}: ${job.config_code}`} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{job.config_code}</Typography>
+            <div className={styles.page}>
+                <div className={styles.header}>
+                    <div className={styles.row} style={{ gap: '0.75rem' }}>
+                        <Title level="H3" size="H3" wrappingType="Normal">
+                            {job.config_code}
+                        </Title>
                         <FioriStatus
                             label={t('status' + job.status.charAt(0).toUpperCase() + job.status.slice(1))}
                             tone={STATUS_TONES[job.status] ?? 'neutral'}
                         />
-                        {isActive && cancelRequested && (
-                            <FioriStatus label={t('cancelRequested')} tone="warning" />
-                        )}
-                    </Stack>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/jobs" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+                        {isActive && cancelRequested && <FioriStatus label={t('cancelRequested')} tone="warning" />}
+                    </div>
+                    <div className={styles.actions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/import-export/jobs')}>
                             {t('backToJobs')}
                         </Button>
                         {isActive && !cancelRequested && (
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                startIcon={<CancelIcon />}
-                                onClick={() => setCancelDialogOpen(true)}
-                                sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
-                            >
+                            <Button design="Negative" icon="sys-cancel" onClick={() => setCancelDialogOpen(true)}>
                                 {t('cancelJob')}
                             </Button>
                         )}
                         {canDownload && (
-                            <Button
-                                variant="contained"
-                                startIcon={<DownloadIcon />}
-                                href={`/import-export/jobs/${job.id}/download`}
-                                sx={fioriEmphasizedSx}
-                            >
+                            <Button design="Emphasized" icon="download" onClick={() => followLink(`/import-export/jobs/${job.id}/download`)}>
                                 {t('download')}
                             </Button>
                         )}
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
                 {/* งานยังไม่จบ — บอกให้ชัดว่ากำลังรอคิว/กำลังทำ เพราะตัวเลขด้านล่างอาจค้างที่ 0
                     จนจบ (เช่น ส่งออกด่วนอัปเดตจำนวนแถวตอนเขียนไฟล์เสร็จทีเดียว) */}
                 {isActive && (
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 2.5, mb: 3, overflow: 'hidden', position: 'relative' }}>
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <CircularProgress size={28} thickness={4.5} sx={{ color: FIORI.brand, flexShrink: 0 }} />
-                            <Box>
-                                <Typography fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+                    <div
+                        className={styles.cardPadded}
+                        style={{ padding: '1.25rem', marginBottom: '1.5rem', overflow: 'hidden', position: 'relative' }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <BusyIndicator active delay={0} size="M" style={{ flexShrink: 0 }} />
+                            <div>
+                                <span className={styles.subHeading} style={{ marginBottom: 0 }}>
                                     {job.status === 'pending' ? t('jobWaitingInQueue') : t('jobRunning')}
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                    {t('jobAutoRefreshHint')}
-                                </Typography>
-                            </Box>
-                        </Stack>
-                        <LinearProgress
-                            sx={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, bgcolor: FIORI.hover, '& .MuiLinearProgress-bar': { bgcolor: FIORI.brand } }}
-                        />
-                    </Paper>
+                                </span>
+                                <span className={styles.secondaryText}>{t('jobAutoRefreshHint')}</span>
+                            </div>
+                        </div>
+                        <div className={styles.indeterminateTrack} />
+                    </div>
                 )}
 
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={12} sm={4}>
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 2.5, textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{job.total_records_created}</Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('totalRecordsCreated')}</Typography>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 2.5, textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{job.total_records_skipped}</Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('totalRecordsSkipped')}</Typography>
-                        </Paper>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 2.5, textAlign: 'center' }}>
-                            <Typography variant="h4" fontWeight={700} sx={{ color: FIORI.textPrimary }}>{job.total_rows_processed}</Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('totalRowsProcessed')}</Typography>
-                        </Paper>
-                    </Grid>
-                </Grid>
+                <div className={styles.statGrid}>
+                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
+                        <span className={styles.statValue}>{job.total_records_created}</span>
+                        <span className={styles.secondaryText}>{t('totalRecordsCreated')}</span>
+                    </div>
+                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
+                        <span className={styles.statValue}>{job.total_records_skipped}</span>
+                        <span className={styles.secondaryText}>{t('totalRecordsSkipped')}</span>
+                    </div>
+                    <div className={styles.cardPadded} style={{ padding: '1.25rem', textAlign: 'center' }}>
+                        <span className={styles.statValue}>{job.total_rows_processed}</span>
+                        <span className={styles.secondaryText}>{t('totalRowsProcessed')}</span>
+                    </div>
+                </div>
 
                 {job.total_translations_queued > 0 && (
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3, mb: 3 }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                            <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('aiTranslationProgress')}</Typography>
+                    <div className={styles.cardPadded} style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                            <Title level="H4" size="H5" wrappingType="Normal">
+                                {t('aiTranslationProgress')}
+                            </Title>
                             <FioriStatus
                                 label={translationsPending ? t('aiTranslationInProgress') : t('aiTranslationDone')}
                                 tone={translationsPending ? 'information' : 'success'}
                             />
-                        </Stack>
-                        <LinearProgress
-                            variant="determinate"
+                        </div>
+                        <ProgressIndicator
                             value={Math.min(100, (job.total_translations_completed / job.total_translations_queued) * 100)}
-                            sx={{ height: 8, borderRadius: 4, mb: 1, bgcolor: FIORI.hover, '& .MuiLinearProgress-bar': { bgcolor: FIORI.brand } }}
+                            hideValue
+                            style={{ width: '100%', marginBottom: '0.5rem' }}
                         />
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                        <span className={styles.secondaryText}>
                             {t('aiTranslationCount', {
                                 completed: job.total_translations_completed,
                                 total: job.total_translations_queued,
                             })}
-                        </Typography>
-                    </Paper>
+                        </span>
+                    </div>
                 )}
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3, mb: 3 }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('summary')}</Typography>
-                    <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>{t('jobType')}</Typography>
-                            <Typography sx={{ color: FIORI.textPrimary }}>{job.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>{t('typeLabel')}</Typography>
-                            <Typography sx={{ color: FIORI.textPrimary }}>{typeLabel(job.entity_type)}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>{t('user')}</Typography>
-                            <Typography sx={{ color: FIORI.textPrimary }}>{userLabel(job.user)}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>{t('startedAt')}</Typography>
-                            <Typography sx={{ color: FIORI.textPrimary }}>{formatLocalDateTime(job.started_at)}</Typography>
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block' }}>{t('completedAt')}</Typography>
-                            <Typography sx={{ color: FIORI.textPrimary }}>{formatLocalDateTime(job.completed_at)}</Typography>
-                        </Grid>
-                    </Grid>
-                </Paper>
+                <div className={styles.cardPadded} style={{ marginBottom: '1.5rem' }}>
+                    <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '1rem' }}>
+                        {t('summary')}
+                    </Title>
+                    <div className={styles.summaryGrid}>
+                        <div>
+                            <Label showColon={false} style={{ display: 'block' }}>
+                                {t('jobType')}
+                            </Label>
+                            <span className={styles.summaryValue}>{job.job_type === 'import' ? t('jobTypeImport') : t('jobTypeExport')}</span>
+                        </div>
+                        <div>
+                            <Label showColon={false} style={{ display: 'block' }}>
+                                {t('typeLabel')}
+                            </Label>
+                            <span className={styles.summaryValue}>{typeLabel(job.entity_type)}</span>
+                        </div>
+                        <div>
+                            <Label showColon={false} style={{ display: 'block' }}>
+                                {t('user')}
+                            </Label>
+                            <span className={styles.summaryValue}>{userLabel(job.user)}</span>
+                        </div>
+                        <div>
+                            <Label showColon={false} style={{ display: 'block' }}>
+                                {t('startedAt')}
+                            </Label>
+                            <span className={styles.summaryValue}>{formatLocalDateTime(job.started_at)}</span>
+                        </div>
+                        <div>
+                            <Label showColon={false} style={{ display: 'block' }}>
+                                {t('completedAt')}
+                            </Label>
+                            <span className={styles.summaryValue}>{formatLocalDateTime(job.completed_at)}</span>
+                        </div>
+                    </div>
+                </div>
 
-                <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                    <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('errorLog')}</Typography>
+                <div className={styles.cardPadded}>
+                    <Title level="H4" size="H5" wrappingType="Normal" style={{ marginBottom: '1rem' }}>
+                        {t('errorLog')}
+                    </Title>
                     {job.error_log && job.error_log.length > 0 ? (
                         <FioriResponsiveTable
                             variant="plain"
@@ -337,10 +321,10 @@ export default function JobTrackerShow({ job: initialJob }: Props) {
                             getRowKey={(entry) => entry.key}
                         />
                     ) : (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>{t('noErrors')}</Typography>
+                        <span className={styles.secondaryText}>{t('noErrors')}</span>
                     )}
-                </Paper>
-            </Box>
+                </div>
+            </div>
 
             <FioriMessageBox
                 open={cancelDialogOpen}

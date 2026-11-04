@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
-import ConstructionOutlinedIcon from '@mui/icons-material/ConstructionOutlined';
-import { Box, Paper, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/wrench.js';
+import { Icon, Text, Title } from '@ui5/webcomponents-react';
 import { useTranslation } from 'react-i18next';
 
-import { FIORI, fioriCardSx } from '@/lib/fiori-style';
+import { MasterListPage, masterStyles } from './master-crud';
 
 interface Props {
     /** i18n key in the `nav` namespace for this page's title. */
@@ -48,38 +48,17 @@ export default function CatalogPlaceholder({ titleKey, subtitle = null }: Props)
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={title} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{title}</Typography>
-                    {subtitle && (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>{subtitle}</Typography>
-                    )}
-                </Box>
-
-                <Paper sx={{ ...fioriCardSx, p: { xs: 4, md: 6 }, textAlign: 'center', maxWidth: 560 }}>
-                    <Box
-                        sx={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: 56,
-                            height: 56,
-                            borderRadius: '12px',
-                            bgcolor: FIORI.brandBg,
-                            color: FIORI.brand,
-                            mb: 2,
-                        }}
-                    >
-                        <ConstructionOutlinedIcon sx={{ fontSize: 30 }} />
-                    </Box>
-                    <Typography variant="h6" fontWeight={700} sx={{ color: FIORI.textPrimary, mb: 0.5 }}>
+            <MasterListPage title={title} intro={subtitle ?? undefined}>
+                <div className={masterStyles.emptyPanel}>
+                    <span className={masterStyles.emptyPanelIcon}>
+                        <Icon name="wrench" />
+                    </span>
+                    <Title level="H3" size="H5" wrappingType="Normal" style={{ marginBottom: '0.25rem' }}>
                         {t('placeholderTitle')}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                        {t('placeholderBody')}
-                    </Typography>
-                </Paper>
-            </Box>
+                    </Title>
+                    <Text className={masterStyles.muted}>{t('placeholderBody')}</Text>
+                </div>
+            </MasterListPage>
         </AppLayout>
     );
 }

@@ -1,37 +1,32 @@
 import { CategoryPicker, type CategoryOption } from '@/components/catalog/category-picker';
+import {
+    LeafStatusTag,
+    MandatoryTag,
+    MappingChip,
+    MappingEmptyPrompt,
+    MappingFilterToggle,
+    MappingLoading,
+    MappingPage,
+    MappingPageHeader,
+    MappingPager,
+    MappingPickerCell,
+    MappingSearchInput,
+    MappingSectionHeader,
+    MappingStatTiles,
+    MappingSyncButton,
+    MappingToolbar,
+    MappingToolbarGroup,
+    cx,
+    mappingStyles,
+} from '@/components/catalog/marketplace-mapping-ui';
 import { PimAttributePicker, type PimAttributeOption } from '@/components/catalog/pim-attribute-picker';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI, fioriSearchFieldSx, fioriToggleButtonGroupSx } from '@/lib/fiori-style';
-import { mappedChipSx, pendingChipSx, pendingRowSx, solidActionSx } from '@/lib/ui-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import CloseIcon from '@mui/icons-material/Close';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    Divider,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import { Button } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -95,7 +90,6 @@ interface PendingAssignment {
 export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt, filters }: Props) {
     const { t } = useTranslation('catalog');
     const { t: tNav } = useTranslation('nav');
-    const { t: tGrid } = useTranslation('grid');
 
     // เขียนข้อมูล attribute mapping ไม่ใช่ข้อมูลหมวดหมู่ — เลย gate ด้วยสิทธิ์แยก
     // ของตัวเอง (marketplace_shopee.edit_attribute_mapping_shopee) ไม่ได้พ่วงกับ
@@ -312,11 +306,7 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'high',
             align: 'right',
             width: 100,
-            render: (row) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {row.id}
-                </Typography>
-            ),
+            render: (row) => <span className={mappingStyles.mono}>{row.id}</span>,
         },
         {
             key: 'name',
@@ -324,18 +314,14 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'always',
             minWidth: 220,
             render: (row) => (
-                <Stack spacing={0}>
-                    <Typography fontWeight={600}>{row.name}</Typography>
+                <div className={mappingStyles.stack}>
+                    <span className={mappingStyles.primary}>{row.name}</span>
                     {row.name_th ? (
-                        <Typography variant="caption" color="text.secondary">
-                            {row.name_th}
-                        </Typography>
+                        <span className={mappingStyles.caption}>{row.name_th}</span>
                     ) : (
-                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {t('noThaiName')}
-                        </Typography>
+                        <span className={mappingStyles.muted}>{t('noThaiName')}</span>
                     )}
-                </Stack>
+                </div>
             ),
         },
         {
@@ -344,16 +330,10 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'medium',
             minWidth: 260,
             render: (row) => (
-                <Stack spacing={0}>
-                    <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                        {row.path}
-                    </Typography>
-                    {row.path_th && (
-                        <Typography variant="caption" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {row.path_th}
-                        </Typography>
-                    )}
-                </Stack>
+                <div className={mappingStyles.stack}>
+                    <span className={mappingStyles.muted}>{row.path}</span>
+                    {row.path_th && <span className={mappingStyles.muted}>{row.path_th}</span>}
+                </div>
             ),
         },
         {
@@ -361,22 +341,12 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             header: t('status'),
             priority: 'medium',
             render: (row) => (
-                <Stack spacing={0.25} alignItems="flex-start">
-                    <Chip
-                        label={row.leaf ? t('leafLabel') : t('parentLabel')}
-                        size="small"
-                        sx={{
-                            bgcolor: row.leaf ? FIORI.successBg : FIORI.neutralBg,
-                            color: row.leaf ? FIORI.success : FIORI.textSecondary,
-                            fontWeight: 600,
-                        }}
-                    />
+                <div className={mappingStyles.stack}>
+                    <LeafStatusTag leaf={row.leaf} label={row.leaf ? t('leafLabel') : t('parentLabel')} />
                     {row.leaf && row.brand_count > 0 && (
-                        <Typography variant="caption" color="text.secondary">
-                            {t('brandsInCategory', { count: row.brand_count })}
-                        </Typography>
+                        <span className={mappingStyles.caption}>{t('brandsInCategory', { count: row.brand_count })}</span>
                     )}
-                </Stack>
+                </div>
             ),
         },
         {
@@ -386,11 +356,7 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             minWidth: 320,
             render: (row) => {
                 if (!row.leaf) {
-                    return (
-                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {t('notMappableParent')}
-                        </Typography>
-                    );
+                    return <span className={mappingStyles.mutedBody}>{t('notMappableParent')}</span>;
                 }
 
                 const existingIds = new Set(row.mapped_categories.map((c) => c.id));
@@ -402,29 +368,12 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                     const staged = pending[pc.id];
                     if (staged === undefined) {
                         return (
-                            <Chip
-                                key={pc.id}
-                                label={pc.name}
-                                size="small"
-                                onDelete={() => stageClear(pc.id)}
-                                deleteIcon={<CloseIcon fontSize="small" />}
-                                sx={mappedChipSx}
-                            />
+                            <MappingChip key={pc.id} label={pc.name} variant="mapped" onDelete={() => stageClear(pc.id)} deleteLabel={t('delete')} />
                         );
                     }
 
                     const label = staged && staged.shopeeId === row.id ? `${t('willMapTo')}: ${pc.name}` : `${t('willClearMapping')}: ${pc.name}`;
-                    return (
-                        <Chip
-                            key={pc.id}
-                            label={label}
-                            size="small"
-                            variant="outlined"
-                            onDelete={() => undoPending(pc.id)}
-                            deleteIcon={<CloseIcon fontSize="small" />}
-                            sx={pendingChipSx}
-                        />
-                    );
+                    return <MappingChip key={pc.id} label={label} variant="pending" onDelete={() => undoPending(pc.id)} deleteLabel={t('cancel')} />;
                 });
 
                 // PIM category ที่ยังไม่อยู่ในลิสต์นี้ แต่ถูกเตรียมไว้ (จากแถวของมันเองที่
@@ -435,42 +384,40 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
                         return assignment !== null && assignment.shopeeId === row.id && !existingIds.has(Number(pimId));
                     })
                     .map(([pimId, assignment]) => (
-                        <Chip
+                        <MappingChip
                             key={pimId}
                             label={`${t('willMapTo')}: ${assignment.pimName}`}
-                            size="small"
-                            variant="outlined"
+                            variant="pending"
                             onDelete={() => undoPending(Number(pimId))}
-                            deleteIcon={<CloseIcon fontSize="small" />}
-                            sx={pendingChipSx}
+                            deleteLabel={t('cancel')}
                         />
                     ));
 
                 const hasChips = existingChips.length > 0 || newlyAssigned.length > 0;
 
                 return (
-                    <Box>
+                    <div>
                         {hasChips && (
-                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+                            <div className={mappingStyles.chipRow}>
                                 {existingChips}
                                 {newlyAssigned}
-                            </Stack>
+                            </div>
                         )}
 
                         {assigningFor === row.id ? (
-                            <Box sx={{ maxWidth: 360 }}>
+                            <div style={{ maxWidth: 360 }}>
                                 <CategoryPicker
                                     value={null}
                                     onChange={(val) => val && stageAssign(row, val)}
                                     placeholder={t('searchPimCategoryPlaceholder')}
                                 />
-                            </Box>
+                            </div>
                         ) : (
-                            <Button size="small" onClick={() => setAssigningFor(row.id)} sx={{ textTransform: 'none', px: 0 }}>
+                            <Button design="Transparent" icon="add" onClick={() => setAssigningFor(row.id)}>
                                 {t('assignPimCategory')}
                             </Button>
                         )}
-                    </Box>
+                    </div>
                 );
             },
         },
@@ -483,11 +430,7 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'high',
             align: 'right',
             width: 120,
-            render: (attribute) => (
-                <Typography variant="body2" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {attribute.id}
-                </Typography>
-            ),
+            render: (attribute) => <span className={mappingStyles.mono}>{attribute.id}</span>,
         },
         {
             key: 'name',
@@ -495,12 +438,10 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             priority: 'always',
             minWidth: 200,
             render: (attribute) => (
-                <Stack spacing={0.25} alignItems="flex-start">
-                    <Typography fontWeight={600}>{attribute.name}</Typography>
-                    {attribute.mandatory && (
-                        <Chip label={t('mandatoryLabel')} size="small" sx={{ bgcolor: FIORI.warningBg, color: FIORI.warning, fontWeight: 600 }} />
-                    )}
-                </Stack>
+                <div className={mappingStyles.stack}>
+                    <span className={mappingStyles.primary}>{attribute.name}</span>
+                    {attribute.mandatory && <MandatoryTag label={t('mandatoryLabel')} />}
+                </div>
             ),
         },
         {
@@ -508,11 +449,11 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             header: t('typeColumn'),
             priority: 'medium',
             render: (attribute) => (
-                <Typography variant="caption" color="text.secondary">
+                <span className={mappingStyles.caption}>
                     {attribute.input_type != null && ATTRIBUTE_INPUT_TYPE_LABEL_KEYS[attribute.input_type]
                         ? t(ATTRIBUTE_INPUT_TYPE_LABEL_KEYS[attribute.input_type])
                         : t('inputTypeUnknown')}
-                </Typography>
+                </span>
             ),
         },
         {
@@ -522,31 +463,24 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
             minWidth: 260,
             render: (attribute) => {
                 if (attribute.input_type !== MAPPABLE_ATTRIBUTE_INPUT_TYPE) {
-                    return (
-                        <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                            {t('notMappableAttribute')}
-                        </Typography>
-                    );
+                    return <span className={mappingStyles.mutedBody}>{t('notMappableAttribute')}</span>;
                 }
 
                 return (
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                        <Box sx={{ flex: 1, minWidth: 200 }}>
-                            <PimAttributePicker
-                                value={attribute.mapped}
-                                disabled={savingAttributeId === attribute.id}
-                                onChange={(val) => {
-                                    if (val) {
-                                        assignAttribute(attribute.id, val);
-                                    } else if (attribute.mapped) {
-                                        clearAttribute(attribute.id, attribute.mapped.id);
-                                    }
-                                }}
-                                placeholder={t('searchPimAttributePlaceholder')}
-                            />
-                        </Box>
-                        {savingAttributeId === attribute.id && <CircularProgress size={14} />}
-                    </Stack>
+                    <MappingPickerCell saving={savingAttributeId === attribute.id}>
+                        <PimAttributePicker
+                            value={attribute.mapped}
+                            disabled={savingAttributeId === attribute.id}
+                            onChange={(val) => {
+                                if (val) {
+                                    assignAttribute(attribute.id, val);
+                                } else if (attribute.mapped) {
+                                    clearAttribute(attribute.id, attribute.mapped.id);
+                                }
+                            }}
+                            placeholder={t('searchPimAttributePlaceholder')}
+                        />
+                    </MappingPickerCell>
                 );
             },
         },
@@ -562,215 +496,104 @@ export default function ShopeeCategoryMapping({ categories, stats, lastSyncedAt,
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('shopeeMappingTitle')} />
-            <Box sx={{ p: 4 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
-                    <Box>
-                        <Button
-                            size="small"
-                            startIcon={<ArrowBackIcon fontSize="small" />}
-                            onClick={() => router.visit('/catalog/marketplace/shopee')}
-                            sx={{ textTransform: 'none', mb: 1, color: 'text.secondary' }}
-                        >
-                            Shopee
-                        </Button>
-                        <Typography variant="h4" fontWeight={700}>
-                            {t('shopeeMappingTitle')}
-                        </Typography>
-                        <Divider sx={{ my: 2 }} />
-                        <Typography color="text.secondary">
+            <MappingPage>
+                <MappingPageHeader
+                    backLabel="Shopee"
+                    onBack={() => router.visit('/catalog/marketplace/shopee')}
+                    title={t('shopeeMappingTitle')}
+                    subtitle={
+                        <>
                             {t('leafCategoriesMapped', { mapped: stats.mapped, total: stats.leaf })}
                             {lastSyncedAt ? ` · ${t('lastSyncedAt', { datetime: new Date(lastSyncedAt).toLocaleString() })}` : ''}
-                        </Typography>
-                    </Box>
-
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            variant="outlined"
-                            disabled={syncingCategories}
-                            startIcon={syncingCategories ? <CircularProgress size={16} /> : <SyncIcon fontSize="small" />}
-                            onClick={runCategorySync}
-                            sx={{ textTransform: 'none' }}
-                        >
-                            {syncingCategories ? t('syncingLazada') : t('syncCategories')}
-                        </Button>
-                        <Button
-                            variant="contained"
-                            disabled={pendingCount === 0 || saving}
-                            onClick={saveChanges}
-                            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={solidActionSx}
-                        >
-                            {t('saveChanges')}
-                            {pendingCount > 0 ? ` (${pendingCount})` : ''}
-                        </Button>
-                    </Stack>
-                </Stack>
-
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-                        gap: '1px',
-                        bgcolor: FIORI.border,
-                        border: `1px solid ${FIORI.border}`,
-                        borderRadius: '10px',
-                        overflow: 'hidden',
-                        mb: 3,
-                    }}
-                >
-                    {statTiles.map((tile) => (
-                        <Box key={tile.label} sx={{ bgcolor: FIORI.surface, p: 2 }}>
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: FIORI.textSecondary,
-                                    fontWeight: 600,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.06em',
-                                    display: 'block',
-                                }}
+                        </>
+                    }
+                    actions={
+                        <>
+                            <MappingSyncButton busy={syncingCategories} onClick={runCategorySync}>
+                                {syncingCategories ? t('syncingLazada') : t('syncCategories')}
+                            </MappingSyncButton>
+                            <Button
+                                design="Emphasized"
+                                disabled={pendingCount === 0 || saving}
+                                loading={saving}
+                                loadingDelay={0}
+                                onClick={saveChanges}
                             >
-                                {tile.label}
-                            </Typography>
-                            <Typography
-                                sx={{
-                                    fontSize: 26,
-                                    fontWeight: 700,
-                                    fontVariantNumeric: 'tabular-nums',
-                                    color: tile.accent ? FIORI.brand : FIORI.textPrimary,
-                                    mt: 0.25,
-                                }}
-                            >
-                                {tile.value.toLocaleString()}
-                            </Typography>
-                        </Box>
-                    ))}
-                </Box>
+                                {t('saveChanges')}
+                                {pendingCount > 0 ? ` (${pendingCount})` : ''}
+                            </Button>
+                        </>
+                    }
+                />
 
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                    <TextField
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                        placeholder={t('searchCategories')}
-                        size="small"
-                        sx={{ ...fioriSearchFieldSx, minWidth: 280 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
+                <MappingStatTiles tiles={statTiles} />
 
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <ToggleButtonGroup
+                <MappingToolbar>
+                    <MappingSearchInput value={search} onChange={setSearch} placeholder={t('searchCategories')} />
+
+                    <MappingToolbarGroup>
+                        <MappingFilterToggle<ShopeeFilter>
                             value={filter}
-                            exclusive
-                            size="small"
-                            onChange={(_event, value: ShopeeFilter | null) => value && applyFilter(value)} sx={fioriToggleButtonGroupSx}
-                        >
-                            <ToggleButton value="all">{t('statusAll')}</ToggleButton>
-                            <ToggleButton value="leaf">{t('leafOnly')}</ToggleButton>
-                            <ToggleButton value="parent">{t('parentOnly')}</ToggleButton>
-                            <ToggleButton value="flagged">{t('flaggedOnly')}</ToggleButton>
-                        </ToggleButtonGroup>
-
-                        <Select
-                            value={perPage}
-                            onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                            size="small"
-                            sx={{ minWidth: 60, height: 36 }}
-                        >
-                            <MenuItem value={10}>10</MenuItem>
-                            <MenuItem value={25}>25</MenuItem>
-                            <MenuItem value={50}>50</MenuItem>
-                            <MenuItem value={100}>100</MenuItem>
-                        </Select>
-                        <Typography variant="body2" color="text.secondary">
-                            {tGrid('perPage')}
-                        </Typography>
-
-                        <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, display: 'flex', alignItems: 'center' }}>
-                            <Typography variant="body2">{currentPage}</Typography>
-                        </Paper>
-                        <Typography variant="body2" color="text.secondary">
-                            {tGrid('pageOf', { lastPage })}
-                        </Typography>
-
-                        <Stack direction="row" spacing={0.2}>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                <FirstPageIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                <LastPageIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    </Stack>
-                </Stack>
+                            onChange={applyFilter}
+                            options={[
+                                { value: 'all', label: t('statusAll') },
+                                { value: 'leaf', label: t('leafOnly') },
+                                { value: 'parent', label: t('parentOnly') },
+                                { value: 'flagged', label: t('flaggedOnly') },
+                            ]}
+                        />
+                        <MappingPager
+                            perPage={perPage}
+                            onPerPageChange={handlePerPageChange}
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            onGoToPage={goToPage}
+                        />
+                    </MappingToolbarGroup>
+                </MappingToolbar>
 
                 <FioriResponsiveTable
                     columns={columns}
                     rows={categories.data}
-                    getRowKey={(row) => row.id}
-                    onRowClick={(row) => row.leaf && setSelectedCategory(row)}
-                    rowSx={(row) => ({
-                        ...pendingRowSx(rowHasPendingChange(row)),
-                        ...(row.id === selectedCategory?.id ? { bgcolor: FIORI.selected } : {}),
-                        ...(row.leaf ? {} : { cursor: 'default' }),
-                    })}
+                    getRowKey={(row: ShopeeRow) => row.id}
+                    onRowClick={(row: ShopeeRow) => row.leaf && setSelectedCategory(row)}
+                    rowClassName={(row: ShopeeRow) =>
+                        cx(
+                            rowHasPendingChange(row) && mappingStyles.pendingRow,
+                            row.id === selectedCategory?.id && mappingStyles.selectedRow,
+                            !row.leaf && mappingStyles.notClickable,
+                        )
+                    }
                     emptyMessage={t('noCategoriesFound')}
                 />
 
                 {canEditAttributes && (
                     <>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 5, mb: 2 }}>
-                            <Typography variant="h6" fontWeight={700}>
-                                {selectedCategory ? t('attributesForCategory', { name: selectedCategory.name }) : t('shopeeAttributesSectionTitle')}
-                            </Typography>
-
-                            {selectedCategory && (
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                    {attributeSyncMessage && (
-                                        <Typography variant="caption" color="text.secondary">
-                                            {attributeSyncMessage}
-                                        </Typography>
-                                    )}
-                                    <Button
-                                        size="small"
-                                        variant="outlined"
-                                        disabled={attributeSyncing}
-                                        startIcon={attributeSyncing ? <CircularProgress size={14} /> : <SyncIcon fontSize="small" />}
-                                        onClick={triggerAttributeSync}
-                                        sx={{ textTransform: 'none' }}
-                                    >
+                        <MappingSectionHeader
+                            title={selectedCategory ? t('attributesForCategory', { name: selectedCategory.name }) : t('shopeeAttributesSectionTitle')}
+                            message={selectedCategory ? attributeSyncMessage : undefined}
+                            actions={
+                                selectedCategory && (
+                                    <MappingSyncButton busy={attributeSyncing} onClick={triggerAttributeSync}>
                                         {attributeSyncing ? t('syncingAttributes') : t('syncAttributesForCategory')}
-                                    </Button>
-                                </Stack>
-                            )}
-                        </Stack>
+                                    </MappingSyncButton>
+                                )
+                            }
+                        />
 
                         {!selectedCategory ? (
-                            <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
-                                <Typography color="text.secondary">{t('selectCategoryPrompt')}</Typography>
-                            </Paper>
+                            <MappingEmptyPrompt>{t('selectCategoryPrompt')}</MappingEmptyPrompt>
                         ) : (
                             <FioriResponsiveTable
                                 columns={attributeColumns}
                                 rows={attributes ?? []}
-                                getRowKey={(attribute) => attribute.id}
-                                emptyMessage={loadingAttributes ? <CircularProgress size={20} /> : t('noAttributesInCategory')}
+                                getRowKey={(attribute: ShopeeAttributeRow) => attribute.id}
+                                emptyMessage={loadingAttributes ? <MappingLoading /> : t('noAttributesInCategory')}
                             />
                         )}
                     </>
                 )}
-            </Box>
+            </MappingPage>
         </AppLayout>
     );
 }

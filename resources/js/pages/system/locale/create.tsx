@@ -1,23 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Alert,
-    Autocomplete,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    FormControlLabel,
-    Paper,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, ComboBox, ComboBoxItem, Input, Title } from '@ui5/webcomponents-react';
 import ISO6391 from 'iso-639-1';
 import { FormEvent } from 'react';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+
+import styles from './locale-pages.module.css';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'SYSTEM', href: '#' },
@@ -31,9 +23,12 @@ interface LanguageOption {
     nativeName: string;
 }
 
-const languageOptions: LanguageOption[] = ISO6391.getLanguages(ISO6391.getAllCodes()).sort((a, b) =>
-    a.name.localeCompare(b.name),
-);
+const languageOptions: LanguageOption[] = ISO6391.getLanguages(ISO6391.getAllCodes()).sort((a, b) => a.name.localeCompare(b.name));
+
+const optionLabel = (option: LanguageOption) => `${option.name} (${option.code})`;
+
+// label ที่แสดงใน ComboBox → option (ใช้ตอน change เพื่อแยกว่าเลือกจากรายการหรือพิมพ์เอง)
+const optionByLabel = new Map(languageOptions.map((option) => [optionLabel(option), option]));
 
 export default function LocaleCreate() {
     const { data, setData, post, processing, errors, isDirty } = useForm({
@@ -57,126 +52,104 @@ export default function LocaleCreate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Locale" />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <form onSubmit={submit} className={styles.page}>
                 {/* Header Title & Actions */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                        Add Locale
-                    </Typography>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            component={Link}
-                            href="/system/locales"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
+                <div className={styles.header}>
+                    <Title level="H3">Add Locale</Title>
+                    <div className={styles.headerActions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/system/locales')}>
                             Back
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button type="Submit" design="Emphasized" icon="save" disabled={processing} loading={processing} loadingDelay={0}>
                             {processing ? 'Saving…' : 'Save Locale'}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Stack spacing={3} sx={{ maxWidth: 800 }}>
+                <div className={styles.formBody}>
                     {/* General Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: FIORI.textPrimary, mb: 2 }}>
-                            General
-                        </Typography>
-                        <Stack spacing={2}>
-                            <Autocomplete
-                                freeSolo
-                                fullWidth
-                                size="small"
-                                options={languageOptions}
-                                getOptionLabel={(option) =>
-                                    typeof option === 'string' ? option : `${option.name} (${option.code})`
-                                }
-                                isOptionEqualToValue={(option, value) =>
-                                    typeof value === 'string' ? option.code === value : option.code === value.code
-                                }
-                                inputValue={data.code}
-                                onInputChange={(_, newInputValue, reason) => {
-                                    // Ignore 'reset' (MUI replaying the picked
-                                    // option's label back into the input) and
-                                    // 'clear' — only free typing should drive
-                                    // the code field; selection is handled by
-                                    // onChange below with the real code.
-                                    if (reason === 'input') {
-                                        setData('code', newInputValue);
+                    <FioriFormGroup title="General">
+                        <FioriField
+                            label="Code"
+                            htmlFor="locale-code"
+                            required
+                            fullWidth
+                            valueState={valueStateOf(errors.code)}
+                            message={errors.code}
+                        >
+                            <ComboBox
+                                id="locale-code"
+                                style={{ width: '100%' }}
+                                required
+                                noTypeahead
+                                filter="Contains"
+                                placeholder="e.g. th, en"
+                                value={data.code}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                // พิมพ์เอง (free text) → ใช้ข้อความที่พิมพ์เป็น code ตรงๆ
+                                onInput={(e) => setData('code', e.target.value)}
+                                // เลือกจากรายการ (คลิก / Enter) → ComboBox ใส่ label ของ option ลงช่อง
+                                // แปลงกลับเป็น code จริง + เติม display name ให้ เหมือนเดิม
+                                onChange={(e) => {
+                                    const option = optionByLabel.get(e.target.value);
+                                    if (option) {
+                                        setData((prev) => ({ ...prev, code: option.code, display_name: option.nativeName || option.name }));
                                     }
                                 }}
-                                onChange={(_, newValue) => {
-                                    if (newValue && typeof newValue !== 'string') {
-                                        setData('code', newValue.code);
-                                        setData('display_name', newValue.nativeName || newValue.name);
-                                    }
-                                }}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Code *"
-                                        required
-                                        placeholder="e.g. th, en"
-                                        error={Boolean(errors.code)}
-                                        helperText={errors.code}
-                                    />
-                                )}
-                            />
-                            <TextField
-                                label="Display Name"
-                                fullWidth
-                                size="small"
+                            >
+                                {languageOptions.map((option) => (
+                                    <ComboBoxItem key={option.code} text={optionLabel(option)} />
+                                ))}
+                            </ComboBox>
+                        </FioriField>
+                        <FioriField
+                            label="Display Name"
+                            htmlFor="locale-display-name"
+                            fullWidth
+                            valueState={valueStateOf(errors.display_name)}
+                            message={errors.display_name}
+                        >
+                            <Input
+                                id="locale-display-name"
+                                style={{ width: '100%' }}
                                 placeholder="e.g. ไทย, English"
                                 value={data.display_name}
-                                onChange={(e) => setData('display_name', e.target.value)}
-                                error={Boolean(errors.display_name)}
-                                helperText={errors.display_name}
+                                valueState={ui5ValueState(valueStateOf(errors.display_name))}
+                                onInput={(e) => setData('display_name', e.target.value)}
                             />
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {/* Status Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 1 }}>
-                            Status
-                        </Typography>
-                        <Stack direction="row" spacing={3}>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={data.enabled === true}
-                                        onChange={() => setData('enabled', true)}
-                                    />
-                                }
-                                label="Active"
+                    <FioriFormGroup title="Status">
+                        {/* สองช่องนี้ทำงานแบบ radio: คลิกช่องที่ติ๊กอยู่แล้วต้องไม่เอาติ๊กออก (preventDefault) */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+                            <CheckBox
+                                text="Active"
+                                checked={data.enabled === true}
+                                onChange={(e) => {
+                                    if (!e.target.checked) e.preventDefault();
+                                    setData('enabled', true);
+                                }}
                             />
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={data.enabled === false}
-                                        onChange={() => setData('enabled', false)}
-                                    />
-                                }
-                                label="Non Active"
+                            <CheckBox
+                                text="Non Active"
+                                checked={data.enabled === false}
+                                onChange={(e) => {
+                                    if (!e.target.checked) e.preventDefault();
+                                    setData('enabled', false);
+                                }}
                             />
-                        </Stack>
-                    </Paper>
-                </Stack>
+                        </div>
+                    </FioriFormGroup>
+                </div>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        Please correct the highlighted fields before saving.
-                    </Alert>
-                )}
-            </Box>
+                <FioriFormErrorSummary
+                    errors={errors}
+                    message="Please correct the highlighted fields before saving."
+                    style={{ marginTop: '1.5rem', maxWidth: 800 }}
+                />
+            </form>
         </AppLayout>
     );
 }

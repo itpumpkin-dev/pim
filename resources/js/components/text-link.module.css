@@ -1,0 +1,15 @@
+.link {
+    color: var(--sapLinkColor);
+    text-decoration: none;
+    font-family: var(--sapFontFamily);
+}
+
+.link:hover {
+    color: var(--sapLink_Hover_Color);
+    text-decoration: underline;
+}
+
+.link:focus-visible {
+    outline: var(--sapContent_FocusWidth) var(--sapContent_FocusStyle) var(--sapContent_FocusColor);
+    outline-offset: 1px;
+}

@@ -1,34 +1,12 @@
-import { FIORI, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
 import { router } from '@inertiajs/react';
-import CloseIcon from '@mui/icons-material/Close';
-import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
-import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    FormControl,
-    IconButton,
-    InputLabel,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
-    MenuItem,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import { Bar, BusyIndicator, Button, CheckBox, Dialog, Icon, Input, Label, Option, Select, Tag, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from './bulk-generate-dialog.module.css';
 
 interface ProductGroupPickerItem {
     id: number;
@@ -176,158 +154,148 @@ export function BulkGenerateDialog({ open, onClose, otherFamilies }: { open: boo
     };
 
     return (
-        <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" PaperProps={{ sx: { height: '85vh', borderRadius: 2 } }}>
-            <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                    {t('generateFromProductGroupsDialogTitle')}
-                </Typography>
-                <IconButton onClick={handleClose} size="small">
-                    <CloseIcon />
-                </IconButton>
-            </DialogTitle>
-            <DialogContent dividers sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ p: 2, borderBottom: `1px solid ${FIORI.border}` }}>
-                    <Typography variant="body2" sx={{ color: FIORI.textSecondary, mb: 1.5 }}>
-                        {t('generateFromProductGroupsHelp')}
-                    </Typography>
-
-                    <TextField
-                        fullWidth
-                        size="small"
-                        label={t('namePatternLabel')}
-                        value={namePattern}
-                        onChange={(e) => setNamePattern(e.target.value)}
-                        helperText={t('namePatternHelp')}
-                        sx={{ mb: 2 }}
-                    />
-
-                    <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                        <InputLabel id="bulk-generate-template-label">{t('startFromTemplateLabel')}</InputLabel>
-                        <Select
-                            labelId="bulk-generate-template-label"
-                            label={t('startFromTemplateLabel')}
-                            value={templateFamilyId}
-                            onChange={(e) => setTemplateFamilyId(e.target.value === '' ? '' : Number(e.target.value))}
-                        >
-                            <MenuItem value="">
-                                <em>{t('startFromTemplateEmpty')}</em>
-                            </MenuItem>
-                            {otherFamilies.map((f) => (
-                                <MenuItem key={f.id} value={f.id}>
-                                    {f.name || f.code} ({f.code})
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    {previewNames.length > 0 && (
-                        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                            {previewNames.map((name) => (
-                                <Chip key={name} label={name} size="small" sx={{ bgcolor: FIORI.brandBg, color: FIORI.brandDark, fontWeight: 600 }} />
-                            ))}
-                            {selectedIds.size > previewNames.length && (
-                                <Chip label={`+${selectedIds.size - previewNames.length}`} size="small" variant="outlined" />
-                            )}
-                        </Stack>
-                    )}
-
-                    <TextField
-                        fullWidth
-                        size="small"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder={t('search')}
-                        InputProps={{ startAdornment: <SearchIcon fontSize="small" sx={{ color: FIORI.textSecondary, mr: 1 }} /> }}
-                    />
-
-                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1 }}>
-                        <Button
-                            size="small"
-                            onClick={selectAllMatching}
-                            disabled={selectAllLoading || !pickerData || pickerData.total === 0}
-                            startIcon={selectAllLoading ? <CircularProgress size={12} /> : undefined}
-                            sx={{ textTransform: 'none', minWidth: 0, p: 0, color: FIORI.brand }}
-                        >
-                            {t('selectAllMatching', { count: pickerData?.total ?? 0 })}
-                        </Button>
-                        {selectedIds.size > 0 && (
-                            <Button
-                                size="small"
-                                onClick={clearSelection}
-                                sx={{ textTransform: 'none', minWidth: 0, p: 0, color: FIORI.textSecondary }}
-                            >
-                                {t('clearSelection')}
+        <Dialog
+            open={open}
+            onClose={handleClose}
+            className={styles.dialog}
+            header={
+                <Bar
+                    startContent={<Title level="H5">{t('generateFromProductGroupsDialogTitle')}</Title>}
+                    endContent={<Button design="Transparent" icon="decline" tooltip={t('close')} accessibleName={t('close')} onClick={handleClose} />}
+                />
+            }
+            footer={
+                <Bar
+                    design="Footer"
+                    endContent={
+                        <>
+                            <Button design="Transparent" onClick={handleClose}>
+                                {t('cancel')}
                             </Button>
-                        )}
-                    </Stack>
+                            <Button design="Emphasized" disabled={!canSubmit} loading={submitting} onClick={handleSubmit}>
+                                {t('bulkGenerateSubmit')}
+                            </Button>
+                        </>
+                    }
+                />
+            }
+        >
+            <div className={styles.top}>
+                <Text className={styles.help}>{t('generateFromProductGroupsHelp')}</Text>
 
-                    {selectedIds.size > 0 && (
-                        <Typography variant="caption" sx={{ color: FIORI.brand, display: 'block', mt: 1 }}>
-                            {t('selectedGroupsCount', { count: selectedIds.size })}
-                        </Typography>
-                    )}
-                </Box>
+                <Label for="bulk-generate-name-pattern" showColon={false}>
+                    {t('namePatternLabel')}
+                </Label>
+                <Input
+                    id="bulk-generate-name-pattern"
+                    style={{ width: '100%' }}
+                    value={namePattern}
+                    onInput={(e) => setNamePattern(e.target.value)}
+                />
+                <span className={styles.fieldHelp}>{t('namePatternHelp')}</span>
 
-                <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                    {pickerLoading ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                            <CircularProgress size={24} />
-                        </Box>
-                    ) : !pickerData || pickerData.data.length === 0 ? (
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, textAlign: 'center', p: 4 }}>
-                            {t('noProductGroupsFound')}
-                        </Typography>
-                    ) : (
-                        <List dense disablePadding>
-                            {pickerData.data.map((group) => (
-                                <ListItem
-                                    key={group.id}
-                                    onClick={() => toggleSelected(group.id)}
-                                    sx={{ py: 1, px: 2, cursor: 'pointer', '&:hover': { bgcolor: FIORI.hover } }}
-                                >
-                                    <ListItemIcon sx={{ minWidth: 36 }}>
-                                        <Checkbox edge="start" size="small" checked={selectedIds.has(group.id)} tabIndex={-1} disableRipple />
-                                    </ListItemIcon>
-                                    <ListItemText
-                                        primary={group.name}
-                                        secondary={[group.category_name, group.subcategory_name].filter(Boolean).join(' / ')}
-                                        primaryTypographyProps={{ variant: 'body2', sx: { color: FIORI.textPrimary } }}
-                                        secondaryTypographyProps={{ variant: 'caption' }}
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    )}
-                </Box>
-
-                {pickerData && pickerData.last_page > 1 && (
-                    <Stack direction="row" justifyContent="center" alignItems="center" spacing={1} sx={{ p: 1.5, borderTop: `1px solid ${FIORI.border}` }}>
-                        <IconButton size="small" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                            <KeyboardArrowLeftIcon fontSize="small" />
-                        </IconButton>
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                            {pickerData.current_page} / {pickerData.last_page}
-                        </Typography>
-                        <IconButton size="small" disabled={page >= pickerData.last_page} onClick={() => setPage((p) => p + 1)}>
-                            <KeyboardArrowRightIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                )}
-            </DialogContent>
-            <DialogActions sx={{ px: 3, py: 2 }}>
-                <Button onClick={handleClose} sx={fioriGhostSx}>
-                    {t('cancel')}
-                </Button>
-                <Button
-                    variant="contained"
-                    disabled={!canSubmit}
-                    startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : undefined}
-                    onClick={handleSubmit}
-                    sx={{ ...fioriEmphasizedSx, px: 2.5 }}
+                <Label for="bulk-generate-template" showColon={false}>
+                    {t('startFromTemplateLabel')}
+                </Label>
+                <Select
+                    id="bulk-generate-template"
+                    style={{ width: '100%', marginBottom: '1rem' }}
+                    value={templateFamilyId === '' ? '' : String(templateFamilyId)}
+                    onChange={(e) => {
+                        const v = e.detail.selectedOption.value ?? '';
+                        setTemplateFamilyId(v === '' ? '' : Number(v));
+                    }}
                 >
-                    {t('bulkGenerateSubmit')}
-                </Button>
-            </DialogActions>
+                    <Option value="">{t('startFromTemplateEmpty')}</Option>
+                    {otherFamilies.map((f) => (
+                        <Option key={f.id} value={String(f.id)}>
+                            {f.name || f.code} ({f.code})
+                        </Option>
+                    ))}
+                </Select>
+
+                {previewNames.length > 0 && (
+                    <div className={styles.chips}>
+                        {previewNames.map((name) => (
+                            <Tag key={name} design="Information" hideStateIcon>
+                                {name}
+                            </Tag>
+                        ))}
+                        {selectedIds.size > previewNames.length && (
+                            <Tag design="Neutral" hideStateIcon>
+                                {`+${selectedIds.size - previewNames.length}`}
+                            </Tag>
+                        )}
+                    </div>
+                )}
+
+                <Input
+                    style={{ width: '100%' }}
+                    value={search}
+                    onInput={(e) => setSearch(e.target.value)}
+                    placeholder={t('search')}
+                    icon={<Icon name="search" />}
+                />
+
+                <div className={styles.selectionActions}>
+                    <Button
+                        design="Transparent"
+                        onClick={selectAllMatching}
+                        loading={selectAllLoading}
+                        disabled={selectAllLoading || !pickerData || pickerData.total === 0}
+                    >
+                        {t('selectAllMatching', { count: pickerData?.total ?? 0 })}
+                    </Button>
+                    {selectedIds.size > 0 && (
+                        <Button design="Transparent" onClick={clearSelection} style={{ color: 'var(--sapContent_LabelColor)' }}>
+                            {t('clearSelection')}
+                        </Button>
+                    )}
+                </div>
+
+                {selectedIds.size > 0 && <span className={styles.selectedCount}>{t('selectedGroupsCount', { count: selectedIds.size })}</span>}
+            </div>
+
+            <div className={styles.listArea}>
+                {pickerLoading ? (
+                    <div className={styles.empty}>
+                        <BusyIndicator active size="M" />
+                    </div>
+                ) : !pickerData || pickerData.data.length === 0 ? (
+                    <div className={styles.empty}>{t('noProductGroupsFound')}</div>
+                ) : (
+                    pickerData.data.map((group) => (
+                        <div
+                            key={group.id}
+                            className={styles.row}
+                            role="checkbox"
+                            aria-checked={selectedIds.has(group.id)}
+                            onClick={() => toggleSelected(group.id)}
+                        >
+                            <CheckBox className={styles.rowCheck} checked={selectedIds.has(group.id)} tabIndex={-1} />
+                            <span>
+                                <span className={styles.rowName}>{group.name}</span>
+                                <span className={styles.rowSub}>{[group.category_name, group.subcategory_name].filter(Boolean).join(' / ')}</span>
+                            </span>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {pickerData && pickerData.last_page > 1 && (
+                <div className={styles.pager}>
+                    <Button design="Transparent" icon="slim-arrow-left" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} />
+                    <span>
+                        {pickerData.current_page} / {pickerData.last_page}
+                    </span>
+                    <Button
+                        design="Transparent"
+                        icon="slim-arrow-right"
+                        disabled={page >= pickerData.last_page}
+                        onClick={() => setPage((p) => p + 1)}
+                    />
+                </div>
+            )}
         </Dialog>
     );
 }

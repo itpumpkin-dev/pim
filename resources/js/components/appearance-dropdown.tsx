@@ -1,55 +1,63 @@
-import { useAppearance } from '@/hooks/use-appearance';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
-import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, type BoxProps } from '@mui/material';
-import { useState } from 'react';
+import { useAppearance, type Appearance } from '@/hooks/use-appearance';
+import '@ui5/webcomponents-icons/dist/dark-mode.js';
+import '@ui5/webcomponents-icons/dist/light-mode.js';
+import '@ui5/webcomponents-icons/dist/palette.js';
+import { Button, Menu, MenuItem, MenuItemGroup, type MenuPropTypes } from '@ui5/webcomponents-react';
+import { useState, type CSSProperties } from 'react';
 
-export default function AppearanceToggleDropdown(props: BoxProps) {
+export const APPEARANCE_OPTIONS: { mode: Appearance; label: string; icon: string }[] = [
+    { mode: 'light', label: 'Light', icon: 'light-mode' },
+    { mode: 'dark', label: 'Dark', icon: 'dark-mode' },
+    { mode: 'system', label: 'System', icon: 'palette' },
+];
+
+export const appearanceIcon = (appearance: Appearance) => APPEARANCE_OPTIONS.find((o) => o.mode === appearance)?.icon ?? 'palette';
+
+interface AppearanceMenuProps {
+    open: boolean;
+    opener: HTMLElement | null;
+    onClose: () => void;
+}
+
+/**
+ * The light/dark/system picker on its own — opened from the standalone
+ * toggle button below, or from the ShellBar item in app-sidebar-header.tsx
+ * (which supplies its own opener element).
+ */
+export function AppearanceMenu({ open, opener, onClose }: AppearanceMenuProps) {
     const { appearance, updateAppearance } = useAppearance();
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-    const getCurrentIcon = () => {
-        switch (appearance) {
-            case 'dark':
-                return <DarkModeIcon fontSize="small" />;
-            case 'light':
-                return <LightModeIcon fontSize="small" />;
-            default:
-                return <SettingsBrightnessIcon fontSize="small" />;
-        }
-    };
-
-    const select = (mode: typeof appearance) => {
-        updateAppearance(mode);
-        setAnchorEl(null);
+    const onItemClick: MenuPropTypes['onItemClick'] = (e) => {
+        const mode = (e.detail.item as HTMLElement).dataset.mode as Appearance | undefined;
+        if (mode) updateAppearance(mode);
+        onClose();
     };
 
     return (
-        <Box {...props}>
-            <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small" aria-label="Toggle theme">
-                {getCurrentIcon()}
-            </IconButton>
-            <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
-                <MenuItem onClick={() => select('light')}>
-                    <ListItemIcon>
-                        <LightModeIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Light</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => select('dark')}>
-                    <ListItemIcon>
-                        <DarkModeIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Dark</ListItemText>
-                </MenuItem>
-                <MenuItem onClick={() => select('system')}>
-                    <ListItemIcon>
-                        <SettingsBrightnessIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>System</ListItemText>
-                </MenuItem>
-            </Menu>
-        </Box>
+        <Menu open={open && !!opener} opener={opener ?? undefined} onClose={onClose} onItemClick={onItemClick} horizontalAlign="End">
+            <MenuItemGroup checkMode="Single">
+                {APPEARANCE_OPTIONS.map((o) => (
+                    <MenuItem key={o.mode} data-mode={o.mode} text={o.label} icon={o.icon} checked={appearance === o.mode} />
+                ))}
+            </MenuItemGroup>
+        </Menu>
+    );
+}
+
+export default function AppearanceToggleDropdown({ style, className }: { style?: CSSProperties; className?: string }) {
+    const { appearance } = useAppearance();
+    const [opener, setOpener] = useState<HTMLElement | null>(null);
+
+    return (
+        <span style={{ display: 'inline-flex', ...style }} className={className}>
+            <Button
+                design="Transparent"
+                icon={appearanceIcon(appearance)}
+                tooltip="Toggle theme"
+                accessibleName="Toggle theme"
+                onClick={(e) => setOpener(opener ? null : (e.currentTarget as HTMLElement))}
+            />
+            <AppearanceMenu open={!!opener} opener={opener} onClose={() => setOpener(null)} />
+        </span>
     );
 }

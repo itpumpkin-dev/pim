@@ -59,7 +59,16 @@ interface CreateRoleProps {
     platformAttributes: Attribute[];
 }
 
-export default function RoleCreate({ suggestedCode, catalog, users, shops, attributeGroups, attributes, platformAttributeGroups, platformAttributes }: CreateRoleProps) {
+export default function RoleCreate({
+    suggestedCode,
+    catalog,
+    users,
+    shops,
+    attributeGroups,
+    attributes,
+    platformAttributeGroups,
+    platformAttributes,
+}: CreateRoleProps) {
     return (
         <RoleFormPage
             suggestedCode={suggestedCode}

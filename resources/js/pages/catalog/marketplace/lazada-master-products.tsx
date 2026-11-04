@@ -1,33 +1,15 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriResponsiveTable, type FioriResponsiveColumn } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
-import { FIORI, fioriCardSx, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx, fioriTableRowSx } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import SearchIcon from '@mui/icons-material/Search';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Alert,
-    Avatar,
-    Box,
-    Button,
-    CircularProgress,
-    Divider,
-    IconButton,
-    InputAdornment,
-    Link,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/action.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import { Avatar, Button, Option, Select } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
+
+import { Body, Caption, HStack, PageHeader, Pager, SearchField, TONE_TEXT } from './marketplace-ui';
+import styles from './marketplace.module.css';
 
 interface ShopOption {
     id: number;
@@ -113,7 +95,11 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
 
     const applyShopFilter = (value: number | '') => {
         setShopId(value);
-        router.get('/catalog/marketplace/lazada/master-products', { search, shop_id: value || undefined, per_page: perPage }, { preserveState: true });
+        router.get(
+            '/catalog/marketplace/lazada/master-products',
+            { search, shop_id: value || undefined, per_page: perPage },
+            { preserveState: true },
+        );
     };
 
     const handlePerPageChange = (value: number) => {
@@ -122,7 +108,11 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
     };
 
     const goToPage = (page: number) => {
-        router.get('/catalog/marketplace/lazada/master-products', { search, shop_id: shopId || undefined, per_page: perPage, page }, { preserveState: true });
+        router.get(
+            '/catalog/marketplace/lazada/master-products',
+            { search, shop_id: shopId || undefined, per_page: perPage, page },
+            { preserveState: true },
+        );
     };
 
     // ไม่มี concept "ลบ/เขียนทับข้อมูลจริงบน Lazada" เลย (อ่านอย่างเดียว) — เลย
@@ -150,21 +140,15 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
             priority: 'always',
             minWidth: 260,
             render: (row) => (
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Avatar
-                        variant="rounded"
-                        src={row.image_url ?? undefined}
-                        sx={{ width: 40, height: 40, bgcolor: FIORI.neutralBg }}
-                    />
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {row.name || row.seller_sku}
-                        </Typography>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                            {row.seller_sku}
-                        </Typography>
-                    </Box>
-                </Stack>
+                <HStack gap="0.75rem">
+                    <Avatar shape="Square" size="XS" style={{ width: 40, height: 40, background: 'var(--sapList_HeaderBackground)' }}>
+                        {row.image_url ? <img src={row.image_url} alt="" /> : undefined}
+                    </Avatar>
+                    <div>
+                        <Body style={{ fontWeight: 600 }}>{row.name || row.seller_sku}</Body>
+                        <Caption mono>{row.seller_sku}</Caption>
+                    </div>
+                </HStack>
             ),
         },
         {
@@ -172,11 +156,7 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
             header: 'ร้าน',
             priority: 'high',
             minWidth: 160,
-            render: (row) => (
-                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>
-                    {row.shop?.name ?? '—'}
-                </Typography>
-            ),
+            render: (row) => <Body>{row.shop?.name ?? '—'}</Body>,
         },
         {
             key: 'status',
@@ -184,12 +164,9 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
             priority: 'high',
             minWidth: 140,
             render: (row) => (
-                <Typography
-                    variant="body2"
-                    sx={{ color: row.status?.toLowerCase() === 'active' ? FIORI.success : FIORI.textSecondary, fontWeight: 600 }}
-                >
+                <Body style={{ color: row.status?.toLowerCase() === 'active' ? TONE_TEXT.success : TONE_TEXT.neutral, fontWeight: 600 }}>
                     {row.status ?? '—'}
-                </Typography>
+                </Body>
             ),
         },
         {
@@ -198,7 +175,7 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
             priority: 'medium',
             align: 'right',
             minWidth: 90,
-            render: (row) => <Typography variant="body2">{row.quantity ?? '—'}</Typography>,
+            render: (row) => <Body>{row.quantity ?? '—'}</Body>,
         },
         {
             key: 'price',
@@ -206,30 +183,31 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
             priority: 'medium',
             align: 'right',
             minWidth: 100,
-            render: (row) => <Typography variant="body2">{row.price ?? '—'}</Typography>,
+            render: (row) => <Body>{row.price ?? '—'}</Body>,
         },
         {
             key: 'item_id',
             header: 'Item ID',
             priority: 'low',
             minWidth: 120,
-            render: (row) => (
-                <Typography variant="caption" sx={{ fontFamily: 'monospace', color: FIORI.textSecondary }}>
-                    {row.item_id}
-                </Typography>
-            ),
+            render: (row) => <Caption mono>{row.item_id}</Caption>,
         },
         {
             key: 'action',
             header: '',
+            popinText: 'Lazada',
             priority: 'always',
             align: 'right',
             minWidth: 48,
             render: (row) =>
                 row.lazada_url ? (
-                    <IconButton size="small" sx={fioriIconButtonSx} component={Link} href={row.lazada_url} target="_blank" rel="noopener noreferrer">
-                        <OpenInNewIcon fontSize="small" />
-                    </IconButton>
+                    <Button
+                        design="Transparent"
+                        icon="action"
+                        tooltip="Lazada"
+                        accessibleName="Open on Lazada"
+                        onClick={() => window.open(row.lazada_url ?? undefined, '_blank', 'noopener,noreferrer')}
+                    />
                 ) : null,
         },
     ];
@@ -237,128 +215,78 @@ export default function LazadaMasterProducts({ products, shops, filters, totalCa
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Lazada Master Product List" />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }} flexWrap="wrap" spacing={2}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            Master Product List — Lazada ({totalCached})
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                            สินค้าที่จริงๆ อยู่บน Lazada ทุกร้าน (cache ไว้ดู ไม่ผูกกับสินค้าใน PIM)
-                        </Typography>
-                    </Box>
-                    {canSync && (
-                        <Button
-                            variant="contained"
-                            disabled={syncing}
-                            startIcon={syncing ? <CircularProgress size={16} color="inherit" /> : <SyncIcon fontSize="small" />}
-                            onClick={syncNow}
-                            sx={fioriEmphasizedSx}
-                        >
-                            {syncing ? 'กำลัง Sync...' : 'Sync ทุกร้านตอนนี้'}
-                        </Button>
-                    )}
-                </Stack>
+            <div className={styles.page}>
+                <PageHeader
+                    title={`Master Product List — Lazada (${totalCached})`}
+                    subtitle="สินค้าที่จริงๆ อยู่บน Lazada ทุกร้าน (cache ไว้ดู ไม่ผูกกับสินค้าใน PIM)"
+                    actions={
+                        canSync && (
+                            <Button design="Emphasized" icon="synchronize" disabled={syncing} loading={syncing} loadingDelay={0} onClick={syncNow}>
+                                {syncing ? 'กำลัง Sync...' : 'Sync ทุกร้านตอนนี้'}
+                            </Button>
+                        )
+                    }
+                />
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ p: 2 }}>
-                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                            <TextField
-                                size="small"
-                                placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                                sx={{ ...fioriSearchFieldSx, minWidth: 260 }}
-                            />
+                <div className={styles.card}>
+                    <div className={styles.toolbar}>
+                        <div className={styles.toolbarStart}>
+                            <SearchField value={search} onChange={setSearch} placeholder="ค้นหาตามชื่อสินค้า หรือ SKU..." />
                             <Select
-                                size="small"
-                                value={shopId}
-                                onChange={(e) => applyShopFilter(e.target.value === '' ? '' : Number(e.target.value))}
-                                displayEmpty
-                                sx={{ minWidth: 180, bgcolor: FIORI.surface, borderRadius: '8px' }}
+                                value={shopId === '' ? '' : String(shopId)}
+                                onChange={(e) => {
+                                    const v = e.detail.selectedOption.value ?? '';
+                                    applyShopFilter(v === '' ? '' : Number(v));
+                                }}
+                                style={{ minWidth: 180 }}
+                                accessibleName="ร้าน"
                             >
-                                <MenuItem value="">ทุกร้าน</MenuItem>
+                                <Option value="">ทุกร้าน</Option>
                                 {shops.map((shop) => (
-                                    <MenuItem key={shop.id} value={shop.id}>
+                                    <Option key={shop.id} value={String(shop.id)}>
                                         {shop.name}
-                                    </MenuItem>
+                                    </Option>
                                 ))}
                             </Select>
-                        </Stack>
+                        </div>
 
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'space-between', md: 'flex-end' } }}>
-                            <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{ bgcolor: FIORI.surface, borderRadius: '8px', minWidth: 60, height: 34 }}
-                            >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                                <MenuItem value={100}>100</MenuItem>
-                            </Select>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                ต่อหน้า
-                            </Typography>
-                            <Paper variant="outlined" sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border, display: 'flex', alignItems: 'center' }}>
-                                <Typography variant="body2" sx={{ color: FIORI.textPrimary }}>{currentPage}</Typography>
-                            </Paper>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                / {lastPage}
-                            </Typography>
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(currentPage + 1)}>
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
+                        <Pager
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            perPage={perPage}
+                            perPageLabel="ต่อหน้า"
+                            onPerPageChange={handlePerPageChange}
+                            onGoToPage={goToPage}
+                        />
+                    </div>
 
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div className={styles.divider} />
 
                     {totalCached === 0 ? (
-                        <Box sx={{ p: 4 }}>
-                            <Alert severity="info">
+                        <div style={{ padding: '2rem' }}>
+                            <FioriMessageStrip severity="information">
                                 {canSync
                                     ? 'ยังไม่มีข้อมูล Master Product List เลย — กด "Sync ทุกร้านตอนนี้" เพื่อดึงข้อมูลจาก Lazada มาเก็บไว้ครั้งแรก'
                                     : 'ยังไม่มีข้อมูล Master Product List เลย — ให้ผู้มีสิทธิ์ sync ดึงข้อมูลจาก Lazada มาเก็บไว้ก่อน'}
-                            </Alert>
-                        </Box>
+                            </FioriMessageStrip>
+                        </div>
                     ) : (
                         <FioriResponsiveTable
                             variant="plain"
                             columns={columns}
                             rows={products.data}
                             getRowKey={(row: MasterProductRow) => row.id}
-                            rowSx={() => fioriTableRowSx(false)}
                             emptyMessage="ไม่พบสินค้าที่ตรงตามเงื่อนไข"
                         />
                     )}
 
-                    <Box sx={{ px: 2, py: 1.5, borderTop: `1px solid ${FIORI.border}` }}>
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
+                    <div className={styles.footer} style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}>
+                        <Caption>
                             แสดง {products.data.length} จาก {products.total} รายการ
-                        </Typography>
-                    </Box>
-                </Paper>
-            </Box>
+                        </Caption>
+                    </div>
+                </div>
+            </div>
         </AppLayout>
     );
 }

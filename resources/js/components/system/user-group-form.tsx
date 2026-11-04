@@ -1,23 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import {
-    Autocomplete,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    Divider,
-    FormControlLabel,
-    Switch,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { FormEventHandler } from 'react';
+import { Button, FlexBox, Input, Label, MultiComboBox, MultiComboBoxItem, Switch, Text, TextArea, Title } from '@ui5/webcomponents-react';
+import { FormEventHandler, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx } from '@/lib/fiori-style';
+import styles from './user-group-form.module.css';
+// TODO(New Group): ปลดคอมเมนต์พร้อมกับตาราง Users ด้านล่าง (+ import { CheckBox } from '@ui5/webcomponents-react')
+// import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -72,6 +62,7 @@ interface UserGroupForm {
     [key: string]: string | boolean | number[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- `users` is only consumed by the commented-out Users table (TODO New Group)
 export default function UserGroupFormPage({ suggestedCode, canEditCode = false, users, roles, group }: UserGroupFormProps) {
     const isEdit = Boolean(group);
     const { t: tCatalog } = useTranslation('catalog');
@@ -99,7 +90,7 @@ export default function UserGroupFormPage({ suggestedCode, canEditCode = false, 
     };
 
     // TODO(New Group): ส่วนเลือก Users (checkbox "Has Group") ยังไม่ต้องมีบนหน้านี้
-    // — คอมเมนต์ไว้ก่อน ปลดคอมเมนต์ทั้ง toggleUser + userColumns + บล็อก <Box> "Users"
+    // — คอมเมนต์ไว้ก่อน ปลดคอมเมนต์ทั้ง toggleUser + userColumns + บล็อก <div> "Users"
     // ในส่วน render เมื่อ flow พร้อม
     // const toggleUser = (userId: number) => {
     //     setData('users', data.users.includes(userId) ? data.users.filter((id) => id !== userId) : [...data.users, userId]);
@@ -114,7 +105,7 @@ export default function UserGroupFormPage({ suggestedCode, canEditCode = false, 
     //         key: 'hasGroup',
     //         header: 'Has Group',
     //         priority: 'always',
-    //         render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
+    //         render: (user) => <CheckBox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
     //     },
     //     {
     //         key: 'employeeId',
@@ -151,163 +142,160 @@ export default function UserGroupFormPage({ suggestedCode, canEditCode = false, 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isEdit ? `Edit ${group?.name}` : 'Create Group'} />
-            <Box
-                component="form"
-                id="user-group-form"
-                onSubmit={submit}
-                sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', bgcolor: FIORI.pageBg }}
-            >
-                <Box sx={{ flex: 1, p: 4 }}>
-                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 3 }}>
-                    {isEdit ? group?.name : 'New Group'}
-                </Typography>
+            <form id="user-group-form" onSubmit={submit} className={styles.form}>
+                <div className={styles.body}>
+                    <Title level="H3" style={{ marginBottom: '1.5rem' }}>
+                        {isEdit ? group?.name : 'New Group'}
+                    </Title>
 
-                <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    {/* TODO(New Group): ส่วน Users (ตาราง + checkbox "Has Group") ยังไม่ต้องมี — ปลดคอมเมนต์เมื่อพร้อม
-                    <Box sx={{ flex: 1, minWidth: 320 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                            Users
-                        </Typography>
-                        <Divider sx={{ mb: 2, borderColor: FIORI.border }} />
-                        <FioriResponsiveTable
-                            columns={userColumns}
-                            rows={users}
-                            getRowKey={(user) => user.id}
-                            rowSx={(user) => fioriTableRowSx(data.users.includes(user.id))}
-                            emptyMessage="No users found."
-                        />
-                    </Box>
+                    <FlexBox alignItems="Start" wrap="Wrap" style={{ gap: '2rem' }}>
+                        {/* TODO(New Group): ส่วน Users (ตาราง + checkbox "Has Group") ยังไม่ต้องมี — ปลดคอมเมนต์เมื่อพร้อม
+                        <div style={{ flex: 1, minWidth: 320 }}>
+                            <Title level="H4" style={{ marginBottom: '0.5rem' }}>
+                                Users
+                            </Title>
+                            <div className={styles.divider} />
+                            <FioriResponsiveTable
+                                columns={userColumns}
+                                rows={users}
+                                getRowKey={(user) => user.id}
+                                rowClassName={(user) => (data.users.includes(user.id) ? styles.selectedRow : undefined)}
+                                emptyMessage="No users found."
+                            />
+                        </div>
 
-                    <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'block' }, borderColor: FIORI.border }} />
-                    */}
+                        <div className={styles.verticalDivider} />
+                        */}
 
-                    <Box sx={{ width: 320, flexShrink: 0 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                            General
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                    User Group Code *
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    value={data.code}
-                                    disabled={!codeEditable}
-                                    placeholder="e.g. group_1"
-                                    onChange={(e) => {
-                                        setData('code', normalizeCodeInput(e.target.value));
-                                        clearErrors('code');
-                                    }}
-                                    error={Boolean(errors.code)}
-                                    helperText={errors.code ?? tCatalog(codeHintKey({ canEditCode: codeEditable }))}
-                                />
-                            </Box>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                    Name *
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    value={data.name}
-                                    onChange={(e) => {
-                                        setData('name', e.target.value);
-                                        clearErrors('name');
-                                    }}
-                                    error={Boolean(errors.name)}
-                                    helperText={errors.name}
-                                />
-                            </Box>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                    Description *
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    multiline
-                                    minRows={3}
-                                    placeholder="Description"
-                                    value={data.description}
-                                    onChange={(e) => {
-                                        setData('description', e.target.value);
-                                        clearErrors('description');
-                                    }}
-                                    error={Boolean(errors.description)}
-                                    helperText={errors.description}
-                                />
-                            </Box>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                    Status
-                                </Typography>
-                                <FormControlLabel
-                                    control={<Switch checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} />}
-                                    label={data.is_active ? 'Active' : 'Inactive'}
-                                />
-                                {errors.is_active && (
-                                    <Typography variant="caption" color="error" display="block">
-                                        {errors.is_active}
-                                    </Typography>
-                                )}
-                            </Box>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                                    Roles
-                                </Typography>
-                                <Autocomplete
-                                    multiple
-                                    size="small"
-                                    options={roles}
-                                    getOptionLabel={(option) => option.label}
-                                    isOptionEqualToValue={(option, value) => option.id === value.id}
-                                    value={roles.filter((r) => data.roles.includes(r.id))}
-                                    onChange={(e, newValue) => setData('roles', newValue.map((v) => v.id))}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            placeholder="Select roles"
-                                            error={Boolean(errors.roles)}
-                                            helperText={errors.roles}
+                        <div style={{ width: 320, flexShrink: 0 }}>
+                            <Title level="H4" style={{ marginBottom: '1rem' }}>
+                                General
+                            </Title>
+                            <FlexBox direction="Column" style={{ gap: '1.25rem' }}>
+                                <div>
+                                    <FieldLabel htmlFor="user-group-code" required>
+                                        User Group Code
+                                    </FieldLabel>
+                                    <Input
+                                        id="user-group-code"
+                                        style={{ width: '100%' }}
+                                        value={data.code}
+                                        disabled={!codeEditable}
+                                        placeholder="e.g. group_1"
+                                        onInput={(e) => {
+                                            setData('code', normalizeCodeInput(e.target.value));
+                                            clearErrors('code');
+                                        }}
+                                        valueState={errors.code ? 'Negative' : 'None'}
+                                        valueStateMessage={errors.code ? <div>{errors.code}</div> : undefined}
+                                    />
+                                    <HelperText error={errors.code}>{tCatalog(codeHintKey({ canEditCode: codeEditable }))}</HelperText>
+                                </div>
+                                <div>
+                                    <FieldLabel htmlFor="user-group-name" required>
+                                        Name
+                                    </FieldLabel>
+                                    <Input
+                                        id="user-group-name"
+                                        style={{ width: '100%' }}
+                                        value={data.name}
+                                        onInput={(e) => {
+                                            setData('name', e.target.value);
+                                            clearErrors('name');
+                                        }}
+                                        valueState={errors.name ? 'Negative' : 'None'}
+                                        valueStateMessage={errors.name ? <div>{errors.name}</div> : undefined}
+                                    />
+                                    <HelperText error={errors.name} />
+                                </div>
+                                <div>
+                                    <FieldLabel htmlFor="user-group-description" required>
+                                        Description
+                                    </FieldLabel>
+                                    <TextArea
+                                        id="user-group-description"
+                                        style={{ width: '100%' }}
+                                        rows={3}
+                                        growing
+                                        placeholder="Description"
+                                        value={data.description}
+                                        onInput={(e) => {
+                                            setData('description', e.target.value);
+                                            clearErrors('description');
+                                        }}
+                                        valueState={errors.description ? 'Negative' : 'None'}
+                                        valueStateMessage={errors.description ? <div>{errors.description}</div> : undefined}
+                                    />
+                                    <HelperText error={errors.description} />
+                                </div>
+                                <div>
+                                    <FieldLabel htmlFor="user-group-status">Status</FieldLabel>
+                                    <FlexBox alignItems="Center" style={{ gap: '0.5rem' }}>
+                                        <Switch
+                                            id="user-group-status"
+                                            checked={data.is_active}
+                                            onChange={(e) => setData('is_active', e.target.checked)}
                                         />
-                                    )}
-                                />
-                            </Box>
-                        </Box>
-                    </Box>
-                </Box>
-                </Box>
+                                        <Text>{data.is_active ? 'Active' : 'Inactive'}</Text>
+                                    </FlexBox>
+                                    <HelperText error={errors.is_active} />
+                                </div>
+                                <div>
+                                    <FieldLabel htmlFor="user-group-roles">Roles</FieldLabel>
+                                    <MultiComboBox
+                                        id="user-group-roles"
+                                        style={{ width: '100%' }}
+                                        placeholder="Select roles"
+                                        selectedValues={data.roles.map(String)}
+                                        onSelectionChange={(e) =>
+                                            setData(
+                                                'roles',
+                                                e.detail.items.map((item) => Number(item.value)).filter((id) => !Number.isNaN(id)),
+                                            )
+                                        }
+                                        valueState={errors.roles ? 'Negative' : 'None'}
+                                        valueStateMessage={errors.roles ? <div>{errors.roles}</div> : undefined}
+                                    >
+                                        {roles.map((role) => (
+                                            <MultiComboBoxItem key={role.id} value={String(role.id)} text={role.label} />
+                                        ))}
+                                    </MultiComboBox>
+                                    <HelperText error={errors.roles} />
+                                </div>
+                            </FlexBox>
+                        </div>
+                    </FlexBox>
+                </div>
 
                 {/* Fiori footer action bar — ปุ่มอยู่ล่างสุด ติดขอบ ไม่ใช่บน header */}
-                <Box
-                    sx={{
-                        position: 'sticky',
-                        bottom: 0,
-                        display: 'flex',
-                        justifyContent: 'flex-end',
-                        gap: 1,
-                        px: 4,
-                        py: 2,
-                        bgcolor: FIORI.surface,
-                        borderTop: `1px solid ${FIORI.border}`,
-                    }}
-                >
-                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
-                        CANCEL
-                    </Button>
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={processing}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 3 }}
-                    >
+                <div className={styles.footer}>
+                    <Button onClick={cancel}>CANCEL</Button>
+                    <Button type="Submit" design="Emphasized" disabled={processing} loading={processing} loadingDelay={0}>
                         {processing ? 'Saving…' : 'Save'}
                     </Button>
-                </Box>
-            </Box>
+                </div>
+            </form>
         </AppLayout>
     );
+}
+
+function FieldLabel({ htmlFor, required = false, children }: { htmlFor: string; required?: boolean; children: ReactNode }) {
+    return (
+        <Label
+            for={htmlFor}
+            required={required}
+            showColon={false}
+            wrappingType="Normal"
+            style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}
+        >
+            {children}
+        </Label>
+    );
+}
+
+/** error (สีแดง) ถ้ามี ไม่งั้นแสดง hint ปกติ — แทน helperText ของ MUI TextField */
+function HelperText({ error, children }: { error?: string; children?: ReactNode }) {
+    const content = error ?? children;
+    if (!content) return null;
+    return <span className={error ? `${styles.helper} ${styles.helperError}` : styles.helper}>{content}</span>;
 }

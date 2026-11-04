@@ -1,6 +1,6 @@
-import CloseIcon from '@mui/icons-material/Close';
-import { Box, Button, Chip, Drawer, IconButton, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import { Bar, Button, DatePicker, Dialog, Input, Label, Option, Select, Tag, Title } from '@ui5/webcomponents-react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface GridColumn {
@@ -91,6 +91,7 @@ export function GridFilterDrawer({
     // `t` (prop) translates the page's column labels; tGrid covers this drawer's own chrome
     const { t: tGrid } = useTranslation('grid');
     const [draft, setDraft] = useState<Record<string, FilterValue>>(value);
+    const idPrefix = useId();
 
     useEffect(() => {
         if (open) setDraft(value);
@@ -114,96 +115,116 @@ export function GridFilterDrawer({
         onClose();
     };
 
+    const fieldStyle = { display: 'flex', flexDirection: 'column', gap: '0.25rem' } as const;
+
+    // UI5 has no Drawer — the filter panel is a (centered) UI5 Dialog with a
+    // Save action in its footer bar.
     return (
-        <Drawer anchor="right" open={open} onClose={onClose}>
-            <Box sx={{ width: 340, p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {tGrid('filterDrawerTitle')}
-                    </Typography>
-                    <IconButton onClick={onClose} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Stack>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            style={{ width: 'min(380px, calc(100vw - 2rem))' }}
+            header={
+                <Bar
+                    startContent={
+                        <Title level="H5" size="H5">
+                            {tGrid('filterDrawerTitle')}
+                        </Title>
+                    }
+                    endContent={<Button design="Transparent" icon="decline" accessibleName="Close" onClick={onClose} />}
+                />
+            }
+            footer={
+                <Bar
+                    design="Footer"
+                    endContent={
+                        <Button design="Emphasized" onClick={save}>
+                            {tGrid('filterDrawerSave')}
+                        </Button>
+                    }
+                />
+            }
+        >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {filterableEntries.map(([key, column]) => {
+                    const id = `${idPrefix}-${key}`;
 
-                <Stack spacing={2.5}>
-                    {filterableEntries.map(([key, column]) => {
-                        if (column.type === 'boolean') {
-                            const current = (draft[key] as string) ?? '';
-                            return (
-                                <Box key={key}>
-                                    <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                        {t(column.label)}
-                                    </Typography>
-                                    <Select fullWidth size="small" displayEmpty value={current} onChange={(e) => setField(key, e.target.value)}>
-                                        <MenuItem value="">
-                                            <em>{tGrid('filterDrawerSelect')}</em>
-                                        </MenuItem>
-                                        <MenuItem value="1">{tGrid('yes')}</MenuItem>
-                                        <MenuItem value="0">{tGrid('no')}</MenuItem>
-                                    </Select>
-                                </Box>
-                            );
-                        }
-
-                        if (column.type === 'datetime' || column.type === 'date') {
-                            const current = (draft[key] as DateRangeValue) ?? {};
-                            return (
-                                <Box key={key}>
-                                    <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                                        {t(column.label)}
-                                    </Typography>
-                                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                                        {Object.entries(quickRanges).map(([rangeKey, getRange]) => (
-                                            <Chip
-                                                key={rangeKey}
-                                                label={tGrid(rangeKey)}
-                                                size="small"
-                                                onClick={() => {
-                                                    const [from, to] = getRange();
-                                                    setField(key, { from: toDateInputValue(from), to: toDateInputValue(to) });
-                                                }}
-                                            />
-                                        ))}
-                                    </Stack>
-                                    <Stack direction="row" spacing={1}>
-                                        <TextField
-                                            type="date"
-                                            size="small"
-                                            fullWidth
-                                            value={current.from ?? ''}
-                                            onChange={(e) => setField(key, { ...current, from: e.target.value })}
-                                            slotProps={{ inputLabel: { shrink: true } }}
-                                        />
-                                        <TextField
-                                            type="date"
-                                            size="small"
-                                            fullWidth
-                                            value={current.to ?? ''}
-                                            onChange={(e) => setField(key, { ...current, to: e.target.value })}
-                                            slotProps={{ inputLabel: { shrink: true } }}
-                                        />
-                                    </Stack>
-                                </Box>
-                            );
-                        }
-
+                    if (column.type === 'boolean') {
                         const current = (draft[key] as string) ?? '';
                         return (
-                            <Box key={key}>
-                                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                            <div key={key} style={fieldStyle}>
+                                <Label for={id} showColon={false}>
                                     {t(column.label)}
-                                </Typography>
-                                <TextField fullWidth size="small" value={current} onChange={(e) => setField(key, e.target.value)} />
-                            </Box>
+                                </Label>
+                                <Select
+                                    id={id}
+                                    style={{ width: '100%' }}
+                                    value={current}
+                                    onChange={(e) => setField(key, e.detail.selectedOption.value ?? '')}
+                                >
+                                    <Option value="">{tGrid('filterDrawerSelect')}</Option>
+                                    <Option value="1">{tGrid('yes')}</Option>
+                                    <Option value="0">{tGrid('no')}</Option>
+                                </Select>
+                            </div>
                         );
-                    })}
-                </Stack>
+                    }
 
-                <Button fullWidth variant="contained" sx={{ mt: 3, color: 'white' }} onClick={save}>
-                    {tGrid('filterDrawerSave')}
-                </Button>
-            </Box>
-        </Drawer>
+                    if (column.type === 'datetime' || column.type === 'date') {
+                        const current = (draft[key] as DateRangeValue) ?? {};
+                        return (
+                            <div key={key} style={fieldStyle}>
+                                <Label for={`${id}-from`} showColon={false}>
+                                    {t(column.label)}
+                                </Label>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                    {Object.entries(quickRanges).map(([rangeKey, getRange]) => (
+                                        <Tag
+                                            key={rangeKey}
+                                            interactive
+                                            design="Neutral"
+                                            hideStateIcon
+                                            onClick={() => {
+                                                const [from, to] = getRange();
+                                                setField(key, { from: toDateInputValue(from), to: toDateInputValue(to) });
+                                            }}
+                                        >
+                                            {tGrid(rangeKey)}
+                                        </Tag>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <DatePicker
+                                        id={`${id}-from`}
+                                        style={{ flex: 1, minWidth: 0 }}
+                                        valueFormat="yyyy-MM-dd"
+                                        displayFormat="yyyy-MM-dd"
+                                        value={current.from ?? ''}
+                                        onChange={(e) => setField(key, { ...current, from: e.detail.value })}
+                                    />
+                                    <DatePicker
+                                        style={{ flex: 1, minWidth: 0 }}
+                                        valueFormat="yyyy-MM-dd"
+                                        displayFormat="yyyy-MM-dd"
+                                        value={current.to ?? ''}
+                                        onChange={(e) => setField(key, { ...current, to: e.detail.value })}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    const current = (draft[key] as string) ?? '';
+                    return (
+                        <div key={key} style={fieldStyle}>
+                            <Label for={id} showColon={false}>
+                                {t(column.label)}
+                            </Label>
+                            <Input id={id} style={{ width: '100%' }} value={current} onInput={(e) => setField(key, e.target.value)} />
+                        </div>
+                    );
+                })}
+            </div>
+        </Dialog>
     );
 }

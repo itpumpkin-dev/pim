@@ -2,115 +2,74 @@ import AppLogoIcon from '@/components/app-logo-icon';
 import AppearanceToggleDropdown from '@/components/appearance-dropdown';
 import LocaleDropdown from '@/components/locale-dropdown';
 import { LocaleSwitchOverlay } from '@/components/locale-switch-overlay';
-import { ProductCard } from '@/components/product-card';
+import { PRODUCT_STATUS_TAG_DESIGN, PRODUCT_TAG_DESIGN, ProductCard } from '@/components/product-card';
 import { RouteTopProgressBar } from '@/components/route-top-progress-bar';
 import { currency, productImageUrl, type IconType, type Product } from '@/data/products';
+import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { useElementWidth } from '@/hooks/use-element-width';
 import { useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
 import { computeBentoLayout, findBentoGaps, gridArea, packBento, scaleBentoItems, type BentoItem } from '@/lib/bento';
-import { getCategoryIcon } from '@/lib/category-icon';
-import { useProductTagLabel } from '@/lib/product-tag';
+import { getCategoryIconName } from '@/lib/category-icon';
 import { isProductStatus, PRODUCT_STATUS_CHIP_COLORS, PRODUCT_STATUS_LABEL_KEYS } from '@/lib/product-status';
+import { useProductTagLabel } from '@/lib/product-tag';
+import { sapIcon } from '@/lib/sap-icon';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
-import LoginIcon from '@mui/icons-material/Login';
-import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
-import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
-import { alpha, AppBar, Box, Button, Chip, Paper, Stack, Table, TableBody, TableCell, TableRow, Toolbar, Typography } from '@mui/material';
-import { keyframes } from '@emotion/react';
-import { cloneElement, useState } from 'react';
+import '@ui5/webcomponents-icons/dist/customize.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/money-bills.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/palette.js';
+import '@ui5/webcomponents-icons/dist/print.js';
+import '@ui5/webcomponents-icons/dist/product.js';
+import '@ui5/webcomponents-icons/dist/retail-store.js';
+import '@ui5/webcomponents-icons/dist/sys-enter-2.js';
+import '@ui5/webcomponents-icons/dist/tag.js';
+import '@ui5/webcomponents-icons/dist/visits.js';
+import { Button, Tag, Icon as Ui5Icon } from '@ui5/webcomponents-react';
+import { cloneElement, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import styles from './show.module.css';
 
-// Plays once whenever this page mounts (i.e. every time Inertia navigates
-// here) — without it the bento grid just pops in the instant data arrives,
-// which is what actually reads as "abrupt" about the click, not the
-// navigation/fetch time itself.
-const pageEnter = keyframes`
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-`;
+// The page-enter keyframe animation (plays once whenever this page mounts,
+// i.e. every time Inertia navigates here) lives in show.module.css (.content).
 
 type GridArea = { gridColumn: string; gridRow: string };
 type CellType = 'hero' | 'spec' | 'product' | 'stat' | 'info' | 'feature' | 'discount' | 'video';
 type CellDef = { key: string; type: CellType; render: (area: GridArea) => React.ReactElement };
 
-const hoverLiftSx = {
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-    '&:hover': { transform: 'translateY(-3px)', boxShadow: 6, zIndex: 2 },
-} as const;
-const clampSx = (lines: number) => ({ display: '-webkit-box', WebkitLineClamp: lines, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) as const;
+const cx = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
+
+const StorefrontIcon = sapIcon('retail-store');
+const PaletteIcon = sapIcon('palette');
+const TuneIcon = sapIcon('customize');
 
 /** rotating palette for small fact tiles, so the grid reads as a lively mosaic instead of one flat color */
-const STAT_VARIANTS: Array<Record<string, unknown>> = [
-    { bgcolor: '#F9FAFB', color: '#334155' },
-    { bgcolor: 'info.main', color: 'info.contrastText' },
-    { bgcolor: 'background.paper', color: 'text.primary', boxShadow: 1 },
-    { bgcolor: 'success.main', color: 'success.contrastText' },
-    { bgcolor: 'primary.main', color: 'primary.contrastText' },
-    { bgcolor: (theme: { palette: { mode: string } }) => (theme.palette.mode === 'dark' ? '#000' : 'grey.900'), color: '#fff' },
-];
+const STAT_VARIANTS = [styles.statVariant0, styles.statVariant1, styles.statVariant2, styles.statVariant3, styles.statVariant4, styles.statVariant5];
+
+/** feature-highlight badge accents (was MUI success / info / secondary / warning) */
+const FEATURE_ACCENTS = ['var(--sapPositiveColor)', 'var(--sapInformativeColor)', 'var(--sapAccentColor9)', 'var(--sapCriticalColor)'];
 
 /** small icon + value + label tile, used both for real facts (brand/category/color) and for filling leftover grid gaps */
 function factCell(area: GridArea, variantIndex: number, FactIcon: IconType, value: string, label: string, h = 2) {
     const compact = h <= 1;
+    const variant = STAT_VARIANTS[variantIndex % STAT_VARIANTS.length];
 
     if (compact) {
         return (
-            <Box
-                sx={{
-                    ...area,
-                    height: '100%',
-                    minWidth: 0,
-                    borderRadius: '12px',
-                    px: 1.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    overflow: 'hidden',
-                    ...hoverLiftSx,
-                    ...STAT_VARIANTS[variantIndex % STAT_VARIANTS.length],
-                }}
-            >
-                <FactIcon fontSize="small" sx={{ opacity: 0.85, flexShrink: 0 }} />
-                <Typography variant="body2" noWrap sx={{ fontWeight: 800, minWidth: 0 }}>
-                    {value}
-                </Typography>
-            </Box>
+            <div style={area} className={cx(styles.cell, styles.factCompact, variant)}>
+                <FactIcon fontSize="small" className={styles.factIcon} />
+                <span className={cx(styles.factCompactValue, styles.noWrap)}>{value}</span>
+            </div>
         );
     }
 
     return (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                borderRadius: '14px',
-                p: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                ...hoverLiftSx,
-                ...STAT_VARIANTS[variantIndex % STAT_VARIANTS.length],
-            }}
-        >
-            <FactIcon fontSize="medium" sx={{ opacity: 0.85, mb: 0.75 }} />
-            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 800, lineHeight: 1.25 }}>
-                {value}
-            </Typography>
-            <Typography variant="body2" noWrap sx={{ opacity: 0.8, fontWeight: 700, mt: 0.25 }}>
-                {label}
-            </Typography>
-        </Box>
+        <div style={area} className={cx(styles.cell, styles.fact, variant)}>
+            <FactIcon fontSize="medium" className={styles.factIcon} />
+            <span className={cx(styles.factValue, styles.noWrap)}>{value}</span>
+            <span className={cx(styles.factLabel, styles.noWrap)}>{label}</span>
+        </div>
     );
 }
 
@@ -118,6 +77,7 @@ export default function ProductShow({ product, related }: { product: Product | n
     const { auth } = usePage<SharedData>().props;
     const tagLabel = useProductTagLabel();
     const { t } = useTranslation();
+    const { resolved: mode } = useResolvedAppearance();
     const [imageFailed, setImageFailed] = useState(false);
     const { ref: bentoRef, width: bentoWidth } = useElementWidth<HTMLDivElement>();
 
@@ -131,446 +91,183 @@ export default function ProductShow({ product, related }: { product: Product | n
     });
 
     const actions = !auth.user ? (
-        <Button
-            component={Link}
-            href={route('login')}
-            variant="contained"
-            startIcon={<LoginIcon />}
-            sx={{
-                borderRadius: '50px',
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 2,
-                py: 1,
-                color: '#fff',
-                background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                    transform: 'translateY(-2px)',
-                    background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                },
-            }}
-        >
+        <Button design="Emphasized" icon="visits" className={styles.signIn} onClick={() => router.visit(route('login'))}>
             Sign in
         </Button>
     ) : (
-        <Button
-            component={Link}
-            href={route('dashboard')}
-            variant="outlined"
-            sx={{
-                borderRadius: '50px',
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
-                py: 1,
-                borderWidth: 2,
-                color: '#06B6D4',
-                borderColor: '#06B6D4',
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                    borderWidth: 2,
-                    borderColor: '#0891B2',
-                    bgcolor: alpha('#06B6D4', 0.08),
-                    transform: 'translateY(-2px)',
-                },
-            }}
-        >
+        <Button className={styles.dashboardButton} onClick={() => router.visit(route('dashboard'))}>
             ไปที่ Dashboard
         </Button>
     );
 
+    const appBar = (
+        <header className={styles.appBar}>
+            <Link href="/" className={styles.brandLink}>
+                <span className={styles.brandLogo}>
+                    <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
+                </span>
+                <span className={styles.brandText}>
+                    PIM <span className={styles.brandAccent}>Pumpkin</span>
+                </span>
+            </Link>
+            <div className={styles.toolbarActions}>
+                <LocaleDropdown />
+                <AppearanceToggleDropdown />
+                {actions}
+            </div>
+        </header>
+    );
+
     if (!product) {
         return (
-            <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', position: 'relative' }}>
+            <div className={styles.root} data-mode={mode}>
                 <Head title="ไม่พบสินค้า" />
-                <AppBar position="sticky" color="inherit" elevation={1}>
-                    <Toolbar sx={{ justifyContent: 'space-between' }}>
-                        <Box
-                            component={Link}
-                            href="/"
-                            sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}
-                        >
-                            <Box sx={{ color: 'primary.main', display: 'flex' }}>
-                                <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
-                            </Box>
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                PIM{' '}
-                                <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                                    Pumpkin
-                                </Box>
-                            </Typography>
-                        </Box>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                            <LocaleDropdown />
-                            <AppearanceToggleDropdown />
-                            {actions}
-                        </Stack>
-                    </Toolbar>
-                </AppBar>
+                {appBar}
 
-                <Stack spacing={2} alignItems="flex-start" sx={{ p: { xs: 2, md: 4 } }}>
-                    <Typography variant="h6">ไม่พบสินค้าที่คุณต้องการ</Typography>
-                    <Button component={Link} href="/" startIcon={<ArrowBackIcon />}>
+                <div className={styles.notFound}>
+                    <span className={styles.notFoundTitle}>ไม่พบสินค้าที่คุณต้องการ</span>
+                    <Button design="Transparent" icon="nav-back" onClick={() => router.visit('/')}>
                         {t('productDetail.backToHome')}
                     </Button>
-                </Stack>
+                </div>
 
                 <RouteTopProgressBar />
-            </Box>
+            </div>
         );
     }
 
-    const Icon = product.icon ?? getCategoryIcon(product.category);
+    const Icon = product.icon ?? sapIcon(getCategoryIconName(product.category));
 
     const heroRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                position: 'relative',
-                overflow: 'hidden',
-                borderRadius: '20px',
-                p: { xs: 3, md: 4 },
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                background: (theme) =>
-                    theme.palette.mode === 'dark'
-                        ? 'linear-gradient(135deg, #1a1a24 0%, #0f0f18 100%)'
-                        : 'linear-gradient(135deg, #1f2430 0%, #12141c 100%)',
-                color: '#fff',
-                ...hoverLiftSx,
-                '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    right: -100,
-                    top: -100,
-                    width: 420,
-                    height: 420,
-                    borderRadius: '50%',
-                    background: (theme) => `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.35)}, transparent 65%)`,
-                    pointerEvents: 'none',
-                },
-            }}
-        >
+        <div style={area} className={cx(styles.cell, styles.hero)}>
             {!imageFailed && (
-                <Box
-                    component="img"
-                    src={productImageUrl(product)}
-                    alt=""
-                    aria-hidden="true"
-                    onError={() => setImageFailed(true)}
-                    sx={{
-                        position: 'absolute',
-                        right: { xs: -40, md: -20 },
-                        bottom: -30,
-                        width: { xs: '55%', md: '42%' },
-                        opacity: 0.16,
-                        zIndex: 0,
-                        pointerEvents: 'none',
-                        filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))',
-                    }}
-                />
+                <img src={productImageUrl(product)} alt="" aria-hidden="true" onError={() => setImageFailed(true)} className={styles.heroImage} />
             )}
-            <Box sx={{ position: 'relative', zIndex: 1, minHeight: 0, overflow: 'hidden' }}>
-                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+            <div className={styles.heroBody}>
+                <span className={styles.heroEyebrow}>
                     {product.brand} · {product.category}
-                </Typography>
-                <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.1, mt: 1.5, maxWidth: 520, ...clampSx(2) }}>
-                    {product.name}
-                </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.75, mt: 1.5, maxWidth: 460, ...clampSx(3) }}>
-                    {product.description}
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, gap: 1 }}>
-                    <Chip
-                        size="small"
-                        label={`SKU ${product.sku}`}
-                        sx={{ bgcolor: alpha('#fff', 0.08), color: '#fff', border: 1, borderColor: alpha('#fff', 0.1) }}
-                    />
-                    {product.color && (
-                        <Chip
-                            size="small"
-                            label={product.color}
-                            sx={{ bgcolor: alpha('#fff', 0.08), color: '#fff', border: 1, borderColor: alpha('#fff', 0.1) }}
-                        />
+                </span>
+                <h1 className={cx(styles.heroTitle, styles.clamp2)}>{product.name}</h1>
+                <p className={cx(styles.heroDescription, styles.clamp3)}>{product.description}</p>
+                <div className={styles.heroChips}>
+                    <span className={styles.glassChip}>{`SKU ${product.sku}`}</span>
+                    {product.color && <span className={styles.glassChip}>{product.color}</span>}
+                    {product.tag && (
+                        <Tag className={styles.boldTag} design={product.tagColor ? PRODUCT_TAG_DESIGN[product.tagColor] : 'Neutral'} hideStateIcon>
+                            {tagLabel(product)}
+                        </Tag>
                     )}
-                    {product.tag && <Chip size="small" label={tagLabel(product)} color={product.tagColor} sx={{ fontWeight: 700 }} />}
                     {isProductStatus(product.status) && (
-                        <Chip
-                            size="small"
-                            label={t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
-                            color={PRODUCT_STATUS_CHIP_COLORS[product.status]}
-                            sx={{ fontWeight: 700 }}
-                        />
+                        <Tag className={styles.boldTag} design={PRODUCT_STATUS_TAG_DESIGN[PRODUCT_STATUS_CHIP_COLORS[product.status]]} hideStateIcon>
+                            {t(`catalog:${PRODUCT_STATUS_LABEL_KEYS[product.status]}`)}
+                        </Tag>
                     )}
-                </Stack>
-            </Box>
-            <Stack direction="row" spacing={1.5} sx={{ position: 'relative', zIndex: 1, mt: 2 }}>
-                <Button
-                    variant="contained"
-                    startIcon={<EditOutlinedIcon />}
-                    sx={{ borderRadius: 999, bgcolor: 'primary.main', '&:hover': { bgcolor: 'primary.dark' } }}
-                >
+                </div>
+            </div>
+            <div className={styles.heroActions}>
+                <Button design="Emphasized" icon="edit" className={styles.pillButton}>
                     {t('productDetail.editInfo')}
                 </Button>
-                <Button
-                    variant="outlined"
-                    startIcon={<PrintOutlinedIcon />}
-                    sx={{ borderRadius: 999, color: '#fff', borderColor: alpha('#fff', 0.3), '&:hover': { borderColor: '#fff' } }}
-                >
+                <Button icon="print" className={styles.ghostButton}>
                     {t('productDetail.printInfo')}
                 </Button>
-            </Stack>
-        </Box>
+            </div>
+        </div>
     );
 
     const specRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                overflow: 'auto',
-                borderRadius: '20px',
-                p: 3,
-                bgcolor: '#F9FAFB',
-                color: '#334155',
-                ...hoverLiftSx,
-            }}
-        >
-            <Stack direction="row" spacing={0.75} alignItems="center">
-                <TuneOutlinedIcon fontSize="small" sx={{ color: '#9CA3AF' }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9CA3AF' }}>
-                    {t('productDetail.specifications')}
-                </Typography>
-            </Stack>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mt: 0.5, ...clampSx(2) }}>
-                {product.name}
-            </Typography>
-            <Table size="small" sx={{ mt: 1 }}>
-                <TableBody>
+        <div style={area} className={cx(styles.cell, styles.spec)}>
+            <div className={styles.specHeader}>
+                <Ui5Icon name="customize" className={styles.specHeaderIcon} />
+                <span className={styles.specHeaderLabel}>{t('productDetail.specifications')}</span>
+            </div>
+            <div className={cx(styles.specTitle, styles.clamp2)}>{product.name}</div>
+            <table className={styles.specTable}>
+                <tbody>
                     {Object.entries(product.specs).map(([label, value]) => (
-                        <TableRow key={label} sx={{ '&:last-child td': { border: 0 } }}>
-                            <TableCell sx={{ pl: 0, color: '#666', borderColor: '#e5e5e5' }}>{label}</TableCell>
-                            <TableCell align="right" sx={{ pr: 0, fontWeight: 700, borderColor: '#e5e5e5' }}>
-                                {value}
-                            </TableCell>
-                        </TableRow>
+                        <tr key={label}>
+                            <td className={styles.specLabel}>{label}</td>
+                            <td className={styles.specValue}>{value}</td>
+                        </tr>
                     ))}
-                </TableBody>
-            </Table>
-        </Box>
+                </tbody>
+            </table>
+        </div>
     );
 
     const productRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                position: 'relative',
-                borderRadius: '20px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                background: (theme) =>
-                    theme.palette.mode === 'dark' ? 'linear-gradient(135deg, #2a2a35, #14141a)' : 'linear-gradient(135deg, #eef0f4, #dfe3ea)',
-                ...hoverLiftSx,
-            }}
-        >
+        <div style={area} className={cx(styles.cell, styles.photo)}>
             {product.tag && (
-                <Chip
-                    label={tagLabel(product)}
-                    color={product.tagColor}
-                    size="small"
-                    sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 700 }}
-                />
+                <Tag className={styles.cornerTag} design={product.tagColor ? PRODUCT_TAG_DESIGN[product.tagColor] : 'Neutral'} hideStateIcon>
+                    {tagLabel(product)}
+                </Tag>
             )}
-            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2 }}>
+            <div className={styles.photoMedia}>
                 {!imageFailed ? (
-                    <Box
-                        component="img"
+                    <img
                         src={productImageUrl(product)}
                         alt={product.name}
                         loading="lazy"
                         onError={() => setImageFailed(true)}
-                        sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.35))' }}
+                        className={styles.photoImage}
                     />
                 ) : (
-                    <Icon sx={{ fontSize: 80, color: (theme) => (theme.palette.mode === 'dark' ? alpha('#fff', 0.4) : 'text.disabled') }} />
+                    <Icon className={styles.photoFallbackIcon} style={{ width: 80, height: 80 }} />
                 )}
-            </Box>
-            <Stack spacing={0.25} sx={{ px: 2, pb: 2 }}>
-                <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.05em', color: 'primary.main' }}>
-                    {product.sku}
-                </Typography>
-                <Typography
-                    variant="body1"
-                    sx={{ fontWeight: 700, color: (theme) => (theme.palette.mode === 'dark' ? '#fff' : 'text.primary'), ...clampSx(2) }}
-                >
-                    {product.name}
-                </Typography>
-            </Stack>
-        </Box>
+            </div>
+            <div className={styles.photoCaption}>
+                <span className={styles.photoSku}>{product.sku}</span>
+                <span className={cx(styles.photoName, styles.clamp2)}>{product.name}</span>
+            </div>
+        </div>
     );
 
     const videoRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                position: 'relative',
-                borderRadius: '20px',
-                overflow: 'hidden',
-                bgcolor: '#000',
-                ...hoverLiftSx,
-            }}
-        >
-            <Chip
-                label="วิดีโอสินค้า"
-                size="small"
-                sx={{ position: 'absolute', top: 10, left: 10, zIndex: 1, fontWeight: 700, bgcolor: alpha('#000', 0.55), color: '#fff' }}
-            />
-            <Box
-                component="video"
-                src={product.videoUrl}
-                controls
-                muted
-                loop
-                playsInline
-                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            />
-        </Box>
+        <div style={area} className={cx(styles.cell, styles.video)}>
+            <span className={styles.videoLabel}>วิดีโอสินค้า</span>
+            <video src={product.videoUrl} controls muted loop playsInline className={styles.videoElement} />
+        </div>
     );
 
     const priceRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                borderRadius: '14px',
-                p: 2.5,
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                ...hoverLiftSx,
-            }}
-        >
-            <PaidOutlinedIcon sx={{ opacity: 0.85, mb: 0.5 }} />
-            <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                {currency(product.price)}
-            </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
-                ราคาต่อหน่วย
-            </Typography>
-        </Box>
+        <div style={area} className={cx(styles.cell, styles.stat, styles.price)}>
+            <Ui5Icon name="money-bills" className={styles.statIcon} />
+            <span className={styles.statValue}>{currency(product.price)}</span>
+            <span className={cx(styles.statCaption, styles.statCaptionStrong)}>ราคาต่อหน่วย</span>
+        </div>
     );
 
     const packagingRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                borderRadius: '14px',
-                p: 2.5,
-                bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#000' : 'grey.900'),
-                color: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                ...hoverLiftSx,
-            }}
-        >
-            <Inventory2OutlinedIcon sx={{ opacity: 0.75, mb: 0.5 }} />
-            <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
+        <div style={area} className={cx(styles.cell, styles.stat, styles.packaging)}>
+            <Ui5Icon name="product" className={cx(styles.statIcon, styles.statIconMuted)} />
+            <span className={styles.statValue}>
                 {product.packQty}
-                <Typography component="span" variant="body1" sx={{ fontWeight: 700, opacity: 0.75, ml: 0.5 }}>
+                <span className={styles.statUnit}>
                     {product.packUnit}/{t('productDetail.carton')}
-                </Typography>
-            </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.75, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700, mt: 1 }}>
+                </span>
+            </span>
+            <span className={styles.statCaption}>
                 {t('productDetail.packSize')} {product.size}
-            </Typography>
-        </Box>
+            </span>
+        </div>
     );
 
     const discountRender = (area: GridArea) => (
-        <Box
-            sx={{
-                ...area,
-                height: '100%',
-                minWidth: 0,
-                borderRadius: '14px',
-                p: 2.5,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                background: (theme) => `linear-gradient(135deg, ${theme.palette.warning.main} 0%, ${theme.palette.warning.dark} 100%)`,
-                color: 'warning.contrastText',
-                ...hoverLiftSx,
-            }}
-        >
-            <LocalOfferOutlinedIcon fontSize="medium" sx={{ opacity: 0.9, mb: 0.5 }} />
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                ส่วนลดตามจำนวนสั่งซื้อ
-            </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.9, mt: 0.5, ...clampSx(3) }}>
-                {product.discountNote}
-            </Typography>
-        </Box>
+        <div style={area} className={cx(styles.cell, styles.stat, styles.discount)}>
+            <Ui5Icon name="tag" className={cx(styles.statIcon, styles.discountIcon)} />
+            <div className={styles.discountTitle}>ส่วนลดตามจำนวนสั่งซื้อ</div>
+            <p className={cx(styles.discountNote, styles.clamp3)}>{product.discountNote}</p>
+        </div>
     );
 
-    const featureRender = (area: GridArea, index: number, highlight: string) => {
-        const accentColors = ['success', 'info', 'secondary', 'warning'] as const;
-        const accent = accentColors[index % accentColors.length];
-        return (
-            <Paper
-                elevation={1}
-                sx={{
-                    ...area,
-                    height: '100%',
-                    minWidth: 0,
-                    borderRadius: '14px',
-                    p: 2.5,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    ...hoverLiftSx,
-                }}
-            >
-                <Box
-                    sx={{
-                        width: 44,
-                        height: 44,
-                        flexShrink: 0,
-                        borderRadius: '12px',
-                        bgcolor: (theme) => alpha(theme.palette[accent].main, 0.15),
-                        color: `${accent}.main`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <CheckCircleOutlineIcon fontSize="medium" />
-                </Box>
-                <Typography variant="body1" sx={{ mt: 1.5, fontWeight: 500, ...clampSx(4) }}>
-                    {highlight}
-                </Typography>
-            </Paper>
-        );
-    };
+    const featureRender = (area: GridArea, index: number, highlight: string) => (
+        <div style={area} className={cx(styles.cell, styles.feature)}>
+            <div className={styles.featureBadge} style={{ '--accent': FEATURE_ACCENTS[index % FEATURE_ACCENTS.length] } as CSSProperties}>
+                <Ui5Icon name="sys-enter-2" className={styles.featureIcon} />
+            </div>
+            <p className={cx(styles.featureText, styles.clamp4)}>{highlight}</p>
+        </div>
+    );
 
     const cells: BentoItem<CellDef>[] = [];
     cells.push({ w: 8, h: 5, weight: 5, data: { key: 'hero', type: 'hero', render: heroRender } });
@@ -595,7 +292,7 @@ export default function ProductShow({ product, related }: { product: Product | n
         w: 2,
         h: 2,
         weight: 2,
-        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontOutlinedIcon, product.brand, t('productDetail.brand')) },
+        data: { key: 'brand', type: 'info', render: (area) => factCell(area, 0, StorefrontIcon, product.brand, t('productDetail.brand')) },
     });
     cells.push({
         w: 2,
@@ -610,7 +307,7 @@ export default function ProductShow({ product, related }: { product: Product | n
             w: 2,
             h: 2,
             weight: 2,
-            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteOutlinedIcon, color, 'สี') },
+            data: { key: 'color', type: 'info', render: (area) => factCell(area, 2, PaletteIcon, color, 'สี') },
         });
     }
 
@@ -643,67 +340,28 @@ export default function ProductShow({ product, related }: { product: Product | n
               ];
 
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', position: 'relative' }}>
+        <div className={styles.root} data-mode={mode}>
             <Head title={product.name} />
-            <AppBar position="sticky" color="inherit" elevation={1}>
-                <Toolbar sx={{ justifyContent: 'space-between' }}>
-                    <Box component={Link} href="/" sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit' }}>
-                        <Box sx={{ color: 'primary.main', display: 'flex' }}>
-                            <AppLogoIcon style={{ width: 32, height: 32, fill: 'currentColor' }} />
-                        </Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            PIM{' '}
-                            <Box component="span" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                                Pumpkin
-                            </Box>
-                        </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                        <LocaleDropdown />
-                        <AppearanceToggleDropdown />
-                        {actions}
-                    </Stack>
-                </Toolbar>
-            </AppBar>
+            {appBar}
 
             {/* Keyed by product id so clicking a related product (same page
                 component, new props — no natural remount otherwise) still
                 restarts the entrance animation instead of just snapping to
                 the new content. */}
-            <Box
-                key={product.id}
-                sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 3,
-                    p: { xs: 2, md: 4 },
-                    flex: 1,
-                    width: '100%',
-                    animation: `${pageEnter} 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
-                }}
-            >
+            <div key={product.id} className={styles.content}>
                 <LocaleSwitchOverlay />
-                <Button component={Link} href="/" startIcon={<ArrowBackIcon />} size="small" sx={{ alignSelf: 'flex-start' }}>
+                <Button design="Transparent" icon="nav-back" className={styles.backButton} onClick={() => router.visit('/')}>
                     {t('productDetail.backToHome')}
                 </Button>
 
-                <Box
-                    ref={bentoRef}
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${cols}, 1fr)`,
-                        gridAutoRows: `${rowH}px`,
-                        gap: 1.25,
-                        py: 2,
-                    }}
-                >
+                <div ref={bentoRef} className={styles.bento} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: `${rowH}px` }}>
                     {placed.map((p) => cloneElement(p.data.render(gridArea(p.x, p.y, p.w, p.h)), { key: p.data.key }))}
                     {gaps.map((g, index) =>
                         cloneElement(
                             factCell(
                                 gridArea(g.x, g.y, g.w, g.h),
                                 index,
-                                TuneOutlinedIcon,
+                                TuneIcon,
                                 fillerPool[index % fillerPool.length].value,
                                 fillerPool[index % fillerPool.length].label,
                                 g.h,
@@ -713,23 +371,21 @@ export default function ProductShow({ product, related }: { product: Product | n
                             },
                         ),
                     )}
-                </Box>
+                </div>
 
                 {related.length > 0 && (
-                    <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-                            สินค้าที่เกี่ยวข้อง
-                        </Typography>
-                        <Box sx={{ columnCount: { xs: 2, sm: 3, md: 4 }, columnGap: 2 }}>
+                    <div>
+                        <h2 className={styles.relatedTitle}>สินค้าที่เกี่ยวข้อง</h2>
+                        <div className={styles.relatedGrid}>
                             {related.map((item) => (
                                 <ProductCard key={item.id} product={item} />
                             ))}
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                 )}
-            </Box>
+            </div>
 
             <RouteTopProgressBar />
-        </Box>
+        </div>
     );
 }

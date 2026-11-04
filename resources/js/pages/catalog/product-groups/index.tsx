@@ -1,34 +1,17 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import AddIcon from '@mui/icons-material/Add';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import FirstPageIcon from '@mui/icons-material/FirstPage';
-import LastPageIcon from '@mui/icons-material/LastPage';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    InputAdornment,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/picture.js';
+import { Link, Option, Select, Tag } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FioriMessageBox } from '@/components/fiori-message-box';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import { ClickableThumbnail, ImagePreviewProvider } from '@/components/image-preview';
-import { FIORI, FioriStatus, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
+import { FioriStatus } from '@/lib/fiori-style';
+
+import { MasterListPage, MasterListToolbar, MasterPagination, masterStyles, RowActions, StrongText } from '../master-crud';
 
 interface GroupItem {
     id: number;
@@ -148,25 +131,25 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
             key: 'code',
             header: t('code'),
             priority: 'medium',
-            render: (row) => <Typography sx={{ color: FIORI.textSecondary }}>{row.code}</Typography>,
+            render: (row) => <span className={masterStyles.secondary}>{row.code}</span>,
         },
         {
             key: 'name',
             header: t('productGroupName'),
             priority: 'always',
-            render: (row) => <Typography sx={{ fontWeight: 600 }}>{row.name}</Typography>,
+            render: (row) => <StrongText>{row.name}</StrongText>,
         },
         {
             key: 'category',
             header: t('category'),
             priority: 'high',
-            render: (row) => <Typography variant="body2">{row.category_name || '-'}</Typography>,
+            render: (row) => row.category_name || '-',
         },
         {
             key: 'subcategory',
             header: t('subcategory'),
             priority: 'high',
-            render: (row) => <Typography variant="body2">{row.subcategory_name || '-'}</Typography>,
+            render: (row) => row.subcategory_name || '-',
         },
         {
             key: 'products_count',
@@ -175,19 +158,18 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
             align: 'right',
             render: (row) =>
                 row.products_count ? (
-                    <Typography
-                        component="a"
+                    <Link
                         href={`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`}
                         onClick={(e) => {
                             e.preventDefault();
                             router.visit(`/catalog/products?category_id=${row.id}&category_name=${encodeURIComponent(row.name)}`);
                         }}
-                        sx={{ color: FIORI.brand, fontWeight: 600, textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                        style={{ fontWeight: 600 }}
                     >
                         {row.products_count}
-                    </Typography>
+                    </Link>
                 ) : (
-                    <Typography color="text.disabled">0</Typography>
+                    <span className={masterStyles.dash}>0</span>
                 ),
         },
         {
@@ -196,15 +178,15 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
             priority: 'medium',
             render: (row) =>
                 row.mapped_platforms && row.mapped_platforms.length > 0 ? (
-                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                         {row.mapped_platforms.map((p) => (
-                            <Chip key={p} label={PLATFORM_LABELS[p] ?? p} size="small" variant="outlined" sx={{ borderColor: FIORI.borderStrong }} />
+                            <Tag key={p} design="Neutral">
+                                {PLATFORM_LABELS[p] ?? p}
+                            </Tag>
                         ))}
-                    </Box>
+                    </div>
                 ) : (
-                    <Typography variant="body2" color="text.disabled" sx={{ fontStyle: 'italic' }}>
-                        {t('notMapped')}
-                    </Typography>
+                    <span style={{ color: 'var(--sapContent_LabelColor)', fontStyle: 'italic' }}>{t('notMapped')}</span>
                 ),
         },
         {
@@ -221,22 +203,8 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
                       priority: 'always' as const,
                       align: 'right' as const,
                       render: (row: GroupItem) => (
-                          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                              {canEdit && (
-                                  <IconButton
-                                      size="small"
-                                      sx={fioriIconButtonSx}
-                                      onClick={() => router.visit(`/catalog/product-groups/${row.id}/edit`)}
-                                  >
-                                      <EditIcon fontSize="small" />
-                                  </IconButton>
-                              )}
-                              {/* {canDelete && (
-                                  <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                                      <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                              )} */}
-                          </Box>
+                          // ปุ่มลบปิดไว้ (เดิม comment out ไว้) — เหลือแค่แก้ไข
+                          <RowActions onEdit={canEdit ? () => router.visit(`/catalog/product-groups/${row.id}/edit`) : undefined} />
                       ),
                   },
               ]
@@ -247,127 +215,67 @@ export default function ProductGroupIndex({ groups, categories, filters }: Props
         <ImagePreviewProvider>
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title={tNav('productGroups')} />
-                <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: { xs: 'column', sm: 'row' },
-                            justifyContent: 'space-between',
-                            alignItems: { xs: 'stretch', sm: 'flex-start' },
-                            gap: 2,
-                            mb: 3,
-                        }}
-                    >
-                        <Box>
-                            <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                                {tNav('productGroups')}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
-                                {tGrid('results', { count: groups.total })}
-                            </Typography>
-                        </Box>
-                        {canCreate && (
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => router.visit('/catalog/product-groups/create')}
-                                sx={fioriEmphasizedSx}
-                            >
-                                {t('createProductGroup')}
-                            </Button>
-                        )}
-                    </Box>
-
-                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-                        <TextField
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder={t('searchProductGroups')}
-                            size="small"
-                            sx={{ ...fioriSearchFieldSx, width: { xs: '100%', md: 'auto' }, minWidth: { xs: 0, md: 280 } }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: FIORI.textSecondary }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <Stack direction="row" alignItems="center" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ rowGap: 1 }}>
-                            <Select
-                                value={category}
-                                onChange={(e) => applyCategory(e.target.value)}
-                                displayEmpty
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 200 }}
-                            >
-                                <MenuItem value="">{t('allCategories')}</MenuItem>
-                                {categories.map((c) => (
-                                    <MenuItem key={c.id} value={String(c.id)}>
-                                        {c.name}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                            <Select
-                                value={platform}
-                                onChange={(e) => applyPlatform(e.target.value)}
-                                displayEmpty
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 180 }}
-                            >
-                                <MenuItem value="">{t('allPlatforms')}</MenuItem>
-                                {PLATFORM_VALUES.map((p) => (
-                                    <MenuItem key={p} value={p}>
-                                        {PLATFORM_LABELS[p]}
-                                    </MenuItem>
-                                ))}
-                                <MenuItem value="mapped">{t('mappedToAny')}</MenuItem>
-                                <MenuItem value="unmapped">{t('notMapped')}</MenuItem>
-                            </Select>
-                            <Select
-                                value={perPage}
-                                onChange={(e) => handlePerPageChange(Number(e.target.value))}
-                                size="small"
-                                sx={{ bgcolor: FIORI.surface, borderRadius: '8px', minWidth: 60, height: 34 }}
-                            >
-                                <MenuItem value={10}>10</MenuItem>
-                                <MenuItem value={15}>15</MenuItem>
-                                <MenuItem value={25}>25</MenuItem>
-                                <MenuItem value={50}>50</MenuItem>
-                            </Select>
-                            <Paper
-                                variant="outlined"
-                                sx={{ px: 1.5, py: 0.5, bgcolor: FIORI.surface, borderRadius: '8px', borderColor: FIORI.border }}
-                            >
-                                <Typography variant="body2">{currentPage}</Typography>
-                            </Paper>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {tGrid('pageOf', { lastPage })}
-                            </Typography>
-                            <Stack direction="row" spacing={0.2}>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(1)}>
-                                    <FirstPageIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)}>
-                                    <ChevronLeftIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton
-                                    size="small"
-                                    sx={fioriIconButtonSx}
-                                    disabled={currentPage >= lastPage}
-                                    onClick={() => goToPage(currentPage + 1)}
+                <MasterListPage
+                    title={tNav('productGroups')}
+                    addLabel={t('createProductGroup')}
+                    onAdd={canCreate ? () => router.visit('/catalog/product-groups/create') : undefined}
+                >
+                    <MasterListToolbar
+                        resultsLabel={tGrid('results', { count: groups.total })}
+                        search={search}
+                        onSearchChange={setSearch}
+                        searchPlaceholder={t('searchProductGroups')}
+                        end={
+                            <>
+                                <Select
+                                    style={{ minWidth: 200 }}
+                                    value={category}
+                                    accessibleName={t('category')}
+                                    onChange={(e) => applyCategory(e.detail.selectedOption.value ?? '')}
                                 >
-                                    <ChevronRightIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton size="small" sx={fioriIconButtonSx} disabled={currentPage >= lastPage} onClick={() => goToPage(lastPage)}>
-                                    <LastPageIcon fontSize="small" />
-                                </IconButton>
-                            </Stack>
-                        </Stack>
-                    </Stack>
+                                    <Option value="">{t('allCategories')}</Option>
+                                    {categories.map((c) => (
+                                        <Option key={c.id} value={String(c.id)}>
+                                            {c.name}
+                                        </Option>
+                                    ))}
+                                </Select>
+                                <Select
+                                    style={{ minWidth: 180 }}
+                                    value={platform}
+                                    accessibleName={t('mappedPlatforms')}
+                                    onChange={(e) => applyPlatform(e.detail.selectedOption.value ?? '')}
+                                >
+                                    <Option value="">{t('allPlatforms')}</Option>
+                                    {PLATFORM_VALUES.map((p) => (
+                                        <Option key={p} value={p}>
+                                            {PLATFORM_LABELS[p]}
+                                        </Option>
+                                    ))}
+                                    <Option value="mapped">{t('mappedToAny')}</Option>
+                                    <Option value="unmapped">{t('notMapped')}</Option>
+                                </Select>
+                            </>
+                        }
+                    />
 
                     <FioriResponsiveTable columns={columns} rows={groups.data} getRowKey={(row) => row.id} emptyMessage={t('noProductGroupsFound')} />
-                </Box>
+
+                    <MasterPagination currentPage={currentPage} lastPage={lastPage} label={tGrid('pageOf', { lastPage })} onPageChange={goToPage}>
+                        <Select
+                            style={{ width: '5rem' }}
+                            value={String(perPage)}
+                            accessibleName={tGrid('perPage')}
+                            onChange={(e) => handlePerPageChange(Number(e.detail.selectedOption.value))}
+                        >
+                            {[10, 15, 25, 50].map((n) => (
+                                <Option key={n} value={String(n)}>
+                                    {n}
+                                </Option>
+                            ))}
+                        </Select>
+                    </MasterPagination>
+                </MasterListPage>
 
                 <FioriMessageBox
                     open={deleteId !== null}

@@ -11,18 +11,18 @@ export default function AppSidebarLayout({
     breadcrumbs = [],
     actions,
 }: {
-    children: React.ReactNode;
+    children: ReactNode;
     breadcrumbs?: BreadcrumbItem[];
     actions?: ReactNode;
 }) {
     return (
-        <AppShell variant="sidebar">
-            <AppSidebar />
-            <AppContent variant="sidebar">
-                <AppSidebarHeader breadcrumbs={breadcrumbs} actions={actions} />
-                {children}
-            </AppContent>
+        <>
+            <AppShell header={<AppSidebarHeader />} sideContent={<AppSidebar />}>
+                <AppContent breadcrumbs={breadcrumbs} actions={actions}>
+                    {children}
+                </AppContent>
+            </AppShell>
             <FlashToast />
-        </AppShell>
+        </>
     );
 }

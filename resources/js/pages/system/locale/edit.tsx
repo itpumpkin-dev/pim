@@ -1,21 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    FormControlLabel,
-    Paper,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, Input, Title } from '@ui5/webcomponents-react';
 import { FormEvent } from 'react';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+
+import styles from './locale-pages.module.css';
 
 interface Locale {
     id: number;
@@ -56,98 +49,89 @@ export default function LocaleEdit({ localeModel }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Locale: ${localeModel.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
+            <form onSubmit={submit} className={styles.page}>
                 {/* Header Title & Actions */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: FIORI.textPrimary }}>
-                        Edit Locale
-                    </Typography>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            component={Link}
-                            href="/system/locales"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
+                <div className={styles.header}>
+                    <Title level="H3">Edit Locale</Title>
+                    <div className={styles.headerActions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/system/locales')}>
                             Back
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={fioriEmphasizedSx}
-                        >
+                        <Button type="Submit" design="Emphasized" icon="save" disabled={processing} loading={processing} loadingDelay={0}>
                             {processing ? 'Saving…' : 'Save Locale'}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Stack spacing={3} sx={{ maxWidth: 800 }}>
+                <div className={styles.formBody}>
                     {/* General Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, color: FIORI.textPrimary, mb: 2 }}>
-                            General
-                        </Typography>
-                        <Stack spacing={2}>
-                            <TextField
-                                label="Code *"
+                    <FioriFormGroup title="General">
+                        <FioriField
+                            label="Code"
+                            htmlFor="locale-code"
+                            required
+                            fullWidth
+                            valueState={valueStateOf(errors.code)}
+                            message={errors.code}
+                        >
+                            <Input
+                                id="locale-code"
+                                style={{ width: '100%' }}
                                 required
-                                fullWidth
-                                size="small"
                                 placeholder="e.g. th, en"
                                 value={data.code}
-                                onChange={(e) => setData('code', e.target.value)}
-                                error={Boolean(errors.code)}
-                                helperText={errors.code}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                onInput={(e) => setData('code', e.target.value)}
                             />
-                            <TextField
-                                label="Display Name"
-                                fullWidth
-                                size="small"
+                        </FioriField>
+                        <FioriField
+                            label="Display Name"
+                            htmlFor="locale-display-name"
+                            fullWidth
+                            valueState={valueStateOf(errors.display_name)}
+                            message={errors.display_name}
+                        >
+                            <Input
+                                id="locale-display-name"
+                                style={{ width: '100%' }}
                                 placeholder="e.g. ไทย, English"
                                 value={data.display_name}
-                                onChange={(e) => setData('display_name', e.target.value)}
-                                error={Boolean(errors.display_name)}
-                                helperText={errors.display_name}
+                                valueState={ui5ValueState(valueStateOf(errors.display_name))}
+                                onInput={(e) => setData('display_name', e.target.value)}
                             />
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {/* Status Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 1 }}>
-                            Status
-                        </Typography>
-                        <Stack direction="row" spacing={3}>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={data.enabled === true}
-                                        onChange={() => setData('enabled', true)}
-                                    />
-                                }
-                                label="Active"
+                    <FioriFormGroup title="Status">
+                        {/* สองช่องนี้ทำงานแบบ radio: คลิกช่องที่ติ๊กอยู่แล้วต้องไม่เอาติ๊กออก (preventDefault) */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+                            <CheckBox
+                                text="Active"
+                                checked={data.enabled === true}
+                                onChange={(e) => {
+                                    if (!e.target.checked) e.preventDefault();
+                                    setData('enabled', true);
+                                }}
                             />
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={data.enabled === false}
-                                        onChange={() => setData('enabled', false)}
-                                    />
-                                }
-                                label="Non Active"
+                            <CheckBox
+                                text="Non Active"
+                                checked={data.enabled === false}
+                                onChange={(e) => {
+                                    if (!e.target.checked) e.preventDefault();
+                                    setData('enabled', false);
+                                }}
                             />
-                        </Stack>
-                    </Paper>
-                </Stack>
+                        </div>
+                    </FioriFormGroup>
+                </div>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        Please correct the highlighted fields before saving.
-                    </Alert>
-                )}
-            </Box>
+                <FioriFormErrorSummary
+                    errors={errors}
+                    message="Please correct the highlighted fields before saving."
+                    style={{ marginTop: '1.5rem', maxWidth: 800 }}
+                />
+            </form>
         </AppLayout>
     );
 }

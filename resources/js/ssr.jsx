@@ -3,11 +3,7 @@ import {
 createInertiaApp
 } from '@inertiajs/react';
 import createServer from '@inertiajs/react/server';
-import { CssBaseline, ThemeProvider } from '@mui/material';
 import ReactDOMServer from 'react-dom/server';
-import { getTheme } from './theme';
-
-const theme = getTheme('light');
 
 createServer((page) =>
     createInertiaApp({
@@ -21,10 +17,7 @@ createServer((page) =>
         },
         // prettier-ignore
         setup: ({ App, props }) => (
-            <ThemeProvider theme={theme}>
-                <CssBaseline />
-                <App {...props} />
-            </ThemeProvider>
+            <App {...props} />
         ),
     }),
 );

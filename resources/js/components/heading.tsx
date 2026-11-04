@@ -1,16 +1,14 @@
-import { Box, Typography } from '@mui/material';
+import { Title } from '@ui5/webcomponents-react';
 
 export default function Heading({ title, description }: { title: string; description?: string }) {
     return (
-        <Box sx={{ mb: 4 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <div style={{ marginBottom: '2rem' }}>
+            <Title level="H2" size="H4" wrappingType="Normal">
                 {title}
-            </Typography>
+            </Title>
             {description && (
-                <Typography variant="body2" color="text.secondary">
-                    {description}
-                </Typography>
+                <div style={{ marginTop: '0.25rem', color: 'var(--sapContent_LabelColor)', fontSize: 'var(--sapFontSize)' }}>{description}</div>
             )}
-        </Box>
+        </div>
     );
 }

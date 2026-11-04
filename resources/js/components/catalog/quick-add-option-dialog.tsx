@@ -1,22 +1,11 @@
-import { router, usePage } from '@inertiajs/react';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
-import { KeyboardEvent, useState } from 'react';
-import { Trans, useTranslation } from 'react-i18next';
-import { useLocale } from '@/hooks/use-locale';
 import { FioriMessageStrip } from '@/components/fiori-form';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { useLocale } from '@/hooks/use-locale';
 import { type SharedData } from '@/types';
+import { router, usePage } from '@inertiajs/react';
+import { Bar, BusyIndicator, Button, Dialog, FileUploader, FlexBox, Input, Label, Text, Title } from '@ui5/webcomponents-react';
+import { KeyboardEvent, useId, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
 export interface ExistingOption {
     id: number;
@@ -128,12 +117,17 @@ export function QuickAddOptionDialog({
         );
     };
 
-    const submitOnEnter = (event: KeyboardEvent<HTMLDivElement>) => {
+    const submitOnEnter = (event: KeyboardEvent<HTMLElement>) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             submit();
         }
     };
+
+    const idPrefix = useId();
+    const labelInputId = `${idPrefix}-label`;
+    const colorInputId = `${idPrefix}-color`;
+    const imageInputId = `${idPrefix}-image`;
 
     // ลิสต์ดูอย่างเร็วนี้มีแค่ 2 คอลัมน์ (Code, Label) — โชว์ตลอดทั้งคู่เลย
     // ไม่มีอะไรต้องลดความสำคัญลง
@@ -153,89 +147,105 @@ export function QuickAddOptionDialog({
     ];
 
     return (
-        <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{t('quickAddOptionTitle', { attribute: attributeLabel })}</DialogTitle>
-            <DialogContent>
-                {masterSourceLabel && (
-                    <FioriMessageStrip severity="information" sx={{ mb: 2 }}>
-                        <Trans
-                            t={t}
-                            i18nKey="quickAddOptionMasterNotice"
-                            values={{ source: masterSourceLabel }}
-                            components={{ strong: <strong /> }}
+        <Dialog
+            open={open}
+            onClose={handleClose}
+            headerText={t('quickAddOptionTitle', { attribute: attributeLabel })}
+            initialFocus={labelInputId}
+            style={{ width: '37.5rem', maxWidth: '100%' }}
+            footer={
+                <Bar
+                    design="Footer"
+                    endContent={
+                        <>
+                            <Button design="Emphasized" onClick={submit} disabled={processing || !label.trim()}>
+                                {processing && <BusyIndicator active size="S" style={{ marginInlineEnd: '0.375rem', verticalAlign: 'middle' }} />}
+                                {processing ? t('quickAddOptionAdding') : t('quickAddOptionAdd')}
+                            </Button>
+                            <Button design="Transparent" onClick={handleClose} disabled={processing}>
+                                {t('quickAddOptionCancel')}
+                            </Button>
+                        </>
+                    }
+                />
+            }
+        >
+            {masterSourceLabel && (
+                <FioriMessageStrip severity="information" style={{ marginBottom: '1rem' }}>
+                    <Trans t={t} i18nKey="quickAddOptionMasterNotice" values={{ source: masterSourceLabel }} components={{ strong: <strong /> }} />
+                </FioriMessageStrip>
+            )}
+
+            {existingOptions.length > 0 && (
+                <>
+                    <Title level="H6" style={{ marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                        {t('quickAddOptionExistingOptions', { count: existingOptions.length })}
+                    </Title>
+                    <div
+                        style={{
+                            maxHeight: 220,
+                            marginBottom: '1rem',
+                            overflowY: 'auto',
+                            border: '1px solid var(--sapGroup_ContentBorderColor)',
+                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        }}
+                    >
+                        <FioriResponsiveTable
+                            variant="plain"
+                            size="small"
+                            columns={existingOptionColumns}
+                            rows={existingOptions}
+                            getRowKey={(option) => option.id}
                         />
-                    </FioriMessageStrip>
-                )}
+                    </div>
+                </>
+            )}
 
-                {existingOptions.length > 0 && (
-                    <>
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
-                            {t('quickAddOptionExistingOptions', { count: existingOptions.length })}
-                        </Typography>
-                        <Box sx={{ maxHeight: 220, mb: 2, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                            <FioriResponsiveTable
-                                variant="plain"
-                                size="small"
-                                columns={existingOptionColumns}
-                                rows={existingOptions}
-                                getRowKey={(option) => option.id}
-                            />
-                        </Box>
-                    </>
-                )}
-
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-                    {t('quickAddOptionNewOptionTitle')}
-                </Typography>
-                <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                    <TextField
-                        label={t('quickAddOptionLabelField', { locale: activeLocale?.display_name ?? activeLocale?.code ?? 'default' })}
-                        size="small"
+            <Title level="H6" style={{ marginBottom: '0.5rem' }}>
+                {t('quickAddOptionNewOptionTitle')}
+            </Title>
+            <FlexBox wrap="Wrap" alignItems="End" style={{ gap: '1rem', marginTop: '0.5rem' }}>
+                <FlexBox direction="Column" style={{ gap: '0.25rem', minWidth: 220, flex: 1 }}>
+                    <Label for={labelInputId} showColon={false}>
+                        {t('quickAddOptionLabelField', { locale: activeLocale?.display_name ?? activeLocale?.code ?? 'default' })}
+                    </Label>
+                    <Input
+                        id={labelInputId}
                         value={label}
-                        onChange={(e) => setLabel(e.target.value)}
+                        onInput={(e) => setLabel(e.target.value)}
                         onKeyDown={submitOnEnter}
-                        autoFocus
-                        sx={{ minWidth: 220, flex: 1 }}
+                        valueState={error ? 'Negative' : 'None'}
+                        style={{ width: '100%' }}
                     />
-                    {!masterSourceLabel && swatchType === 'color' && (
-                        <TextField
-                            label={t('quickAddOptionColorHex')}
-                            size="small"
+                </FlexBox>
+                {!masterSourceLabel && swatchType === 'color' && (
+                    <FlexBox direction="Column" style={{ gap: '0.25rem', width: 140 }}>
+                        <Label for={colorInputId} showColon={false}>
+                            {t('quickAddOptionColorHex')}
+                        </Label>
+                        <Input
+                            id={colorInputId}
                             value={swatchText}
-                            onChange={(e) => setSwatchText(e.target.value)}
+                            onInput={(e) => setSwatchText(e.target.value)}
                             onKeyDown={submitOnEnter}
-                            sx={{ width: 140 }}
+                            style={{ width: '100%' }}
                         />
-                    )}
-                    {!masterSourceLabel && swatchType === 'image' && (
-                        <TextField
-                            type="file"
-                            size="small"
-                            onChange={(e) => setSwatchImage((e.target as HTMLInputElement).files?.[0] ?? null)}
-                            slotProps={{ htmlInput: { accept: 'image/*' } }}
-                            sx={{ width: 220 }}
-                        />
-                    )}
-                    {error && (
-                        <Typography variant="caption" color="error">
-                            {error}
-                        </Typography>
-                    )}
-                </Stack>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={handleClose} disabled={processing}>
-                    {t('quickAddOptionCancel')}
-                </Button>
-                <Button
-                    variant="contained"
-                    onClick={submit}
-                    disabled={processing || !label.trim()}
-                    startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                >
-                    {processing ? t('quickAddOptionAdding') : t('quickAddOptionAdd')}
-                </Button>
-            </DialogActions>
+                    </FlexBox>
+                )}
+                {!masterSourceLabel && swatchType === 'image' && (
+                    <FileUploader
+                        id={imageInputId}
+                        accept="image/*"
+                        onChange={(e) => setSwatchImage(e.detail.files?.[0] ?? null)}
+                        style={{ width: 220 }}
+                    />
+                )}
+            </FlexBox>
+            {error && (
+                <Text style={{ display: 'block', marginTop: '0.5rem', fontSize: 'var(--sapFontSmallSize)', color: 'var(--sapNegativeTextColor)' }}>
+                    {error}
+                </Text>
+            )}
         </Dialog>
     );
 }

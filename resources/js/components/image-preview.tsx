@@ -1,7 +1,8 @@
-import { Icon } from '@/components/icon';
-import { FIORI } from '@/lib/fiori-style';
-import { Box, Dialog, IconButton } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import { Button, Dialog } from '@ui5/webcomponents-react';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+
+import styles from './image-preview.module.css';
 
 /**
  * เปิดรูปเต็มจอใน lightbox โดยกดที่ thumbnail ในตาราง list ต่างๆ (Products,
@@ -21,30 +22,23 @@ export function ImagePreviewProvider({ children }: { children: ReactNode }) {
     return (
         <ImagePreviewContext.Provider value={open}>
             {children}
-            <Dialog open={!!preview} onClose={() => setPreview(null)} maxWidth="md">
-                <IconButton
-                    onClick={() => setPreview(null)}
-                    aria-label="Close"
-                    sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        zIndex: 1,
-                        bgcolor: 'rgba(0,0,0,0.4)',
-                        color: '#fff',
-                        '&:hover': { bgcolor: 'rgba(0,0,0,0.6)' },
-                    }}
-                >
-                    <Icon name="close" fontSize="small" />
-                </IconButton>
-                {preview && (
-                    <Box
-                        component="img"
-                        src={preview.src}
-                        alt={preview.alt}
-                        sx={{ display: 'block', maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain' }}
+            <Dialog
+                open={!!preview}
+                onClose={() => setPreview(null)}
+                accessibleName={preview?.alt || 'Image preview'}
+                style={{ maxWidth: 'min(900px, calc(100vw - 2rem))', padding: 0 }}
+            >
+                <div style={{ position: 'relative' }}>
+                    <Button
+                        design="Transparent"
+                        icon="decline"
+                        tooltip="Close"
+                        accessibleName="Close"
+                        className={styles.dialogClose}
+                        onClick={() => setPreview(null)}
                     />
-                )}
+                    {preview && <img src={preview.src} alt={preview.alt} className={styles.previewImage} />}
+                </div>
             </Dialog>
         </ImagePreviewContext.Provider>
     );
@@ -64,33 +58,28 @@ export function ClickableThumbnail({
     src: string | null | undefined;
     alt?: string;
     size?: number;
+    /** corner radius in 4px steps (kept from the old MUI theme-spacing unit) */
     radius?: number;
     fallback?: ReactNode;
 }) {
     const openPreview = useImagePreview();
-
-    const frameSx = {
-        width: size,
-        height: size,
-        borderRadius: radius,
-        border: `1px solid ${FIORI.border}`,
-        bgcolor: 'grey.100',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        flexShrink: 0,
-    } as const;
+    const frameStyle = { width: size, height: size, borderRadius: radius * 4 };
 
     if (!src) {
-        return <Box sx={frameSx}>{fallback}</Box>;
+        return (
+            <div className={styles.frame} style={frameStyle}>
+                {fallback}
+            </div>
+        );
     }
 
     return (
-        <Box
+        <div
             role="button"
             tabIndex={0}
             aria-label={alt || 'View image'}
+            className={`${styles.frame} ${styles.clickable}`}
+            style={frameStyle}
             onClick={(e) => {
                 e.stopPropagation();
                 openPreview(src, alt);
@@ -101,15 +90,8 @@ export function ClickableThumbnail({
                     openPreview(src, alt);
                 }
             }}
-            sx={{
-                ...frameSx,
-                cursor: 'zoom-in',
-                transition: 'box-shadow 0.15s ease',
-                '&:hover': { boxShadow: `0 0 0 2px ${FIORI.brand}` },
-                '&:focus-visible': { outline: `2px solid ${FIORI.brand}`, outlineOffset: 1 },
-            }}
         >
-            <Box component="img" src={src} alt={alt} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </Box>
+            <img src={src} alt={alt} className={styles.thumb} />
+        </div>
     );
 }

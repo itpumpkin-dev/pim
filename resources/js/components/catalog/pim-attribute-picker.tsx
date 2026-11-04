@@ -1,27 +1,23 @@
-import { FIORI } from '@/lib/fiori-style';
-import CloseIcon from '@mui/icons-material/Close';
-import SearchIcon from '@mui/icons-material/Search';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/search.js';
 import {
-    Autocomplete,
-    Box,
+    Bar,
+    BusyIndicator,
     Button,
-    Chip,
-    CircularProgress,
     Dialog,
-    DialogContent,
-    DialogTitle,
-    IconButton,
-    InputAdornment,
+    FlexBox,
+    Icon,
+    Input,
     List,
-    ListItemButton,
-    ListItemText,
-    Stack,
-    TextField,
-    ToggleButton,
-    ToggleButtonGroup,
-    Typography,
-} from '@mui/material';
+    ListItemStandard,
+    SegmentedButton,
+    SegmentedButtonItem,
+    Text,
+    Title,
+} from '@ui5/webcomponents-react';
 import { useEffect, useMemo, useState } from 'react';
+
+import { AsyncSearchComboBox } from '@/components/catalog/async-search-combo-box';
 
 export interface PimAttributeOption {
     id: number;
@@ -45,36 +41,22 @@ interface PimAttributeRow extends PimAttributeOption {
 
 type SourceFilter = 'all' | 'pim' | 'shopee' | 'lazada' | 'tiktok';
 
-const PLATFORM_CHIP: Record<'shopee' | 'lazada' | 'tiktok', { label: string; color: string; bg: string }> = {
-    shopee: { label: 'Shopee', color: FIORI.brand, bg: FIORI.brandBg },
-    lazada: { label: 'Lazada', color: FIORI.warning, bg: FIORI.warningBg },
-    tiktok: { label: 'TikTok', color: FIORI.success, bg: FIORI.successBg },
+/** ป้ายบอกที่มาของ attribute (ท้ายแถวในหน้าต่างรายการทั้งหมด) — สร้างเองในระบบ
+ * PIM ตามปกติ ("PIM", ไม่มีสี) หรือถูกสร้างอัตโนมัติตอนกด "สร้าง/อัปเดต
+ * Attribute Family" ของแพลตฟอร์มไหน (สีตามแพลตฟอร์มนั้น) */
+const PLATFORM_CHIP: Record<'shopee' | 'lazada' | 'tiktok', { label: string; state: 'Information' | 'Critical' | 'Positive' }> = {
+    shopee: { label: 'Shopee', state: 'Information' },
+    lazada: { label: 'Lazada', state: 'Critical' },
+    tiktok: { label: 'TikTok', state: 'Positive' },
 };
 
-/** chip เล็กๆ ท้ายตัวเลือกในดรอปดาวน์/หน้าต่างรายการทั้งหมด บอกว่า attribute
- * ตัวนี้มาจากไหน — สร้างเองในระบบ PIM ตามปกติ (เทา, "PIM") หรือถูกสร้าง
- * อัตโนมัติตอนกด "สร้าง/อัปเดต Attribute Family" ของแพลตฟอร์มไหน (สีตาม
- * แพลตฟอร์มนั้น) */
-function AttributeSourceChip({ platform }: { platform: PimAttributeOption['auto_created_platform'] }) {
-    if (platform === undefined) return null;
-
-    const meta = platform ? PLATFORM_CHIP[platform] : null;
-
-    return (
-        <Chip
-            label={meta ? meta.label : 'PIM'}
-            size="small"
-            sx={{
-                height: 18,
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                flexShrink: 0,
-                bgcolor: meta ? meta.bg : FIORI.neutralBg,
-                color: meta ? meta.color : FIORI.textSecondary,
-            }}
-        />
-    );
-}
+const SOURCE_FILTERS: { value: SourceFilter; label: string }[] = [
+    { value: 'all', label: 'ทั้งหมด' },
+    { value: 'pim', label: 'PIM' },
+    { value: 'shopee', label: 'Shopee' },
+    { value: 'lazada', label: 'Lazada' },
+    { value: 'tiktok', label: 'TikTok' },
+];
 
 /**
  * หน้าต่าง "ดู attributes ทั้งหมด" — ทางเลือกแทนการค้นหาทีละคำใน Autocomplete
@@ -129,88 +111,81 @@ function PimAttributeBrowserDialog({
         const needle = search.trim().toLowerCase();
 
         return attributes.filter((attr) => {
-            const matchesSearch =
-                needle === '' || attr.name.toLowerCase().includes(needle) || attr.code.toLowerCase().includes(needle);
-            const matchesSource =
-                source === 'all' ||
-                (source === 'pim' ? !attr.auto_created_platform : attr.auto_created_platform === source);
+            const matchesSearch = needle === '' || attr.name.toLowerCase().includes(needle) || attr.code.toLowerCase().includes(needle);
+            const matchesSource = source === 'all' || (source === 'pim' ? !attr.auto_created_platform : attr.auto_created_platform === source);
 
             return matchesSearch && matchesSource;
         });
     }, [attributes, search, source]);
 
     return (
-        <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { height: '80vh' } }}>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                Attributes ทั้งหมด
-                <IconButton size="small" onClick={onClose}>
-                    <CloseIcon fontSize="small" />
-                </IconButton>
-            </DialogTitle>
-            <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', p: 0 }}>
-                <Stack spacing={1.5} sx={{ p: 2 }}>
-                    <TextField
-                        size="small"
-                        autoFocus
+        <Dialog
+            open={open}
+            onClose={onClose}
+            style={{ width: '37.5rem', maxWidth: '100%', height: '80vh' }}
+            header={
+                <Bar
+                    startContent={<Title level="H5">Attributes ทั้งหมด</Title>}
+                    endContent={<Button design="Transparent" icon="decline" tooltip="Close" accessibleName="Close" onClick={onClose} />}
+                />
+            }
+        >
+            <FlexBox direction="Column" style={{ height: '100%', margin: '-1rem' }}>
+                <FlexBox direction="Column" style={{ gap: '0.75rem', padding: '1rem' }}>
+                    <Input
                         placeholder="ค้นหาด้วยชื่อหรือโค้ด..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                </InputAdornment>
-                            ),
-                        }}
+                        onInput={(e) => setSearch(e.target.value)}
+                        icon={<Icon name="search" />}
+                        style={{ width: '100%' }}
                     />
-                    <ToggleButtonGroup
-                        size="small"
-                        exclusive
-                        value={source}
-                        onChange={(_, val: SourceFilter | null) => val && setSource(val)}
-                        sx={{ flexWrap: 'wrap' }}
+                    <SegmentedButton
+                        style={{ flexWrap: 'wrap' }}
+                        onSelectionChange={(e) => {
+                            const val = (e.detail.selectedItems[0] as HTMLElement | undefined)?.dataset.value as SourceFilter | undefined;
+                            if (val) setSource(val);
+                        }}
                     >
-                        <ToggleButton value="all">ทั้งหมด</ToggleButton>
-                        <ToggleButton value="pim">PIM</ToggleButton>
-                        <ToggleButton value="shopee">Shopee</ToggleButton>
-                        <ToggleButton value="lazada">Lazada</ToggleButton>
-                        <ToggleButton value="tiktok">TikTok</ToggleButton>
-                    </ToggleButtonGroup>
-                </Stack>
+                        {SOURCE_FILTERS.map((opt) => (
+                            <SegmentedButtonItem key={opt.value} data-value={opt.value} selected={source === opt.value}>
+                                {opt.label}
+                            </SegmentedButtonItem>
+                        ))}
+                    </SegmentedButton>
+                </FlexBox>
 
-                <Box sx={{ flex: 1, overflowY: 'auto', borderTop: `1px solid ${FIORI.border}` }}>
+                <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }}>
                     {loading ? (
-                        <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
-                            <CircularProgress size={28} />
-                        </Stack>
+                        <FlexBox alignItems="Center" justifyContent="Center" style={{ height: '100%' }}>
+                            <BusyIndicator active size="M" />
+                        </FlexBox>
                     ) : filtered.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
+                        <Text style={{ display: 'block', textAlign: 'center', padding: '2rem 0', color: 'var(--sapContent_LabelColor)' }}>
                             ไม่พบ attribute ที่ตรงกับตัวกรอง
-                        </Typography>
+                        </Text>
                     ) : (
-                        <List disablePadding>
-                            {filtered.map((attr) => (
-                                <ListItemButton
-                                    key={attr.id}
-                                    onClick={() => {
-                                        onSelect(attr);
-                                        onClose();
-                                    }}
-                                    sx={{ py: 1 }}
-                                >
-                                    <ListItemText
-                                        primary={attr.name}
-                                        secondary={`${attr.code} · ${attr.type}`}
-                                        primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
-                                        secondaryTypographyProps={{ variant: 'caption' }}
+                        <List>
+                            {filtered.map((attr) => {
+                                const meta = attr.auto_created_platform ? PLATFORM_CHIP[attr.auto_created_platform] : null;
+
+                                return (
+                                    <ListItemStandard
+                                        key={attr.id}
+                                        text={attr.name}
+                                        description={`${attr.code} · ${attr.type}`}
+                                        additionalText={attr.auto_created_platform === undefined ? undefined : meta ? meta.label : 'PIM'}
+                                        additionalTextState={meta ? meta.state : 'None'}
+                                        onClick={() => {
+                                            onSelect(attr);
+                                            onClose();
+                                        }}
                                     />
-                                    <AttributeSourceChip platform={attr.auto_created_platform} />
-                                </ListItemButton>
-                            ))}
+                                );
+                            })}
                         </List>
                     )}
-                </Box>
-            </DialogContent>
+                </div>
+            </FlexBox>
         </Dialog>
     );
 }
@@ -274,55 +249,28 @@ export function PimAttributePicker({
     }, [query, open, typeFilter?.join(',')]);
 
     return (
-        <Box>
-            <Autocomplete
-                size="small"
-                disabled={disabled}
-                open={open}
-                onOpen={() => setOpen(true)}
-                onClose={() => setOpen(false)}
-                options={results}
-                loading={loading}
-                filterOptions={(options) => options}
-                getOptionLabel={(opt) => opt.name}
-                isOptionEqualToValue={(opt, val) => opt.id === val.id}
+        <div>
+            <AsyncSearchComboBox
                 value={value}
-                onChange={(_, val) => onChange(val)}
-                onInputChange={(_, val, reason) => {
-                    if (reason === 'input') setQuery(val);
-                }}
-                renderOption={(props, option) => (
-                    <Stack
-                        component="li"
-                        {...props}
-                        key={option.id}
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        spacing={1}
-                    >
-                        <Typography variant="body2" noWrap>
-                            {option.name}
-                        </Typography>
-                        <AttributeSourceChip platform={option.auto_created_platform} />
-                    </Stack>
-                )}
-                renderInput={(params) => <TextField {...params} placeholder={placeholder} />}
+                onChange={onChange}
+                results={results}
+                loading={loading}
+                getKey={(opt) => opt.id}
+                getLabel={(opt) => opt.name}
+                onQueryChange={setQuery}
+                onActivate={() => setOpen(true)}
+                placeholder={placeholder}
+                disabled={disabled}
             />
             <Button
-                size="small"
+                design="Transparent"
                 disabled={disabled}
                 onClick={() => setBrowserOpen(true)}
-                sx={{ mt: 0.25, p: 0, minWidth: 0, textTransform: 'none', fontSize: '0.75rem', fontWeight: 600 }}
+                style={{ marginTop: '0.125rem', fontSize: 'var(--sapFontSmallSize)' }}
             >
                 ดู attributes ทั้งหมด
             </Button>
-            <PimAttributeBrowserDialog
-                open={browserOpen}
-                onClose={() => setBrowserOpen(false)}
-                onSelect={onChange}
-                typeFilter={typeFilter}
-            />
-        </Box>
+            <PimAttributeBrowserDialog open={browserOpen} onClose={() => setBrowserOpen(false)} onSelect={onChange} typeFilter={typeFilter} />
+        </div>
     );
 }

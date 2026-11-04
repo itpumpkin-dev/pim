@@ -1,0 +1,160 @@
+/* Layout for the read-only product page (show.tsx). Breakpoint md = 900px. */
+
+.page {
+    background: var(--sapBackgroundColor);
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.gutter {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.topTabs {
+    background: var(--sapGroup_ContentBackground);
+}
+
+.header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    background: var(--sapGroup_ContentBackground);
+    border-bottom: 1px solid var(--sapGroup_ContentBorderColor);
+    margin-bottom: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.headerTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.scrollBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 3rem;
+}
+
+.groupTabBar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin-bottom: 0.5rem;
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    padding: 0 1rem;
+}
+
+.columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+}
+
+.card {
+    background: var(--sapGroup_ContentBackground);
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+    border-radius: var(--sapElement_BorderCornerRadius, 0.5rem);
+    box-shadow: var(--sapContent_Shadow0);
+    padding: 1.5rem;
+}
+
+.groupHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.groupHeaderOpen {
+    margin-bottom: 1.25rem;
+}
+
+.cardTitle {
+    margin-bottom: 1rem;
+}
+
+.infoLabel {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: var(--sapFontSmallSize);
+    font-weight: 600;
+    color: var(--sapContent_LabelColor);
+}
+
+.bodyText {
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+    word-break: break-word;
+}
+
+.richText {
+    font-size: var(--sapFontSize);
+    color: var(--sapTextColor);
+}
+
+.richText p {
+    margin: 0;
+}
+
+.muted {
+    font-size: var(--sapFontSize);
+    color: var(--sapContent_LabelColor);
+    font-style: italic;
+}
+
+.empty {
+    font-size: var(--sapFontSize);
+    color: var(--sapContent_DisabledTextColor, var(--sapContent_LabelColor));
+    font-style: italic;
+}
+
+.wrapRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.thumb {
+    object-fit: cover;
+    border-radius: 0.5rem;
+    border: 1px solid var(--sapGroup_ContentBorderColor);
+}
+
+@media (min-width: 900px) {
+    .gutter {
+        padding-left: 2rem;
+        padding-right: 2rem;
+    }
+
+    .header {
+        flex-direction: row;
+    }
+
+    .columns {
+        grid-template-columns: minmax(0, 8.5fr) minmax(0, 3.5fr);
+    }
+}

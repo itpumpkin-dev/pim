@@ -5,58 +5,63 @@ import { ProductCard } from '@/components/product-card';
 import SplashScreen from '@/components/splash-screen';
 import { productCsvHeaders, productToCsvRow, type IconType, type Product } from '@/data/products';
 import { reloadStorefrontLists, useStorefrontWatcher } from '@/hooks/use-storefront-watcher';
-import { getCategoryIcon } from '@/lib/category-icon';
+import { getCategoryIconName } from '@/lib/category-icon';
 import { downloadCsv } from '@/lib/csv';
+import { sapIcon } from '@/lib/sap-icon';
 import { trackEvent } from '@/lib/track-event';
-import { getFioriShell } from '@/theme';
 import { type SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
-import ConstructionIcon from '@mui/icons-material/Construction';
-import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
-import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import LocalOfferOutlinedIcon from '@mui/icons-material/LocalOfferOutlined';
-import LoginIcon from '@mui/icons-material/Login';
-import ScienceIcon from '@mui/icons-material/Science';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    alpha,
-    Box,
-    Button,
-    Chip,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-    useMediaQuery,
-    useTheme,
-} from '@mui/material';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/business-objects-experience.js';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/lab.js';
+import '@ui5/webcomponents-icons/dist/log.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-left.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-right.js';
+import '@ui5/webcomponents-icons/dist/tag.js';
+import '@ui5/webcomponents-icons/dist/tools-opportunity.js';
+import { Button, Icon, Input, Text, Title } from '@ui5/webcomponents-react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import styles from './home.module.css';
 
 // How many product cards to render on first paint, and how many more each
 // time the load-more sentinel scrolls into view. The full result set can be
-// 150+ products — rendering every MUI card up front is the single biggest
+// 150+ products — rendering every card up front is the single biggest
 // main-thread cost on this page.
 const INITIAL_VISIBLE = 24;
 const LOAD_MORE_STEP = 24;
 
-const SLIDE_ICONS: IconType[] = [ScienceIcon, ConstructionIcon, LocalOfferOutlinedIcon];
+// SAP-icons names (side-effect imported above): science / construction / offer
+const SLIDE_ICONS = ['lab', 'tools-opportunity', 'tag'];
 const SLIDE_GRADIENTS = [
     'linear-gradient(135deg, #334155 0%, #1e293b 100%)',
     'linear-gradient(135deg, #06B6D4 0%, #0891B2 100%)',
     'linear-gradient(135deg, #EA580C 0%, #F97316 100%)',
 ];
 
+// Below `sm` (600px) — same breakpoint the MUI theme used.
+const COMPACT_QUERY = '(max-width: 599.98px)';
+
+function useMediaQuery(query: string): boolean {
+    return useSyncExternalStore(
+        (onChange) => {
+            if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+            const mql = window.matchMedia(query);
+            mql.addEventListener('change', onChange);
+            return () => mql.removeEventListener('change', onChange);
+        },
+        () => (typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false),
+        () => false,
+    );
+}
+
 function HeroCarousel() {
     const { t } = useTranslation('home');
     const [index, setIndex] = useState(0);
 
-    const slides: { title: string; subtitle: string; icon: IconType; gradient: string }[] = useMemo(
+    const slides: { title: string; subtitle: string; icon: string; gradient: string }[] = useMemo(
         () =>
             [1, 2, 3].map((n) => ({
                 title: t(`slide${n}Title`),
@@ -75,92 +80,34 @@ function HeroCarousel() {
     const go = (delta: number) => setIndex((current) => (current + delta + slides.length) % slides.length);
 
     const slide = slides[index];
-    const SlideIcon = slide.icon;
 
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                position: 'relative',
-                overflow: 'hidden',
-                borderRadius: 3,
-                minHeight: 220,
-                display: 'flex',
-                alignItems: 'center',
-                background: slide.gradient,
-                transition: 'background 0.6s ease',
-                color: '#fff',
-                px: { xs: 3, md: 6 },
-            }}
-        >
-            <Stack spacing={2} sx={{ zIndex: 1, maxWidth: 480 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                    {slide.title}
-                </Typography>
-                <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                    {slide.subtitle}
-                </Typography>
-            </Stack>
+        <div className={styles.hero} style={{ background: slide.gradient }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', zIndex: 1, maxWidth: 480 }}>
+                <div style={{ fontSize: '2.125rem', fontWeight: 700, lineHeight: 1.235 }}>{slide.title}</div>
+                <div style={{ fontSize: '1rem', opacity: 0.9, lineHeight: 1.5 }}>{slide.subtitle}</div>
+            </div>
 
-            <SlideIcon
-                sx={{
-                    position: 'absolute',
-                    right: { xs: -30, md: 20 },
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    fontSize: { xs: 160, md: 220 },
-                    opacity: 0.18,
-                }}
-            />
+            <Icon name={slide.icon} className={styles.heroIcon} />
 
-            <IconButton
-                onClick={() => go(-1)}
-                size="small"
-                sx={{
-                    position: 'absolute',
-                    left: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#fff',
-                    bgcolor: alpha('#000', 0.15),
-                    '&:hover': { bgcolor: alpha('#000', 0.3) },
-                }}
-            >
-                <ArrowBackIosNewIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-                onClick={() => go(1)}
-                size="small"
-                sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#fff',
-                    bgcolor: alpha('#000', 0.15),
-                    '&:hover': { bgcolor: alpha('#000', 0.3) },
-                }}
-            >
-                <ArrowForwardIosIcon fontSize="small" />
-            </IconButton>
+            <button type="button" className={styles.heroArrow} style={{ left: 8 }} onClick={() => go(-1)} aria-label="Previous slide">
+                <Icon name="slim-arrow-left" style={{ width: 18, height: 18, color: '#fff' }} />
+            </button>
+            <button type="button" className={styles.heroArrow} style={{ right: 8 }} onClick={() => go(1)} aria-label="Next slide">
+                <Icon name="slim-arrow-right" style={{ width: 18, height: 18, color: '#fff' }} />
+            </button>
 
-            <Stack direction="row" spacing={1} sx={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}>
                 {slides.map((_, i) => (
-                    <Box
+                    <div
                         key={i}
+                        className={styles.dot}
                         onClick={() => setIndex(i)}
-                        sx={{
-                            width: i === index ? 20 : 8,
-                            height: 8,
-                            borderRadius: 4,
-                            bgcolor: i === index ? '#fff' : alpha('#fff', 0.5),
-                            cursor: 'pointer',
-                            transition: 'width 0.3s ease',
-                        }}
+                        style={{ width: i === index ? 20 : 8, background: i === index ? '#fff' : 'rgba(255,255,255,0.5)' }}
                     />
                 ))}
-            </Stack>
-        </Paper>
+            </div>
+        </div>
     );
 }
 
@@ -202,74 +149,54 @@ function CategoryStrip({
         el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: 'smooth' });
     };
 
-    const arrowSx = (side: 'left' | 'right') => ({
-        position: 'absolute' as const,
+    const fadeStyle = (side: 'left' | 'right') => ({
         [side]: 0,
-        top: 'calc(50% - 4px)',
-        transform: 'translateY(-50%)',
-        zIndex: 2,
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
-        boxShadow: 2,
-        '&:hover': { bgcolor: 'action.hover' },
-    });
-
-    const fadeSx = (side: 'left' | 'right') => ({
-        position: 'absolute' as const,
-        [side]: 0,
-        top: 0,
-        bottom: 8,
-        width: 64,
-        pointerEvents: 'none' as const,
-        zIndex: 1,
-        background: (theme: { palette: { background: { default: string } } }) =>
-            `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, ${theme.palette.background.default}, transparent)`,
+        background: `linear-gradient(to ${side === 'left' ? 'right' : 'left'}, var(--sapBackgroundColor), transparent)`,
     });
 
     return (
-        <Box sx={{ position: 'relative' }}>
-            {canScrollLeft && <Box sx={fadeSx('left')} />}
+        <div style={{ position: 'relative' }}>
+            {canScrollLeft && <div className={styles.stripFade} style={fadeStyle('left')} />}
             {canScrollLeft && (
-                <IconButton size="small" onClick={() => scrollByPage(-1)} aria-label={t('scrollLeft')} sx={arrowSx('left')}>
-                    <ArrowBackIosNewIcon fontSize="small" />
-                </IconButton>
+                <Button
+                    design="Transparent"
+                    icon="slim-arrow-left"
+                    onClick={() => scrollByPage(-1)}
+                    accessibleName={t('scrollLeft')}
+                    tooltip={t('scrollLeft')}
+                    className={styles.stripArrow}
+                    style={{ left: 0 }}
+                />
             )}
 
-            <Stack
-                ref={scrollRef}
-                onScroll={updateArrows}
-                direction="row"
-                spacing={1.5}
-                sx={{ overflowX: 'auto', pb: 1, '&::-webkit-scrollbar': { height: 6 } }}
-            >
-                {categories.map(({ label, icon: Icon }) => (
-                    <Chip
+            <div ref={scrollRef} onScroll={updateArrows} className={styles.stripScroller}>
+                {categories.map(({ label, icon: CategoryIcon }) => (
+                    <button
                         key={label}
-                        icon={<Icon fontSize="small" />}
-                        label={label}
-                        variant={selected === label ? 'filled' : 'outlined'}
-                        color={selected === label ? 'primary' : 'default'}
+                        type="button"
+                        aria-pressed={selected === label}
+                        className={`${styles.chip} ${selected === label ? styles.chipSelected : ''}`}
                         onClick={() => onSelect(label)}
-                        sx={{
-                            flexShrink: 0,
-                            py: 2.5,
-                            px: 0.5,
-                            borderRadius: 3,
-                            transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 },
-                        }}
-                    />
+                    >
+                        <CategoryIcon fontSize="small" style={{ color: 'currentColor' }} />
+                        {label}
+                    </button>
                 ))}
-            </Stack>
+            </div>
 
-            {canScrollRight && <Box sx={fadeSx('right')} />}
+            {canScrollRight && <div className={styles.stripFade} style={fadeStyle('right')} />}
             {canScrollRight && (
-                <IconButton size="small" onClick={() => scrollByPage(1)} aria-label={t('scrollRight')} sx={arrowSx('right')}>
-                    <ArrowForwardIosIcon fontSize="small" />
-                </IconButton>
+                <Button
+                    design="Transparent"
+                    icon="slim-arrow-right"
+                    onClick={() => scrollByPage(1)}
+                    accessibleName={t('scrollRight')}
+                    tooltip={t('scrollRight')}
+                    className={styles.stripArrow}
+                    style={{ right: 0 }}
+                />
             )}
-        </Box>
+        </div>
     );
 }
 
@@ -284,12 +211,10 @@ export default function Home({
 }) {
     const { t } = useTranslation('home');
     const { auth } = usePage<SharedData>().props;
-    const theme = useTheme();
-    const shell = getFioriShell(theme.palette.mode);
     // Below `sm` the shell bar has no room for a full-width wordmark + button
     // label — collapse the wordmark and swap the CTA for an icon-only button
     // (same "shrink to icon" convention as ShellSearch/AppSidebarHeader).
-    const isCompact = useMediaQuery(theme.breakpoints.down('sm'));
+    const isCompact = useMediaQuery(COMPACT_QUERY);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
@@ -316,7 +241,7 @@ export default function Home({
         };
     }, []);
 
-    const categoryOptions = useMemo(() => categories.map((label) => ({ label, icon: getCategoryIcon(label) })), [categories]);
+    const categoryOptions = useMemo(() => categories.map((label) => ({ label, icon: sapIcon(getCategoryIconName(label)) })), [categories]);
     const popularIds = useMemo(() => new Set(topViewedProducts.map((product) => product.id)), [topViewedProducts]);
 
     useStorefrontWatcher(reloadStorefrontLists);
@@ -363,153 +288,71 @@ export default function Home({
 
     const actions = !auth.user ? (
         isCompact ? (
-            <Tooltip title={t('signIn')}>
-                <IconButton
-                    component={Link}
-                    href={route('login')}
-                    aria-label={t('signIn')}
-                    sx={{
-                        width: 36,
-                        height: 36,
-                        color: '#fff',
-                        // background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                        '&:hover': { background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)' },
-                    }}
-                >
-                    <LoginIcon fontSize="small" />
-                </IconButton>
-            </Tooltip>
-        ) : (
             <Button
-                component={Link}
-                href={route('login')}
-                // variant="contained"
-                startIcon={<LoginIcon />}
-                sx={{
-                    borderRadius: '50px',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    px: 2,
-                    py: 1,
-                    color: '-moz-initial',
-                    // background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                    transition: 'all 0.2s ease-in-out',
-                    // '&:hover': {
-                    //     transform: 'translateY(-2px)',
-                    //     background: 'linear-gradient(135deg, #FB923C 0%, #F97316 100%)',
-                    // },
-                }}
-            >
+                design="Transparent"
+                icon="log"
+                tooltip={t('signIn')}
+                accessibleName={t('signIn')}
+                onClick={() => router.visit(route('login'))}
+                style={{ color: 'var(--sapShell_InteractiveTextColor)' }}
+            />
+        ) : (
+            <Button design="Transparent" icon="log" onClick={() => router.visit(route('login'))} style={{ borderRadius: '50px', fontWeight: 600 }}>
                 {t('signIn')}
             </Button>
         )
     ) : isCompact ? (
-        <Tooltip title={t('goToDashboard')}>
-            <IconButton
-                component={Link}
-                href={route('dashboard')}
-                aria-label={t('goToDashboard')}
-                sx={{
-                    width: 36,
-                    height: 36,
-                    color: shell.interactiveColor,
-                    border: `1px solid ${shell.interactiveColor}`,
-                    '&:hover': { bgcolor: shell.hoverBg },
-                }}
-            >
-                <DashboardOutlinedIcon fontSize="small" />
-            </IconButton>
-        </Tooltip>
-    ) : (
-        // Shell-bar CTA styled from the same getFioriShell() tokens as the
-        // rest of the bar (interactiveColor / hoverBg / borderRadius) instead
-        // of MUI's generic outlined-primary — so it reads as part of the
-        // shell rather than an unrelated page button, matching the compact
-        // icon variant's colors above.
         <Button
-            component={Link}
-            href={route('dashboard')}
-            variant="outlined"
-            startIcon={<DashboardOutlinedIcon fontSize="small" />}
-            sx={{
-                borderRadius: `${shell.borderRadius}px`,
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 2,
-                py: 0.75,
-                color: shell.interactiveColor,
-                borderColor: shell.interactiveColor,
-                transition: 'all 0.2s ease-in-out',
-                '&:hover': {
-                    borderColor: shell.interactiveColor,
-                    bgcolor: shell.hoverBg,
-                    transform: 'translateY(-2px)',
-                },
-            }}
-        >
+            icon="business-objects-experience"
+            tooltip={t('goToDashboard')}
+            accessibleName={t('goToDashboard')}
+            onClick={() => router.visit(route('dashboard'))}
+        />
+    ) : (
+        // Shell-bar CTA — a standard UI5 Button so it reads as part of the
+        // Horizon shell rather than an unrelated page button, matching the
+        // compact icon variant above.
+        <Button icon="business-objects-experience" onClick={() => router.visit(route('dashboard'))} style={{ fontWeight: 600 }}>
             {t('goToDashboard')}
         </Button>
     );
 
     return (
-        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <div className={styles.root}>
             <Head title="Home" />
             {showSplash && <SplashScreen exiting={splashExiting} />}
-            {/* Fiori Horizon shell bar — same getFioriShell() tokens as
+            {/* Fiori Horizon shell bar — same --sapShell* tokens as
                 <AppSidebarHeader>, so the storefront header and the admin
                 header read as one design system rather than two. */}
-            <Box
-                component="header"
-                sx={{
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: (t) => t.zIndex.appBar,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    height: shell.height,
-                    minHeight: shell.height,
-                    px: { xs: 1.5, sm: 2.5, md: 4 },
-                    bgcolor: shell.color,
-                    color: shell.textColor,
-                    boxShadow: shell.shadow,
-                }}
-            >
-                <Box
-                    component={Link}
-                    href="/"
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit', minWidth: 0, flexShrink: 0 }}
-                >
-                    <Box sx={{ color: 'primary.main', display: 'flex', flexShrink: 0 }}>
+            <header className={styles.shellBar}>
+                <Link href="/" className={styles.brandLink}>
+                    <span style={{ color: 'var(--sapBrandColor)', display: 'flex', flexShrink: 0 }}>
                         <AppLogoIcon style={{ width: 40, height: 40, fill: 'currentColor' }} />
-                    </Box>
+                    </span>
                     {/* Wordmark collapses below `sm` — the logo mark alone carries
                         the brand there, freeing room for the language switcher +
                         CTA so they don't overlap on a phone-width shell bar. */}
-                    <Typography variant="h6" noWrap sx={{ fontWeight: 700, display: { xs: 'none', sm: 'block' } }}>
-                        PIM{' '}
-                        <Box component="span" sx={{ fontWeight: 800, color: '#FF7F50' }}>
-                            Pumpkin
-                        </Box>
-                    </Typography>
-                </Box>
+                    <span className={styles.wordmark}>
+                        PIM <span style={{ fontWeight: 800, color: '#FF7F50' }}>Pumpkin</span>
+                    </span>
+                </Link>
 
-                <Box sx={{ flex: 1 }} />
+                <div style={{ flex: 1 }} />
 
-                <Stack direction="row" spacing={{ xs: 0.75, sm: 1.5 }} alignItems="center" sx={{ flexShrink: 0 }}>
+                <div className={styles.shellActions}>
                     <LocaleDropdown />
                     {actions}
-                </Stack>
-            </Box>
+                </div>
+            </header>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: { xs: 2, md: 4 }, flex: 1, width: '100%' }}>
+            <div className={styles.content}>
                 <LocaleSwitchOverlay />
                 <HeroCarousel />
 
-                <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+                <div>
+                    <Title level="H5" style={{ fontWeight: 700, marginBottom: '0.75rem' }}>
                         {t('categoriesHeading')}
-                    </Typography>
+                    </Title>
                     <CategoryStrip
                         categories={categoryOptions}
                         selected={selectedCategory}
@@ -523,68 +366,54 @@ export default function Home({
                             })
                         }
                     />
-                </Box>
+                </div>
 
-                <Box>
-                    <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1.5} sx={{ mb: 1.5 }}>
-                        <Box>
-                            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                                {t('productListHeading')}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                {t('totalItems', { count: filtered.length })}
-                                {selectedCategory && t('categoryFilterSuffix', { category: selectedCategory })}
-                            </Typography>
-                        </Box>
-                        <Stack direction="row" spacing={1.5}>
-                            <TextField
-                                size="small"
-                                placeholder={t('searchPlaceholder')}
-                                value={search}
-                                onChange={(event) => setSearch(event.target.value)}
-                                slotProps={{
-                                    input: {
-                                        startAdornment: (
-                                            <InputAdornment position="start">
-                                                <SearchIcon fontSize="small" color="action" />
-                                            </InputAdornment>
-                                        ),
-                                    },
-                                }}
-                            />
-                            <Button
-                                variant="outlined"
-                                startIcon={<FileDownloadOutlinedIcon />}
-                                onClick={handleExport}
-                                disabled={filtered.length === 0}
-                            >
-                                {selectedCategory ? t('exportCategory') : t('exportAll')}
-                            </Button>
-                        </Stack>
-                    </Stack>
-                    <Box
-                        sx={{
-                            display: 'grid',
-                            gap: 2,
-                            gridTemplateColumns: {
-                                xs: 'repeat(2, 1fr)',
-                                sm: 'repeat(3, 1fr)',
-                                md: 'repeat(4, 1fr)',
-                            },
+                <div>
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            marginBottom: '0.75rem',
                         }}
                     >
+                        <div>
+                            <Title level="H5" style={{ fontWeight: 700 }}>
+                                {t('productListHeading')}
+                            </Title>
+                            <Text style={{ color: 'var(--sapContent_LabelColor)' }}>
+                                {t('totalItems', { count: filtered.length })}
+                                {selectedCategory && t('categoryFilterSuffix', { category: selectedCategory })}
+                            </Text>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <Input
+                                placeholder={t('searchPlaceholder')}
+                                accessibleName={t('searchPlaceholder')}
+                                value={search}
+                                onInput={(event) => setSearch(event.target.value)}
+                                icon={<Icon name="search" />}
+                            />
+                            <Button icon="download" onClick={handleExport} disabled={filtered.length === 0}>
+                                {selectedCategory ? t('exportCategory') : t('exportAll')}
+                            </Button>
+                        </div>
+                    </div>
+                    <div className={styles.productGrid}>
                         {visible.map((product) => (
                             <ProductCard key={product.id} product={product} popular={popularIds.has(product.id)} />
                         ))}
                         {filtered.length === 0 && (
-                            <Typography variant="body2" color="text.secondary" sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 4 }}>
+                            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem 0', color: 'var(--sapContent_LabelColor)' }}>
                                 {t('noResults')}
-                            </Typography>
+                            </div>
                         )}
-                    </Box>
-                    {visibleCount < filtered.length && <Box ref={loadMoreRef} sx={{ height: 1, width: '100%' }} />}
-                </Box>
-            </Box>
-        </Box>
+                    </div>
+                    {visibleCount < filtered.length && <div ref={loadMoreRef} style={{ height: 1, width: '100%' }} />}
+                </div>
+            </div>
+        </div>
     );
 }

@@ -1,26 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/react';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import {
-    Alert,
-    Autocomplete,
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    FormControlLabel,
-    IconButton,
-    MenuItem,
-    Paper,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/refresh.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import { Button, CheckBox, ComboBox, ComboBoxItem, Input, Option, Select, Title } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx } from '@/lib/fiori-style';
+
+import styles from './provider-pages.module.css';
 
 interface ProviderField {
     key: string;
@@ -95,168 +84,158 @@ export default function TranslationProviderCreate({ providerTypes }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Translation Provider" />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
+            <form onSubmit={submit} className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H2" size="H4">
                         Add Translation Provider
-                    </Typography>
-                    <Stack direction="row" spacing={1.5}>
-                        <Button
-                            component={Link}
-                            href="/system/translationProviders"
-                            variant="outlined"
-                            sx={fioriDefaultSx}
-                        >
+                    </Title>
+                    <div className={styles.headerActions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/system/translationProviders')}>
                             Back
                         </Button>
-                        <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={processing}
-                            startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5 }}
-                        >
+                        <Button type="Submit" design="Emphasized" icon="save" disabled={processing} loading={processing} loadingDelay={0}>
                             {processing ? 'Saving…' : 'Save Provider'}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Stack spacing={3} sx={{ maxWidth: 800 }}>
+                <div className={styles.formBody}>
                     {/* General Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                            General
-                        </Typography>
-                        <Stack spacing={2}>
-                            <TextField
-                                select
-                                label="Provider Type *"
+                    <FioriFormGroup title="General">
+                        <FioriField
+                            label="Provider Type"
+                            htmlFor="provider-type"
+                            required
+                            fullWidth
+                            valueState={valueStateOf(errors.type)}
+                            message={errors.type}
+                        >
+                            <Select
+                                id="provider-type"
+                                style={{ width: '100%' }}
                                 required
-                                fullWidth
-                                size="small"
                                 value={data.type}
+                                valueState={ui5ValueState(valueStateOf(errors.type))}
                                 onChange={(e) => {
-                                    setData('type', e.target.value);
+                                    setData('type', e.detail.selectedOption.value ?? '');
                                     setData('credentials', {});
                                 }}
-                                error={Boolean(errors.type)}
-                                helperText={errors.type}
                             >
+                                <Option value="">&nbsp;</Option>
                                 {Object.entries(providerTypes).map(([value, schema]) => (
-                                    <MenuItem key={value} value={value}>
+                                    <Option key={value} value={value}>
                                         {schema.label}
-                                    </MenuItem>
+                                    </Option>
                                 ))}
-                            </TextField>
-                            <TextField
-                                label="Name *"
+                            </Select>
+                        </FioriField>
+                        <FioriField
+                            label="Name"
+                            htmlFor="provider-name"
+                            required
+                            fullWidth
+                            valueState={valueStateOf(errors.name)}
+                            message={errors.name}
+                        >
+                            <Input
+                                id="provider-name"
+                                style={{ width: '100%' }}
                                 required
-                                fullWidth
-                                size="small"
                                 placeholder="e.g. Google Cloud Translate (production)"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
-                                error={Boolean(errors.name)}
-                                helperText={errors.name}
+                                valueState={ui5ValueState(valueStateOf(errors.name))}
+                                onInput={(e) => setData('name', e.target.value)}
                             />
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
                     {/* Credentials Panel — fields are entirely driven by the selected provider type's schema */}
                     {fields.length > 0 && (
-                        <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                            <Typography variant="h6" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 2 }}>
-                                Credentials
-                            </Typography>
-                            <Stack spacing={2}>
-                                {fields.map((field) =>
-                                    field.dynamic ? (
-                                        <Stack key={field.key} direction="row" spacing={1} alignItems="flex-start">
-                                            <Autocomplete
-                                                freeSolo
-                                                fullWidth
-                                                size="small"
-                                                options={dynamicOptions[field.key] ?? []}
-                                                getOptionLabel={(option) => (typeof option === 'string' ? option : option.label)}
-                                                isOptionEqualToValue={(option, value) =>
-                                                    typeof value === 'string' ? option.value === value : option.value === value.value
-                                                }
-                                                inputValue={data.credentials[field.key] ?? ''}
-                                                onInputChange={(_, newInputValue, reason) => {
-                                                    if (reason === 'input') {
-                                                        setCredential(field.key, newInputValue);
-                                                    }
-                                                }}
-                                                onChange={(_, newValue) => {
-                                                    if (newValue && typeof newValue !== 'string') {
-                                                        setCredential(field.key, newValue.value);
-                                                    }
-                                                }}
-                                                renderInput={(params) => (
-                                                    <TextField
-                                                        {...params}
-                                                        label={field.required ? `${field.label} *` : field.label}
-                                                        required={field.required}
-                                                        error={Boolean(errors[`credentials.${field.key}`])}
-                                                        helperText={errors[`credentials.${field.key}`]}
-                                                    />
-                                                )}
+                        <FioriFormGroup title="Credentials">
+                            {fields.map((field) => {
+                                const error = (errors as Record<string, string | undefined>)[`credentials.${field.key}`];
+                                const inputId = `provider-credential-${field.key}`;
+
+                                return (
+                                    <FioriField
+                                        key={field.key}
+                                        label={field.label}
+                                        htmlFor={inputId}
+                                        required={field.required}
+                                        fullWidth
+                                        valueState={valueStateOf(error)}
+                                        message={error}
+                                    >
+                                        {field.dynamic ? (
+                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', width: '100%' }}>
+                                                {/* free text หรือเลือกจากรายการที่โหลดจาก server — เก็บ option.value */}
+                                                <ComboBox
+                                                    id={inputId}
+                                                    style={{ flex: 1, minWidth: 0 }}
+                                                    required={field.required}
+                                                    noTypeahead
+                                                    filter="Contains"
+                                                    value={data.credentials[field.key] ?? ''}
+                                                    valueState={ui5ValueState(valueStateOf(error))}
+                                                    onInput={(e) => setCredential(field.key, e.target.value)}
+                                                    onSelectionChange={(e) => {
+                                                        const value = e.detail.item?.value;
+                                                        if (value) {
+                                                            setCredential(field.key, value);
+                                                        }
+                                                    }}
+                                                >
+                                                    {(dynamicOptions[field.key] ?? []).map((option) => (
+                                                        <ComboBoxItem key={option.value} text={option.label} value={option.value} />
+                                                    ))}
+                                                </ComboBox>
+                                                <Button
+                                                    design="Transparent"
+                                                    icon="refresh"
+                                                    tooltip="Load options from server"
+                                                    accessibleName="Load options from server"
+                                                    disabled={loadingField === field.key}
+                                                    loading={loadingField === field.key}
+                                                    loadingDelay={0}
+                                                    onClick={() => loadOptions(field)}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <Input
+                                                id={inputId}
+                                                style={{ width: '100%' }}
+                                                required={field.required}
+                                                type={field.type === 'password' ? 'Password' : 'Text'}
+                                                value={data.credentials[field.key] ?? ''}
+                                                valueState={ui5ValueState(valueStateOf(error))}
+                                                onInput={(e) => setCredential(field.key, e.target.value)}
                                             />
-                                            <Tooltip title="Load options from server">
-                                                <span>
-                                                    <IconButton
-                                                        onClick={() => loadOptions(field)}
-                                                        disabled={loadingField === field.key}
-                                                        sx={{ mt: 0.5 }}
-                                                    >
-                                                        {loadingField === field.key ? <CircularProgress size={20} /> : <RefreshIcon fontSize="small" />}
-                                                    </IconButton>
-                                                </span>
-                                            </Tooltip>
-                                        </Stack>
-                                    ) : (
-                                        <TextField
-                                            key={field.key}
-                                            label={field.required ? `${field.label} *` : field.label}
-                                            required={field.required}
-                                            fullWidth
-                                            size="small"
-                                            type={field.type === 'password' ? 'password' : 'text'}
-                                            value={data.credentials[field.key] ?? ''}
-                                            onChange={(e) => setCredential(field.key, e.target.value)}
-                                            error={Boolean(errors[`credentials.${field.key}`])}
-                                            helperText={errors[`credentials.${field.key}`]}
-                                        />
-                                    ),
-                                )}
-                            </Stack>
-                        </Paper>
+                                        )}
+                                    </FioriField>
+                                );
+                            })}
+                        </FioriFormGroup>
                     )}
 
                     {/* Status Panel */}
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="body2" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 1 }}>
-                            Status
-                        </Typography>
-                        <Stack direction="row" spacing={3}>
-                            <FormControlLabel
-                                control={<Checkbox checked={data.enabled} onChange={(e) => setData('enabled', e.target.checked)} />}
-                                label="Enabled"
+                    <FioriFormGroup title="Status">
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
+                            <CheckBox text="Enabled" checked={data.enabled} onChange={(e) => setData('enabled', e.target.checked)} />
+                            <CheckBox
+                                text="Set as default (used for all translation jobs)"
+                                checked={data.is_default}
+                                onChange={(e) => setData('is_default', e.target.checked)}
                             />
-                            <FormControlLabel
-                                control={<Checkbox checked={data.is_default} onChange={(e) => setData('is_default', e.target.checked)} />}
-                                label="Set as default (used for all translation jobs)"
-                            />
-                        </Stack>
-                    </Paper>
-                </Stack>
+                        </div>
+                    </FioriFormGroup>
+                </div>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 3, maxWidth: 800 }}>
-                        Please correct the highlighted fields before saving.
-                    </Alert>
-                )}
-            </Box>
+                <FioriFormErrorSummary
+                    errors={errors}
+                    message="Please correct the highlighted fields before saving."
+                    style={{ marginTop: '1.5rem', maxWidth: 800 }}
+                />
+            </form>
         </AppLayout>
     );
 }

@@ -1,27 +1,46 @@
-import { SidebarProvider } from '@/hooks/use-sidebar';
-import { Box } from '@mui/material';
-import { useState } from 'react';
+import { SidebarProvider, useSidebar } from '@/hooks/use-sidebar';
+import { NavigationLayout } from '@ui5/webcomponents-react';
+import { type ReactElement, type ReactNode } from 'react';
 
 interface AppShellProps {
-    children: React.ReactNode;
-    variant?: 'header' | 'sidebar';
+    children: ReactNode;
+    /** The ShellBar (rendered into NavigationLayout's `header` slot). */
+    header: ReactElement;
+    /** The SideNavigation (rendered into NavigationLayout's `sideContent` slot). */
+    sideContent: ReactElement;
 }
 
-export function AppShell({ children, variant = 'header' }: AppShellProps) {
-    // Always starts expanded on every page load — the collapsed/expanded
-    // state no longer persists across reloads (previously read/wrote a
-    // 'sidebar' localStorage flag, so a user who once collapsed it would
-    // keep landing on a collapsed sidebar on this machine forever). Still
-    // toggleable for the rest of the session via setOpen/toggleSidebar.
-    const [isOpen, setIsOpen] = useState(true);
+function ShellFrame({ children, header, sideContent }: AppShellProps) {
+    const { isMobile, open, openMobile } = useSidebar();
 
-    if (variant === 'header') {
-        return <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', flexDirection: 'column' }}>{children}</Box>;
-    }
+    // Desktop: the menu button flips the rail between expanded and the
+    // icon-only collapsed mode. Mobile/tablet: hidden (phone) or icon rail
+    // (tablet) by default, expanded on demand — NavigationLayout itself
+    // turns "Expanded" into a full-width overlay below 600px.
+    const expanded = isMobile ? openMobile : open;
 
     return (
-        <SidebarProvider defaultOpen open={isOpen} onOpenChange={setIsOpen}>
-            <Box sx={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden' }}>{children}</Box>
+        <NavigationLayout mode={expanded ? 'Expanded' : 'Collapsed'} header={header} sideContent={sideContent}>
+            {children}
+        </NavigationLayout>
+    );
+}
+
+/**
+ * SAP Fiori app shell — UI5 `NavigationLayout` (ShellBar on top, Side
+ * Navigation on the left, page content in the rest). The layout positions
+ * itself `absolute; inset: 0`, so it sits in a fixed full-viewport box.
+ *
+ * The sidebar's expanded/collapsed choice is remembered across Inertia
+ * navigations for the session (`persist`) but resets to expanded on a full
+ * reload — see hooks/use-sidebar.tsx.
+ */
+export function AppShell(props: AppShellProps) {
+    return (
+        <SidebarProvider defaultOpen persist>
+            <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+                <ShellFrame {...props} />
+            </div>
         </SidebarProvider>
     );
 }

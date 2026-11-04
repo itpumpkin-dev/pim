@@ -1,9 +1,10 @@
-import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
-import { Autocomplete, Box, Button, Drawer, IconButton, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
+import { PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUSES, type ProductStatus } from '@/lib/product-status';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import { Bar, Button, ComboBox, ComboBoxItem, Dialog, FlexBox, Input, Label, Option, Select } from '@ui5/webcomponents-react';
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PRODUCT_STATUS_LABEL_KEYS, PRODUCT_STATUSES, type ProductStatus } from '@/lib/product-status';
 
 export interface ProductFamilyOption {
     id: number;
@@ -96,167 +97,159 @@ export function ProductFilterDrawer({
         onClose();
     };
 
+    // ไม่มี Drawer ใน UI5 → ใช้ Dialog แทน (ESC/ปิดเอง → sync state ผ่าน onClose)
     return (
-        <Drawer anchor="right" open={open} onClose={onClose}>
-            <Box sx={{ width: 340, p: 3 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                    <Typography variant="h6" fontWeight={700}>
-                        {t('filterDrawerTitle')}
-                    </Typography>
-                    <IconButton onClick={onClose} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Stack>
+        <Dialog
+            open={open}
+            onClose={onClose}
+            headerText={t('filterDrawerTitle')}
+            style={{ width: 'min(400px, 95vw)' }}
+            footer={
+                <Bar
+                    design="Footer"
+                    endContent={
+                        <>
+                            <Button design="Transparent" onClick={onClose}>
+                                {t('cancel')}
+                            </Button>
+                            <Button design="Emphasized" onClick={save}>
+                                {t('filterDrawerSave')}
+                            </Button>
+                        </>
+                    }
+                />
+            }
+        >
+            <FlexBox direction="Column" style={{ gap: '1.25rem' }}>
+                <FilterField id="product-filter-sku" label="SKU">
+                    <Input
+                        id="product-filter-sku"
+                        style={{ width: '100%' }}
+                        placeholder="SKU"
+                        value={draftFilters.sku ?? ''}
+                        onInput={(e) => setDraftFilters((prev) => ({ ...prev, sku: e.target.value }))}
+                    />
+                </FilterField>
 
-                <Stack spacing={2.5}>
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            SKU
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="SKU"
-                            value={draftFilters.sku ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, sku: e.target.value }))}
-                        />
-                    </Box>
+                <FilterField id="product-filter-name" label={t('filterDrawerName')}>
+                    <Input
+                        id="product-filter-name"
+                        style={{ width: '100%' }}
+                        placeholder={t('filterDrawerName')}
+                        value={draftFilters.name ?? ''}
+                        onInput={(e) => setDraftFilters((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                </FilterField>
 
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {t('filterDrawerName')}
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            placeholder={t('filterDrawerName')}
-                            value={draftFilters.name ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, name: e.target.value }))}
-                        />
-                    </Box>
-
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {t('filterDrawerAttributeFamily')}
-                        </Typography>
-                        <Select
-                            fullWidth
-                            size="small"
-                            displayEmpty
-                            value={draftFilters.family_id ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, family_id: e.target.value === '' ? '' : Number(e.target.value) }))}
-                        >
-                            <MenuItem value="">
-                                <em>{t('filterDrawerSelectOption')}</em>
-                            </MenuItem>
-                            {families.map((family) => (
-                                <MenuItem key={family.id} value={family.id}>
-                                    {family.name || family.code}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </Box>
-
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {tCatalog('publishing')}
-                        </Typography>
-                        <Select
-                            fullWidth
-                            size="small"
-                            displayEmpty
-                            value={draftFilters.enabled ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, enabled: e.target.value as ProductFilters['enabled'] }))}
-                        >
-                            <MenuItem value="">
-                                <em>{t('filterDrawerSelect')}</em>
-                            </MenuItem>
-                            <MenuItem value="1">{tCatalog('published')}</MenuItem>
-                            <MenuItem value="0">{tCatalog('unpublished')}</MenuItem>
-                        </Select>
-                    </Box>
-
-                    {/* ว่าง = ทุกสถานะยกเว้น Delete (ฝั่ง backend ซ่อน Delete ไว้
-                        โดยตั้งต้น — ดู ProductController::index()) */}
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {tCatalog('productStatus')}
-                        </Typography>
-                        <Select
-                            fullWidth
-                            size="small"
-                            displayEmpty
-                            value={draftFilters.status ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value as ProductFilters['status'] }))}
-                        >
-                            <MenuItem value="">
-                                <em>{t('filterDrawerSelect')}</em>
-                            </MenuItem>
-                            {PRODUCT_STATUSES.map((status) => (
-                                <MenuItem key={status} value={status}>
-                                    {tCatalog(PRODUCT_STATUS_LABEL_KEYS[status])}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </Box>
-
-                    <Box>
-                        <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-                            {t('filterDrawerType')}
-                        </Typography>
-                        <Select
-                            fullWidth
-                            size="small"
-                            displayEmpty
-                            value={draftFilters.type ?? ''}
-                            onChange={(e) => setDraftFilters((prev) => ({ ...prev, type: e.target.value as ProductFilters['type'] }))}
-                        >
-                            <MenuItem value="">
-                                <em>{t('filterDrawerSelect')}</em>
-                            </MenuItem>
-                            <MenuItem value="simple">{t('filterDrawerSimple')}</MenuItem>
-                            <MenuItem value="configurable">{t('filterDrawerConfigurable')}</MenuItem>
-                        </Select>
-                    </Box>
-
-                    {draftAttrFilters.map((row, index) => (
-                        <Stack key={index} direction="row" spacing={1} alignItems="center">
-                            <Autocomplete
-                                size="small"
-                                sx={{ flex: 1 }}
-                                options={filterableAttributes}
-                                getOptionLabel={(opt) => opt.label || opt.code}
-                                value={filterableAttributes.find((attr) => attr.id === row.attribute_id) ?? null}
-                                onChange={(_, val) => updateFilterRow(index, { attribute_id: val?.id ?? '' })}
-                                renderInput={(params) => <TextField {...params} placeholder={t('filterDrawerSearchAttribute')} />}
-                            />
-                            <TextField
-                                size="small"
-                                placeholder={t('filterDrawerValue')}
-                                sx={{ flex: 1 }}
-                                value={row.value}
-                                onChange={(e) => updateFilterRow(index, { value: e.target.value })}
-                            />
-                            <IconButton size="small" onClick={() => removeFilterRow(index)}>
-                                <CloseIcon fontSize="small" />
-                            </IconButton>
-                        </Stack>
-                    ))}
-
-                    <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={addFilterRow}
-                        sx={{ borderStyle: 'dashed' }}
+                <FilterField id="product-filter-family" label={t('filterDrawerAttributeFamily')}>
+                    <Select
+                        id="product-filter-family"
+                        style={{ width: '100%' }}
+                        value={draftFilters.family_id === undefined || draftFilters.family_id === '' ? '' : String(draftFilters.family_id)}
+                        onChange={(e) => {
+                            const value = e.detail.selectedOption?.value ?? '';
+                            setDraftFilters((prev) => ({ ...prev, family_id: value === '' ? '' : Number(value) }));
+                        }}
                     >
-                        {t('filterDrawerAddFilter')}
-                    </Button>
-                </Stack>
+                        <Option value="">{t('filterDrawerSelectOption')}</Option>
+                        {families.map((family) => (
+                            <Option key={family.id} value={String(family.id)}>
+                                {family.name || family.code}
+                            </Option>
+                        ))}
+                    </Select>
+                </FilterField>
 
-                <Button fullWidth variant="contained" sx={{ mt: 3, color: 'white' }} onClick={save}>
-                    {t('filterDrawerSave')}
+                <FilterField id="product-filter-enabled" label={tCatalog('publishing')}>
+                    <Select
+                        id="product-filter-enabled"
+                        style={{ width: '100%' }}
+                        value={draftFilters.enabled ?? ''}
+                        onChange={(e) =>
+                            setDraftFilters((prev) => ({ ...prev, enabled: (e.detail.selectedOption?.value ?? '') as ProductFilters['enabled'] }))
+                        }
+                    >
+                        <Option value="">{t('filterDrawerSelect')}</Option>
+                        <Option value="1">{tCatalog('published')}</Option>
+                        <Option value="0">{tCatalog('unpublished')}</Option>
+                    </Select>
+                </FilterField>
+
+                {/* ว่าง = ทุกสถานะยกเว้น Delete (ฝั่ง backend ซ่อน Delete ไว้
+                    โดยตั้งต้น — ดู ProductController::index()) */}
+                <FilterField id="product-filter-status" label={tCatalog('productStatus')}>
+                    <Select
+                        id="product-filter-status"
+                        style={{ width: '100%' }}
+                        value={draftFilters.status ?? ''}
+                        onChange={(e) =>
+                            setDraftFilters((prev) => ({ ...prev, status: (e.detail.selectedOption?.value ?? '') as ProductFilters['status'] }))
+                        }
+                    >
+                        <Option value="">{t('filterDrawerSelect')}</Option>
+                        {PRODUCT_STATUSES.map((status) => (
+                            <Option key={status} value={status}>
+                                {tCatalog(PRODUCT_STATUS_LABEL_KEYS[status])}
+                            </Option>
+                        ))}
+                    </Select>
+                </FilterField>
+
+                <FilterField id="product-filter-type" label={t('filterDrawerType')}>
+                    <Select
+                        id="product-filter-type"
+                        style={{ width: '100%' }}
+                        value={draftFilters.type ?? ''}
+                        onChange={(e) =>
+                            setDraftFilters((prev) => ({ ...prev, type: (e.detail.selectedOption?.value ?? '') as ProductFilters['type'] }))
+                        }
+                    >
+                        <Option value="">{t('filterDrawerSelect')}</Option>
+                        <Option value="simple">{t('filterDrawerSimple')}</Option>
+                        <Option value="configurable">{t('filterDrawerConfigurable')}</Option>
+                    </Select>
+                </FilterField>
+
+                {draftAttrFilters.map((row, index) => (
+                    <FlexBox key={index} alignItems="Center" style={{ gap: '0.5rem' }}>
+                        <ComboBox
+                            style={{ flex: 1, minWidth: 0 }}
+                            placeholder={t('filterDrawerSearchAttribute')}
+                            selectedValue={row.attribute_id === '' ? '' : String(row.attribute_id)}
+                            onSelectionChange={(e) => {
+                                const value = e.detail.item?.value;
+                                updateFilterRow(index, { attribute_id: value ? Number(value) : '' });
+                            }}
+                        >
+                            {filterableAttributes.map((attr) => (
+                                <ComboBoxItem key={attr.id} value={String(attr.id)} text={attr.label || attr.code} />
+                            ))}
+                        </ComboBox>
+                        <Input
+                            style={{ flex: 1, minWidth: 0 }}
+                            placeholder={t('filterDrawerValue')}
+                            value={row.value}
+                            onInput={(e) => updateFilterRow(index, { value: e.target.value })}
+                        />
+                        <Button design="Transparent" icon="decline" onClick={() => removeFilterRow(index)} />
+                    </FlexBox>
+                ))}
+
+                <Button icon="add" onClick={addFilterRow} style={{ width: '100%' }}>
+                    {t('filterDrawerAddFilter')}
                 </Button>
-            </Box>
-        </Drawer>
+            </FlexBox>
+        </Dialog>
+    );
+}
+
+function FilterField({ id, label, children }: { id: string; label: ReactNode; children: ReactNode }) {
+    return (
+        <FlexBox direction="Column" style={{ gap: '0.25rem' }}>
+            <Label for={id} showColon={false} style={{ fontWeight: 600 }}>
+                {label}
+            </Label>
+            {children}
+        </FlexBox>
     );
 }

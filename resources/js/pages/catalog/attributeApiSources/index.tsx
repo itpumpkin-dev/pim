@@ -1,29 +1,18 @@
+import { FioriMessageStrip } from '@/components/fiori-form';
+import { FioriMessageBox } from '@/components/fiori-message-box';
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { FioriStatus } from '@/lib/fiori-style';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import SearchIcon from '@mui/icons-material/Search';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import SyncIcon from '@mui/icons-material/Sync';
-import {
-    Box,
-    Button,
-    CircularProgress,
-    Divider,
-    IconButton,
-    InputAdornment,
-    Paper,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
+import '@ui5/webcomponents-icons/dist/add.js';
+import '@ui5/webcomponents-icons/dist/delete.js';
+import '@ui5/webcomponents-icons/dist/edit.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/synchronize.js';
+import { BusyIndicator, Button, FlexBox, Icon, Input, Text, Title } from '@ui5/webcomponents-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FioriMessageBox } from '@/components/fiori-message-box';
-import { FioriMessageStrip } from '@/components/fiori-form';
-import { FIORI, FioriStatus, fioriCardSx, fioriEmphasizedSx, fioriIconButtonSx, fioriSearchFieldSx } from '@/lib/fiori-style';
 
 interface ApiSourceRow {
     id: number;
@@ -109,13 +98,13 @@ export default function AttributeApiSourceIndex({ gridData, filters }: Props) {
             key: 'name',
             header: t('fields.name'),
             priority: 'always',
-            render: (row) => <Typography component="span" fontWeight={600}>{row.name}</Typography>,
+            render: (row) => <span style={{ fontWeight: 600 }}>{row.name}</span>,
         },
         {
             key: 'endpoint',
             header: t('fields.endpoint'),
             priority: 'high',
-            render: (row) => <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{row.endpoint}</Typography>,
+            render: (row) => <span style={{ wordBreak: 'break-all', fontSize: 'var(--sapFontSize)' }}>{row.endpoint}</span>,
         },
         {
             key: 'auth_type',
@@ -135,23 +124,37 @@ export default function AttributeApiSourceIndex({ gridData, filters }: Props) {
             priority: 'always',
             align: 'right',
             render: (row) => (
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                    <Tooltip title={t('rowActions.test')}>
-                        <IconButton size="small" sx={fioriIconButtonSx} disabled={testingId === row.id} onClick={() => runTest(row)}>
-                            {testingId === row.id ? <CircularProgress size={18} color="inherit" /> : <SyncIcon fontSize="small" />}
-                        </IconButton>
-                    </Tooltip>
+                <FlexBox justifyContent="End" alignItems="Center" style={{ gap: '0.25rem' }}>
+                    {testingId === row.id ? (
+                        <BusyIndicator active size="S" style={{ padding: '0 0.5rem' }} />
+                    ) : (
+                        <Button
+                            design="Transparent"
+                            icon="synchronize"
+                            tooltip={t('rowActions.test')}
+                            accessibleName={t('rowActions.test')}
+                            onClick={() => runTest(row)}
+                        />
+                    )}
                     {canEdit && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => router.visit(`/catalog/attributes/api-sources/${row.id}/edit`)}>
-                            <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="edit"
+                            tooltip={t('rowActions.edit')}
+                            accessibleName={t('rowActions.edit')}
+                            onClick={() => router.visit(`/catalog/attributes/api-sources/${row.id}/edit`)}
+                        />
                     )}
                     {canDelete && (
-                        <IconButton size="small" sx={fioriIconButtonSx} onClick={() => setDeleteId(row.id)}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        <Button
+                            design="Transparent"
+                            icon="delete"
+                            tooltip={t('rowActions.delete')}
+                            accessibleName={t('rowActions.delete')}
+                            onClick={() => setDeleteId(row.id)}
+                        />
                     )}
-                </Stack>
+                </FlexBox>
             ),
         },
     ];
@@ -159,63 +162,49 @@ export default function AttributeApiSourceIndex({ gridData, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={tCatalog('attributeApiSourcesTitle')} />
-            <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                    <Box>
-                        <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>
-                            {tCatalog('attributeApiSourcesTitle')}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary, mt: 0.25 }}>
+            <div style={{ padding: 'clamp(1rem, 3vw, 2rem)', background: 'var(--sapBackgroundColor)', minHeight: '100%', boxSizing: 'border-box' }}>
+                <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div>
+                        <Title level="H3">{tCatalog('attributeApiSourcesTitle')}</Title>
+                        <Text style={{ color: 'var(--sapContent_LabelColor)', marginTop: '0.125rem', display: 'block' }}>
                             {t('results', { count: gridData.total })}
-                        </Typography>
-                    </Box>
+                        </Text>
+                    </div>
                     {canCreate && (
-                        <Button
-                            variant="contained"
-                            onClick={() => router.visit('/catalog/attributes/api-sources/create')}
-                            sx={{ ...fioriEmphasizedSx, px: 2.5, py: 1 }}
-                        >
+                        <Button design="Emphasized" icon="add" onClick={() => router.visit('/catalog/attributes/api-sources/create')}>
                             {tCatalog('createAttributeApiSource')}
                         </Button>
                     )}
-                </Stack>
+                </FlexBox>
 
                 {testMessage && (
-                    <FioriMessageStrip severity={testMessage.ok ? 'success' : 'error'} sx={{ mb: 2 }}>
+                    <FioriMessageStrip severity={testMessage.ok ? 'success' : 'error'} style={{ marginBottom: '1rem' }}>
                         {testMessage.text}
                     </FioriMessageStrip>
                 )}
 
-                <Paper elevation={0} sx={fioriCardSx}>
-                    <Stack
-                        direction={{ xs: 'column', md: 'row' }}
-                        justifyContent="space-between"
-                        alignItems="center"
-                        spacing={2}
-                        sx={{ p: 2 }}
-                    >
-                        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
-                            <TextField
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                placeholder={tCatalog('searchAttributeApiSources')}
-                                size="small"
-                                sx={{ ...fioriSearchFieldSx, minWidth: 240 }}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <SearchIcon sx={{ color: FIORI.textSecondary, fontSize: 20 }} />
-                                        </InputAdornment>
-                                    ),
-                                }}
-                            />
-                        </Stack>
-                        <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
+                <div
+                    style={{
+                        background: 'var(--sapGroup_ContentBackground)',
+                        border: '1px solid var(--sapGroup_ContentBorderColor)',
+                        borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        overflow: 'hidden',
+                    }}
+                >
+                    <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" style={{ gap: '1rem', padding: '1rem' }}>
+                        <Input
+                            value={search}
+                            onInput={(event) => setSearch(event.target.value)}
+                            placeholder={tCatalog('searchAttributeApiSources')}
+                            icon={<Icon name="search" />}
+                            style={{ minWidth: 240 }}
+                        />
+                        <Text style={{ color: 'var(--sapContent_LabelColor)' }}>
                             {t('pageOf', { lastPage })} ({currentPage})
-                        </Typography>
-                    </Stack>
+                        </Text>
+                    </FlexBox>
 
-                    <Divider sx={{ borderColor: FIORI.border }} />
+                    <div style={{ borderTop: '1px solid var(--sapGroup_ContentBorderColor)' }} />
 
                     <FioriResponsiveTable
                         variant="plain"
@@ -224,8 +213,8 @@ export default function AttributeApiSourceIndex({ gridData, filters }: Props) {
                         getRowKey={(row) => row.id}
                         emptyMessage={tCatalog('noAttributeApiSourcesFound')}
                     />
-                </Paper>
-            </Box>
+                </div>
+            </div>
 
             <FioriMessageBox
                 open={deleteId !== null}

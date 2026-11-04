@@ -1,8 +1,8 @@
 import { useResolvedAppearance } from '@/hooks/use-appearance';
 import { xsrfToken } from '@/lib/csrf';
-import { FIORI } from '@/lib/fiori-style';
-import { Box, type SxProps, type Theme } from '@mui/material';
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
+
+import styles from './rich-text-editor.module.css';
 
 interface RichTextEditorProps {
     value: string;
@@ -14,7 +14,7 @@ interface RichTextEditorProps {
      *  ทันที — ไม่กำหนดไว้แปลว่าซ่อนปุ่มรูปภาพไป (เช่นตอนที่ยังไม่มี product id
      *  ให้ผูก endpoint ด้วย) */
     imageUploadUrl?: string;
-    /** 'error' วาดกรอบ + พื้นแบบ value-state แดง ให้เข้าชุดกับ fioriFieldStateSx */
+    /** 'error' วาดกรอบ + พื้นแบบ value-state แดง ให้เข้าชุดกับ UI5 Input valueState="Negative" */
     valueState?: 'none' | 'error';
 }
 
@@ -23,12 +23,14 @@ interface RichTextEditorProps {
 const CONTENT_FONT_FAMILY = '"Roboto","Sarabun",sans-serif';
 
 // TinyMCE เรนเดอร์เนื้อหาที่แก้ไขได้ใน <iframe> ของมันเอง (คนละ document กับ
-// หน้าแอป) — CSS custom property แบบ var(--fiori-*) ที่ประกาศไว้ที่ :root ของ
+// หน้าแอป) — CSS custom property (--sap* ของธีม UI5) ที่ประกาศไว้ที่ :root ของ
 // หน้าแอปเลยข้ามเข้าไปใน iframe ไม่ได้ ต้องฝังค่าสีจริง (hex) ที่ตรงกับแต่ละธีม
-// เข้าไปใน content_style เองแทน (ตรงกับ --fiori-* ใน resources/css/app.css)
+// เข้าไปใน content_style เองแทน (ตรงกับ sap_horizon / sap_horizon_dark:
+// sapField_Background / sapTextColor / sapField_PlaceholderTextColor /
+// sapLinkColor / sapGroup_ContentBorderColor)
 const CONTENT_PALETTE = {
-    light: { bg: '#ffffff', text: '#1d2d3e', muted: '#6a6d70', link: '#0070f2', border: '#d9d9d9' },
-    dark: { bg: '#1e2124', text: '#e8eaed', muted: '#9aa4ae', link: '#4da3ff', border: '#383c40' },
+    light: { bg: '#ffffff', text: '#131e29', muted: '#556b82', link: '#0064d9', border: '#d9d9d9' },
+    dark: { bg: '#161c22', text: '#f5f6f7', muted: '#8396a8', link: '#008fff', border: '#323c40' },
 } as const;
 
 function contentStyle(mode: 'light' | 'dark'): string {
@@ -55,61 +57,12 @@ function contentStyle(mode: 'light' | 'dark'): string {
     `;
 }
 
-/**
- * SAP Fiori (Horizon) "Rich Text Editor" look for TinyMCE's oxide skin — same
- * intent as the old fioriQuillSx() this replaced (ดู git history): one
- * bordered control, flat toolbar strip with grouped icon buttons, brand-tinted
- * active state. TinyMCE's outer chrome (.tox-*) lives in the main document
- * (not the iframe), so it can use the same var(--fiori-*) tokens as the rest
- * of the app and stays theme-reactive automatically — only the *inner* iframe
- * content needs the hardcoded contentStyle() above.
- */
-function fioriTinyMceSx(valueState: 'none' | 'error', readOnly: boolean): SxProps<Theme> {
-    const border = valueState === 'error' ? FIORI.error : FIORI.borderStrong;
-    const borderWidth = valueState === 'error' ? '2px' : '1px';
-
-    return {
-        borderRadius: '0.375rem',
-        border: `${borderWidth} solid ${border}`,
-        bgcolor: valueState === 'error' ? FIORI.errorBg : FIORI.surface,
-        overflow: 'hidden',
-        transition: 'border-color 0.1s ease',
-        '&:focus-within': { borderColor: FIORI.brand },
-
-        // TinyMCE draws its own outer border/shadow on .tox-tinymce — drop it,
-        // the wrapper above owns the outline now (same move as .ql-toolbar/
-        // .ql-container in the old Quill version).
-        '& .tox.tox-tinymce': { border: 'none', boxShadow: 'none', borderRadius: 0 },
-        '& .tox .tox-editor-header': {
-            borderBottom: `1px solid ${FIORI.border}`,
-            bgcolor: FIORI.headerBg,
-            boxShadow: 'none',
-            padding: '5px 8px',
-            zIndex: 0,
-        },
-        '& .tox .tox-toolbar__group': {
-            marginRight: '8px',
-            paddingRight: '8px',
-            borderRight: `1px solid ${FIORI.border}`,
-            '&:last-child': { borderRight: 'none', marginRight: 0, paddingRight: 0 },
-        },
-        '& .tox .tox-tbtn': {
-            height: 26,
-            borderRadius: '0.25rem',
-            color: FIORI.textSecondary,
-        },
-        '& .tox .tox-tbtn:hover': { bgcolor: FIORI.hover, color: FIORI.textPrimary },
-        '& .tox .tox-tbtn--enabled, & .tox .tox-tbtn--enabled:hover': { bgcolor: FIORI.brandBg, color: FIORI.brand },
-        '& .tox .tox-edit-area__iframe': { bgcolor: 'transparent' },
-
-        // Fiori display mode: drop the toolbar entirely, show the formatted
-        // content on a muted surface — matches readOnly mode of the old Quill
-        // component (toolbar hidden via display:none there; here `toolbar:
-        // false` in init already stops it rendering, this just handles the
-        // surface tint).
-        ...(readOnly && { bgcolor: FIORI.headerBg }),
-    };
-}
+// SAP Fiori (Horizon) "Rich Text Editor" look for TinyMCE's oxide skin lives in
+// rich-text-editor.module.css: one bordered field-like control, flat toolbar
+// strip with grouped icon buttons, brand-tinted active state. TinyMCE's outer
+// chrome (.tox-*) lives in the main document (not the iframe), so it can use
+// the --sap* theme variables and stays theme-reactive automatically — only
+// the *inner* iframe content needs the hardcoded contentStyle() above.
 
 /**
  * WYSIWYG editor for `textarea`-type attributes (product description, etc.)
@@ -158,7 +111,7 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly,
     }, []);
 
     // ตัว toolbar/menu chrome (.tox-*) อยู่ใน document หลัก เลย re-theme ตาม
-    // light/dark ผ่าน var(--fiori-*) ใน sx ได้ปกติ (ไม่ต้อง remount) — แต่เนื้อหา
+    // light/dark ผ่าน var(--sap*) ใน CSS module ได้ปกติ (ไม่ต้อง remount) — แต่เนื้อหา
     // ที่แก้ไขได้จริงอยู่ใน iframe แยก document ซึ่ง var() ข้ามเข้าไปไม่ถึง เลยต้อง
     // อาศัย contentStyle() (hex ตรงๆ) แทน ผูกกับ key ด้านล่างเพื่อบังคับ remount
     // ตอนสลับธีม (content_style เป็นค่าที่ TinyMCE อ่านแค่ตอน init เท่านั้น ไม่ใช่
@@ -192,20 +145,11 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly,
     );
 
     if (!Editor) {
-        return (
-            <Box
-                sx={{
-                    minHeight: 220,
-                    border: `1px solid ${FIORI.borderStrong}`,
-                    borderRadius: '0.375rem',
-                    bgcolor: FIORI.surface,
-                }}
-            />
-        );
+        return <div className={styles.placeholder} />;
     }
 
     return (
-        <Box sx={fioriTinyMceSx(valueState, Boolean(readOnly))}>
+        <div className={[styles.editor, valueState === 'error' ? styles.error : '', readOnly ? styles.readOnly : ''].filter(Boolean).join(' ')}>
             <Editor
                 key={resolved}
                 licenseKey="gpl"
@@ -240,7 +184,7 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly,
                     placeholder,
                     min_height: 280,
                     // skin.css ถูก import มือไว้ข้างบนแล้ว (ครั้งเดียว, ไม่ผูกกับธีม —
-                    // ดู docblock ของ fioriTinyMceSx()) ปิด auto-load ของ TinyMCE เอง
+                    // ดู rich-text-editor.module.css) ปิด auto-load ของ TinyMCE เอง
                     // ไปเลยเพื่อไม่ให้มันพยายามยิง fetch หา URL ที่ไม่มีจริงในโปรเจกต์นี้
                     skin: false,
                     // เช่นเดียวกับ skin — ปิด default content CSS ของ TinyMCE เอง (ก็
@@ -250,6 +194,6 @@ export default function RichTextEditor({ value, onChange, placeholder, readOnly,
                     images_upload_handler: imagesUploadHandler,
                 }}
             />
-        </Box>
+        </div>
     );
 }

@@ -1,31 +1,16 @@
+import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
 import AppLayout from '@/layouts/app-layout';
+import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import SearchIcon from '@mui/icons-material/Search';
-import {
-    Box,
-    Button,
-    Checkbox,
-    CircularProgress,
-    FormControlLabel,
-    IconButton,
-    InputAdornment,
-    Popover,
-    Switch,
-    Tab,
-    Tabs,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import { FormEventHandler, useState, useMemo, useRef } from 'react';
+import '@ui5/webcomponents-icons/dist/information.js';
+import '@ui5/webcomponents-icons/dist/navigation-down-arrow.js';
+import '@ui5/webcomponents-icons/dist/navigation-up-arrow.js';
+import '@ui5/webcomponents-icons/dist/search.js';
+import { Button, CheckBox, FlexBox, Icon, Input, Label, Popover, Switch, Tab, TabContainer, Text, Title } from '@ui5/webcomponents-react';
+import { FormEventHandler, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
-import { FIORI, fioriDefaultSx, fioriEmphasizedSx, fioriTableRowSx, fioriTabsSx } from '@/lib/fiori-style';
-import { codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import styles from './role-form.module.css';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -245,12 +230,9 @@ export default function RoleFormPage({
     };
 
     // Check if user has both products AND attributes permissions to show Attribute Access
-    const hasProductsPermission = useMemo(
-        () => {
-            return (data.permissions['products'] || []).length > 0;
-        },
-        [data.permissions]
-    );
+    const hasProductsPermission = useMemo(() => {
+        return (data.permissions['products'] || []).length > 0;
+    }, [data.permissions]);
 
     // Whether any marketplace-synced ("Platform") group/attribute exists at
     // all — gates showing the scope tabs below; with nothing synced yet,
@@ -260,8 +242,7 @@ export default function RoleFormPage({
     // Read/Edit access for the "Attribute Groups" / "Individual Attributes" tables below.
     // Edit always implies Read — checking Edit turns Read on too, and unchecking Read
     // turns Edit back off, so the two resources (view_*/edit_*) never end up inconsistent.
-    const hasAccess = (resource: string, prefix: 'view' | 'edit', code: string) =>
-        (data.permissions[resource] || []).includes(`${prefix}_${code}`);
+    const hasAccess = (resource: string, prefix: 'view' | 'edit', code: string) => (data.permissions[resource] || []).includes(`${prefix}_${code}`);
 
     const setAccess = (viewResource: string, editResource: string, code: string, level: 'read' | 'edit', checked: boolean) => {
         const view = new Set(data.permissions[viewResource] || []);
@@ -355,7 +336,7 @@ export default function RoleFormPage({
     const isModulePartiallyGranted = (moduleKey: string): boolean => {
         const module = catalog[moduleKey];
         if (!module || !module.resources) return false;
-        
+
         let hasAnyGranted = false;
         let isFullyGranted = true;
 
@@ -605,7 +586,7 @@ export default function RoleFormPage({
             key: 'hasRole',
             header: 'Has Role',
             priority: 'always',
-            render: (user) => <Checkbox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
+            render: (user) => <CheckBox checked={data.users.includes(user.id)} onChange={() => toggleUser(user.id)} />,
         },
         {
             key: 'employeeId',
@@ -639,6 +620,11 @@ export default function RoleFormPage({
         },
     ];
 
+    // UI5 CheckBox only renders the partial ("indeterminate") look while
+    // `checked` is also true — MUI showed it regardless of `checked`. Clicking
+    // a partial UI5 checkbox yields checked=true, same as MUI did.
+    const selectAllState = (all: boolean, some: boolean) => ({ checked: all || some, indeterminate: some && !all });
+
     // Permission-matrix-style tables: only 3 columns total (the resource
     // name plus a Read and an Edit checkbox column), and Read/Edit are meant
     // to be seen and toggled together — popping either one into the detail
@@ -656,25 +642,29 @@ export default function RoleFormPage({
         {
             key: 'read',
             header: (
-                <>
-                    <Checkbox
-                        size="small"
-                        checked={groups.length > 0 && groups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))}
-                        indeterminate={
-                            groups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)) &&
-                            !groups.every((g) => hasAccess('view_attribute_groups', 'view', g.code))
-                        }
-                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', groups.map((g) => g.code), 'read', e.target.checked)}
-                    />
-                    {t('roleFormReadColumn')}
-                </>
+                <CheckBox
+                    text={t('roleFormReadColumn')}
+                    {...selectAllState(
+                        groups.length > 0 && groups.every((g) => hasAccess('view_attribute_groups', 'view', g.code)),
+                        groups.some((g) => hasAccess('view_attribute_groups', 'view', g.code)),
+                    )}
+                    onChange={(e) =>
+                        setAllAccess(
+                            'view_attribute_groups',
+                            'edit_attribute_groups',
+                            groups.map((g) => g.code),
+                            'read',
+                            e.target.checked,
+                        )
+                    }
+                />
             ),
+            popinText: t('roleFormReadColumn'),
             priority: 'always',
             align: 'center',
             width: 100,
             render: (group) => (
-                <Checkbox
-                    size="small"
+                <CheckBox
                     checked={hasAccess('view_attribute_groups', 'view', group.code)}
                     onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'read', e.target.checked)}
                 />
@@ -683,25 +673,29 @@ export default function RoleFormPage({
         {
             key: 'edit',
             header: (
-                <>
-                    <Checkbox
-                        size="small"
-                        checked={groups.length > 0 && groups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))}
-                        indeterminate={
-                            groups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)) &&
-                            !groups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code))
-                        }
-                        onChange={(e) => setAllAccess('view_attribute_groups', 'edit_attribute_groups', groups.map((g) => g.code), 'edit', e.target.checked)}
-                    />
-                    {t('roleFormEditColumn')}
-                </>
+                <CheckBox
+                    text={t('roleFormEditColumn')}
+                    {...selectAllState(
+                        groups.length > 0 && groups.every((g) => hasAccess('edit_attribute_groups', 'edit', g.code)),
+                        groups.some((g) => hasAccess('edit_attribute_groups', 'edit', g.code)),
+                    )}
+                    onChange={(e) =>
+                        setAllAccess(
+                            'view_attribute_groups',
+                            'edit_attribute_groups',
+                            groups.map((g) => g.code),
+                            'edit',
+                            e.target.checked,
+                        )
+                    }
+                />
             ),
+            popinText: t('roleFormEditColumn'),
             priority: 'always',
             align: 'center',
             width: 100,
             render: (group) => (
-                <Checkbox
-                    size="small"
+                <CheckBox
                     checked={hasAccess('edit_attribute_groups', 'edit', group.code)}
                     onChange={(e) => setAccess('view_attribute_groups', 'edit_attribute_groups', group.code, 'edit', e.target.checked)}
                 />
@@ -719,25 +713,29 @@ export default function RoleFormPage({
         {
             key: 'read',
             header: (
-                <>
-                    <Checkbox
-                        size="small"
-                        checked={attrs.length > 0 && attrs.every((a) => hasAccess('view_attributes', 'view', a.code))}
-                        indeterminate={
-                            attrs.some((a) => hasAccess('view_attributes', 'view', a.code)) &&
-                            !attrs.every((a) => hasAccess('view_attributes', 'view', a.code))
-                        }
-                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attrs.map((a) => a.code), 'read', e.target.checked)}
-                    />
-                    {t('roleFormReadColumn')}
-                </>
+                <CheckBox
+                    text={t('roleFormReadColumn')}
+                    {...selectAllState(
+                        attrs.length > 0 && attrs.every((a) => hasAccess('view_attributes', 'view', a.code)),
+                        attrs.some((a) => hasAccess('view_attributes', 'view', a.code)),
+                    )}
+                    onChange={(e) =>
+                        setAllAccess(
+                            'view_attributes',
+                            'edit_attributes',
+                            attrs.map((a) => a.code),
+                            'read',
+                            e.target.checked,
+                        )
+                    }
+                />
             ),
+            popinText: t('roleFormReadColumn'),
             priority: 'always',
             align: 'center',
             width: 100,
             render: (attr) => (
-                <Checkbox
-                    size="small"
+                <CheckBox
                     checked={hasAccess('view_attributes', 'view', attr.code)}
                     onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'read', e.target.checked)}
                 />
@@ -746,28 +744,38 @@ export default function RoleFormPage({
         {
             key: 'edit',
             header: (
-                <>
-                    <Checkbox
-                        size="small"
-                        checked={attrs.length > 0 && attrs.every((a) => hasAccess('edit_attributes', 'edit', a.code))}
-                        indeterminate={
-                            attrs.some((a) => hasAccess('edit_attributes', 'edit', a.code)) &&
-                            !attrs.every((a) => hasAccess('edit_attributes', 'edit', a.code))
+                <FlexBox alignItems="Center" justifyContent="Center">
+                    <CheckBox
+                        text={t('roleFormEditColumn')}
+                        {...selectAllState(
+                            attrs.length > 0 && attrs.every((a) => hasAccess('edit_attributes', 'edit', a.code)),
+                            attrs.some((a) => hasAccess('edit_attributes', 'edit', a.code)),
+                        )}
+                        onChange={(e) =>
+                            setAllAccess(
+                                'view_attributes',
+                                'edit_attributes',
+                                attrs.map((a) => a.code),
+                                'edit',
+                                e.target.checked,
+                            )
                         }
-                        onChange={(e) => setAllAccess('view_attributes', 'edit_attributes', attrs.map((a) => a.code), 'edit', e.target.checked)}
                     />
-                    {t('roleFormEditColumn')}
-                    <Tooltip title={t('roleFormEditOverrideTooltip')}>
-                        <InfoOutlinedIcon fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle', color: FIORI.textSecondary }} />
-                    </Tooltip>
-                </>
+                    <Icon
+                        name="information"
+                        showTooltip
+                        accessibleName={t('roleFormEditOverrideTooltip')}
+                        design="NonInteractive"
+                        className={styles.infoIcon}
+                    />
+                </FlexBox>
             ),
+            popinText: t('roleFormEditColumn'),
             priority: 'always',
             align: 'center',
             width: 100,
             render: (attr) => (
-                <Checkbox
-                    size="small"
+                <CheckBox
                     checked={hasAccess('edit_attributes', 'edit', attr.code)}
                     onChange={(e) => setAccess('view_attributes', 'edit_attributes', attr.code, 'edit', e.target.checked)}
                 />
@@ -811,6 +819,8 @@ export default function RoleFormPage({
     const platformAttributeGroupColumns = makeAttributeGroupColumns(filteredPlatformAttributeGroups);
     const platformAttributeColumns = makeAttributeColumns(filteredPlatformAttributes);
 
+    const changesCount = permissionChanges.added.length + permissionChanges.removed.length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={isEdit ? `Edit ${role?.label}` : 'Create Role'} />
@@ -821,749 +831,617 @@ export default function RoleFormPage({
                 which is what actually scrolls) rather than the global header,
                 so it stays reachable on this very long form without competing
                 for shell-bar space. Same pattern as user-group-form.tsx. */}
-            <Box
-                component="form"
-                id="role-form"
-                onSubmit={submit}
-                sx={{ display: 'flex', flexDirection: 'column', minHeight: '100%', bgcolor: FIORI.pageBg }}
-            >
-                <Box sx={{ flex: 1, p: 4 }}>
-                <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary, mb: 3 }}>
-                    {isEdit ? 'UPDATE' : 'CREATE'}
-                </Typography>
+            <form id="role-form" onSubmit={submit} className={styles.form}>
+                <div className={styles.body}>
+                    <Title level="H3" style={{ marginBottom: '1.5rem' }}>
+                        {isEdit ? 'UPDATE' : 'CREATE'}
+                    </Title>
 
-                {/* The changes-summary popover itself lives here (Popover renders
-                    via a portal, so its physical position in the tree doesn't
-                    matter) — only its trigger badge moved down to the footer
-                    action bar, right next to Save/Cancel. */}
-                <Popover
-                    open={Boolean(changesAnchorEl)}
-                    anchorEl={changesAnchorEl}
-                    onClose={() => setChangesAnchorEl(null)}
-                    // Trigger now sits in the bottom footer bar, so the popover
-                    // opens upward from it (anchored at the button's top edge,
-                    // growing from its own bottom edge) instead of downward —
-                    // opening downward from a footer would push it off-screen.
-                    anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-                    transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                >
-                    <Box sx={{ p: 2, maxWidth: 420, maxHeight: 480, overflowY: 'auto' }}>
-                        {permissionChanges.added.length > 0 && (
-                            <Box sx={{ mb: permissionChanges.removed.length > 0 ? 2 : 0 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: FIORI.success, display: 'block', mb: 0.5 }}>
-                                    {t('roleFormChangesAddedSection', { count: permissionChanges.added.length })}
-                                </Typography>
-                                {permissionChanges.added.map(({ resourceKey, actionKey }) => (
-                                    <Typography key={`added:${resourceKey}:${actionKey}`} variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                        + {permissionEntryLabel(resourceKey, actionKey)}
-                                    </Typography>
-                                ))}
-                            </Box>
-                        )}
-                        {permissionChanges.removed.length > 0 && (
-                            <Box>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: FIORI.error, display: 'block', mb: 0.5 }}>
-                                    {t('roleFormChangesRemovedSection', { count: permissionChanges.removed.length })}
-                                </Typography>
-                                {permissionChanges.removed.map(({ resourceKey, actionKey }) => (
-                                    <Typography key={`removed:${resourceKey}:${actionKey}`} variant="body2" sx={{ color: FIORI.textPrimary }}>
-                                        − {permissionEntryLabel(resourceKey, actionKey)}
-                                    </Typography>
-                                ))}
-                            </Box>
-                        )}
-                    </Box>
-                </Popover>
+                    {/* The changes-summary popover itself lives here (Popover renders
+                        in the top layer, so its physical position in the tree doesn't
+                        matter) — only its trigger button lives in the footer
+                        action bar, right next to Save/Cancel. */}
+                    <Popover
+                        open={Boolean(changesAnchorEl)}
+                        opener={changesAnchorEl ?? undefined}
+                        onClose={() => setChangesAnchorEl(null)}
+                        // Trigger sits in the bottom footer bar, so the popover
+                        // opens upward from it — opening downward from a footer
+                        // would push it off-screen.
+                        placement="Top"
+                        horizontalAlign="Start"
+                    >
+                        <div className={styles.changesPopover}>
+                            {permissionChanges.added.length > 0 && (
+                                <div style={{ marginBottom: permissionChanges.removed.length > 0 ? '1rem' : 0 }}>
+                                    <span className={`${styles.changesHeading} ${styles.changesHeadingAdded}`}>
+                                        {t('roleFormChangesAddedSection', { count: permissionChanges.added.length })}
+                                    </span>
+                                    {permissionChanges.added.map(({ resourceKey, actionKey }) => (
+                                        <div key={`added:${resourceKey}:${actionKey}`} className={styles.changesItem}>
+                                            + {permissionEntryLabel(resourceKey, actionKey)}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {permissionChanges.removed.length > 0 && (
+                                <div>
+                                    <span className={`${styles.changesHeading} ${styles.changesHeadingRemoved}`}>
+                                        {t('roleFormChangesRemovedSection', { count: permissionChanges.removed.length })}
+                                    </span>
+                                    {permissionChanges.removed.map(({ resourceKey, actionKey }) => (
+                                        <div key={`removed:${resourceKey}:${actionKey}`} className={styles.changesItem}>
+                                            − {permissionEntryLabel(resourceKey, actionKey)}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </Popover>
 
-                <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ ...fioriTabsSx, mb: 3 }}>
-                    {TAB_KEYS.map((key, index) => (
-                        <Tab key={key} label={t(key)} value={index} />
-                    ))}
-                </Tabs>
+                    <TabContainer collapsed onTabSelect={(e) => setTab(e.detail.tabIndex)} style={{ marginBottom: '1.5rem' }}>
+                        {TAB_KEYS.map((key, index) => (
+                            <Tab key={key} text={t(key)} selected={tab === index} />
+                        ))}
+                    </TabContainer>
 
-                {tab === 0 && (
-                    <Box sx={{ maxWidth: 420 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                            Role Code *
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={data.code}
-                            disabled={!codeEditable}
-                            placeholder="e.g. role_1"
-                            onChange={(e) => {
-                                setData('code', normalizeCodeInput(e.target.value));
-                                clearErrors('code');
-                            }}
-                            error={Boolean(errors.code)}
-                            helperText={errors.code ?? tCatalog(codeHintKey({ canEditCode: codeEditable }))}
-                            sx={{ mb: 2.5 }}
-                        />
+                    {tab === 0 && (
+                        <FlexBox direction="Column" style={{ maxWidth: 420, gap: '1.25rem' }}>
+                            <div>
+                                <FieldLabel htmlFor="role-code" required>
+                                    Role Code
+                                </FieldLabel>
+                                <Input
+                                    id="role-code"
+                                    style={{ width: '100%' }}
+                                    value={data.code}
+                                    disabled={!codeEditable}
+                                    placeholder="e.g. role_1"
+                                    onInput={(e) => {
+                                        setData('code', normalizeCodeInput(e.target.value));
+                                        clearErrors('code');
+                                    }}
+                                    valueState={errors.code ? 'Negative' : 'None'}
+                                    valueStateMessage={errors.code ? <div>{errors.code}</div> : undefined}
+                                />
+                                <HelperText error={errors.code}>{tCatalog(codeHintKey({ canEditCode: codeEditable }))}</HelperText>
+                            </div>
 
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mb: 0.5 }}>
-                            Role Name *
-                        </Typography>
-                        <TextField
-                            fullWidth
-                            size="small"
-                            value={data.label}
-                            onChange={(e) => {
-                                setData('label', e.target.value);
-                                clearErrors('label');
-                            }}
-                            error={Boolean(errors.label)}
-                            helperText={errors.label}
-                        />
+                            <div>
+                                <FieldLabel htmlFor="role-label" required>
+                                    Role Name
+                                </FieldLabel>
+                                <Input
+                                    id="role-label"
+                                    style={{ width: '100%' }}
+                                    value={data.label}
+                                    onInput={(e) => {
+                                        setData('label', e.target.value);
+                                        clearErrors('label');
+                                    }}
+                                    valueState={errors.label ? 'Negative' : 'None'}
+                                    valueStateMessage={errors.label ? <div>{errors.label}</div> : undefined}
+                                />
+                                <HelperText error={errors.label} />
+                            </div>
 
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: FIORI.textPrimary, mt: 2.5, mb: 0.5 }}>
-                            Status
-                        </Typography>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={data.is_active}
-                                    disabled={isAdministratorRole || data.is_guest}
+                            <div>
+                                <FieldLabel htmlFor="role-status">Status</FieldLabel>
+                                <FlexBox alignItems="Center" style={{ gap: '0.5rem' }}>
+                                    <Switch
+                                        id="role-status"
+                                        checked={data.is_active}
+                                        disabled={isAdministratorRole || data.is_guest}
+                                        onChange={(e) => {
+                                            setData('is_active', e.target.checked);
+                                            clearErrors('is_active');
+                                        }}
+                                    />
+                                    <Text>{data.is_active ? 'Active' : 'Inactive'}</Text>
+                                </FlexBox>
+                                <HelperText error={errors.is_active}>
+                                    {isAdministratorRole
+                                        ? 'The Administrator role is always active.'
+                                        : data.is_guest
+                                          ? 'The guest role must stay active.'
+                                          : 'An inactive role grants none of its permissions to its users and groups.'}
+                                </HelperText>
+                            </div>
+
+                            <div className={styles.guestBlock}>
+                                <CheckBox
+                                    text="Guest role (applies to visitors who aren't logged in)"
+                                    wrappingType="Normal"
+                                    checked={data.is_guest}
                                     onChange={(e) => {
-                                        setData('is_active', e.target.checked);
-                                        clearErrors('is_active');
+                                        const checked = e.target.checked;
+                                        // The guest role must be active (see the Status hint above).
+                                        setData((prev) => ({ ...prev, is_guest: checked, is_active: checked ? true : prev.is_active }));
                                     }}
                                 />
-                            }
-                            label={data.is_active ? 'Active' : 'Inactive'}
-                        />
-                        <Typography variant="caption" color={errors.is_active ? 'error' : 'text.secondary'} sx={{ display: 'block', mt: -0.5 }}>
-                            {errors.is_active ??
-                                (isAdministratorRole
-                                    ? 'The Administrator role is always active.'
-                                    : data.is_guest
-                                      ? 'The guest role must stay active.'
-                                      : 'An inactive role grants none of its permissions to its users and groups.')}
-                        </Typography>
-
-                        <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${FIORI.border}` }}>
-                            <FormControlLabel
-                                control={
-                                    <Checkbox
-                                        checked={data.is_guest}
-                                        onChange={(e) => {
-                                            // The guest role must be active (see the Status hint above).
-                                            setData((prev) => ({ ...prev, is_guest: e.target.checked, is_active: e.target.checked ? true : prev.is_active }));
-                                        }}
-                                    />
-                                }
-                                label="Guest role (applies to visitors who aren't logged in)"
-                            />
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', pl: 4, mt: -0.5 }}>
-                                This role's Attribute Access restrictions (Permissions tab) govern what anonymous visitors see on the public
-                                product pages. Only one role can be marked as the guest role — checking this here will uncheck it on whichever
-                                role currently has it.
-                            </Typography>
-                        </Box>
-                    </Box>
-                )}
-
-                {tab === 1 && (
-                    <>
-                    <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 2, maxWidth: 720 }}>
-                        {t('roleFormPermissionsHint')}
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                        <TextField
-                            size="small"
-                            placeholder={t('searchByName')}
-                            value={permissionSearch}
-                            onChange={(e) => setPermissionSearch(e.target.value)}
-                            sx={{ width: 280 }}
-                            slotProps={{
-                                input: {
-                                    startAdornment: (
-                                        <InputAdornment position="start">
-                                            <SearchIcon fontSize="small" />
-                                        </InputAdornment>
-                                    ),
-                                },
-                            }}
-                        />
-                        <Button size="small" variant="text" onClick={toggleExpandAllResources} disabled={visibleResourceKeys.length === 0}>
-                            {allVisibleResourcesExpanded ? t('roleFormCollapseAll') : t('roleFormExpandAll')}
-                        </Button>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {filteredModuleEntries.length === 0 && (
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('noResultsFound')}
-                            </Typography>
-                        )}
-                        {filteredModuleEntries.map(([moduleKey, module, resourceEntries]) => {
-                            // While a search is active, force every matching module
-                            // open regardless of its remembered collapse state —
-                            // otherwise a module the admin had manually collapsed
-                            // still shows collapsed even though one of its resources
-                            // matched the search, so the match exists in
-                            // filteredModuleEntries but never actually renders.
-                            const isExpanded = permissionSearch.trim() ? true : (expandedModules[moduleKey] ?? true);
-                            const grantedCount = moduleGrantedResourceCount(moduleKey);
-                            const totalCount = Object.keys(module.resources || {}).length;
-                            return (
-                                <Box key={moduleKey} sx={{ mb: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => setExpandedModules({ ...expandedModules, [moduleKey]: !isExpanded })}
-                                            sx={{ p: 0 }}
-                                        >
-                                            {isExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                        </IconButton>
-                                        <Checkbox
-                                            size="small"
-                                            checked={isModuleFullyGranted(moduleKey)}
-                                            indeterminate={isModulePartiallyGranted(moduleKey)}
-                                            onChange={() => toggleModuleAll(moduleKey)}
-                                            sx={{ p: 0.5, mr: 0.5 }}
-                                        />
-                                        <Typography
-                                            variant="caption"
-                                            sx={{ fontWeight: 700, color: FIORI.textSecondary, textTransform: 'uppercase', cursor: 'pointer' }}
-                                            onClick={() => setExpandedModules({ ...expandedModules, [moduleKey]: !isExpanded })}
-                                        >
-                                            {module.label}
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, ml: 1 }}>
-                                            ({grantedCount}/{totalCount})
-                                        </Typography>
-                                    </Box>
-                                    {isExpanded && (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.1, pl: 4 }}>
-                                            {resourceEntries.map(([resourceKey, resource]) => {
-                                                const resourceExpanded = expandedResources[resourceKey] ?? false;
-                                                return (
-                                                    <Box key={resourceKey}>
-                                                        <Box
-                                                            sx={{
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: 0.5,
-                                                                py: 0.1,
-                                                                px: 0.5,
-                                                                borderRadius: '6px',
-                                                            }}
-                                                        >
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={() => setExpandedResources({ ...expandedResources, [resourceKey]: !resourceExpanded })}
-                                                                sx={{ p: 0 }}
-                                                            >
-                                                                {resourceExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                                            </IconButton>
-                                                            <Checkbox
-                                                                size="small"
-                                                                checked={isResourceFullyGranted(resourceKey)}
-                                                                indeterminate={isResourcePartiallyGranted(resourceKey)}
-                                                                onChange={() => toggleResourceAll(resourceKey)}
-                                                            />
-                                                            <Typography
-                                                                variant="body2"
-                                                                sx={{ cursor: 'pointer' }}
-                                                                onClick={() => setExpandedResources({ ...expandedResources, [resourceKey]: !resourceExpanded })}
-                                                            >
-                                                                {resource.label}
-                                                            </Typography>
-                                                        </Box>
-                                                        {resourceExpanded && (
-                                                            <Box sx={{ pl: 6, borderLeft: `1px solid ${FIORI.border}`, ml: 2 }}>
-                                                                {Object.entries(resource.actions).map(([actionKey, action]) => {
-                                                                    const hasChildren = Boolean(action.children);
-                                                                    const actionExpandKey = `${resourceKey}:${actionKey}`;
-                                                                    const actionExpanded = expandedActionsByResource[actionExpandKey] ?? true;
-
-                                                                    return (
-                                                                        <Box key={actionKey}>
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                                <FormControlLabel
-                                                                                    control={
-                                                                                        <Checkbox
-                                                                                            checked={isChecked(resourceKey, actionKey)}
-                                                                                            indeterminate={isParentIndeterminate(resourceKey, actionKey, action.children)}
-                                                                                            onChange={() => toggleAction(resourceKey, actionKey, action.children)}
-                                                                                        />
-                                                                                    }
-                                                                                    label={action.label}
-                                                                                    // FormControlLabel's label defaults to
-                                                                                    // Typography variant="body1" (1rem) when
-                                                                                    // given a plain string — bigger than the
-                                                                                    // resource row's own "body2" text right
-                                                                                    // above it, so the action (a level deeper)
-                                                                                    // was reading larger than its parent.
-                                                                                    slotProps={{ typography: { variant: 'body2' } }}
-                                                                                />
-                                                                                {hasChildren && (
-                                                                                    <IconButton
-                                                                                        size="small"
-                                                                                        onClick={() =>
-                                                                                            setExpandedActionsByResource({
-                                                                                                ...expandedActionsByResource,
-                                                                                                [actionExpandKey]: !actionExpanded,
-                                                                                            })
-                                                                                        }
-                                                                                    >
-                                                                                        {actionExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                                                                    </IconButton>
-                                                                                )}
-                                                                            </Box>
-                                                                            {hasChildren && actionExpanded && (
-                                                                                <Box
-                                                                                    sx={{
-                                                                                        pl: 4,
-                                                                                        borderLeft: `1px solid ${FIORI.border}`,
-                                                                                        ml: 2,
-                                                                                    }}
-                                                                                >
-                                                                                    {Object.entries(action.children!).map(([childKey, child]) => (
-                                                                                        <FormControlLabel
-                                                                                            key={childKey}
-                                                                                            control={
-                                                                                                <Checkbox
-                                                                                                    checked={isChecked(resourceKey, `${actionKey}.${childKey}`)}
-                                                                                                    onChange={() =>
-                                                                                                        toggleChild(
-                                                                                                            resourceKey,
-                                                                                                            actionKey,
-                                                                                                            childKey,
-                                                                                                            Object.keys(action.children!),
-                                                                                                        )
-                                                                                                    }
-                                                                                                />
-                                                                                            }
-                                                                                            label={child.label}
-                                                                                            sx={{ display: 'flex' }}
-                                                                                            slotProps={{ typography: { variant: 'body2' } }}
-                                                                                        />
-                                                                                    ))}
-                                                                                </Box>
-                                                                            )}
-                                                                        </Box>
-                                                                    );
-                                                                })}
-                                                            </Box>
-                                                        )}
-                                                    </Box>
-                                                );
-                                            })}
-                                        </Box>
-                                    )}
-                                </Box>
-                            );
-                        })}
-                    </Box>
-
-                    {/* Attribute Access Section - Only show if user has products permission */}
-                    {hasProductsPermission ? (
-                    <>
-                    {/* "General" and Platform-sourced (marketplace-synced) groups/
-                        attributes used to render as two full copies of this same
-                        group+attribute table layout stacked one under the other.
-                        A tab switches which scope is visible instead — same
-                        resource/action pair underneath either way
-                        (view_attribute_groups/edit_attribute_groups/
-                        view_attributes/edit_attributes), just a different list
-                        of rows. The tab itself only shows up once there's a
-                        Platform scope to switch to (see hasPlatformAttributeData). */}
-                    <Box sx={{ mt: 4, pt: 3, mb: 10, pb: 5, borderTop: `2px solid ${FIORI.border}`, width: '100%' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: FIORI.brand }}>
-                            📋 {t('roleFormAttributeAccessTitle')}
-                        </Typography>
-
-                        {hasPlatformAttributeData && (
-                            <Tabs
-                                value={attributeScope}
-                                onChange={(_, value) => setAttributeScope(value)}
-                                sx={{ ...fioriTabsSx, minHeight: 36, mb: 1 }}
-                            >
-                                <Tab label={t('roleFormAttributeScopeGeneral')} value="general" sx={{ minHeight: 36, py: 0.5 }} />
-                                <Tab label={t('roleFormAttributeScopePlatform')} value="platform" sx={{ minHeight: 36, py: 0.5 }} />
-                            </Tabs>
-                        )}
-
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 2 }}>
-                            {attributeScope === 'platform' ? t('roleFormPlatformAttributeAccessDescription') : t('roleFormAttributeAccessDescription')}
-                        </Typography>
-
-                        {attributeScope === 'platform' ? (
-                        <>
-                        {/* Platform Attribute Groups */}
-                        <Box sx={{ mb: 3 }}>
-                            <Box
-                                onClick={() => setExpandedPlatformGroups(!expandedPlatformGroups)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    mb: 2,
-                                    cursor: 'pointer',
-                                    p: 1,
-                                    bgcolor: FIORI.headerBg,
-                                    borderRadius: '8px',
-                                }}
-                            >
-                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
-                                    {expandedPlatformGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    🏷️ {t('roleFormPlatformAttributeGroupsTitle')}
-                                </Typography>
-                            </Box>
-
-                            {expandedPlatformGroups && (
-                                <>
-                                    <TextField
-                                        size="small"
-                                        placeholder={t('searchByName')}
-                                        value={platformGroupSearch}
-                                        onChange={(e) => setPlatformGroupSearch(e.target.value)}
-                                        sx={{ mb: 1.5, width: 280 }}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon fontSize="small" />
-                                                    </InputAdornment>
-                                                ),
-                                            },
-                                        }}
-                                    />
-                                    <FioriResponsiveTable
-                                        columns={platformAttributeGroupColumns}
-                                        rows={filteredPlatformAttributeGroups}
-                                        getRowKey={(group) => group.id}
-                                        rowSx={() => fioriTableRowSx(false)}
-                                        emptyMessage={t('noResultsFound')}
-                                    />
-                                </>
-                            )}
-                        </Box>
-
-                        {/* Platform Attributes */}
-                        <Box>
-                            <Box
-                                onClick={() => setExpandedPlatformAttributes(!expandedPlatformAttributes)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    mb: 2,
-                                    cursor: 'pointer',
-                                    p: 1,
-                                    bgcolor: FIORI.headerBg,
-                                    borderRadius: '8px',
-                                }}
-                            >
-                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
-                                    {expandedPlatformAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    ⚙️ {t('roleFormPlatformAttributesTitle')}
-                                </Typography>
-                            </Box>
-
-                            {expandedPlatformAttributes && (
-                                <>
-                                    <TextField
-                                        size="small"
-                                        placeholder={t('searchByName')}
-                                        value={platformAttributeSearch}
-                                        onChange={(e) => setPlatformAttributeSearch(e.target.value)}
-                                        sx={{ mb: 1.5, width: 280 }}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon fontSize="small" />
-                                                    </InputAdornment>
-                                                ),
-                                            },
-                                        }}
-                                    />
-                                    <FioriResponsiveTable
-                                        stickyHeader
-                                        maxHeight={500}
-                                        columns={platformAttributeColumns}
-                                        rows={filteredPlatformAttributes}
-                                        getRowKey={(attr) => attr.id}
-                                        rowSx={() => fioriTableRowSx(false)}
-                                        emptyMessage={t('noResultsFound')}
-                                    />
-                                </>
-                            )}
-                        </Box>
-                        </>
-                        ) : (
-                        <>
-                        {/* Attribute Groups */}
-                        <Box sx={{ mb: 3 }}>
-                            <Box
-                                onClick={() => setExpandedAttrGroups(!expandedAttrGroups)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    mb: 2,
-                                    cursor: 'pointer',
-                                    p: 1,
-                                    bgcolor: FIORI.headerBg,
-                                    borderRadius: '8px',
-                                }}
-                            >
-                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
-                                    {expandedAttrGroups ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    🏷️ {t('roleFormAttributeGroupsTitle')}
-                                </Typography>
-                            </Box>
-
-                            {expandedAttrGroups && (
-                                <>
-                                    <TextField
-                                        size="small"
-                                        placeholder={t('searchByName')}
-                                        value={attrGroupSearch}
-                                        onChange={(e) => setAttrGroupSearch(e.target.value)}
-                                        sx={{ mb: 1.5, width: 280 }}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon fontSize="small" />
-                                                    </InputAdornment>
-                                                ),
-                                            },
-                                        }}
-                                    />
-                                    <FioriResponsiveTable
-                                        columns={attributeGroupColumns}
-                                        rows={filteredAttributeGroups}
-                                        getRowKey={(group) => group.id}
-                                        rowSx={() => fioriTableRowSx(false)}
-                                        emptyMessage={t('noResultsFound')}
-                                    />
-                                </>
-                            )}
-                        </Box>
-
-                        {/* Attributes */}
-                        <Box>
-                            <Box
-                                onClick={() => setExpandedAttributes(!expandedAttributes)}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    mb: 2,
-                                    cursor: 'pointer',
-                                    p: 1,
-                                    bgcolor: FIORI.headerBg,
-                                    borderRadius: '8px',
-                                }}
-                            >
-                                <IconButton size="small" sx={{ p: 0, mr: 1 }}>
-                                    {expandedAttributes ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                                </IconButton>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                    ⚙️ {t('roleFormIndividualAttributesTitle')}
-                                </Typography>
-                            </Box>
-
-                            {expandedAttributes && (
-                                <>
-                                    <TextField
-                                        size="small"
-                                        placeholder={t('searchByName')}
-                                        value={attributeSearch}
-                                        onChange={(e) => setAttributeSearch(e.target.value)}
-                                        sx={{ mb: 1.5, width: 280 }}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon fontSize="small" />
-                                                    </InputAdornment>
-                                                ),
-                                            },
-                                        }}
-                                    />
-                                    {/* maxHeight ต้องอยู่บน FioriResponsiveTable เอง (ไม่ใช่ Box ที่ห่อ
-                                    ข้างนอกแบบเดิม) — TableContainer ข้างในมันตั้ง overflow-x:auto
-                                    เป็นของตัวเองเสมออยู่แล้ว กลายเป็น scrolling ancestor ที่ใกล้กว่า
-                                    Box ข้างนอก ทำให้ stickyHeader เกาะกับ Box ข้างนอกไม่ได้จริงๆ
-                                    (เลื่อนพ้นไปแล้วหัวตารางก็หายไปด้วย) ดู FioriResponsiveTable ทีคอมเมนต์ */}
-                                    <FioriResponsiveTable
-                                        stickyHeader
-                                        maxHeight={500}
-                                        columns={attributeColumns}
-                                        rows={filteredAttributes}
-                                        getRowKey={(attr) => attr.id}
-                                        rowSx={() => fioriTableRowSx(false)}
-                                        emptyMessage={t('noResultsFound')}
-                                    />
-                                </>
-                            )}
-                        </Box>
-                        </>
-                        )}
-                    </Box>
-                    </>
-                    ) : (
-                        <Box sx={{ mt: 2, pt: 3, p: 2, bgcolor: '#FFF4E5', border: `1px solid ${FIORI.warning}`, borderRadius: '8px' }}>
-                            <Typography variant="body2" sx={{ color: FIORI.warning }}>
-                                ⚠️ {t('roleFormProductsPermissionRequired')}
-                            </Typography>
-                        </Box>
+                                <span className={styles.helper} style={{ paddingLeft: '2.75rem' }}>
+                                    This role's Attribute Access restrictions (Permissions tab) govern what anonymous visitors see on the public
+                                    product pages. Only one role can be marked as the guest role — checking this here will uncheck it on whichever
+                                    role currently has it.
+                                </span>
+                            </div>
+                        </FlexBox>
                     )}
-                    </>
-                )}
 
-                {tab === 2 && (
-                    <FioriResponsiveTable
-                        columns={userColumns}
-                        rows={users}
-                        getRowKey={(user) => user.id}
-                        rowSx={(user) => fioriTableRowSx(data.users.includes(user.id))}
-                        emptyMessage="No users found."
-                    />
-                )}
+                    {tab === 1 && (
+                        <>
+                            <span className={styles.helper} style={{ marginBottom: '1rem', maxWidth: 720 }}>
+                                {t('roleFormPermissionsHint')}
+                            </span>
 
-                {tab === 3 && (
-                    <Box sx={{ maxWidth: 640 }}>
-                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mb: 3 }}>
-                            {t('roleFormShopsHint')}
-                        </Typography>
+                            <FlexBox alignItems="Center" style={{ gap: '0.75rem', marginBottom: '1rem' }}>
+                                <SearchInput value={permissionSearch} onChange={setPermissionSearch} placeholder={t('searchByName')} />
+                                <Button design="Transparent" onClick={toggleExpandAllResources} disabled={visibleResourceKeys.length === 0}>
+                                    {allVisibleResourcesExpanded ? t('roleFormCollapseAll') : t('roleFormExpandAll')}
+                                </Button>
+                            </FlexBox>
 
-                        {shopsByPlatform.length === 0 && (
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('roleFormShopsNoShops')}
-                            </Typography>
-                        )}
+                            <FlexBox direction="Column" style={{ gap: '0.5rem' }}>
+                                {filteredModuleEntries.length === 0 && <Text className={styles.secondaryText}>{t('noResultsFound')}</Text>}
+                                {filteredModuleEntries.map(([moduleKey, module, resourceEntries]) => {
+                                    // While a search is active, force every matching module
+                                    // open regardless of its remembered collapse state —
+                                    // otherwise a module the admin had manually collapsed
+                                    // still shows collapsed even though one of its resources
+                                    // matched the search, so the match exists in
+                                    // filteredModuleEntries but never actually renders.
+                                    const isExpanded = permissionSearch.trim() ? true : (expandedModules[moduleKey] ?? true);
+                                    const grantedCount = moduleGrantedResourceCount(moduleKey);
+                                    const totalCount = Object.keys(module.resources || {}).length;
+                                    const toggleModuleExpanded = () => setExpandedModules({ ...expandedModules, [moduleKey]: !isExpanded });
+                                    const moduleFull = isModuleFullyGranted(moduleKey);
+                                    const modulePartial = isModulePartiallyGranted(moduleKey);
+                                    return (
+                                        <div key={moduleKey} style={{ marginBottom: '0.5rem' }}>
+                                            <FlexBox alignItems="Center" style={{ marginBottom: '0.5rem' }}>
+                                                <ExpandToggle expanded={isExpanded} onClick={toggleModuleExpanded} />
+                                                <CheckBox
+                                                    checked={moduleFull || modulePartial}
+                                                    indeterminate={modulePartial && !moduleFull}
+                                                    onChange={() => toggleModuleAll(moduleKey)}
+                                                    accessibleName={module.label}
+                                                />
+                                                <span className={styles.moduleLabel} onClick={toggleModuleExpanded}>
+                                                    {module.label}
+                                                </span>
+                                                <span
+                                                    className={styles.secondaryText}
+                                                    style={{ marginLeft: '0.5rem', fontSize: 'var(--sapFontSmallSize)' }}
+                                                >
+                                                    ({grantedCount}/{totalCount})
+                                                </span>
+                                            </FlexBox>
+                                            {isExpanded && (
+                                                <FlexBox direction="Column" style={{ paddingLeft: '2rem' }}>
+                                                    {resourceEntries.map(([resourceKey, resource]) => {
+                                                        const resourceExpanded = expandedResources[resourceKey] ?? false;
+                                                        const toggleResourceExpanded = () =>
+                                                            setExpandedResources({ ...expandedResources, [resourceKey]: !resourceExpanded });
+                                                        const resourceFull = isResourceFullyGranted(resourceKey);
+                                                        const resourcePartial = isResourcePartiallyGranted(resourceKey);
+                                                        return (
+                                                            <div key={resourceKey}>
+                                                                <FlexBox alignItems="Center" style={{ gap: '0.25rem', padding: '0 0.25rem' }}>
+                                                                    <ExpandToggle expanded={resourceExpanded} onClick={toggleResourceExpanded} />
+                                                                    <CheckBox
+                                                                        checked={resourceFull || resourcePartial}
+                                                                        indeterminate={resourcePartial && !resourceFull}
+                                                                        onChange={() => toggleResourceAll(resourceKey)}
+                                                                        accessibleName={resource.label}
+                                                                    />
+                                                                    <span className={styles.resourceLabel} onClick={toggleResourceExpanded}>
+                                                                        {resource.label}
+                                                                    </span>
+                                                                </FlexBox>
+                                                                {resourceExpanded && (
+                                                                    <div className={styles.treeBranch} style={{ paddingLeft: '3rem' }}>
+                                                                        {Object.entries(resource.actions).map(([actionKey, action]) => {
+                                                                            const hasChildren = Boolean(action.children);
+                                                                            const actionExpandKey = `${resourceKey}:${actionKey}`;
+                                                                            const actionExpanded = expandedActionsByResource[actionExpandKey] ?? true;
+                                                                            const actionChecked = isChecked(resourceKey, actionKey);
+                                                                            const actionPartial = isParentIndeterminate(
+                                                                                resourceKey,
+                                                                                actionKey,
+                                                                                action.children,
+                                                                            );
 
-                        {shopsByPlatform.map(({ platformId, platformName, shops: platformShops }) => {
-                            const isRestricted = data.restricted_platforms.includes(platformId);
-                            const checkedCount = platformShops.filter((shop) => data.shop_ids.includes(shop.id)).length;
-
-                            return (
-                                <Box key={platformId} sx={{ mb: 3, pb: 3, borderBottom: `1px solid ${FIORI.border}` }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 700, color: FIORI.textPrimary, mb: 1 }}>
-                                        {platformName}
-                                    </Typography>
-
-                                    <FormControlLabel
-                                        control={<Checkbox size="small" checked={isRestricted} onChange={() => toggleRestrictPlatform(platformId)} />}
-                                        label={t('roleFormShopsRestrictToggle')}
-                                        sx={{ mb: 0.5 }}
-                                    />
-
-                                    {isRestricted ? (
-                                        <>
-                                            {checkedCount === 0 && (
-                                                <Typography variant="caption" sx={{ color: FIORI.warning, display: 'block', pl: 4, mb: 0.5 }}>
-                                                    {t('roleFormShopsZeroSelectedWarning')}
-                                                </Typography>
+                                                                            return (
+                                                                                <div key={actionKey}>
+                                                                                    <FlexBox alignItems="Center">
+                                                                                        <CheckBox
+                                                                                            text={action.label}
+                                                                                            checked={actionChecked || actionPartial}
+                                                                                            indeterminate={actionPartial}
+                                                                                            onChange={() =>
+                                                                                                toggleAction(resourceKey, actionKey, action.children)
+                                                                                            }
+                                                                                        />
+                                                                                        {hasChildren && (
+                                                                                            <ExpandToggle
+                                                                                                expanded={actionExpanded}
+                                                                                                onClick={() =>
+                                                                                                    setExpandedActionsByResource({
+                                                                                                        ...expandedActionsByResource,
+                                                                                                        [actionExpandKey]: !actionExpanded,
+                                                                                                    })
+                                                                                                }
+                                                                                            />
+                                                                                        )}
+                                                                                    </FlexBox>
+                                                                                    {hasChildren && actionExpanded && (
+                                                                                        <FlexBox
+                                                                                            direction="Column"
+                                                                                            alignItems="Start"
+                                                                                            className={styles.treeBranch}
+                                                                                            style={{ paddingLeft: '2rem' }}
+                                                                                        >
+                                                                                            {Object.entries(action.children!).map(
+                                                                                                ([childKey, child]) => (
+                                                                                                    <CheckBox
+                                                                                                        key={childKey}
+                                                                                                        text={child.label}
+                                                                                                        checked={isChecked(
+                                                                                                            resourceKey,
+                                                                                                            `${actionKey}.${childKey}`,
+                                                                                                        )}
+                                                                                                        onChange={() =>
+                                                                                                            toggleChild(
+                                                                                                                resourceKey,
+                                                                                                                actionKey,
+                                                                                                                childKey,
+                                                                                                                Object.keys(action.children!),
+                                                                                                            )
+                                                                                                        }
+                                                                                                    />
+                                                                                                ),
+                                                                                            )}
+                                                                                        </FlexBox>
+                                                                                    )}
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </FlexBox>
                                             )}
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', pl: 4 }}>
-                                                {platformShops.map((shop) => (
-                                                    <FormControlLabel
-                                                        key={shop.id}
-                                                        control={
-                                                            <Checkbox
-                                                                size="small"
-                                                                checked={data.shop_ids.includes(shop.id)}
-                                                                onChange={() => toggleShop(shop.id)}
-                                                            />
-                                                        }
-                                                        label={shop.name}
-                                                        slotProps={{ typography: { variant: 'body2' } }}
-                                                    />
-                                                ))}
-                                            </Box>
+                                        </div>
+                                    );
+                                })}
+                            </FlexBox>
+
+                            {/* Attribute Access Section - Only show if user has products permission */}
+                            {hasProductsPermission ? (
+                                // "General" and Platform-sourced (marketplace-synced) groups/
+                                // attributes used to render as two full copies of this same
+                                // group+attribute table layout stacked one under the other.
+                                // A tab switches which scope is visible instead — same
+                                // resource/action pair underneath either way
+                                // (view_attribute_groups/edit_attribute_groups/
+                                // view_attributes/edit_attributes), just a different list
+                                // of rows. The tab itself only shows up once there's a
+                                // Platform scope to switch to (see hasPlatformAttributeData).
+                                <div className={styles.attributeAccess}>
+                                    <Title level="H5" className={styles.attributeAccessTitle}>
+                                        📋 {t('roleFormAttributeAccessTitle')}
+                                    </Title>
+
+                                    {hasPlatformAttributeData && (
+                                        <TabContainer
+                                            collapsed
+                                            onTabSelect={(e) => setAttributeScope(e.detail.tabIndex === 1 ? 'platform' : 'general')}
+                                            style={{ marginBottom: '0.5rem' }}
+                                        >
+                                            <Tab text={t('roleFormAttributeScopeGeneral')} selected={attributeScope === 'general'} />
+                                            <Tab text={t('roleFormAttributeScopePlatform')} selected={attributeScope === 'platform'} />
+                                        </TabContainer>
+                                    )}
+
+                                    <span className={styles.helper} style={{ marginBottom: '1rem' }}>
+                                        {attributeScope === 'platform'
+                                            ? t('roleFormPlatformAttributeAccessDescription')
+                                            : t('roleFormAttributeAccessDescription')}
+                                    </span>
+
+                                    {attributeScope === 'platform' ? (
+                                        <>
+                                            {/* Platform Attribute Groups */}
+                                            <div style={{ marginBottom: '1.5rem' }}>
+                                                <SectionHeader
+                                                    expanded={expandedPlatformGroups}
+                                                    onToggle={() => setExpandedPlatformGroups(!expandedPlatformGroups)}
+                                                >
+                                                    🏷️ {t('roleFormPlatformAttributeGroupsTitle')}
+                                                </SectionHeader>
+
+                                                {expandedPlatformGroups && (
+                                                    <>
+                                                        <SearchInput
+                                                            value={platformGroupSearch}
+                                                            onChange={setPlatformGroupSearch}
+                                                            placeholder={t('searchByName')}
+                                                            style={{ marginBottom: '0.75rem' }}
+                                                        />
+                                                        <FioriResponsiveTable
+                                                            columns={platformAttributeGroupColumns}
+                                                            rows={filteredPlatformAttributeGroups}
+                                                            getRowKey={(group) => group.id}
+                                                            emptyMessage={t('noResultsFound')}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Platform Attributes */}
+                                            <div>
+                                                <SectionHeader
+                                                    expanded={expandedPlatformAttributes}
+                                                    onToggle={() => setExpandedPlatformAttributes(!expandedPlatformAttributes)}
+                                                >
+                                                    ⚙️ {t('roleFormPlatformAttributesTitle')}
+                                                </SectionHeader>
+
+                                                {expandedPlatformAttributes && (
+                                                    <>
+                                                        <SearchInput
+                                                            value={platformAttributeSearch}
+                                                            onChange={setPlatformAttributeSearch}
+                                                            placeholder={t('searchByName')}
+                                                            style={{ marginBottom: '0.75rem' }}
+                                                        />
+                                                        <FioriResponsiveTable
+                                                            stickyHeader
+                                                            maxHeight={500}
+                                                            columns={platformAttributeColumns}
+                                                            rows={filteredPlatformAttributes}
+                                                            getRowKey={(attr) => attr.id}
+                                                            emptyMessage={t('noResultsFound')}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
                                         </>
                                     ) : (
-                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', pl: 4 }}>
-                                            {t('roleFormShopsUnrestrictedNote')}
-                                        </Typography>
+                                        <>
+                                            {/* Attribute Groups */}
+                                            <div style={{ marginBottom: '1.5rem' }}>
+                                                <SectionHeader
+                                                    expanded={expandedAttrGroups}
+                                                    onToggle={() => setExpandedAttrGroups(!expandedAttrGroups)}
+                                                >
+                                                    🏷️ {t('roleFormAttributeGroupsTitle')}
+                                                </SectionHeader>
+
+                                                {expandedAttrGroups && (
+                                                    <>
+                                                        <SearchInput
+                                                            value={attrGroupSearch}
+                                                            onChange={setAttrGroupSearch}
+                                                            placeholder={t('searchByName')}
+                                                            style={{ marginBottom: '0.75rem' }}
+                                                        />
+                                                        <FioriResponsiveTable
+                                                            columns={attributeGroupColumns}
+                                                            rows={filteredAttributeGroups}
+                                                            getRowKey={(group) => group.id}
+                                                            emptyMessage={t('noResultsFound')}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Attributes */}
+                                            <div>
+                                                <SectionHeader
+                                                    expanded={expandedAttributes}
+                                                    onToggle={() => setExpandedAttributes(!expandedAttributes)}
+                                                >
+                                                    ⚙️ {t('roleFormIndividualAttributesTitle')}
+                                                </SectionHeader>
+
+                                                {expandedAttributes && (
+                                                    <>
+                                                        <SearchInput
+                                                            value={attributeSearch}
+                                                            onChange={setAttributeSearch}
+                                                            placeholder={t('searchByName')}
+                                                            style={{ marginBottom: '0.75rem' }}
+                                                        />
+                                                        {/* maxHeight ต้องอยู่บน FioriResponsiveTable เอง (ไม่ใช่ div ที่ห่อ
+                                                        ข้างนอก) — ไม่งั้น sticky header จะเกาะกับ container ข้างนอกไม่ได้จริงๆ
+                                                        (เลื่อนพ้นไปแล้วหัวตารางก็หายไปด้วย) ดู FioriResponsiveTable ทีคอมเมนต์ */}
+                                                        <FioriResponsiveTable
+                                                            stickyHeader
+                                                            maxHeight={500}
+                                                            columns={attributeColumns}
+                                                            rows={filteredAttributes}
+                                                            getRowKey={(attr) => attr.id}
+                                                            emptyMessage={t('noResultsFound')}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+                                        </>
                                     )}
-                                </Box>
-                            );
-                        })}
-                    </Box>
-                )}
-                </Box>
+                                </div>
+                            ) : (
+                                <div className={styles.warningBox}>
+                                    <Text className={styles.warningText}>⚠️ {t('roleFormProductsPermissionRequired')}</Text>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {tab === 2 && (
+                        <FioriResponsiveTable
+                            columns={userColumns}
+                            rows={users}
+                            getRowKey={(user) => user.id}
+                            rowClassName={(user: RoleUserOption) => (data.users.includes(user.id) ? styles.selectedRow : undefined)}
+                            emptyMessage="No users found."
+                        />
+                    )}
+
+                    {tab === 3 && (
+                        <div style={{ maxWidth: 640 }}>
+                            <span className={styles.helper} style={{ marginBottom: '1.5rem' }}>
+                                {t('roleFormShopsHint')}
+                            </span>
+
+                            {shopsByPlatform.length === 0 && <Text className={styles.secondaryText}>{t('roleFormShopsNoShops')}</Text>}
+
+                            {shopsByPlatform.map(({ platformId, platformName, shops: platformShops }) => {
+                                const isRestricted = data.restricted_platforms.includes(platformId);
+                                const checkedCount = platformShops.filter((shop) => data.shop_ids.includes(shop.id)).length;
+
+                                return (
+                                    <div key={platformId} className={styles.platformBlock}>
+                                        <Title level="H6" style={{ marginBottom: '0.5rem' }}>
+                                            {platformName}
+                                        </Title>
+
+                                        <CheckBox
+                                            text={t('roleFormShopsRestrictToggle')}
+                                            wrappingType="Normal"
+                                            checked={isRestricted}
+                                            onChange={() => toggleRestrictPlatform(platformId)}
+                                        />
+
+                                        {isRestricted ? (
+                                            <>
+                                                {checkedCount === 0 && (
+                                                    <span className={`${styles.helper} ${styles.warningText}`} style={{ paddingLeft: '2rem' }}>
+                                                        {t('roleFormShopsZeroSelectedWarning')}
+                                                    </span>
+                                                )}
+                                                <FlexBox direction="Column" alignItems="Start" style={{ paddingLeft: '2rem' }}>
+                                                    {platformShops.map((shop) => (
+                                                        <CheckBox
+                                                            key={shop.id}
+                                                            text={shop.name}
+                                                            checked={data.shop_ids.includes(shop.id)}
+                                                            onChange={() => toggleShop(shop.id)}
+                                                        />
+                                                    ))}
+                                                </FlexBox>
+                                            </>
+                                        ) : (
+                                            <span className={styles.helper} style={{ paddingLeft: '2rem' }}>
+                                                {t('roleFormShopsUnrestrictedNote')}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
 
                 {/* Fiori footer action bar — ปุ่มอยู่ล่างสุด ติดขอบ ไม่ใช่บน header */}
-                <Box
-                    sx={{
-                        position: 'sticky',
-                        bottom: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        gap: 1,
-                        px: 4,
-                        py: 2,
-                        bgcolor: FIORI.surface,
-                        borderTop: `1px solid ${FIORI.border}`,
-                        zIndex: 10, // ป้องกัน footer bar ถูก popover ของ permission changes summary ทับ
-                    }}
-                >
+                <div className={styles.footer}>
                     {/* Diffs the live permissions against the snapshot the page
                         loaded with (see initialPermissionsRef) — only meaningful
                         once there's a saved baseline to compare against, so this
                         stays hidden entirely while creating a brand-new role.
-                        `mr: 'auto'` absorbs the row's leftover space so it sits
-                        at the left while Cancel/Save stay pinned to the right,
-                        regardless of the container's own justifyContent. */}
-                    {isEdit && (permissionChanges.added.length > 0 || permissionChanges.removed.length > 0) && (
-                        <Box
-                            sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                flexWrap: 'wrap',
-                                mr: 'auto',
-                                px: 1.5,
-                                py: 0.75,
-                                borderRadius: '8px',
-                                bgcolor: FIORI.warningBg,
-                                border: `1px solid ${FIORI.warning}`,
-                            }}
-                        >
-                            <Box sx={{ width: 8, height: 8, borderRadius: '2px', bgcolor: FIORI.warning, flexShrink: 0 }} />
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: FIORI.textPrimary }}>
-                                {t('roleFormChangesSummaryTitle', { count: permissionChanges.added.length + permissionChanges.removed.length })}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: FIORI.textSecondary }}>
-                                {t('roleFormChangesSummaryDetail', { added: permissionChanges.added.length, removed: permissionChanges.removed.length })}
-                            </Typography>
-                            <Button
-                                size="small"
-                                onClick={(e) => setChangesAnchorEl(e.currentTarget)}
-                                sx={{ minWidth: 0, textTransform: 'none', fontWeight: 600, py: 0 }}
-                            >
+                        `margin-right: auto` absorbs the row's leftover space so it
+                        sits at the left while Cancel/Save stay pinned to the right. */}
+                    {isEdit && changesCount > 0 && (
+                        <div className={styles.changesBadge}>
+                            <span className={styles.changesDot} />
+                            <Text style={{ fontWeight: 700 }}>{t('roleFormChangesSummaryTitle', { count: changesCount })}</Text>
+                            <Text className={styles.secondaryText}>
+                                {t('roleFormChangesSummaryDetail', {
+                                    added: permissionChanges.added.length,
+                                    removed: permissionChanges.removed.length,
+                                })}
+                            </Text>
+                            <Button design="Transparent" onClick={(e) => setChangesAnchorEl(e.currentTarget as HTMLElement)}>
                                 {t('roleFormViewChanges')}
                             </Button>
-                        </Box>
+                        </div>
                     )}
 
-                    <Button variant="contained" color="inherit" onClick={cancel} sx={{ ...fioriDefaultSx, px: 3 }}>
-                        CANCEL
-                    </Button>
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={processing || !hasChanges}
-                        startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
-                        sx={{ ...fioriEmphasizedSx, px: 3 }}
-                    >
+                    <Button onClick={cancel}>CANCEL</Button>
+                    <Button type="Submit" design="Emphasized" disabled={processing || !hasChanges} loading={processing} loadingDelay={0}>
                         {processing ? 'Saving…' : 'Save'}
                     </Button>
-                </Box>
-            </Box>
+                </div>
+            </form>
         </AppLayout>
+    );
+}
+
+function FieldLabel({ htmlFor, required = false, children }: { htmlFor: string; required?: boolean; children: ReactNode }) {
+    return (
+        <Label
+            for={htmlFor}
+            required={required}
+            showColon={false}
+            wrappingType="Normal"
+            style={{ display: 'block', fontWeight: 600, marginBottom: '0.25rem' }}
+        >
+            {children}
+        </Label>
+    );
+}
+
+/** error (สีแดง) ถ้ามี ไม่งั้นแสดง hint ปกติ — แทน helperText ของ MUI TextField */
+function HelperText({ error, children }: { error?: string; children?: ReactNode }) {
+    const content = error ?? children;
+    if (!content) return null;
+    return <span className={error ? `${styles.helper} ${styles.helperError}` : styles.helper}>{content}</span>;
+}
+
+function ExpandToggle({ expanded, onClick }: { expanded: boolean; onClick: () => void }) {
+    const label = expanded ? 'Collapse' : 'Expand';
+    return (
+        <Button
+            design="Transparent"
+            icon={expanded ? 'navigation-up-arrow' : 'navigation-down-arrow'}
+            tooltip={label}
+            accessibleName={label}
+            onClick={onClick}
+        />
+    );
+}
+
+/** หัว section แบบพับได้ของตาราง Attribute Access (คลิกทั้งแถวเพื่อพับ/ขยาย) */
+function SectionHeader({ expanded, onToggle, children }: { expanded: boolean; onToggle: () => void; children: ReactNode }) {
+    return (
+        <div className={styles.sectionHeader} onClick={onToggle}>
+            <Icon name={expanded ? 'navigation-up-arrow' : 'navigation-down-arrow'} className={styles.sectionHeaderIcon} />
+            <span className={styles.sectionHeaderTitle}>{children}</span>
+        </div>
+    );
+}
+
+function SearchInput({
+    value,
+    onChange,
+    placeholder,
+    style,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    style?: CSSProperties;
+}) {
+    return (
+        <Input
+            value={value}
+            placeholder={placeholder}
+            showClearIcon
+            icon={<Icon name="search" />}
+            onInput={(e) => onChange(e.target.value)}
+            style={{ width: 280, ...style }}
+        />
     );
 }

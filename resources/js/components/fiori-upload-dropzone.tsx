@@ -1,8 +1,9 @@
-import { FIORI } from '@/lib/fiori-style';
-import CloseIcon from '@mui/icons-material/Close';
-import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
-import { Box, FormHelperText, IconButton, LinearProgress, Stack, Typography } from '@mui/material';
+import '@ui5/webcomponents-icons/dist/decline.js';
+import '@ui5/webcomponents-icons/dist/upload-to-cloud.js';
+import { Button, Icon, ProgressIndicator } from '@ui5/webcomponents-react';
 import { useRef, useState, type DragEvent } from 'react';
+
+import styles from './fiori-upload-dropzone.module.css';
 
 export interface UploadDropzoneRow {
     id: string;
@@ -53,9 +54,24 @@ export function FioriUploadDropzoneTile({
         onFilesSelected(multiple ? Array.from(list) : [list[0]]);
     };
 
+    const tileClass = [styles.tile, dragging ? styles.dragging : hasError ? styles.error : '', disabled ? styles.disabled : '']
+        .filter(Boolean)
+        .join(' ');
+
     return (
-        <Box
+        <div
+            role="button"
+            tabIndex={disabled ? -1 : 0}
+            aria-disabled={disabled || undefined}
+            className={tileClass}
+            style={{ width, height }}
             onClick={openPicker}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openPicker();
+                }
+            }}
             onDragOver={(e: DragEvent<HTMLElement>) => {
                 e.preventDefault();
                 if (!disabled) setDragging(true);
@@ -66,41 +82,22 @@ export function FioriUploadDropzoneTile({
                 setDragging(false);
                 if (!disabled) handleList(e.dataTransfer.files);
             }}
-            sx={{
-                width,
-                height,
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 0.5,
-                border: '2px dashed',
-                borderColor: dragging ? FIORI.brand : hasError ? FIORI.error : FIORI.borderStrong,
-                borderRadius: 1,
-                bgcolor: dragging ? FIORI.selected : FIORI.surface,
-                cursor: disabled ? 'default' : 'pointer',
-                opacity: disabled ? 0.6 : 1,
-                transition: 'border-color 0.15s, background-color 0.15s',
-                '&:hover': disabled ? undefined : { borderColor: FIORI.brand },
-            }}
         >
-            <CloudUploadOutlinedIcon sx={{ fontSize: 28, color: hasError ? FIORI.error : FIORI.textSecondary }} />
-            <Typography variant="caption" sx={{ color: FIORI.brand, fontWeight: 600 }}>
-                {label}
-            </Typography>
+            <Icon name="upload-to-cloud" className={[styles.icon, hasError ? styles.iconError : ''].filter(Boolean).join(' ')} />
+            <span className={styles.label}>{label}</span>
             <input
                 ref={inputRef}
                 type="file"
                 hidden
                 accept={accept}
                 multiple={multiple}
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => {
                     handleList(e.target.files);
                     e.target.value = '';
                 }}
             />
-        </Box>
+        </div>
     );
 }
 
@@ -118,50 +115,38 @@ export function FileUploadRowsList({ error, rows, percentLabel, onRemoveRow }: F
     if (!error && rows.length === 0) return null;
 
     return (
-        <Box sx={{ mt: 1 }}>
-            {error && <FormHelperText error>{error}</FormHelperText>}
+        <div className={styles.rows}>
+            {error && <span className={styles.errorText}>{error}</span>}
             {rows.length > 0 && (
-                <Stack spacing={1} sx={{ mt: error ? 1 : 0 }}>
+                <div className={styles.rowList} style={{ marginTop: error ? '0.5rem' : 0 }}>
                     {rows.map((row) => (
-                        <Box key={row.id} sx={{ border: `1px solid ${FIORI.border}`, borderRadius: '0.375rem', px: 1.5, py: 1, maxWidth: 420 }}>
-                            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                                <Typography variant="body2" noWrap sx={{ color: FIORI.textPrimary, flex: 1, minWidth: 0 }}>
+                        <div key={row.id} className={styles.row}>
+                            <div className={styles.rowHeader}>
+                                <span className={styles.rowName} title={row.name}>
                                     {row.name}
-                                </Typography>
-                                <IconButton
-                                    size="small"
+                                </span>
+                                <Button
+                                    design="Transparent"
+                                    icon="decline"
+                                    accessibleName="remove file"
+                                    tooltip="Remove"
                                     onClick={() => onRemoveRow(row.id)}
-                                    sx={{ p: 0.25, color: FIORI.error }}
-                                    aria-label="remove file"
-                                >
-                                    <CloseIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                            </Stack>
+                                />
+                            </div>
                             {row.status === 'error' ? (
-                                <Typography variant="caption" sx={{ color: FIORI.error }}>
-                                    {row.error}
-                                </Typography>
+                                <span className={styles.errorText}>{row.error}</span>
                             ) : (
-                                <Box sx={{ mt: 0.5 }}>
-                                    <LinearProgress
-                                        variant="determinate"
-                                        value={row.progress}
-                                        sx={{
-                                            height: 6,
-                                            borderRadius: 3,
-                                            bgcolor: FIORI.hover,
-                                            '& .MuiLinearProgress-bar': { bgcolor: FIORI.success, borderRadius: 3 },
-                                        }}
-                                    />
-                                    <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', color: FIORI.textSecondary, mt: 0.25 }}>
-                                        {percentLabel(row.progress)}
-                                    </Typography>
-                                </Box>
+                                <ProgressIndicator
+                                    value={row.progress}
+                                    valueState="Positive"
+                                    displayValue={percentLabel(row.progress)}
+                                    style={{ marginTop: '0.25rem', width: '100%' }}
+                                />
                             )}
-                        </Box>
+                        </div>
                     ))}
-                </Stack>
+                </div>
             )}
-        </Box>
+        </div>
     );
 }

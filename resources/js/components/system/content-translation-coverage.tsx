@@ -1,23 +1,9 @@
-import TranslateIcon from '@mui/icons-material/Translate';
-import {
-    Box,
-    Button,
-    Chip,
-    CircularProgress,
-    IconButton,
-    InputAdornment,
-    LinearProgress,
-    Link as MuiLink,
-    Paper,
-    Stack,
-    TextField,
-    Tooltip,
-    Typography,
-} from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import { Link, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
 import { FioriResponsiveColumn, FioriResponsiveTable } from '@/components/fiori-responsive-table';
+import { router } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/search.js';
+import '@ui5/webcomponents-icons/dist/translate.js';
+import { Button, FlexBox, Icon, Input, Link, ProgressIndicator, Tag, Text, Title } from '@ui5/webcomponents-react';
+import { useMemo, useState } from 'react';
 
 export interface ContentMissingRow {
     id: number;
@@ -67,7 +53,7 @@ export function ContentTranslationCoverage({ localeId, groups }: { localeId: num
     };
 
     return (
-        <Stack spacing={2}>
+        <FlexBox direction="Column" style={{ gap: '1rem' }}>
             {groups.map((group) => (
                 <ContentGroupCard
                     key={group.key}
@@ -80,7 +66,7 @@ export function ContentTranslationCoverage({ localeId, groups }: { localeId: num
                     onTranslateOne={(id) => translateOne(group.key, id)}
                 />
             ))}
-        </Stack>
+        </FlexBox>
     );
 }
 
@@ -102,14 +88,13 @@ function ContentGroupCard({
     onTranslateOne: (id: number) => void;
 }) {
     const percent = group.total > 0 ? Math.round((group.translated / group.total) * 100) : 100;
-    const color = percent >= 100 ? '#22c55e' : percent >= 50 ? '#f59e0b' : '#ef4444';
+    // ไล่สีตามความครบ: เขียว ≥100%, เหลือง ≥50%, แดงต่ำกว่านั้น
+    const state = percent >= 100 ? ('Positive' as const) : percent >= 50 ? ('Critical' as const) : ('Negative' as const);
 
     const filteredMissing = useMemo(() => {
         const needle = search.trim().toLowerCase();
         if (!needle) return group.missing;
-        return group.missing.filter(
-            (row) => row.code.toLowerCase().includes(needle) || row.name.toLowerCase().includes(needle),
-        );
+        return group.missing.filter((row) => row.code.toLowerCase().includes(needle) || row.name.toLowerCase().includes(needle));
     }, [group.missing, search]);
 
     // Code identifies the row and Actions are the point of the table, so both
@@ -120,17 +105,13 @@ function ContentGroupCard({
             key: 'code',
             header: 'Code',
             priority: 'always',
-            render: (row) => (
-                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{row.code}</Typography>
-            ),
+            render: (row) => <Text style={{ fontFamily: 'monospace', fontSize: 'var(--sapFontSmallSize)' }}>{row.code}</Text>,
         },
         {
             key: 'name',
             header: 'Name',
             priority: 'high',
-            render: (row) => (
-                <Typography sx={{ fontSize: '0.8rem' }}>{row.name || '—'}</Typography>
-            ),
+            render: (row) => <Text style={{ fontSize: 'var(--sapFontSmallSize)' }}>{row.name || '—'}</Text>,
         },
         {
             key: 'actions',
@@ -142,83 +123,82 @@ function ContentGroupCard({
                 const isTranslating = translatingRowKey === rowKey;
 
                 return (
-                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                        <Tooltip title="Translate this one">
-                            <span>
-                                <IconButton size="small" disabled={isTranslating} onClick={() => onTranslateOne(row.id)}>
-                                    {isTranslating ? <CircularProgress size={16} /> : <TranslateIcon fontSize="small" />}
-                                </IconButton>
-                            </span>
-                        </Tooltip>
-                        <Tooltip title="Edit">
-                            <span>
-                                <MuiLink component={Link} href={row.editUrl} sx={{ display: 'flex', alignItems: 'center', px: 0.5 }}>
-                                    <Typography variant="caption">Edit</Typography>
-                                </MuiLink>
-                            </span>
-                        </Tooltip>
-                    </Stack>
+                    <FlexBox justifyContent="End" alignItems="Center" style={{ gap: '0.25rem' }}>
+                        <Button
+                            design="Transparent"
+                            icon="translate"
+                            tooltip="Translate this one"
+                            accessibleName="Translate this one"
+                            disabled={isTranslating}
+                            loading={isTranslating}
+                            onClick={() => onTranslateOne(row.id)}
+                        />
+                        <Link
+                            href={row.editUrl}
+                            tooltip="Edit"
+                            style={{ padding: '0 0.25rem', fontSize: 'var(--sapFontSmallSize)' }}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                router.visit(row.editUrl);
+                            }}
+                        >
+                            Edit
+                        </Link>
+                    </FlexBox>
                 );
             },
         },
     ];
 
     return (
-        <Paper variant="outlined" sx={{ borderRadius: 2, p: 2.5 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 1.5 }}>
-                <Box sx={{ flex: 1 }}>
-                    <Stack direction="row" alignItems="center" spacing={1.5}>
-                        <Typography variant="subtitle1" fontWeight={700}>
+        <div
+            style={{
+                background: 'var(--sapGroup_ContentBackground)',
+                border: '1px solid var(--sapGroup_ContentBorderColor)',
+                borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                padding: '1.25rem',
+            }}
+        >
+            <FlexBox justifyContent="SpaceBetween" alignItems="Center" style={{ gap: '1rem', marginBottom: '0.75rem' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <FlexBox alignItems="Center" style={{ gap: '0.75rem' }}>
+                        <Title level="H5" style={{ fontWeight: 700 }}>
                             {group.label}
-                        </Typography>
-                        <Chip
-                            label={`${group.translated} / ${group.total} · ${percent}%`}
-                            size="small"
-                            sx={{ bgcolor: color, color: '#fff', fontWeight: 600, height: 22, fontSize: '0.7rem' }}
-                        />
-                    </Stack>
-                    <LinearProgress
-                        variant="determinate"
-                        value={percent}
-                        sx={{
-                            mt: 1,
-                            height: 6,
-                            borderRadius: 3,
-                            bgcolor: '#e2e8f0',
-                            maxWidth: 320,
-                            '& .MuiLinearProgress-bar': { bgcolor: color },
-                        }}
-                    />
-                </Box>
+                        </Title>
+                        <Tag design={state} hideStateIcon>
+                            {`${group.translated} / ${group.total} · ${percent}%`}
+                        </Tag>
+                    </FlexBox>
+                    <ProgressIndicator value={percent} valueState={state} hideValue style={{ marginTop: '0.5rem', maxWidth: 320, height: 6 }} />
+                </div>
                 <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={translatingGroup ? <CircularProgress size={14} /> : <TranslateIcon fontSize="small" />}
+                    icon="translate"
+                    loading={translatingGroup}
                     disabled={translatingGroup || group.missing.length === 0}
                     onClick={onTranslateAll}
-                    sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                    style={{ whiteSpace: 'nowrap' }}
                 >
                     {translatingGroup ? 'Queuing…' : `Translate all missing (${group.missing.length})`}
                 </Button>
-            </Stack>
+            </FlexBox>
 
             {group.missing.length > 0 && (
                 <>
-                    <TextField
+                    <Input
                         value={search}
-                        onChange={(e) => onSearchChange(e.target.value)}
+                        onInput={(e) => onSearchChange(e.target.value)}
                         placeholder="Search code or name"
-                        size="small"
-                        sx={{ mb: 1, minWidth: 240 }}
-                        InputProps={{
-                            startAdornment: (
-                                <InputAdornment position="start">
-                                    <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                                </InputAdornment>
-                            ),
-                        }}
+                        icon={<Icon name="search" />}
+                        style={{ marginBottom: '0.5rem', minWidth: 240 }}
                     />
-                    <Box sx={{ maxHeight: 280, overflowY: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <div
+                        style={{
+                            maxHeight: 280,
+                            overflowY: 'auto',
+                            border: '1px solid var(--sapList_BorderColor)',
+                            borderRadius: 'var(--sapElement_BorderCornerRadius)',
+                        }}
+                    >
                         <FioriResponsiveTable
                             variant="plain"
                             size="small"
@@ -227,9 +207,9 @@ function ContentGroupCard({
                             getRowKey={(row) => row.id}
                             emptyMessage="No matches."
                         />
-                    </Box>
+                    </div>
                 </>
             )}
-        </Paper>
+        </div>
     );
 }

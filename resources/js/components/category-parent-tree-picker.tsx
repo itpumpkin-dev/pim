@@ -1,7 +1,5 @@
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { Box, Collapse, IconButton, Radio, Stack, Typography } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { Text, Tree, TreeItem } from '@ui5/webcomponents-react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 interface CategoryNode {
     id: number;
@@ -19,11 +17,15 @@ function findAncestorIds(nodes: CategoryNode[], targetId: number, path: number[]
     return null;
 }
 
+/** data-id of the pinned "root" option (no parent) */
+const ROOT_ID = '';
+
 /**
  * Single-select category tree, for picking a parent category (Create/Edit
  * Category forms) — same tree data source and expand/collapse shape as
- * category-tree-picker.tsx (product multi-select), but one radio-style
- * selection instead of checkboxes, plus a pinned "root" option.
+ * category-tree-picker.tsx (product multi-select), but one single selection
+ * (UI5 `Tree` with `selectionMode="Single"`) instead of checkboxes, plus a
+ * pinned "root" option.
  */
 export function CategoryParentTreePicker({
     value,
@@ -56,73 +58,59 @@ export function CategoryParentTreePicker({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [excludeId]);
 
-    const toggleExpand = (id: number) => {
+    const setNodeExpanded = (id: number, open: boolean) => {
         setExpanded((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) {
-                next.delete(id);
-            } else {
+            if (open) {
                 next.add(id);
+            } else {
+                next.delete(id);
             }
             return next;
         });
     };
 
-    const renderNode = (node: CategoryNode, depth: number) => {
-        const hasChildren = node.children.length > 0;
-        const isExpanded = expanded.has(node.id);
-        const isSelected = value === node.id;
-
-        return (
-            <Box key={node.id}>
-                <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={0.5}
-                    sx={{ pl: depth * 2.5, bgcolor: isSelected ? 'action.selected' : 'transparent', borderRadius: 1 }}
-                >
-                    {hasChildren ? (
-                        <IconButton size="small" onClick={() => toggleExpand(node.id)}>
-                            {isExpanded ? <ExpandMoreIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
-                        </IconButton>
-                    ) : (
-                        <Box sx={{ width: 32, flexShrink: 0 }} />
-                    )}
-                    <Radio size="small" checked={isSelected} onChange={() => onChange(node.id)} sx={{ p: 0.5 }} />
-                    <Typography variant="body2" sx={{ cursor: 'pointer' }} onClick={() => onChange(node.id)}>
-                        {node.name}
-                    </Typography>
-                </Stack>
-                {hasChildren && (
-                    <Collapse in={isExpanded}>{node.children.map((child) => renderNode(child, depth + 1))}</Collapse>
-                )}
-            </Box>
-        );
-    };
+    const renderNode = (node: CategoryNode): ReactNode => (
+        <TreeItem
+            key={node.id}
+            data-id={String(node.id)}
+            text={node.name}
+            selected={value === node.id}
+            expanded={expanded.has(node.id)}
+            hasChildren={node.children.length > 0}
+        >
+            {node.children.map(renderNode)}
+        </TreeItem>
+    );
 
     if (loading) {
-        return (
-            <Typography variant="body2" color="text.secondary">
-                กำลังโหลดหมวดหมู่...
-            </Typography>
-        );
+        return <Text style={{ color: 'var(--sapContent_LabelColor)' }}>กำลังโหลดหมวดหมู่...</Text>;
     }
 
     return (
-        <Box sx={{ maxHeight: 320, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
-            <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.5}
-                sx={{ bgcolor: value === '' ? 'action.selected' : 'transparent', borderRadius: 1, mb: 0.5 }}
+        <div
+            style={{
+                maxHeight: 320,
+                overflowY: 'auto',
+                border: '1px solid var(--sapGroup_ContentBorderColor)',
+                borderRadius: 'var(--sapElement_BorderCornerRadius)',
+            }}
+        >
+            <Tree
+                selectionMode="Single"
+                onItemToggle={(e) => {
+                    const id = Number((e.detail.item as HTMLElement).dataset.id);
+                    // the event fires before the item flips its own `expanded`
+                    if (!Number.isNaN(id)) setNodeExpanded(id, !e.detail.item.expanded);
+                }}
+                onSelectionChange={(e) => {
+                    const raw = (e.detail.targetItem as HTMLElement).dataset.id ?? ROOT_ID;
+                    onChange(raw === ROOT_ID ? '' : Number(raw));
+                }}
             >
-                <Box sx={{ width: 32, flexShrink: 0 }} />
-                <Radio size="small" checked={value === ''} onChange={() => onChange('')} sx={{ p: 0.5 }} />
-                <Typography variant="body2" sx={{ fontStyle: 'italic', cursor: 'pointer' }} onClick={() => onChange('')}>
-                    {rootLabel}
-                </Typography>
-            </Stack>
-            {tree.map((node) => renderNode(node, 0))}
-        </Box>
+                <TreeItem data-id={ROOT_ID} text={rootLabel} selected={value === ''} style={{ fontStyle: 'italic' }} />
+                {tree.map(renderNode)}
+            </Tree>
+        </div>
     );
 }

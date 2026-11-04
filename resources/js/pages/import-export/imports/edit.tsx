@@ -1,37 +1,21 @@
-import ImportFilePreview from '@/components/import-export/import-file-preview';
 import { FioriFileUploader } from '@/components/fiori-file-uploader';
-import AppLayout from '@/layouts/app-layout';
+import { FioriField, FioriFormErrorSummary, FioriFormGroup, ui5ValueState, valueStateOf } from '@/components/fiori-form';
+import { followLink } from '@/components/import-export/follow-link';
+import ImportFilePreview from '@/components/import-export/import-file-preview';
 import { useUnsavedChangesGuard } from '@/hooks/use-unsaved-changes-guard';
+import AppLayout from '@/layouts/app-layout';
+import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import SaveIcon from '@mui/icons-material/Save';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import DownloadIcon from '@mui/icons-material/Download';
-import {
-    Alert,
-    Box,
-    Button,
-    Checkbox,
-    Chip,
-    CircularProgress,
-    FormControl,
-    FormControlLabel,
-    FormHelperText,
-    InputLabel,
-    Menu,
-    MenuItem,
-    Paper,
-    Select,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import '@ui5/webcomponents-icons/dist/download.js';
+import '@ui5/webcomponents-icons/dist/nav-back.js';
+import '@ui5/webcomponents-icons/dist/play.js';
+import '@ui5/webcomponents-icons/dist/save.js';
+import '@ui5/webcomponents-icons/dist/slim-arrow-down.js';
+import { Button, CheckBox, Input, Menu, MenuItem, Option, Select, Tag, Title } from '@ui5/webcomponents-react';
 import { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FIORI, fioriCardSx, fioriDefaultSx, fioriEmphasizedSx, fioriGhostSx } from '@/lib/fiori-style';
-import { type CodeEditState, codeHintKey, normalizeCodeInput } from '@/lib/code-field';
+import styles from '../import-export.module.css';
 
 interface ImportConfigItem {
     id: number;
@@ -90,10 +74,10 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
     };
 
     const [activeAction, setActiveAction] = useState<'save' | 'run' | null>(null);
-    const [sampleAnchor, setSampleAnchor] = useState<HTMLElement | null>(null);
+    const [sampleMenuOpen, setSampleMenuOpen] = useState(false);
 
-    const submit = (e: FormEvent) => {
-        e.preventDefault();
+    const submit = (e?: FormEvent) => {
+        e?.preventDefault();
         setActiveAction('save');
         transform((formData) => ({ ...formData, _method: 'put' }));
         skipNavigationGuardRef.current = true;
@@ -106,8 +90,8 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
         });
     };
 
-    const submitAndRun = (e: FormEvent) => {
-        e.preventDefault();
+    const submitAndRun = (e?: FormEvent) => {
+        e?.preventDefault();
         setActiveAction('run');
         transform((formData) => ({ ...formData, _method: 'put', run: true }));
         skipNavigationGuardRef.current = true;
@@ -124,227 +108,224 @@ export default function ImportEdit({ config, types, requiredColumnsByType, colum
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${t('editImport')}: ${config.code}`} />
-            <Box component="form" onSubmit={submit} sx={{ p: { xs: 2, md: 4 }, width: '100%', bgcolor: FIORI.pageBg, minHeight: '100%' }}>
-                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-                    <Typography variant="h5" fontWeight={600} sx={{ color: FIORI.textPrimary }}>{t('editImport')}</Typography>
-                    <Stack direction="row" spacing={1}>
-                        <Button component={Link} href="/import-export/imports" variant="outlined" startIcon={<ArrowBackIcon />} sx={fioriDefaultSx}>
+            <form onSubmit={submit} className={styles.page}>
+                <div className={styles.header}>
+                    <Title level="H3" size="H3" wrappingType="Normal">
+                        {t('editImport')}
+                    </Title>
+                    <div className={styles.actions}>
+                        <Button icon="nav-back" onClick={() => router.visit('/import-export/imports')}>
                             {tCatalog('back')}
                         </Button>
-                        <Button type="submit" variant="outlined" disabled={processing} startIcon={activeAction === 'save' ? <CircularProgress size={16} /> : <SaveIcon />} sx={fioriDefaultSx}>
+                        <Button icon="save" disabled={processing} loading={activeAction === 'save'} loadingDelay={0} onClick={() => submit()}>
                             {activeAction === 'save' ? tCatalog('saving') : tCatalog('save')}
                         </Button>
                         <Button
-                            variant="contained"
+                            design="Emphasized"
+                            icon="play"
                             disabled={processing}
-                            startIcon={activeAction === 'run' ? <CircularProgress size={16} color="inherit" /> : <PlayArrowIcon />}
-                            onClick={submitAndRun}
-                            sx={fioriEmphasizedSx}
+                            loading={activeAction === 'run'}
+                            loadingDelay={0}
+                            onClick={() => submitAndRun()}
                         >
                             {t('importNow')}
                         </Button>
-                    </Stack>
-                </Stack>
+                    </div>
+                </div>
 
-                <Stack spacing={2}>
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{tCatalog('generalTitle')}</Typography>
-                        <Stack spacing={3}>
-                            <TextField
-                                label={tCatalog('code')}
-                                fullWidth
+                <div className={styles.stack}>
+                    <FioriFormGroup title={tCatalog('generalTitle')}>
+                        <FioriField
+                            label={tCatalog('code')}
+                            htmlFor="import-code"
+                            valueState={valueStateOf(errors.code)}
+                            message={errors.code}
+                            hint={tCatalog(codeHintKey({ canEditCode, codeLocked }))}
+                        >
+                            <Input
+                                id="import-code"
+                                className={styles.fullWidth}
                                 value={data.code}
                                 disabled={!canEditCode}
-                                onChange={(e) => setData('code', normalizeCodeInput(e.target.value))}
-                                error={!!errors.code}
-                                helperText={errors.code || tCatalog(codeHintKey({ canEditCode, codeLocked }))}
-                                inputProps={{ maxLength: 100 }}
+                                maxlength={100}
+                                valueState={ui5ValueState(valueStateOf(errors.code))}
+                                onInput={(e) => setData('code', normalizeCodeInput(e.target.value))}
                             />
-                            <FormControl fullWidth>
-                                <InputLabel id="import-type-label">{t('typeLabel')}</InputLabel>
-                                <Select
-                                    labelId="import-type-label"
-                                    label={t('typeLabel')}
-                                    value={data.type}
-                                    onChange={(e) => setData('type', e.target.value)}
+                        </FioriField>
+                        <FioriField label={t('typeLabel')} htmlFor="import-type">
+                            <Select
+                                id="import-type"
+                                className={styles.fullWidth}
+                                value={data.type}
+                                onChange={(e) => setData('type', e.detail.selectedOption.value ?? data.type)}
+                            >
+                                {types.map((type) => (
+                                    <Option key={type} value={type}>
+                                        {typeLabel(type)}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
+                        <FioriField label={t('sourceLocaleLabel')} htmlFor="import-source-locale" hint={t('sourceLocaleHelp')}>
+                            <Select
+                                id="import-source-locale"
+                                className={styles.fullWidth}
+                                value={data.source_locale}
+                                onChange={(e) => setData('source_locale', e.detail.selectedOption.value ?? data.source_locale)}
+                            >
+                                {locales.map((l) => (
+                                    <Option key={l.code} value={l.code}>
+                                        {l.display_name ?? l.code}
+                                    </Option>
+                                ))}
+                            </Select>
+                        </FioriField>
+                        <FioriField label={t('uploadedFile')} fullWidth>
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                <div style={{ flex: 1, minWidth: 220 }}>
+                                    <FioriFileUploader
+                                        files={data.file ? [data.file] : []}
+                                        onFilesChange={(files) => setData('file', files[0] ?? null)}
+                                        placeholder={t('chooseFile')}
+                                        accept=".csv,.xls,.xlsx"
+                                        error={errors.file}
+                                    />
+                                    {!data.file && (
+                                        <span className={styles.hint}>
+                                            {t('currentFile')}:{' '}
+                                            {config.source_file_name ?? config.source_file_path?.split('/').pop() ?? t('noFileUploaded')}
+                                        </span>
+                                    )}
+                                </div>
+                                <Button
+                                    id="import-sample-menu-opener"
+                                    design="Transparent"
+                                    icon="download"
+                                    endIcon="slim-arrow-down"
+                                    style={{ flexShrink: 0 }}
+                                    onClick={() => setSampleMenuOpen((open) => !open)}
                                 >
-                                    {types.map((type) => (
-                                        <MenuItem key={type} value={type}>{typeLabel(type)}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-
-                            <FormControl fullWidth>
-                                <InputLabel id="import-source-locale-label">{t('sourceLocaleLabel')}</InputLabel>
-                                <Select
-                                    labelId="import-source-locale-label"
-                                    label={t('sourceLocaleLabel')}
-                                    value={data.source_locale}
-                                    onChange={(e) => setData('source_locale', e.target.value)}
+                                    {t('downloadSample')}
+                                </Button>
+                                <Menu
+                                    opener="import-sample-menu-opener"
+                                    open={sampleMenuOpen}
+                                    onClose={() => setSampleMenuOpen(false)}
+                                    onItemClick={(e) => {
+                                        const format = e.detail.text === 'XLSX' ? 'xlsx' : 'csv';
+                                        setSampleMenuOpen(false);
+                                        followLink(`/import-export/imports/sample/${data.type}?format=${format}`);
+                                    }}
                                 >
-                                    {locales.map((l) => (
-                                        <MenuItem key={l.code} value={l.code}>{l.display_name ?? l.code}</MenuItem>
+                                    <MenuItem text="CSV" />
+                                    <MenuItem text="XLSX" />
+                                </Menu>
+                            </div>
+                            {(requiredColumnsByType[data.type] ?? []).length > 0 && (
+                                <div className={styles.row} style={{ marginTop: '0.5rem' }}>
+                                    <span className={styles.smallText}>{t('requiredFields')}:</span>
+                                    {requiredColumnsByType[data.type].map((column) => (
+                                        <Tag key={column} design="Neutral" hideStateIcon>
+                                            {columnLabelsByType[data.type]?.[column] ?? column}
+                                        </Tag>
                                     ))}
-                                </Select>
-                                <FormHelperText>{t('sourceLocaleHelp')}</FormHelperText>
-                            </FormControl>
-
-                            <Box>
-                                <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <FioriFileUploader
-                                            files={data.file ? [data.file] : []}
-                                            onFilesChange={(files) => setData('file', files[0] ?? null)}
-                                            placeholder={t('chooseFile')}
-                                            accept=".csv,.xls,.xlsx"
-                                            error={errors.file}
-                                        />
-                                        {!data.file && (
-                                            <Typography variant="caption" sx={{ color: FIORI.textSecondary, display: 'block', mt: 0.5 }}>
-                                                {t('currentFile')}: {config.source_file_name ?? config.source_file_path?.split('/').pop() ?? t('noFileUploaded')}
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                    <Button
-                                        variant="text"
-                                        startIcon={<DownloadIcon />}
-                                        endIcon={<ArrowDropDownIcon />}
-                                        onClick={(e) => setSampleAnchor(e.currentTarget)}
-                                        sx={{ ...fioriGhostSx, flexShrink: 0 }}
-                                    >
-                                        {t('downloadSample')}
-                                    </Button>
-                                    <Menu anchorEl={sampleAnchor} open={Boolean(sampleAnchor)} onClose={() => setSampleAnchor(null)}>
-                                        <MenuItem
-                                            component="a"
-                                            href={`/import-export/imports/sample/${data.type}?format=csv`}
-                                            onClick={() => setSampleAnchor(null)}
-                                        >
-                                            CSV
-                                        </MenuItem>
-                                        <MenuItem
-                                            component="a"
-                                            href={`/import-export/imports/sample/${data.type}?format=xlsx`}
-                                            onClick={() => setSampleAnchor(null)}
-                                        >
-                                            XLSX
-                                        </MenuItem>
-                                    </Menu>
-                                </Stack>
-                                {(requiredColumnsByType[data.type] ?? []).length > 0 && (
-                                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mt: 1 }}>
-                                        <Typography variant="caption" sx={{ color: FIORI.textSecondary }}>
-                                            {t('requiredFields')}:
-                                        </Typography>
-                                        {requiredColumnsByType[data.type].map((column) => (
-                                            <Chip
-                                                key={column}
-                                                label={columnLabelsByType[data.type]?.[column] ?? column}
-                                                size="small"
-                                                variant="outlined"
-                                                sx={{ borderColor: FIORI.borderStrong, borderRadius: '6px', color: FIORI.textPrimary }}
-                                            />
-                                        ))}
-                                    </Stack>
-                                )}
-                                <ImportFilePreview file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} />
-                            </Box>
-
-                            <TextField
-                                label={t('imageDirectoryPath')}
-                                fullWidth
+                                </div>
+                            )}
+                            <ImportFilePreview file={data.file} fileFormat={data.file_format} fieldSeparator={data.field_separator} />
+                        </FioriField>
+                        <FioriField
+                            label={t('imageDirectoryPath')}
+                            htmlFor="import-image-dir"
+                            valueState={valueStateOf(errors.image_directory_path)}
+                            message={errors.image_directory_path}
+                        >
+                            <Input
+                                id="import-image-dir"
+                                className={styles.fullWidth}
                                 value={data.image_directory_path}
-                                onChange={(e) => setData('image_directory_path', e.target.value)}
-                                error={Boolean(errors.image_directory_path)}
-                                helperText={errors.image_directory_path}
+                                valueState={ui5ValueState(valueStateOf(errors.image_directory_path))}
+                                onInput={(e) => setData('image_directory_path', e.target.value)}
                             />
-                        </Stack>
-                    </Paper>
+                        </FioriField>
+                    </FioriFormGroup>
 
-                    <Paper elevation={0} sx={{ ...fioriCardSx, p: 3 }}>
-                        <Typography variant="h6" fontWeight={600} sx={{ mb: 2, color: FIORI.textPrimary }}>{t('settingsTitle')}</Typography>
-                        <Stack spacing={3}>
-                            <FormControl fullWidth>
-                                <InputLabel id="import-action-label">{t('action')}</InputLabel>
-                                <Select
-                                    labelId="import-action-label"
-                                    label={t('action')}
-                                    value={data.action}
-                                    onChange={(e) => setData('action', e.target.value)}
-                                >
-                                    <MenuItem value="create_update">{t('actionCreateUpdate')}</MenuItem>
-                                    <MenuItem value="delete">{t('actionDelete')}</MenuItem>
-                                </Select>
-                            </FormControl>
-
-                            <FormControl fullWidth>
-                                <InputLabel id="import-validation-label">{t('validationStrategy')}</InputLabel>
-                                <Select
-                                    labelId="import-validation-label"
-                                    label={t('validationStrategy')}
-                                    value={data.validation_strategy}
-                                    onChange={(e) => setData('validation_strategy', e.target.value)}
-                                >
-                                    <MenuItem value="skip_errors">{t('validationStrategySkip')}</MenuItem>
-                                    <MenuItem value="stop_on_errors">{t('validationStrategyStop')}</MenuItem>
-                                </Select>
-                            </FormControl>
-
-                            <Box>
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={data.ai_translate}
-                                            onChange={(e) => setData('ai_translate', e.target.checked)}
-                                        />
-                                    }
-                                    label={t('aiTranslate')}
-                                />
-                                <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{t('aiTranslateHelp')}</FormHelperText>
-                            </Box>
-
-                            <TextField
-                                label={t('allowedErrors')}
-                                type="number"
-                                fullWidth
-                                value={data.allowed_errors}
-                                onChange={(e) => setData('allowed_errors', Number(e.target.value))}
-                                error={Boolean(errors.allowed_errors)}
-                                helperText={errors.allowed_errors}
+                    <FioriFormGroup title={t('settingsTitle')}>
+                        <FioriField label={t('action')} htmlFor="import-action">
+                            <Select
+                                id="import-action"
+                                className={styles.fullWidth}
+                                value={data.action}
+                                onChange={(e) => setData('action', e.detail.selectedOption.value ?? data.action)}
+                            >
+                                <Option value="create_update">{t('actionCreateUpdate')}</Option>
+                                <Option value="delete">{t('actionDelete')}</Option>
+                            </Select>
+                        </FioriField>
+                        <FioriField label={t('validationStrategy')} htmlFor="import-validation">
+                            <Select
+                                id="import-validation"
+                                className={styles.fullWidth}
+                                value={data.validation_strategy}
+                                onChange={(e) => setData('validation_strategy', e.detail.selectedOption.value ?? data.validation_strategy)}
+                            >
+                                <Option value="skip_errors">{t('validationStrategySkip')}</Option>
+                                <Option value="stop_on_errors">{t('validationStrategyStop')}</Option>
+                            </Select>
+                        </FioriField>
+                        <FioriField label={t('aiTranslate')} htmlFor="import-ai-translate" hint={t('aiTranslateHelp')}>
+                            <CheckBox
+                                id="import-ai-translate"
+                                accessibleName={t('aiTranslate')}
+                                checked={data.ai_translate}
+                                onChange={(e) => setData('ai_translate', e.target.checked)}
                             />
-
-                            <FormControl fullWidth>
-                                <InputLabel id="import-format-label">{t('fileFormat')}</InputLabel>
-                                <Select
-                                    labelId="import-format-label"
-                                    label={t('fileFormat')}
-                                    value={data.file_format}
-                                    onChange={(e) => setData('file_format', e.target.value)}
-                                >
-                                    <MenuItem value="csv">CSV</MenuItem>
-                                    <MenuItem value="xls">XLS</MenuItem>
-                                    <MenuItem value="xlsx">XLSX</MenuItem>
-                                </Select>
-                            </FormControl>
-
-                            <TextField
-                                label={t('fieldSeparator')}
-                                fullWidth
+                        </FioriField>
+                        <FioriField
+                            label={t('allowedErrors')}
+                            htmlFor="import-allowed-errors"
+                            valueState={valueStateOf(errors.allowed_errors)}
+                            message={errors.allowed_errors}
+                        >
+                            <Input
+                                id="import-allowed-errors"
+                                type="Number"
+                                className={styles.fullWidth}
+                                value={String(data.allowed_errors)}
+                                valueState={ui5ValueState(valueStateOf(errors.allowed_errors))}
+                                onInput={(e) => setData('allowed_errors', Number(e.target.value))}
+                            />
+                        </FioriField>
+                        <FioriField label={t('fileFormat')} htmlFor="import-format">
+                            <Select
+                                id="import-format"
+                                className={styles.fullWidth}
+                                value={data.file_format}
+                                onChange={(e) => setData('file_format', e.detail.selectedOption.value ?? data.file_format)}
+                            >
+                                <Option value="csv">CSV</Option>
+                                <Option value="xls">XLS</Option>
+                                <Option value="xlsx">XLSX</Option>
+                            </Select>
+                        </FioriField>
+                        <FioriField
+                            label={t('fieldSeparator')}
+                            htmlFor="import-field-separator"
+                            valueState={valueStateOf(errors.field_separator)}
+                            message={errors.field_separator}
+                        >
+                            <Input
+                                id="import-field-separator"
+                                className={styles.fullWidth}
                                 value={data.field_separator}
-                                onChange={(e) => setData('field_separator', e.target.value)}
-                                error={Boolean(errors.field_separator)}
-                                helperText={errors.field_separator}
+                                valueState={ui5ValueState(valueStateOf(errors.field_separator))}
+                                onInput={(e) => setData('field_separator', e.target.value)}
                             />
-                        </Stack>
-                    </Paper>
-                </Stack>
+                        </FioriField>
+                    </FioriFormGroup>
+                </div>
 
-                {Object.keys(errors).length > 0 && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        {tCatalog('correctHighlightedFields')}
-                    </Alert>
-                )}
-            </Box>
+                <FioriFormErrorSummary errors={errors} message={tCatalog('correctHighlightedFields')} style={{ marginTop: '1rem' }} />
+            </form>
         </AppLayout>
     );
 }
